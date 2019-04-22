@@ -5,6 +5,7 @@ import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.math._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.retiming._
@@ -232,13 +233,13 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixMin(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux(($a < $b), $a, $b).r")
     case FixMax(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux(($a > $b), $a, $b).r")
-    case FixToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFix", Some(bitWidth(lhs.tp))))
-    case FixToFixSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixSat", Some(bitWidth(lhs.tp))))
-    case FixToFixUnb(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnb", Some(bitWidth(lhs.tp))))
-    case FixToFixUnbSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnbSat", Some(bitWidth(lhs.tp))))
-    case FltToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFlt", Some(bitWidth(lhs.tp))))
-    case FixToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFlt", Some(bitWidth(lhs.tp))))
-    case FltToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFix", Some(bitWidth(lhs.tp))))
+    case FixToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFix", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFixSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixSat", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFixUnb(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnb", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFixUnbSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnbSat", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FltToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFlt", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFlt", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FltToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFix", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
     case FltRecip(x) => MathDL(lhs, rhs, latencyOption("FltRecip", Some(bitWidth(lhs.tp)))) 
     
     case And(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := $a & $b")

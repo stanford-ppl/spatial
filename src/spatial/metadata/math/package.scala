@@ -20,6 +20,9 @@ package object math {
 
     def inCycle: Boolean = metadata[InCycle](s).map(_.is).getOrElse(false)
     def inCycle_=(is: Boolean): Unit = metadata.add(s, InCycle(is))
+
+    def getSrcType: Option[Type[_]] = metadata[SrcType](s).map(_.typ)
+    def setSrcType(typ: Type[_]): Unit = metadata.add(s, SrcType(typ))
     
     def getResidual: Option[ResidualGenerator] = metadata[Residual](s.trace).map(_.equ)
     @stateful def residual: ResidualGenerator = getResidual.getOrElse(

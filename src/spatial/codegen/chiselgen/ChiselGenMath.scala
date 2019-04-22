@@ -37,7 +37,7 @@ trait ChiselGenMath extends ChiselGenCommon {
       case UnbDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Unbiased, Wrapping, "$lhs")).r""")
       case SatDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Truncate, Saturating, "$lhs")).r""")
       case UnbSatDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Unbiased, Saturating, "$lhs")).r""")
-      case FixMod(x,y) => emit(src"""$lhs.r := (Math.mod($x, $y, $lat, $backpressure, "$lhs")).r""")
+      case FixMod(x,y) => emit(src"""$lhs.r := (Math.mod($x, $y, $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
       case FixRecip(x) => emit(src"""$lhs.r := (${lhs}_one.div($x, $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
       case FixSqrt(x) => emit(src"""$lhs.r := Math.sqrt($x, $lat, $backpressure,"$lhs").r""")
       case FixSin(x) => emit(src"""$lhs.r := Math.sin($x, $lat, $backpressure,"$lhs").r""")

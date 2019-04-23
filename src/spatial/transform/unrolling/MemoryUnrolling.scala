@@ -85,7 +85,10 @@ trait MemoryUnrolling extends UnrollingBase {
     * Duplicates are registered internally for each lane (orig, dispatch#) -> dup.
     */
   def unrollMemory(mem: Sym[_])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    lanes.duplicateMem(mem){_ => duplicateMemory(mem)}
+    val dups = lanes.duplicateMem(mem){_ => duplicateMemory(mem)}
+    if (lanes.vectorize && dups.distinct.size != 1) { //TODO: Can we check this earlier in MemoryConfiguration?
+      error(s"Invalid duplication for $mem for plasticine. Inconsisten duplications across lanes ${dups}")
+    }
     Nil // No correct default substitution for mem - have to know dispatch number of the access
   }
 

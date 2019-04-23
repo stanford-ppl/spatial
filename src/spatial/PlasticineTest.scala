@@ -362,6 +362,10 @@ trait PlasticineTest extends DSLTest { test =>
   }
 
   case object Tst extends PIRBackend {
+    private val genName = name + "_" + property("project").get
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
     val row:Int=14
     val col:Int=14
     def runPasses():Result = {

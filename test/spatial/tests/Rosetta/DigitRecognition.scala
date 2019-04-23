@@ -5,7 +5,7 @@ import spatial.targets._
 import utils.implicits._
 
 
-@spatial class DigitRecognitionV1 extends SpatialTest {
+@spatial class DigitRecognition extends SpatialTest {
 	override def runtimeArgs: Args = "18000 2000"
 
     type LabelType	 		= UInt8
@@ -349,7 +349,8 @@ import utils.implicits._
 
 					Foreach(num_training by par_factor) { train_inx  =>
 
-						Foreach(par_factor by 1 par par_factor) { p => 
+						List.tabulate(par_factor) { p =>
+						//Foreach(par_factor by 1 par par_factor) { p => 
 							val curr_train_inx = train_inx * par_factor + p
 							update_knn(test_local1, test_local2,
 									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
@@ -358,7 +359,8 @@ import utils.implicits._
 
 					}
 					
-					Foreach(par_factor by 1 par par_factor)  { p =>
+					//Foreach(par_factor by 1 par par_factor)  { p =>
+					List.tabulate(par_factor) { p =>					
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 					
 					}
 					/*

@@ -8,7 +8,7 @@ fi
 
 
 rm -r gen/$APP
-bin/spatial $APP --fpga=VCS --dot --instrument
+bin/spatial $APP --synth --fpga=VCS  --vv --instrumentation
 cd gen/$APP
 make 
 bash run.sh 18000 2000 0

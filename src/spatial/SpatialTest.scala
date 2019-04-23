@@ -32,7 +32,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object Scala extends Backend(
     name = "Scala",
-    args = "--sim",
+    args = "--sim --dot",
     make = "make",
     run  = "bash scripts/regression_run.sh scalasim",
     model = "noninteractive"

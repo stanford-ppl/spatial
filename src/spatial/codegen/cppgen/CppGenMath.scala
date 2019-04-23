@@ -99,6 +99,7 @@ trait CppGenMath extends CppGenCommon {
     case FltExp(x)  => emit(src"${lhs.tp} $lhs = exp($x);")
     case FltSqrt(x) => emit(src"${lhs.tp} $lhs = sqrt($x);")
     case FixSqrt(x) => emit(src"${lhs.tp} $lhs = sqrt($x);")
+    case FltSigmoid(x)  => emit(src"${lhs.tp} $lhs = 1.0 / (exp(-$x) + 1);")
 
     case FltPow(x,exp) => emit(src"${lhs.tp} $lhs = pow($x, $exp);")
     case FltSin(x)     => emit(src"${lhs.tp} $lhs = sin($x);")

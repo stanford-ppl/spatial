@@ -391,3 +391,58 @@ case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User
   * Default: false
   */
 case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)
+
+/** Enumeration of banking views.  Hierarchical means each dimension gets its own bank address.  Flat means all
+  * dimensions are flattened and there is only one scalar representing bank address
+  */
+sealed trait BankingView {
+  def expand: Seq[List[Int]]
+}
+case class Flat(rank: Int) extends BankingView {
+  def expand: Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
+}
+case class Hierarchical(rank: Int) extends BankingView {
+  def expand: Seq[List[Int]] = Seq.tabulate(rank){i => List(i)}
+}
+
+/** Enumeration of how to search for possible number of banks */
+sealed trait NStrictness {
+  def expand: List[Int]
+}
+case class NPowersOf2(min: Int, max: Int, dims: List[Int], numAccesses: Int) extends NStrictness {
+  def expand: List[Int] = (min to max).filter(isPow2(_)).toList
+}
+case class NBestGuess(min: Int, max: Int, dims: List[Int], numAccesses: Int) extends NStrictness {
+  def expand: List[Int] = { // TODO
+    List()
+  }
+}
+case class NRelaxed(min: Int, max: Int, dims: List[Int], numAccesses: Int) extends NStrictness {
+  def expand: List[Int] = (min to max).filter(!isPow2(_)).toList
+}
+
+/** Enumeration of how to search for possible number of banks */
+sealed trait AlphaStrictness {
+  def expand: Seq[List[Int]]
+}
+case class AlphaPowersOf2(min: Int, max: Int, dims: List[Int], N: Int) extends AlphaStrictness {
+  def expand: Seq[List[Int]] = Seq() //TODO
+}
+case class AlphaBestGuess(min: Int, max: Int, dims: List[Int], N: Int) extends AlphaStrictness {
+  private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+    for(n <- 2 to number if number % n == 0) {
+      return factorize(number / n, list :+ n)
+    }
+    list
+  }
+  def expand: Seq[List[Int]] = { // TODO
+    Seq()
+    // val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product) 
+    // val dimBased = Seq.tabulate(dims.length){i => dims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N) 
+    // (accessBased ++ dimBased).uniqueModN(N)
+  }
+}
+case class AlphaRelaxed(min: Int, max: Int, dims: List[Int], N: Int) extends AlphaStrictness {
+  def expand: Seq[List[Int]] = Seq() //TODO
+}
+

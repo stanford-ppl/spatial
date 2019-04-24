@@ -46,6 +46,8 @@ trait PIRGenFixPt extends PIRCodegen {
     case FixMin(x,y)          => genOp(lhs)
     case FixToFix(x, fmt)     => genOp(lhs, inputs=Some(Seq(x)))
     case FixToFlt(x, fmt)     => genOp(lhs, inputs=Some(Seq(x)))
+    case FixToFixUnb(x, fmt)  => genOp(lhs, inputs=Some(Seq(x)))
+    case FixToFixSat(x, fmt)  => genOp(lhs, inputs=Some(Seq(x)))
     case FixToText(x)         => genOp(lhs)
     //case TextToFix(x, _) =>
     case FixRandom(Some(max)) => genOp(lhs)

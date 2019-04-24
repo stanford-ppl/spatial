@@ -13,8 +13,8 @@ trait PIRGenBits extends PIRCodegen {
       val op = s"OneHotMux${selects.size}"
       genOp(lhs, op=Some(op))
 
-    //case e@DataAsBits(a) =>
-    //case BitsAsData(v,a) => 
+    case e@DataAsBits(a) => alias(lhs)(a)
+    case BitsAsData(v,a) => genOp(lhs, inputs=Some(List(v)))
     case _ => super.genAccel(lhs,rhs)
   }
 

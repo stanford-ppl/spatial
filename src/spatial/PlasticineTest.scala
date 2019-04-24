@@ -153,6 +153,9 @@ trait PlasticineTest extends DSLTest { test =>
       } else if (line.contains("PASS: false")) {
         println(line)
         Fail
+      } else if (line.contains("exception")) {
+        println(line)
+        Fail
       } 
       else Unknown
     }

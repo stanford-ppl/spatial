@@ -434,7 +434,6 @@ def collectSMData():
 					sym = re.search('id=(x[0-9]+)>', line).group(1)
 					current = Node(sym + "_" + appname, sym, "CounterChainNew"); 
 					ctrs = [x for x in list(set(re.findall('x[0-9]+',line))) if x != sym]
-					print "want %s" % ','.join(ctrs) 
 					inctr = 0
 					for ctr in ctrs:
 						cc = [x for x in ctr_pool if x.localname == ctr][0]

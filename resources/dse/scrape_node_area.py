@@ -11,16 +11,16 @@ import sys
 ################
 ## PROPERTIES ##
 ################
-requirerpt = False # Filter out apps that have no synth log?
+requirerpt = True # Filter out apps that have no synth log?
 target = 'zcu' # i.e. out0/verilog-zcu/
 capstarget = 'ZCU'  #i.e. gen/ZCU/
 scrapetype = 'par' # either scrape synth_ or par_ log
-# spatialdir = '/home/mattfel/regression/synth/' + target + '/current-spatial/spatial/'
-# gendir = spatialdir + 'gen/' + capstarget
-# logdir = spatialdir + 'logs/' + capstarget
-spatialdir='/home/mattfel/sp_area/spatial/out0'
-gendir = spatialdir
-logdir = spatialdir + 'logs/'
+spatialdir = '/home/mattfel/regression/synth/' + target + '/last-spatial/spatial/'
+gendir = spatialdir + 'gen/' + capstarget
+logdir = spatialdir + 'logs/' + capstarget
+# spatialdir='/home/mattfel/sp_area/spatial/out0'
+# gendir = spatialdir
+# logdir = spatialdir + 'logs/'
 
 
 
@@ -421,10 +421,20 @@ def collectSMData():
 					except: pass
 					ctr_pool = ctr_pool + [current]
 					current = None
+				if (line.find("ForeverNew") >= 0):
+					sym = re.search('id=(x[0-9]+)>', line).group(1)
+					current = Node(sym + "_" + appname, sym, "ForeverNew"); 
+					setattr(current, "cchain_ctr0par", '1')
+					setattr(current, "cchain_ctr0start", '0')
+					setattr(current, "cchain_ctr0stop", 'inf')
+					setattr(current, "cchain_ctr0step", '1')
+					ctr_pool = ctr_pool + [current]
+					current = None
 				elif (line.find("CounterChainNew") >= 0):
 					sym = re.search('id=(x[0-9]+)>', line).group(1)
 					current = Node(sym + "_" + appname, sym, "CounterChainNew"); 
 					ctrs = [x for x in list(set(re.findall('x[0-9]+',line))) if x != sym]
+					print "want %s" % ','.join(ctrs) 
 					inctr = 0
 					for ctr in ctrs:
 						cc = [x for x in ctr_pool if x.localname == ctr][0]

@@ -11,7 +11,8 @@ abstract class BankingStrategy {
     rank:   Int,                           // Rank of memory to be banked
     reads:  Set[Set[AccessMatrix]],        // Reads to this banked memory
     writes: Set[Set[AccessMatrix]],        // Writes to this banked memory
-    dimGrps: Seq[Seq[Seq[Int]]]            // Sequence of dimension groupings
-  ): Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]]  // Mapping of Sequence of possible multidimensional bankings to the reads associated with it
+    attemptDirectives: Seq[BankingOptions] // Enumeration of which banking directives to solve for
+
+  ): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]]  // Mapping of a set of banking directives to a mapping of squence of possible multidimensional bankings to the reads associated with it
 
 }

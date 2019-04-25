@@ -392,57 +392,101 @@ case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User
   */
 case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)
 
+/** Container for describing a set of banking options */
+case class BankingOptions(view: BankingView, N: NStrictness, alpha: AlphaStrictness, regroup: RegroupDims)
+
+/** Put each read access matrix in its own group, forcing compiler to only bank for writers and make a new duplicate for
+  * every read
+  */
+object RegroupHelper {
+  def regroupAny(rank: Int): List[RegroupDims] = List.tabulate(rank){i => i}.toSet.subsets.map{x => RegroupDims(x.toList)}.toList
+  def regroupAll(rank: Int): List[RegroupDims] = List(RegroupDims(List.tabulate(rank){i => i}))
+  def regroupNone: List[RegroupDims] = List(RegroupDims(List()))
+}
+case class RegroupDims(dims: List[Int])
+
 /** Enumeration of banking views.  Hierarchical means each dimension gets its own bank address.  Flat means all
   * dimensions are flattened and there is only one scalar representing bank address
   */
 sealed trait BankingView {
-  def expand: Seq[List[Int]]
+  def expand(): Seq[List[Int]]
 }
 case class Flat(rank: Int) extends BankingView {
-  def expand: Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
+  def expand(): Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
 }
-case class Hierarchical(rank: Int) extends BankingView {
-  def expand: Seq[List[Int]] = Seq.tabulate(rank){i => List(i)}
+case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends BankingView {
+  def expand(): Seq[List[Int]] = {
+    if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if view.get.contains(i) => List(i)}
+    else Seq.tabulate(rank){i => List(i)}
+  }
 }
 
 /** Enumeration of how to search for possible number of banks */
 sealed trait NStrictness {
-  def expand: List[Int]
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int]
 }
-case class NPowersOf2(min: Int, max: Int, dims: List[Int], numAccesses: Int) extends NStrictness {
-  def expand: List[Int] = (min to max).filter(isPow2(_)).toList
+case object NPowersOf2 extends NStrictness {
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
 }
-case class NBestGuess(min: Int, max: Int, dims: List[Int], numAccesses: Int) extends NStrictness {
-  def expand: List[Int] = { // TODO
-    List()
-  }
-}
-case class NRelaxed(min: Int, max: Int, dims: List[Int], numAccesses: Int) extends NStrictness {
-  def expand: List[Int] = (min to max).filter(!isPow2(_)).toList
-}
-
-/** Enumeration of how to search for possible number of banks */
-sealed trait AlphaStrictness {
-  def expand: Seq[List[Int]]
-}
-case class AlphaPowersOf2(min: Int, max: Int, dims: List[Int], N: Int) extends AlphaStrictness {
-  def expand: Seq[List[Int]] = Seq() //TODO
-}
-case class AlphaBestGuess(min: Int, max: Int, dims: List[Int], N: Int) extends AlphaStrictness {
+case object NBestGuess extends NStrictness {
   private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
     for(n <- 2 to number if number % n == 0) {
       return factorize(number / n, list :+ n)
     }
     list
   }
-  def expand: Seq[List[Int]] = { // TODO
-    Seq()
-    // val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product) 
-    // val dimBased = Seq.tabulate(dims.length){i => dims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N) 
-    // (accessBased ++ dimBased).uniqueModN(N)
+
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = { 
+    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}    
   }
 }
-case class AlphaRelaxed(min: Int, max: Int, dims: List[Int], N: Int) extends AlphaStrictness {
-  def expand: Seq[List[Int]] = Seq() //TODO
+case object NRelaxed extends NStrictness {
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = (min to max).filter(!isPow2(_)).toList
 }
 
+/** Enumeration of how to search for possible alpha vectors
+  * The three groups are:
+  * 1) All elements must be powers of 2
+  * 2) All elements composed of either:
+  *    - Number that evenly divides N
+  *    - Number that is the result of a product of some combination of stagedDims (Not sure if this increases the likelihood of valid schemes compared to option 1 only)
+  *    - Number that is also power of 2
+  *    (consider something like 96x3x3x96 sram N = 36, want to try things like alpha = 18,1,3,9)
+  * 3) Everything else
+  */
+sealed trait AlphaStrictness {
+  /** Creates all alpha vectors comprising of only values in the valids list */
+  def selectAs(valids: Seq[Int], dim: Int, prev: Seq[Int], rank: Int): Iterator[Seq[Int]] = {
+    if (dim < rank) {
+      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }
+    }
+    else valids.iterator.map{aR => prev :+ aR }
+  }
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]]
+}
+case object AlphaPowersOf2 extends AlphaStrictness {
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
+    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N)
+    selectAs(possibleAs, 1, Nil, rank)
+  }
+}
+case object AlphaBestGuess extends AlphaStrictness {
+  private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+    for(n <- 2 to number if number % n == 0) {
+      return factorize(number / n, list :+ n)
+    }
+    list
+  }
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = { 
+    val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product).uniqueModN(N)
+    val dimBased = Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N).uniqueModN(N)
+    val possibleAs = accessBased ++ dimBased
+    selectAs(possibleAs, 1, Nil, rank)
+  }
+}
+case object AlphaRelaxed extends AlphaStrictness {
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
+    val possibleAs = (0 to 2*N).uniqueModN(N)
+    selectAs(possibleAs, 1, Nil, rank).filterNot(_.forall(x => isPow2(x) || x == 1))
+  }
+}

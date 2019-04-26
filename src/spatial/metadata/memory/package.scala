@@ -30,6 +30,9 @@ package object memory {
     def segmentMapping: Map[Int,Int] = metadata[SegmentMapping](s).map(_.mapping).getOrElse(Map[Int,Int]())
     def segmentMapping_=(mapping: Map[Int,Int]): Unit = metadata.add(s, SegmentMapping(mapping))
     def removeSegmentMapping: Unit = metadata.add(s,SegmentMapping(Map[Int,Int]()))
+
+    def isInnerAccum: Boolean = metadata[InnerAccum](s).map(_.isInnerAccum).getOrElse(false)
+    def isInnerAccum_=(v: Boolean): Unit = metadata.add(s, InnerAccum(v))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {

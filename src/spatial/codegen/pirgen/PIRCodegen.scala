@@ -4,6 +4,7 @@ import argon._
 import argon.codegen.{Codegen, FileDependencies}
 import spatial.metadata.CLIArgs
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.lang._
 import spatial.util.spatialConfig
 
@@ -71,6 +72,11 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   def emitAccelFooter = {
     close("}")
     close("}")
+  }
+
+  override def quote(s: Sym[_]): String = s match {
+    case VecConst(vs) => src"Const(${vs}).tp(${s.tp})"
+    case s => super.quote(s)
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = c match {

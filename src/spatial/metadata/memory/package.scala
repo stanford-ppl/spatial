@@ -194,6 +194,8 @@ package object memory {
       case _ => 1
     }
 
+    def isDuplicatable: Boolean = (mem.isSRAM || mem.isReg || mem.isRegFile || mem.isLUT)
+
     def isLocalMem: Boolean = mem match {
       case _: LocalMem[_,_] => true
       case _ => false

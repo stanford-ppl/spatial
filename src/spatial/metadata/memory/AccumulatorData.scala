@@ -91,3 +91,9 @@ case class IterDiff(diff: Int) extends Data[IterDiff](SetBy.Analysis.Self)
 
   */
 case class SegmentMapping(mapping: Map[Int,Int]) extends Data[SegmentMapping](SetBy.Analysis.Self)
+
+/*
+ * A marker for inner loop accumulator. Used by pir
+ * */
+
+case class InnerAccum(isInnerAccum:Boolean) extends Data[InnerAccum](SetBy.Analysis.Self)

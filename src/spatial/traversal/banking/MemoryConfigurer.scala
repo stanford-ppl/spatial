@@ -37,7 +37,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   lazy val nStricts: Seq[NStrictness] = Seq(NPowersOf2, NBestGuess, NRelaxed)
   lazy val aStricts: Seq[AlphaStrictness] = Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
-  lazy val dimensionDuplication: Seq[RegroupDims] = RegroupHelper.regroupAny(rank)
+  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isDuplicatable) RegroupHelper.regroupAny(rank) else RegroupHelper.regroupNone
 
 
   def configure(): Unit = {
@@ -455,6 +455,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
     val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds.map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives)
+    bankings.toSeq.foreach{b => dbgs(s" Banking solution: ${b._1} -> "); b._2.toSeq.foreach{e => dbgs(s"  ${e._1.flatMap(_.map(_.access))} -> ${e._2}")}}
     val result = if (bankings.nonEmpty) {
       val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
 

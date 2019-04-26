@@ -31,9 +31,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   // Mapping to keep track of which AccessMatrix is rewritten as which
   private val accMatrixMapping = scala.collection.mutable.HashMap[AccessMatrix, AccessMatrix]()
   // Mapping te keep track of which rewritten AccessMatrix corresponds to which SparseMatrix for proper re-bundling after computing banking
-  private val sparseMatrixMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], AccessMatrix]()
+  private val sparseMatrixMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], Set[AccessMatrix]]()
   // Helper for replacing sparse matrix with its original access matrix
-  private def reverseAM(a: SparseMatrix[Idx]): AccessMatrix = accMatrixMapping(sparseMatrixMapping(a))
+  private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = sparseMatrixMapping(a).map(accMatrixMapping)
 
   /** Returns a Map from Seq(banking schemes) to the readers for these schemes.  
     * Generally, it will contain Map(Seq(flat_scheme, nested_scheme) -> all readers) but in 
@@ -137,10 +137,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
     }
 
-    def findSchemes(myReads: Set[Seq[SparseMatrix[Idx]]], myWrites: Set[Seq[SparseMatrix[Idx]]]): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
+    def findSchemes(myReads: Set[Seq[SparseMatrix[Idx]]], myWrites: Set[Seq[SparseMatrix[Idx]]], hostReads: Set[AccessMatrix]): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
       val myGrps = myReads ++ myWrites
-      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map(myReads.map{x => x.map(reverseAM).toSet} -> Seq(ModBanking.Unit(rank))))
-      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Map(attemptDirectives.head -> Map(myReads.map{x => x.map(reverseAM).toSet} -> Seq(ModBanking.Simple(1, Seq(1), 1, 0))))
+      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Simple(1, Seq(1), 1, 0))))
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(bankViews, nStricts, aStricts, dimensionDuplication) => 
           /* Example of what "rawBanking" could look like if we duplicate for dim0 and actually bank for dim1 on something that may look like:
@@ -169,7 +169,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               else {
                 findBanking(selGrps, axes, nStricts, aStricts, axes, stagedDims, mem)
               }
-            if (axes.forall(dimensionDuplication.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(Set(reverseAM(a))) -> axisBankingScheme)}}.toMap else Map(selRdGrps.map(_.map(reverseAM(_))) -> axisBankingScheme)
+            if (axes.forall(dimensionDuplication.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(reverseAM(a)) -> axisBankingScheme)}}.toMap else Map((selRdGrps.map(_.flatMap(reverseAM(_))) ++ Set(hostReads)) -> axisBankingScheme)
           }
           val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
           val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds.map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}.map{dup => (dup.map(_._1).reduce{_++_} -> dup.map(_._2))}.toMap
@@ -183,22 +183,31 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
     }
 
+    accMatrixMapping.clear()
+    sparseMatrixMapping.clear()
+
     // Step 1: Modify access matrices due to lockstep dephasing and compute new "actual" grps
     val readIterSubsts = generateSubstRules(allDephasingIters(reads))
     if (readIterSubsts.nonEmpty) dbgs(s"General read dephasing rules for $mem: ${readIterSubsts.mkString("\n  - ")}")
     val writeIterSubsts = generateSubstRules(allDephasingIters(writes))
     if (writeIterSubsts.nonEmpty) dbgs(s"General write dephasing rules for $mem: ${writeIterSubsts.mkString("\n  - ")}")
-    val newReads = rewriteAccesses(reads, readIterSubsts).map(_.toSeq.filter(_.parent != Ctrl.Host).map{x => 
-      sparseMatrixMapping += (x.matrix -> x)
-      x.matrix
+    val hostReads = scala.collection.mutable.Set[AccessMatrix]()
+    val newReads = rewriteAccesses(reads, readIterSubsts).map(_.toSeq.flatMap{x => 
+      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+      if (x.parent != Ctrl.Host) Some(x.matrix)
+      else {
+        hostReads += x
+        None
+      }
     }.distinct)
-    val newWrites = rewriteAccesses(writes, writeIterSubsts).map(_.toSeq.filter(_.parent != Ctrl.Host).map{x =>
-      sparseMatrixMapping += (x.matrix -> x)
-      x.matrix
+    val newWrites = rewriteAccesses(writes, writeIterSubsts).map(_.toSeq.flatMap{x => 
+      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+      if (x.parent != Ctrl.Host) Some(x.matrix)
+      else None
     }.distinct)
 
     // Step 2: Find schemes for these grps
-    findSchemes(newReads, newWrites)
+    findSchemes(newReads, newWrites, hostReads.toSet)
   }
 
   /** True if this is a valid banking strategy for the given sets of access matrices. */

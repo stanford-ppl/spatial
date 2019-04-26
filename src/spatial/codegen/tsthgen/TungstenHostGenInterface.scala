@@ -53,11 +53,11 @@ std::stringstream stopsim;
 
 
     case SetReg(reg, v) =>
-      emit(s"$reg = $v;")
+      emit(src"$reg = $v;")
     //case _: CounterNew[_] => 
     //case _: CounterChainNew => 
     case GetReg(reg)    =>
-      emit(s"auto $lhs = $reg;")
+      emit(src"auto $lhs = $reg;")
 
     case DRAMHostNew(dims, _) =>
       val tp = lhs.tp.typeArgs.head

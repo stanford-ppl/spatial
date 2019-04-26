@@ -443,23 +443,23 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   case class FullUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean, mop: Boolean) extends LoopUnroller {
     lazy val indices: Seq[Seq[I32]] = createBounds{ 
       case (ctr, List(i)) => I32(ctr.start.toInt + ctr.step.toInt*i)
-      case (ctr, ctrIdxs) => stage(FixVecConstNew[TRUE,_32,_0](ctrIdxs.map{i => ctr.start.toInt + ctr.step.toInt*i }))
+      case (ctr, ctrIdxs) => val i = boundVar[I32]; i.vecConst = ctrIdxs.map{i => ctr.start.toInt + ctr.step.toInt*i }; i
     }
     lazy val indexValids: Seq[Seq[Bit]] = 
-    if (mop) {
-      indices.zip(cchain.counters).map{case (is,ctr) =>
-        is.map{
-          case Const(i) => Bit(i < ctr.end.toInt)
-          case Def(FixVecConstNew(is)) => stage(BitVecConstNew(is.map { _ < ctr.end.toInt }))
+      if (mop) {
+        indices.zip(cchain.counters).map{case (is,ctr) =>
+          is.map {
+            case Const(i) => Bit(i < ctr.end.toInt)
+            case VecConst(is) => val b = boundVar[Bit]; b.vecConst = is.map { _.asInstanceOf[Int] < ctr.end.toInt }; b
+          }
+        }
+      } else {
+        indices.map { inds =>
+          inds.zip(cchain.counters).map { case (i, ctr) =>
+            i match {case Const(i) => Bit(i < ctr.end.toInt) }
+          }
         }
       }
-    } else {
-      indices.map { inds =>
-        inds.zip(cchain.counters).map { case (i, ctr) =>
-          i match {case Const(i) => Bit(i < ctr.end.toInt) }
-        }
-      }
-    }
 
   }
 

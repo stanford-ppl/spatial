@@ -455,22 +455,18 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
     val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds.map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }.sortBy{x => (x.view.P, x.N.P, x.alpha.P, x.regroup.P)}
-    val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives)
+    val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
+    val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
+    val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
     val result = if (bankings.nonEmpty) {
-      val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
-
       if (issue.isEmpty) {
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
-
-        val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
         val costs: Map[BankingOptions, Long] = bankings.map{case (scheme, banking) => 
           val c = banking.toList.map{case (rds, b) => cost(b,depth,rds,reachingWrGroups)}.sum
-          dbgs(s"Scheme $scheme:")
+          dbgs(s"Cost: $c, Scheme $scheme:")
           banking.foreach{x => dbgs(s"  - ${x._1.size} readers -> ${x._2}")}
-          dbgs(s"  TOTAL COST: $c")
           scheme -> c
         }
-        bankings.toSeq.foreach{b => dbgs(s" Cost ${costs(b._1)} banking solution: ${b._1} -> "); b._2.toSeq.foreach{e => dbgs(s"   - ${e._1.flatMap(_.map(_.access))} -> ${e._2}")}}
         val winningScheme = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
         val winner = bankings(winningScheme._1)
         Right(

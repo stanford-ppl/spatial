@@ -426,10 +426,12 @@ case class RegroupDims(dims: List[Int]) extends SearchPriority {
 sealed trait BankingView extends SearchPriority {
   def expand(): Seq[List[Int]]
   def rank: Int
+  def complementView: Seq[Int]
 } 
 case class Flat(rank: Int) extends BankingView {
   val P = 0
   def expand(): Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
+  def complementView: Seq[Int] = List()
 }
 case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends BankingView {
   val P = 1
@@ -437,6 +439,7 @@ case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends Banki
     if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if view.get.contains(i) => List(i)}
     else Seq.tabulate(rank){i => List(i)}
   }
+  def complementView: Seq[Int] = if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if !view.get.contains(i) => i} else Seq()
 }
 
 /** Enumeration of how to search for possible number of banks */

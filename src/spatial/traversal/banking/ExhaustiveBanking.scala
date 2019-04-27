@@ -188,36 +188,42 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               *   To convert to "banking," we want to take one entry from each Map and call it a new duplicate
               */
             val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))} else Seq()
-            val rawBanking: Seq[Map[Set[Set[AccessMatrix]], ModBanking]] = view.expand().map{axes => 
+            val rawBanking: Seq[Map[Set[Set[AccessMatrix]], Option[ModBanking]]] = view.expand().map{axes => 
               myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
               val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myWrites.map(_.toSet)
               val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myReads.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myReads.map(_.toSet)
               val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
               selGrps.zipWithIndex.foreach{case (grp,i) =>
-                dbgs(s"Banking group #$i: (${grp.size} accesses)")
-                // grp.foreach{matrix => dbgss("    ", matrix.toString) }
+                dbgs(s"Banking group #$i has (${grp.size} accesses)")
+                grp.foreach{matrix => dbgss("    ", matrix.toString) }
               }
               // If only 1 acc left per group, Unit banking, otherwise search
-              val axisBankingScheme: ModBanking = 
-                if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) ModBanking.Unit(1)
-                else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) ModBanking.Unit(rank)
+              val axisBankingScheme: Option[ModBanking] = 
+                if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(ModBanking.Unit(1))
+                else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(ModBanking.Unit(rank))
                 else {
-                  findBanking(selGrps, axes, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
+                  findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
                 }
               if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(reverseAM(a)) -> axisBankingScheme)}}.toMap else Map((selRdGrps.map(_.flatMap(reverseAM(_))) ++ Set(hostReads)) -> axisBankingScheme)
             }
-            val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
-            val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds.map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}.map{dup => (dup.map(_._1).reduce{_++_} -> (autoFullBank ++ dup.map(_._2)))}.toMap
-            val dimsInStrategy = view.expand().flatten.distinct
-            if (banking.forall{case (accs, banks) => 
-                        val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.toSeq.distinct}  
-                        isValidBanking(banks, prunedGrps)
-                      }) {
-              markFound(scheme)
-              Some((scheme -> banking))
-            }
-            else {
-              dbgs(s"Computed banking for $scheme is invalid!")
+            if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {
+              val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
+              val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds.map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}.map{dup => (dup.map(_._1).reduce{_++_} -> (autoFullBank ++ dup.map(_._2.get)))}.toMap
+              val dimsInStrategy = view.expand().flatten.distinct
+              if (banking.forall{case (accs, banks) => 
+                          val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.toSeq.distinct}  
+                          isValidBanking(banks, prunedGrps)
+                        }) {
+                dbgs(s"Banking scheme ${banking.map(_._2)} accepted!")
+                markFound(scheme)
+                Some((scheme -> banking))
+              }
+              else {
+                dbgs(s"Computed banking for $scheme is invalid!")
+                None
+              }
+            } else {
+              dbgs(s"Could not find valid solution for $scheme!")
               None
             }
           } else {
@@ -348,13 +354,13 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
   }
 
-  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], dims: Seq[Int], nStricts: NStrictness, aStricts: AlphaStrictness, axes: List[Int], stagedDims: Seq[Int], mem: Sym[_]): ModBanking = {
+  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Option[ModBanking] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
     val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList).iterator
 
-    val rank = dims.length
+    val rank = axes.length
     var banking: Option[ModBanking] = None
 
     var attempts = 0
@@ -370,7 +376,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           val t = computeP(N,1,alpha,stagedDims,mem)
           val P = t._1
           val darkVolume = t._2
-          banking = Some(ModBanking(N,1,alpha,dims,P,darkVolume))
+          banking = Some(ModBanking(N,1,alpha,axes,P,darkVolume))
         }
         else if (!mem.noBlockCyclic) {
           val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
@@ -379,13 +385,13 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             val t = computeP(N, b, alpha, stagedDims,mem)
             val P = t._1
             val darkVolume = t._2
-            ModBanking(N, b, alpha, dims, P, darkVolume) 
+            ModBanking(N, b, alpha, axes, P, darkVolume) 
           }
         }
       }
     }
 
-    banking.getOrElse(ModBanking.Unit(rank))
+    banking
   }
 
   implicit class SeqMath(a: Seq[Int]) {

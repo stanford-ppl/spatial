@@ -276,6 +276,15 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
+
+    cli.opt[Int]("bankingEffort").action{ (t,_) => 
+      spatialConfig.bankingEffort = t
+    }.text("""Specify the level of effort to put into banking local memories.  i.e:
+      0: Quit banking analyzer after first banking scheme is found
+      1: (default) Allow banking analyzer to find up to 4 valid schemes (flat, hierarchical, flat+duplication, hierarchical+duplication)
+      2: Allow banking analyzer to find banking scheme for every set of banking directives
+""")
+
     cli.opt[Unit]("mop").action{ (_,_) => 
       spatialConfig.unrollMetapipeOfParallels = true
       spatialConfig.unrollParallelOfMetapipes = false

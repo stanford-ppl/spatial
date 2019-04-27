@@ -47,7 +47,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     rank:   Int,
     reads:  Set[Set[AccessMatrix]],
     writes: Set[Set[AccessMatrix]],
-    attemptDirectives: Seq[BankingOptions]
+    attemptDirectives: Seq[BankingOptions],
+    depth: Int
   ): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
 
     // Return Set of iterator combined with its unroll address with which it dephases
@@ -186,6 +187,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               *
               *   To convert to "banking," we want to take one entry from each Map and call it a new duplicate
               */
+            val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))} else Seq()
             val rawBanking: Seq[Map[Set[Set[AccessMatrix]], ModBanking]] = view.expand().map{axes => 
               myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
               val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myWrites.map(_.toSet)
@@ -205,7 +207,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(reverseAM(a)) -> axisBankingScheme)}}.toMap else Map((selRdGrps.map(_.flatMap(reverseAM(_))) ++ Set(hostReads)) -> axisBankingScheme)
             }
             val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
-            val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds.map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}.map{dup => (dup.map(_._1).reduce{_++_} -> dup.map(_._2))}.toMap
+            val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds.map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}.map{dup => (dup.map(_._1).reduce{_++_} -> (autoFullBank ++ dup.map(_._2)))}.toMap
             val dimsInStrategy = view.expand().flatten.distinct
             if (banking.forall{case (accs, banks) => 
                         val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.toSeq.distinct}  

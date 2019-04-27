@@ -6,15 +6,15 @@ import spatial.dsl._
   override def compileArgs: Args = super.compileArgs and "--forceBanking"
 
   val R = 32; val C = 16
-  val P = 1;  val Q = 4
+  val P = 2;  val Q = 4
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](R,C)
 
     Accel {
-      val x = SRAM[Int](R,C)
+      val x = SRAM[Int](R,C)//.effort(2)
 
-      Foreach(0 until R, 0 until C par Q){(i,j) =>
+      Foreach(0 until R par P, 0 until C par Q){(i,j) =>
         x(i,j) = i + j
       }
       dram store x

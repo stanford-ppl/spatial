@@ -187,7 +187,6 @@ trait Spatial extends Compiler with ParamLoader {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
-        irCodegen           ==>
         //(spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
@@ -195,7 +194,8 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
-        (spatialConfig.enableTsth ? tsthCodegen)
+        (spatialConfig.enableTsth ? tsthCodegen) ==>
+        irCodegen           
     }
 
     isl.shutdown(100)

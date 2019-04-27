@@ -463,10 +463,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
         val costs: Map[BankingOptions, Long] = bankings.map{case (scheme, banking) => 
           val c = banking.toList.map{case (rds, b) => cost(b,depth,rds,reachingWrGroups)}.sum
-          dbgs(s"Cost: $c, Scheme $scheme:")
+          dbgs(s"Scheme $scheme:")
           banking.foreach{x => dbgs(s"  - ${x._1.size} readers -> ${x._2}")}
           scheme -> c
         }
+        bankings.foreach{case (scheme,banking) => dbgs(s"Cost: ${costs(scheme)} for $scheme")}
         val winningScheme = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
         val winner = bankings(winningScheme._1)
         Right(

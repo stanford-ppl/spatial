@@ -70,12 +70,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         newa
       }.toSet}.toSet
     }
-    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int]): ArrayBuffer[Seq[SparseMatrix[Idx]]] = {
+    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): ArrayBuffer[Seq[SparseMatrix[Idx]]] = {
       val fullStrategy = Seq.tabulate(rank){i => i}
       // For hierarchical views, regroup accesses based on whether their "complements" are non-interfering
       val grpViews = grp.map{mat => 
         val t = AccessView(dims, fullStrategy, mat)
-        lowRankMapping += (t.activeAccess -> {lowRankMapping.getOrElse(t.activeAccess, Set()) ++ Set(mat)}) 
+        if (isRd) lowRankMapping += (t.activeAccess -> {lowRankMapping.getOrElse(t.activeAccess, Set()) ++ Set(mat)}) 
         t
       } 
       val regrp = ArrayBuffer[ArrayBuffer[AccessView]]()
@@ -177,7 +177,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(view, nStricts, aStricts, regroup) => 
-          lowRankMapping.clear()
           if (wantScheme(scheme)) {
             dbgs(s"Finding scheme for $scheme")
             /* Example of what "rawBanking" could look like if we duplicate for dim0 and actually bank for dim1 on something that may look like:
@@ -192,9 +191,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               */
             val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))} else Seq()
             val rawBanking: Seq[Map[Set[Set[AccessMatrix]], Option[ModBanking]]] = view.expand().map{axes => 
+              lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-              val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myWrites.map(_.toSet)
-              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myReads.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myReads.map(_.toSet)
+              val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else myWrites.map(_.toSet)
+              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet) else myReads.map(_.toSet)
               val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
               selGrps.zipWithIndex.foreach{case (grp,i) =>
                 dbgs(s"Banking group #$i has (${grp.size} accesses)")

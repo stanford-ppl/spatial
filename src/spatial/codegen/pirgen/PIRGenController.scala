@@ -25,6 +25,9 @@ trait PIRGenController extends PIRCodegen {
     if (ens.nonEmpty) {
       newCtrler += src".en($ens)"
     }
+    lhs.sym.unrollBy.foreach { par =>
+      newCtrler += src".par($par)"
+    }
     state(lhs, tp=Some(tp))(
       src"""createCtrl(schedule="${schedule.getOrElse(lhs.sym.schedule)}")(${newCtrler})"""
     )

@@ -71,6 +71,7 @@ trait ReduceUnrolling extends UnrollingBase {
         }
       }
     })){lhs2 => transferData(lhs,lhs2) }
+    pipe.unrollBy = mapLanes.Ps.product
     dbgs(s"Created unit pipe ${stm(pipe)}")
     pipe
   }

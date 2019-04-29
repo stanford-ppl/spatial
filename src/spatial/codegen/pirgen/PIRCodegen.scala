@@ -66,6 +66,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     emit("")
     open(s"""object AccelMain extends PIRApp {""")
     open(src"def staging(top:Top) = {")
+    emit("""import pirgenStaging._""")
     emit("""import top._""")
   }
 

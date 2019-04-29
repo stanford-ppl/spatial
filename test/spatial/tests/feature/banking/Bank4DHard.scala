@@ -16,7 +16,7 @@ import argon.Block
     setMem(dram,data)
     val out = ArgOut[Int]
     Accel {
-      val x = SRAM[Int](I,R,C,O)
+      val x = SRAM[Int](I,R,C,O).noduplicate
       x load dram
 
       out := Reduce(Reg[Int])(0 until I par PI, 0 until R par PR, 0 until C par PC, 0 until O par PO){case List(i,r,c,o) =>
@@ -41,10 +41,10 @@ import argon.Block
     setMem(dram,data)
     val out = DRAM[Int](3,3,64)
     Accel {
-      val x = SRAM[Int](64) // Assert there is only 2 copies of this (or 1 copy if k is par 1)
+      val x = SRAM[Int](64).noduplicate // Assert there is only 2 copies of this (or 1 copy if k is par 1)
       x load dram
-      val y = SRAM[Int](3,3,64)
-      val z = SRAM[Int](3,3)
+      val y = SRAM[Int](3,3,64).noduplicate
+      val z = SRAM[Int](3,3).noduplicate
       Foreach(3 by 1, 3 by 1){(i,j) => z(i,j) = i+j}
 
       Foreach(10 by 1){i => 
@@ -103,7 +103,7 @@ import argon.Block
     setMem(INPUT_DATA, input)
 
     Accel{
-      val in_sram = SRAM[Int](3,3,32).noflat
+      val in_sram = SRAM[Int](3,3,32).noflat.noduplicate
       Foreach(5 by 1){row =>
         Foreach(5 by 1){col => 
           val idx0 = row * ARG.value

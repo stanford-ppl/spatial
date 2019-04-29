@@ -170,7 +170,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank))))
+      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
       else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) {
         val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1, 0)))))
@@ -202,8 +202,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               }
               // If only 1 acc left per group, Unit banking, otherwise search
               val axisBankingScheme: Option[ModBanking] = 
-                if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(ModBanking.Unit(1))
-                else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(ModBanking.Unit(rank))
+                if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(ModBanking.Unit(1, axes))
+                else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(ModBanking.Unit(rank, axes))
                 else {
                   findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
                 }
@@ -214,12 +214,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds
                 .map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}
                 .map{dup => 
-                  // When reapackaging rawBanking, make sure to only keep read groups whose accesses can be found in read groups of ALL other dimensions
+                  // When repackaging rawBanking, make sure to only keep read groups whose accesses can be found in read groups of ALL other dimensions
                   val accs: Seq[Set[Set[AccessMatrix]]] = dup.map(_._1.filter(_.nonEmpty)).toSeq
                   val inViewAccs: Set[Set[AccessMatrix]] = accs.zipWithIndex.map{ case (dimGrp,i) => 
                     val others: Seq[Set[Set[AccessMatrix]]] = accs.patch(i, Nil, 1) 
-                    dimGrp.collect{ case grp if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
-                  }.reduce{_++_}
+                    dimGrp.flatMap{ grp => if (others.isEmpty) Set(grp) else others.flatMap(_.map(_.intersect(grp)))} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
+                  }.reduce{_++_}.filter(_.nonEmpty)
                   (inViewAccs -> (autoFullBank ++ dup.map(_._2.get)))
                 }.toMap
               val dimsInStrategy = view.expand().flatten.distinct
@@ -227,8 +227,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                           val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.toSeq.distinct}  
                           isValidBanking(banks, prunedGrps)
                         }) {
-                // dbgs(s"raw bank $rawBanking")
-                // dbgs(s"assembled banking $banking")
+                // dbgs(s"Dim-based (raw) banking $rawBanking")
+                // dbgs(s"Duplicate-based (ssembled) banking $banking")
                 dbgs(s"Banking scheme ${banking.map(_._2)} accepted!")
                 markFound(scheme)
                 Some((scheme -> banking))

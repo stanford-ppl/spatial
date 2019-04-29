@@ -44,7 +44,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   }
 }
 object ModBanking {
-  def Unit(rank: Int) = ModBanking(1, 1, Seq.fill(rank)(1), Seq.tabulate(rank){i => i}, Seq.fill(rank)(1), 0)
+  def Unit(rank: Int, dims: Seq[Int]) = ModBanking(1, 1, Seq.fill(rank)(1), dims, Seq.fill(rank)(1), 0)
   def Simple(banks: Int, dims: Seq[Int], stride: Int, darkVolume: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride), darkVolume)
 }
 
@@ -147,7 +147,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank)),1,0,Map.empty,Seq.fill(rank)(0),0,AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})),1,0,Map.empty,Seq.fill(rank)(0),0,AccumType.None)
 }
 
 
@@ -236,7 +236,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank)), 1, Seq.fill(rank)(0), 0, AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})), 1, Seq.fill(rank)(0), 0, AccumType.None)
 }
 
 

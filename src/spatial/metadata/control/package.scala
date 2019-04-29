@@ -623,6 +623,8 @@ package object control {
     def userII: Option[Double] = metadata[UserII](s).map(_.interval)
     def userII_=(interval: Option[Double]): Unit = interval.foreach{ii => metadata.add(s, UserII(ii)) }
 
+    def unrollBy: Option[Int] = metadata[UnrollBy](s).map(_.par)
+    def unrollBy_=(par: Int): Unit = metadata.add(s, UnrollBy(par))
   }
 
 

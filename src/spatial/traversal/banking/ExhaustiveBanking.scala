@@ -32,7 +32,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   private val accMatrixMapping = scala.collection.mutable.HashMap[AccessMatrix, AccessMatrix]()
   // Mapping te keep track of which rewritten AccessMatrix corresponds to which SparseMatrix for proper re-bundling after computing banking
   private val sparseMatrixMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], Set[AccessMatrix]]()
-  // Mapping te keep track of which SparseMatrix slices rewritten as low rank corresponds to which original full-rank SparseMatrix
+  // Mapping te keep track of which read SparseMatrix slices rewritten as low rank corresponds to which original full-rank read SparseMatrix
   private val lowRankMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], Set[SparseMatrix[Idx]]]()
   // Helper for replacing sparse matrix with its original access matrix
   private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
@@ -171,7 +171,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
       if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank))))
-      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Simple(1, Seq(1), 1, 0))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) {
+        val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
+        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1, 0)))))
+      }
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(view, nStricts, aStricts, regroup) => 
           lowRankMapping.clear()
@@ -189,7 +192,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               */
             val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))} else Seq()
             val rawBanking: Seq[Map[Set[Set[AccessMatrix]], Option[ModBanking]]] = view.expand().map{axes => 
-              myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
+              myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
               val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myWrites.map(_.toSet)
               val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myReads.flatMap{grp => repackageGroup(grp, axes)}.map(_.toSet) else myReads.map(_.toSet)
               val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
@@ -204,16 +207,28 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                 else {
                   findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
                 }
-              if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(reverseAM(a)) -> axisBankingScheme)}}.toMap else Map((selRdGrps.map(_.flatMap(reverseAM(_))) ++ Set(hostReads)) -> axisBankingScheme)
+              if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(reverseAM(a)) -> axisBankingScheme)}}.toMap else Map((selRdGrps.map{x => x.flatMap(reverseAM(_)).toSet ++ hostReads}) -> axisBankingScheme)
             }
             if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {
               val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
-              val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds.map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}.map{dup => (dup.map(_._1).reduce{_++_} -> (autoFullBank ++ dup.map(_._2.get)))}.toMap
+              val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds
+                .map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}
+                .map{dup => 
+                  // When reapackaging rawBanking, make sure to only keep read groups whose accesses can be found in read groups of ALL other dimensions
+                  val accs: Seq[Set[Set[AccessMatrix]]] = dup.map(_._1.filter(_.nonEmpty)).toSeq
+                  val inViewAccs: Set[Set[AccessMatrix]] = accs.zipWithIndex.map{ case (dimGrp,i) => 
+                    val others: Seq[Set[Set[AccessMatrix]]] = accs.patch(i, Nil, 1) 
+                    dimGrp.collect{ case grp if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
+                  }.reduce{_++_}
+                  (inViewAccs -> (autoFullBank ++ dup.map(_._2.get)))
+                }.toMap
               val dimsInStrategy = view.expand().flatten.distinct
               if (banking.forall{case (accs, banks) => 
                           val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.toSeq.distinct}  
                           isValidBanking(banks, prunedGrps)
                         }) {
+                // dbgs(s"raw bank $rawBanking")
+                // dbgs(s"assembled banking $banking")
                 dbgs(s"Banking scheme ${banking.map(_._2)} accepted!")
                 markFound(scheme)
                 Some((scheme -> banking))
@@ -252,7 +267,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
     }.distinct)
     val newWrites = rewriteAccesses(writes, writeIterSubsts).map(_.toSeq.flatMap{x => 
-      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+      // sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
       if (x.parent != Ctrl.Host) Some(x.matrix)
       else None
     }.distinct)

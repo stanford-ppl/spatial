@@ -307,32 +307,32 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       // Compute penalty from volume
       val sizePenalty = depth * w.product * volumePenalty
       
-      dbgs(s"BANKING COST FOR $mem UNDER $banking:")
-      dbgs(s"  depth            = ${depth}")
-      dbgs(s"  volume           = ${w.product}")
-      dbgs(s"  numBanks         = ${numBanks}")
-      dbgs(s"    `- # not pow 2 = ${Ns_not_pow2}")
-      dbgs(s"  alphas           = ${banking.map(_.alphas)}")
-      dbgs(s"    `- # not pow 2 = ${alphas_not_pow2}")
-      dbgs(s"  Ps               = ${banking.map(_.Ps)}")
-      dbgs(s"    `- # not pow 2 = ${Pss_not_pow2}")
-      dbgs(s"  dim multipliers  = ${dimMultipliers}")
-      dbgs(s"    `- # not pow 2 = ${mults_not_pow2}")
-      dbgs(s"  Directly banked accesses: ${direct.map(_.access)}")
-      dbgs(s"  XBar banked accesses:     ${xbar.map(_.access)}")
-      dbgs(s"")    
-      dbgs(s"  ofsDivPenalty  = ${ofsDivPenalty}")
-      dbgs(s"  ofsMulPenalty  = ${ofsMulPenalty}")
-      dbgs(s"  bankMulPenalty  = ${bankMulPenalty}")
-      dbgs(s"  bankModPenalty  = ${bankModPenalty}")
-      dbgs(s"  wmuxPenalty  = ${wmuxPenalty}")
-      dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
-      dbgs(s"  sizePenalty  = ${sizePenalty}")
-      dbgs(s"")
+      // dbgs(s"BANKING COST FOR $mem UNDER $banking:")
+      // dbgs(s"  depth            = ${depth}")
+      // dbgs(s"  volume           = ${w.product}")
+      // dbgs(s"  numBanks         = ${numBanks}")
+      // dbgs(s"    `- # not pow 2 = ${Ns_not_pow2}")
+      // dbgs(s"  alphas           = ${banking.map(_.alphas)}")
+      // dbgs(s"    `- # not pow 2 = ${alphas_not_pow2}")
+      // dbgs(s"  Ps               = ${banking.map(_.Ps)}")
+      // dbgs(s"    `- # not pow 2 = ${Pss_not_pow2}")
+      // dbgs(s"  dim multipliers  = ${dimMultipliers}")
+      // dbgs(s"    `- # not pow 2 = ${mults_not_pow2}")
+      // dbgs(s"  Directly banked accesses: ${direct.map(_.access)}")
+      // dbgs(s"  XBar banked accesses:     ${xbar.map(_.access)}")
+      // dbgs(s"")    
+      // dbgs(s"  ofsDivPenalty  = ${ofsDivPenalty}")
+      // dbgs(s"  ofsMulPenalty  = ${ofsMulPenalty}")
+      // dbgs(s"  bankMulPenalty  = ${bankMulPenalty}")
+      // dbgs(s"  bankModPenalty  = ${bankModPenalty}")
+      // dbgs(s"  wmuxPenalty  = ${wmuxPenalty}")
+      // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
+      // dbgs(s"  sizePenalty  = ${sizePenalty}")
+      // dbgs(s"")
 
       val totalCost = (ofsDivPenalty + ofsMulPenalty + bankMulPenalty + bankModPenalty + wmuxPenalty + rmuxPenalty + sizePenalty).toLong
 
-      dbgs(s"TOTAL COST: $totalCost")
+      // dbgs(s"TOTAL COST: $totalCost")
 
       totalCost
     } else {
@@ -344,15 +344,15 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       // Assume direct banking for W, and crossbar for readers
       val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn) depth * muxCost * numWriters * numWriters else 0
 
-      dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
-      dbg(s"  depth            = ${depth}")
-      dbg(s"  volume           = ${w.product}")
-      dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
-      dbgs(s"")
+      // dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
+      // dbg(s"  depth            = ${depth}")
+      // dbg(s"  volume           = ${w.product}")
+      // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
+      // dbgs(s"")
 
       val totalCost =  rdGroups.flatten.size * (sizePenalty + rmuxPenalty).toLong
 
-      dbgs(s"TOTAL COST: $sizePenalty")
+      // dbgs(s"TOTAL COST: $sizePenalty")
 
       totalCost
 

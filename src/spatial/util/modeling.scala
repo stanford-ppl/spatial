@@ -278,8 +278,8 @@ object modeling {
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){
-        debugs(s"Multiplexed accesses for memory $mem: ")
-        accesses.foreach{access => debugs(s"  ${stm(access)}") }
+        dbgs(s"Multiplexed accesses for memory $mem: ")
+        accesses.foreach{access => dbgs(s"  ${stm(access)}") }
       }
 
       // NOTE: After unrolling there should be only one mux index per access
@@ -306,14 +306,14 @@ object modeling {
           writeStage = writeDelay + 1
           pairs.foreach{case (access, dly, _) =>
             val oldPath = paths(access)
-            paths(access) = writeDelay
-            debugs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
+            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
             if (writeDelay-oldPath > 0) {
-              debugs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              paths(access) = writeDelay
+              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
               val affectedNodes = consumersDfs(access.consumers, Set(), scope) intersect scope
               affectedNodes.foreach{case x if (paths.contains(x)) => 
-                  debugs(s"  $x")
+                  dbgs(s"  $x")
                   paths(x) = paths(x) + (writeDelay-oldPath)
                 case _ =>
               }
@@ -379,7 +379,7 @@ object modeling {
       // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
-        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
+        dbgs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
         reverseDFS(writer, cycle)
       }
     }

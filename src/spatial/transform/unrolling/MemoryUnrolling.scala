@@ -88,6 +88,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val dups = lanes.duplicateMem(mem){_ => duplicateMemory(mem)}
     if (lanes.vectorize && dups.distinct.size != 1) { //TODO: Can we check this earlier in MemoryConfiguration?
       error(s"Invalid duplication for $mem for plasticine. Inconsisten duplications across lanes ${dups}")
+      IR.logError()
     }
     Nil // No correct default substitution for mem - have to know dispatch number of the access
   }

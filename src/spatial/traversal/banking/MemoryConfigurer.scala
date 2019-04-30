@@ -138,14 +138,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           groups.flatten.groupBy { _.access }.foreach { case (access, ams) =>
             val gids = ams.map { a => groupMap(a) }
             if (gids.size > 1) {
-              var msg = s"//TODO: Plasticine does not support unbanked unrolled access at the moment. "
-              msg += s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})\n"
-              msg += s"access=$access (${access.ctx})\n"
-              msg += s"AccessMatrix:\n"
+              error(s"//TODO: Plasticine does not support unbanked unrolled access at the moment. ")
+              error(s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})")
+              error(s"access=$access (${access.ctx})")
+              error(s"AccessMatrix:")
               ams.foreach { a => 
-                msg += s"$a"
+                error(s"$a")
               }
-              error(msg)
+              state.logError()
             }
           }
         }

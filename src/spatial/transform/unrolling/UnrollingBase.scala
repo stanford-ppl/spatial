@@ -433,6 +433,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       }
       if (mop) default else List.tabulate(P){p => default.zip(parAddr(p)).map{case (vec,i) => vec(i)}}
     }
+    if (spatialConfig.enablePIR && !mop) {
+      error(s"PIRGen doesn't support POM ${name}")
+      IR.logError()
+    }
   }
 
   case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean, mop: Boolean) extends LoopUnroller {

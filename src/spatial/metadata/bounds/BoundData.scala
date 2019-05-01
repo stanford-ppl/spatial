@@ -84,3 +84,16 @@ object Upper {
 object Bounded {
   @stateful def unapply(x: Sym[_]): Option[Bound] = x.getBound
 }
+
+/*
+ * Metadata set on bound indicating the const value contains actually a vector 
+ * of values as supposed to be a single one. Used in vectorizing inner loop
+ * for PIR where iterators can be a vector of constant
+ * */
+case class VecConst(vs: Seq[Any]) extends Data[VecConst](SetBy.Analysis.Self)
+object VecConst {
+  def unapply(x:Any) = x match {
+    case x:Sym[_] if x.vecConst.nonEmpty => Some(x.vecConst.get)
+    case x => None
+  }
+}

@@ -194,7 +194,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
               val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else myWrites.map(_.toSet)
-              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet) else myReads.map(_.toSet)
+              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) {dbgs(s"aoeu repacking");myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet)} else {dbgs(s"aoeu not repacking");myReads.map(_.toSet)}
               val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
               selGrps.zipWithIndex.foreach{case (grp,i) =>
                 dbgs(s"Banking group #$i has (${grp.size} accesses)")
@@ -216,9 +216,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                 .map{dup => 
                   // When repackaging rawBanking, make sure to only keep read groups whose accesses can be found in read groups of ALL other dimensions
                   val accs: Seq[Set[Set[AccessMatrix]]] = dup.map(_._1.filter(_.nonEmpty)).toSeq
-                  val inViewAccs: Set[Set[AccessMatrix]] = accs.zipWithIndex.map{ case (dimGrp,i) => 
+                  val inViewAccs: Set[Set[AccessMatrix]] = accs.zipWithIndex.map{ case (dimGrp:Set[Set[AccessMatrix]],i:Int) => 
                     val others: Seq[Set[Set[AccessMatrix]]] = accs.patch(i, Nil, 1) 
-                    dimGrp.flatMap{ grp => if (others.isEmpty) Set(grp) else others.flatMap(_.map(_.intersect(grp)))} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
+                    dimGrp.map{ grp:Set[AccessMatrix] => if (others.isEmpty) grp else others.map{allDimGrps => allDimGrps.flatten}.reduce(_.intersect(_)).intersect(grp)}//.map{otherDimGrp => otherDimGrp.intersect(grp)}}} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
                   }.reduce{_++_}.filter(_.nonEmpty)
                   (inViewAccs -> (autoFullBank ++ dup.map(_._2.get)))
                 }.toMap
@@ -228,7 +228,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                           isValidBanking(banks, prunedGrps)
                         }) {
                 // dbgs(s"Dim-based (raw) banking $rawBanking")
-                // dbgs(s"Duplicate-based (ssembled) banking $banking")
+                // dbgs(s"Duplicate-based (assembled) banking $banking")
                 dbgs(s"Banking scheme ${banking.map(_._2)} accepted!")
                 markFound(scheme)
                 Some((scheme -> banking))

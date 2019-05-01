@@ -467,7 +467,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val costs: Map[BankingOptions, Long] = bankings.map{case (scheme, banking) => 
           val c = banking.toList.map{case (rds, b) => cost(b,depth,rds,reachingWrGroups)}.sum
           dbgs(s"Scheme $scheme:")
-          banking.foreach{x => dbgs(s"  - ${x._1.size} readers -> ${x._2}")}
+          banking.foreach{x => dbgs(s"  - ${x._1.map(_.size)} readers -> ${x._2}")}
           scheme -> c
         }
         bankings.foreach{case (scheme,banking) => dbgs(s"Cost: ${costs(scheme)} for $scheme")}
@@ -489,9 +489,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     else Left(UnbankableGroup(mem, reads, writes))
 
     dbgs(s"  Reads:")
-    rdGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+    rdGroups.zipWithIndex.foreach{case (grp, i) => grp.foreach{m => dbgss(s"    grp $i: ", m) }}
     dbgs(s"  Writes:")
-    reachingWrGroups.foreach{grp => grp.foreach{m => dbgss("    ", m) }}
+    reachingWrGroups.zipWithIndex.foreach{case (grp, i) => grp.foreach{m => dbgss(s"    grp $i: ", m) }}
     dbgs(s"  Result: $result")
     result
   }

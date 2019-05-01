@@ -95,7 +95,7 @@ class OuterForeachUnrolling2POM extends OuterForeachUnrolling2Base {
     val golden = (0::4, 0::16) {(i,j) => j + i}
     printMatrix(got, "got")
     printMatrix(golden, "golden")
-    val cksum = result == golden
+    val cksum = got == golden
     println("PASS: " + cksum + s" (${getClass.getSimpleName})")
     assert(cksum)
   }

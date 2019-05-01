@@ -253,7 +253,6 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.vecInnerLoop = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
-      //spatialConfig.enableDot = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
     }.text("Enable codegen to PIR [false]")

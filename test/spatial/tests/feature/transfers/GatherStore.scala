@@ -69,3 +69,100 @@ import spatial.dsl._
     assert(cksum)
   }
 }
+
+@spatial class SimpleGatherStore extends SpatialTest {
+  val tileSize = 32
+  val numAddr = tileSize * 2
+  val numData = tileSize * 4
+
+  val P = param(16)
+
+  def gatherStore[T:Num](addrs: Array[Int], offchip_data: Array[T]): Array[T] = {
+
+    val srcAddrs = DRAM[Int](numAddr)
+    val gatherData = DRAM[T](numData)
+    val denseResult = DRAM[T](numAddr)
+
+    setMem(srcAddrs, addrs)
+    setMem(gatherData, offchip_data)
+
+    Accel {
+      val addrs = SRAM[Int](tileSize)
+      Sequential.Foreach(numAddr by tileSize) { i =>
+        val sram = SRAM[T](tileSize)
+        addrs load srcAddrs(i::i + tileSize par P)
+        sram gather gatherData(addrs par P, tileSize)
+        denseResult(i::i+tileSize par P) store sram
+      }
+    }
+
+    getMem(denseResult)
+  }
+
+
+  def main(args: Array[String]): Unit = {
+
+    val addrs = Array.tabulate[Int](numAddr) { i => 2*i }
+    val offchip_data = Array.tabulate[Int](numData){ i => i }
+
+    val received = gatherStore(addrs, offchip_data)
+
+    val gold = Array.tabulate(numAddr){ i => offchip_data(addrs(i)) }
+
+    printArray(gold, "gold:")
+    printArray(received, "received:")
+    val cksum = (received == gold)
+    println("PASS: " + cksum + " (SimpleGatherStore)")
+    assert(cksum)
+  }
+}
+
+@spatial class GatherStore2 extends SpatialTest {
+  val tileSize = 32
+  val numAddr = tileSize * 2
+  val numData = tileSize * 4
+
+  val P = param(16)
+
+  def gatherStore[T:Num](ts:Int, addrs: Array[Int], offchip_data: Array[T]): Array[T] = {
+
+    val B = ArgIn[Int]
+    val srcAddrs = DRAM[Int](numAddr)
+    val gatherData = DRAM[T](numData)
+    val denseResult = DRAM[T](numAddr)
+
+    setArg(B, ts)
+    setMem(srcAddrs, addrs)
+    setMem(gatherData, offchip_data)
+
+    Accel {
+      val addrs = SRAM[Int](tileSize)
+      Sequential.Foreach(numAddr by tileSize) { i =>
+        val sram = SRAM[T](tileSize)
+        addrs load srcAddrs(i::i + tileSize par P)
+        sram gather gatherData(addrs par P, B)
+        denseResult(i::i+tileSize par P) store sram
+      }
+    }
+
+    getMem(denseResult)
+  }
+
+
+  def main(args: Array[String]): Unit = {
+
+    val ts = args(0).to[Int]
+    val addrs = Array.tabulate[Int](numAddr) { i => 2*i }
+    val offchip_data = Array.tabulate[Int](numData){ i => i }
+
+    val received = gatherStore(ts, addrs, offchip_data)
+
+    val gold = Array.tabulate(numAddr){ i => offchip_data(addrs(i)) }
+
+    printArray(gold, "gold:")
+    printArray(received, "received:")
+    val cksum = (received == gold)
+    println("PASS: " + cksum + " (SimpleGatherStore)")
+    assert(cksum)
+  }
+}

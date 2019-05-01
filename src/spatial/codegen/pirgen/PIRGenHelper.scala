@@ -29,7 +29,8 @@ trait PIRGenHelper extends PIRFormatGen {
       src".depth(${lhs.instance.depth})" +
       src".dims(${lhs.constDims.zip(padding).map { case (d,p) => d + p }})" +
       src".banks(${lhs.instance.banking.map { b => b.nBanks}})" +
-      src".tp(${field.map {_._2}.getOrElse(lhs.asMem.A)})"
+      src".tp(${field.map {_._2}.getOrElse(lhs.asMem.A)})" + 
+      src".isInnerAccum(${lhs.isInnerAccum})"
     )
   }
 

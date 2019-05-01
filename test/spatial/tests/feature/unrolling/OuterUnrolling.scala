@@ -23,7 +23,9 @@ import spatial.dsl._
 
     val result = getMatrix(dram)
     val golden = (0::2,0::16){(i,j) => j + 16*i}
-    assert(result == golden)
+    val cksum = result == golden
+    println("PASS: " + cksum + s" (${getClass.getSimpleName})")
+    assert(cksum)
   }
 }
 
@@ -57,7 +59,9 @@ import spatial.dsl._
 
     val result = getMatrix(dram)
     val golden = (0::2,0::16){(i,j) => j + 16*i}
-    assert(result == golden)
+    val cksum = result == golden
+    println("PASS: " + cksum + s" (${getClass.getSimpleName})")
+    assert(cksum)
   }
 }
 class OuterForeachUnrolling2 extends OuterForeachUnrolling2Base {
@@ -91,7 +95,9 @@ class OuterForeachUnrolling2POM extends OuterForeachUnrolling2Base {
     val golden = (0::4, 0::16) {(i,j) => j + i}
     printMatrix(got, "got")
     printMatrix(golden, "golden")
-    assert(got == golden)
+    val cksum = got == golden
+    println("PASS: " + cksum + s" (${getClass.getSimpleName})")
+    assert(cksum)
   }
 }
 
@@ -117,7 +123,9 @@ class OuterForeachUnrolling2POM extends OuterForeachUnrolling2Base {
     }
     val result = getArg(out)
     val golden = 26
-    assert(result == golden)
+    val cksum = result == golden
+    println("PASS: " + cksum + s" (${getClass.getSimpleName})")
+    assert(cksum)
   }
 }
 
@@ -152,6 +160,8 @@ class OuterForeachUnrolling2POM extends OuterForeachUnrolling2Base {
     val result2 = getArg(out2)
     val golden = Array.tabulate(32){i => i }.sum
     val golden2 = Array.tabulate(64){i => i }.sum
-    assert(result == golden && result2 == golden2)
+    val cksum = result == golden && result2 == golden2
+    println("PASS: " + cksum + s" (${getClass.getSimpleName})")
+    assert(cksum)
   }
 }

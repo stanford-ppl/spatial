@@ -21,6 +21,8 @@ trait CppGenMath extends CppGenCommon {
     case FixNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
     case FixPow(x,y) => emit(src"${lhs.tp} $lhs = pow($x,$y);")
     case FltNeg(x)   => emit(src"${lhs.tp} $lhs = -$x;")
+    case FltCeil(x)  => emit(src"${lhs.tp} $lhs = ceil($x);")
+    case FltFloor(x)  => emit(src"${lhs.tp} $lhs = floor($x);")
     case FixAdd(x,y) => emit(src"${lhs.tp} $lhs = $x + $y;")
     case FixSub(x,y) => emit(src"${lhs.tp} $lhs = $x - $y;")
     case FixMul(x,y) => emit(src"${lhs.tp} $lhs = $x * $y;")

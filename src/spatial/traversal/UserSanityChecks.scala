@@ -32,11 +32,13 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
       error(lhs.ctx, "Reading ArgOuts within Accel is disallowed.")
       error("Use a Reg to store intermediate values.")
       error(lhs.ctx)
+      IR.logError()
 
     case SetReg(arg,_) if inHw =>
       error(lhs.ctx, "Writing ArgIn within Accel is disallowed.")
       error("Use a Reg to store intermediate values.")
       error(lhs.ctx)
+      IR.logError()
 
     case AccelScope(block) => inAccel {
       val (stms,rawInputs) = block.nestedStmsAndInputs
@@ -46,24 +48,28 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
           error(sym.ctx, s"Variables cannot be used within the Accel scope.")
           error("Use an ArgIn, HostIO, or DRAM to pass values from the host to the accelerator.")
           error(sym.ctx, showCaret = true)
+          IR.logError()
           sym
 
         case sym @ Op(VarNew(init)) =>
           error(sym.ctx, s"Variables cannot be created within the Accel scope.")
           error("Use a local accelerator memory like SRAM or Reg instead.")
           error(sym.ctx)
+          IR.logError()
           sym
 
         case sym @ Op(VarAssign(v, x)) if !stms.contains(v) =>
           error(sym.ctx, s"Variables cannot be assigned within the Accel scope.")
           error("Use an ArgOut, HostIO, or DRAM to pass values from the accelerator to the host.")
           error(sym.ctx, showCaret = true)
+          IR.logError()
           sym
 
         case sym @ Op(ArrayApply(Def(InputArguments()), _)) =>
           error(sym.ctx, "Input arguments cannot be accessed in Accel scope.")
           error("Use an ArgIn or HostIO to pass values from the host to the accelerator.")
           error(sym.ctx, showCaret = true)
+          IR.logError()
           sym
       }
       val inputs = rawInputs.filterNot{
@@ -83,6 +89,7 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
           error(use.ctx)
         }
         if (illegalUsed.size > 5) error(s"(${illegalUsed.size - 5} values elided)")
+        IR.logError()
       }
 
       super.visit(lhs,rhs)
@@ -105,6 +112,7 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
       error("This will create a counter with infinite iterations, which is probably not what you wanted.")
       error("(If this is what you wanted, use the forever counter '*' notation instead.)")
       error(lhs)
+      IR.logError()
 
     case CounterNew(Expect(start),Expect(end),Expect(step),Expect(par)) =>
       val len = Math.ceil((end.toDouble - start.toDouble)/step.toDouble).toInt
@@ -119,10 +127,12 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
     case RegNew(init) if !init.isFixedBits =>
       error(lhs.ctx, s"Reset value of register ${lhs.fullname} was not a constant.")
       error(lhs.ctx)
+      IR.logError()
 
     case RegNew(init) if !inHw =>
       error(lhs.ctx, s"Register was created outside Accel. Use an ArgIn, ArgOut, or HostIO instead.")
       error(lhs.ctx)
+      IR.logError()
 
     case op @ StreamInNew(bus)  => busWidthCheck(op.A,bus,"StreamIn")
     case op @ StreamOutNew(bus) => busWidthCheck(op.A,bus,"StreamOut")
@@ -137,6 +147,7 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
         } else {
           error(lhs.ctx, s"Total size of LUT ($size) does not match the number of supplied elements (${elems.length}).")
           error(lhs.ctx)
+          IR.logError()
         }
       }
 

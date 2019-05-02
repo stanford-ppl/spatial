@@ -177,6 +177,14 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.C
   */
 case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)
 
+/** Memories which are read in order to set up a given controller (i.e. setting up counter bounds or enables).
+  *
+  * Getter: sym.transientReadMems
+  * Setter: sym.transientReadMems = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class TransientReadMems(mems: Set[Sym[_]]) extends Data[TransientReadMems](SetBy.Analysis.Self)
+
 /** Marks top-level streaming controller as one derived from DRAM transfer during blackbox lowering.
   * Used for runtime performance modeling post-blackbox lowering
   *

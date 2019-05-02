@@ -27,10 +27,10 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
     dbgs(s"Attempt to bundle children of $lhs (${lhs.children.map(_.s.get)})")
     val bundling: HashMap[Int,Seq[Sym[_]]] = HashMap((0 -> Seq(lhs.children.head.s.get)))
     val prevMems: Set[Sym[_]] = Set()
-    (lhs.children.head.s.get.nestedWrittenMems.toSet ++ lhs.children.head.s.get.nestedReadMems.toSet).foreach(prevMems += _)
+    (lhs.children.head.s.get.nestedWrittenMems.toSet ++ lhs.children.head.s.get.nestedReadMems.toSet ++ lhs.children.head.s.get.nestedTransientReadMems.toSet).foreach(prevMems += _)
     lhs.children.drop(1).foreach{case cc => 
       val c = cc.s.get
-      val activeMems = c.nestedWrittenMems.toSet ++ c.nestedReadMems.toSet 
+      val activeMems = c.nestedWrittenMems.toSet ++ c.nestedReadMems.toSet ++ c.nestedTransientReadMems
       if (prevMems.intersect(activeMems).nonEmpty) {
         dbgs(s"Conflict between $prevMems and $activeMems! Placing $c in group ${bundling.toList.size}")
         prevMems.clear()
@@ -123,10 +123,14 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
 
     case ctrl@UnrolledForeach(ens, cchain, blk, is, vs, stopWhen) if (spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1) => 
       val bundling = precomputeBundling(lhs)
-      stage(UnrolledForeach(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen))
+      if (bundling.toList.size < lhs.children.size) {
+        stageWithFlow(UnrolledForeach(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
+      } else super.transform(lhs,rhs)
     case ctrl@UnrolledReduce(ens, cchain, blk, is, vs, stopWhen) if (spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1) => 
       val bundling = precomputeBundling(lhs)
-      stage(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen))
+      if (bundling.toList.size < lhs.children.size) {
+        stageWithFlow(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
+      } else super.transform(lhs,rhs)
 
     case _ => super.transform(lhs,rhs)
   }

@@ -51,6 +51,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
 
     if (lhs.isControl) {
+      lhs.transientReadMems = Set()
       lhs match {
         case Op(OpForeach(_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(OpReduce(_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true

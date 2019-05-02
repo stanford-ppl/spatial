@@ -416,6 +416,16 @@ package object control {
       s.foreach{sym => metadata.add(sym, ReadMems(mems)) }
     }
 
+    @stateful def nestedTransientReadMems: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.transientReadMems).toSet) }.getOrElse(Set.empty)
+    }
+    def transientReadMems: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[TransientReadMems](sym).map(_.mems) }.getOrElse(Set.empty)
+    }
+    def transientReadMems_=(mems: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, TransientReadMems(mems)) }
+    }
+
     def getLoweredTransfer: Option[TransferType] = {
       s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ).headOption }.headOption
     }

@@ -17,10 +17,10 @@ import spatial.dsl._
     Accel {
       val s1 = SRAM[T](dim0, dim1)
       val s2 = SRAM[T](dim1, dim1)
-      Parallel{
-        s1 load mat(0::dim0, 0::dim1)
-        s2 load other(0::dim1, 0::dim1)
-      }
+      // Parallel{
+      s1 load mat(0::dim0, 0::dim1)
+      s2 load other(0::dim1, 0::dim1)
+      // }
 
       val accum = Reg[T](0.to[T])
       Reduce(accum)(dim0 by 1, dim1 by 1) { (i,j) =>

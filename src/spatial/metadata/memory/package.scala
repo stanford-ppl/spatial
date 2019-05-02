@@ -139,6 +139,16 @@ package object memory {
 
     /** Returns the final port after unrolling. For use after unrolling only. */
     def port: Port = getPorts(0).flatMap(_.values.headOption).getOrElse{ throw new Exception(s"No final port defined for $s") }
+    def setBufPort(p: Int): Unit = {
+      val originalPortMetadata = getPorts
+      if (originalPortMetadata.isDefined) {
+        val originalPort = port
+        val newPort = Port(Some(p), originalPort.muxPort, originalPort.muxOfs, originalPort.castgroup, originalPort.broadcast)
+        metadata.remove(s, classOf[Ports])
+        originalPortMetadata.get.foreach{case (k,v) => metadata.add(s, Ports(Map((k -> Map((v.toList.head._1 -> newPort))))))}
+      }
+    }
+
   }
 
 

@@ -501,12 +501,12 @@ import utils.io.files._
       val llike_sram = SRAM[T](N_OBS, N_STATES)
       val path_sram = SRAM[Int](N_OBS)
 
-      Parallel{
-        obs_sram load obs_dram
-        init_sram load init_dram
-        transitions_sram load transitions_dram
-        emissions_sram load emissions_dram
-      }
+      // Parallel{
+      obs_sram load obs_dram
+      init_sram load init_dram
+      transitions_sram load transitions_dram
+      emissions_sram load emissions_dram
+      // }
 
       // from --> to
       Sequential.Foreach(0 until steps_to_take) { step =>
@@ -929,10 +929,10 @@ import utils.io.files._
       }
 
       // Store result
-      Parallel{
-        seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned
-        seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned
-      }
+      // Parallel{
+      seqa_dram_aligned(0::length*2 par par_store) store seqa_fifo_aligned
+      seqb_dram_aligned(0::length*2 par par_store) store seqb_fifo_aligned
+      // }
 
     }
 
@@ -2078,10 +2078,10 @@ import utils.io.files._
 
           val start_id = rowid_sram(i)
           val stop_id = rowid_sram(i+1)
-          Parallel{
-            Pipe{cols_sram load cols_dram(start_id :: stop_id par par_segment_load)}
-            Pipe{values_sram load values_dram(start_id :: stop_id par par_segment_load)}
-          }
+          // Parallel{
+          Pipe{cols_sram load cols_dram(start_id :: stop_id par par_segment_load)}
+          Pipe{values_sram load values_dram(start_id :: stop_id par par_segment_load)}
+          // }
           vec_sram gather vec_dram(cols_sram, stop_id - start_id)
           println("row " + {i + tile})
           val element = Reduce(Reg[T](0))(stop_id - start_id by 1 par red_par) { j => 

@@ -119,7 +119,10 @@ import spatial.dsl._
 
       val b_addr = Reg[Int](0)
       val a_addr = Reg[Int](0)
-      Parallel{b_addr := entry_point.row; a_addr := entry_point.col}
+      // Parallel{
+      b_addr := entry_point.row
+      a_addr := entry_point.col
+      // }
       val done_backtrack = Reg[Bit](false)
       FSM(0){state => state != doneState }{ state =>
         if (state == traverseState) {

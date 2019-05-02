@@ -40,18 +40,18 @@ import spatial.dsl._
 
       // Flush first few for scatter safety
       Foreach(anpe by 1){i =>  //dummy read of anpe
-        Parallel{
-          frontierNodes(i) = 0.to[Int]
-          // frontierCounts(i) = 0.to[Int]
-          frontierLevels(i) = 0.to[Int]
-          currentNodes(i) = 0.to[Int]
-          pieceMem(i) = 0.to[Int]
-        }
+        // Parallel{
+        frontierNodes(i) = 0.to[Int]
+        // frontierCounts(i) = 0.to[Int]
+        frontierLevels(i) = 0.to[Int]
+        currentNodes(i) = 0.to[Int]
+        pieceMem(i) = 0.to[Int]
+        // }
       }
-      Parallel {
-        frontierIds load ids(0 :: tileSize)
-        frontierCounts load counts(0 :: tileSize)
-      }
+      // Parallel {
+      frontierIds load ids(0 :: tileSize)
+      frontierCounts load counts(0 :: tileSize)
+      // }
 
       Sequential.Foreach(depth.value by 1) { i => /* Loop 1 */
         val nextLen = Reg[Int](1)

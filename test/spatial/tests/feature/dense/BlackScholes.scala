@@ -110,14 +110,14 @@ import spatial.dsl._
         val timeBlk   = SRAM[Float](B)
         val optpriceBlk = SRAM[Float](B)
 
-        Parallel {
-          typeBlk   load types(i::i+B par lp)
-          priceBlk  load prices(i::i+B par lp)
-          strikeBlk load strike(i::i+B par lp)
-          rateBlk   load rate(i::i+B par lp)
-          volBlk    load vol(i::i+B par lp)
-          timeBlk   load times(i::i+B par lp)
-        }
+        // Parallel {
+        typeBlk   load types(i::i+B par lp)
+        priceBlk  load prices(i::i+B par lp)
+        strikeBlk load strike(i::i+B par lp)
+        rateBlk   load rate(i::i+B par lp)
+        volBlk    load vol(i::i+B par lp)
+        timeBlk   load times(i::i+B par lp)
+        // }
 
         Foreach(B par ip){ j =>
           val price = BlkSchlsEqEuroNoDiv(priceBlk(j), strikeBlk(j), rateBlk(j), volBlk(j), timeBlk(j), typeBlk(j))

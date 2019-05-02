@@ -38,10 +38,10 @@ import spatial.lib._
 
       Sequential.Foreach (0 until length by tileSize) { i=>
 
-        Parallel {
-          sram1 load dram1(i::i+tileSize)
-          sram2 load dram2(i::i+tileSize)
-        }
+        // Parallel {
+        sram1 load dram1(i::i+tileSize)
+        sram2 load dram2(i::i+tileSize)
+        // }
 
         Pipe.Foreach (0 until tileSize) { j=>
           Sequential{

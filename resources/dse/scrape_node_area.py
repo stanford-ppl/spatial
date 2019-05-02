@@ -299,6 +299,10 @@ def collectIRNodeData():
 					declaration = True
 					sym = re.search('id=(x[0-9]+)>', line).group(1)
 					current = Node(sym + "_" + appname, sym, "FixMul")
+				if (line.find("FixMod") >= 0):
+					declaration = True
+					sym = re.search('id=(x[0-9]+)>', line).group(1)
+					current = Node(sym + "_" + appname, sym, "FixMod")
 				elif (line.find("FixDiv") >= 0):
 					declaration = True
 					sym = re.search('id=(x[0-9]+)>', line).group(1)

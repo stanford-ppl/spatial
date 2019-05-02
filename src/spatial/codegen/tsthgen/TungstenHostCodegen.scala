@@ -37,7 +37,7 @@ using namespace std;
       emit(s"""fprintf(stderr, "Help for app: ${config.name}\\n");""")
       emit(s"""fprintf(stderr, "  -- Args:    ${argsList.mkString(" ")}\\n");""")
       while(examples.hasNext) {
-        emit(s"""fprintf(stderr, "    -- Example: bash run.sh ${examples.next.mkString(" ")}\\n");""")  
+        emit(s"""fprintf(stderr, "    -- Example: ./tungsten ${examples.next.mkString(" ")}\\n");""")  
       }
   	  emit(s"""exit(1);""")
     close("}")

@@ -76,12 +76,14 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes, mop)
       })){lhs2 =>
         transferData(lhs,lhs2)
+        lhs2.unrollBy = redLanes.Ps.product
       }
     
     }
 
     val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
       transferData(lhs,lhs2)
+      lhs2.unrollBy = mapLanes.Ps.product
     }
     //accumulatesTo(lhs2) = accum
 
@@ -142,6 +144,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         // unrollReduceAccumulate[A,C](accum, values, mvalids(), ident, foldValue, reduce, loadAcc, storeAcc, isMap2.map(_.head), start, redLanes, isInner = false)
       })){lhs2 =>
         transferData(lhs,lhs2)
+        lhs2.unrollBy = redLanes.Ps.product
       }
     
     }
@@ -206,6 +209,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
       transferData(lhs,lhs2)
+      lhs2.unrollBy = mapLanes.Ps.product
     }
     //accumulatesTo(lhs2) = accum
 

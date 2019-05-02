@@ -21,7 +21,7 @@ import spatial.dsl._
       val dataInConfl = SRAM[Int](16,16)   // Should bank N = 8
       val dataInNoConfl = SRAM[Int](16,16) // Should duplicate (can't broadcast), N = 4 and 2
       val dataOut = SRAM[Int](4,16,16)     // Should bank N = 4
-      val cols_todo = SRAM[Int](16)
+      val cols_todo = SRAM[Int](16).noduplicate
       cols_todo load cols_dram
       dataInConfl load dram
       dataInNoConfl load dram

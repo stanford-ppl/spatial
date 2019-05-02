@@ -14,7 +14,7 @@ import spatial.dsl._
   val margin = 1
 
   def gda[T:Num](xCPU: Array[T], yCPU: Array[Int], mu0CPU: Array[T], mu1CPU: Array[T]): Array[T] = {
-    val ts = loadParam("ts", 20 (96 -> 19200))
+    val ts = loadParam("ts", 32 (96 -> 19200))
     val op = loadParam("op", 2 (1 -> 8))
     val mp = loadParam("mp", 2 (1 -> 8))
     val ip = loadParam("ip", 16 (1 -> 12))

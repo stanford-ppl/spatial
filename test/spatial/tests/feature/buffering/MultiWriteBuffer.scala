@@ -9,7 +9,7 @@ import spatial.dsl._
     val C = 16
 
     val mem = DRAM[Int](R, C)
-    val y = ArgOut[Int]
+    //val y = ArgOut[Int]
 
     Accel {
       val accum = SRAM[Int](R, C)

@@ -202,3 +202,10 @@ case class LoweredTransferSize(info: (Sym[_], Sym[_], Int)) extends Data[Lowered
   */
 case class UnrollAsPOM(should: Boolean) extends Data[UnrollAsPOM](SetBy.User)
 case class UnrollAsMOP(should: Boolean) extends Data[UnrollAsMOP](SetBy.User)
+
+/** 
+  * Set on unrolled unit pipes when loops are fully unrolled. Mark how much the loops are unrolled. Used by pir.
+  * Getter:  sym.unrollby
+  * Setter:  sym.unrollby = (int)
+  */
+case class UnrollBy(par: Int) extends Data[UnrollBy](SetBy.Analysis.Self)

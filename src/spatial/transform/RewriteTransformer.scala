@@ -37,7 +37,9 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     if (y.size==1) {
       x.from(y.head)
     } else {
-      stage(FixVecConstNew[S,I,F](y))
+      val b = boundVar[FixPt[S,I,F]]
+      b.vecConst = y
+      b
     }
   }
 

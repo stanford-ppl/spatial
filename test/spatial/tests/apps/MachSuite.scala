@@ -87,7 +87,7 @@ import utils.io.files._
     Accel{
       // Setup data structures
       val plaintext_flat = SRAM[UInt8](16).buffer
-      val plaintext_sram = RegFile[UInt8](4,4).buffer
+      val plaintext_sram = RegFile[UInt8](4,4).buffer.effort(2)
       val sbox_sram = SRAM[UInt8](256)
       val key_sram = SRAM[UInt8](32).buffer
       // val mix_lut = LUT[Int](4,4)(

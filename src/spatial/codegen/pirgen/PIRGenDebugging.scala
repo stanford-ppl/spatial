@@ -13,12 +13,12 @@ trait PIRGenDebugging extends PIRCodegen {
       //emit(src"val $lhs = if (${and(ens)}) System.out.print($msg)")
     case AssertIf(ens,cond,Some(msg)) => 
       state(lhs) { 
-        src"""AssertIf().ens($ens).cond($cond).msg($msg).tp(${lhs.sym.tp})"""
+        src"""AssertIf().en($ens).cond($cond).msg($msg).tp(${lhs.sym.tp})"""
       }
       //emit(src"val $lhs = if (${and(ens)}) { if (!$cond.toValidBoolean) { System.out.println($msg) }; assert($cond.toValidBoolean, $msg) }")
     case AssertIf(ens,cond,None)  => 
       state(lhs) { 
-        src"""AssertIf().ens($ens).cond($cond).tp(${lhs.sym.tp})"""
+        src"""AssertIf().en($ens).cond($cond).tp(${lhs.sym.tp})"""
       }
       //emit(src"val $lhs = if (${and(ens)}) assert($cond.toValidBoolean)")
 
@@ -27,7 +27,7 @@ trait PIRGenDebugging extends PIRCodegen {
 
     case ExitIf(ens) => 
       state(lhs) { 
-        src"""ExitIf().ens($ens)"""
+        src"""ExitIf().en($ens)"""
       }
       emit(src"""val $lhs = if (${and(ens)}) { System.out.println("${lhs.ctx}: Exit"); sys.exit() }""")
 

@@ -16,6 +16,7 @@ trait ReduceUnrolling extends UnrollingBase {
       val OpReduce(ens,cchain,accum,map,load,reduce,store,ident,fold,iters,stopWhen) = op
       implicit val A: Bits[a] = op.A
       val accum2 = accumHack(accum, load)
+      accum2.isInnerAccum = lhs.isInnerControl
 
       val stopWhen2 = if (stopWhen.isDefined) Some(memories((stopWhen.get,0)).asInstanceOf[Reg[Bit]]) else stopWhen
       if (cchain.willFullyUnroll) {
@@ -70,6 +71,7 @@ trait ReduceUnrolling extends UnrollingBase {
         }
       }
     })){lhs2 => transferData(lhs,lhs2) }
+    pipe.unrollBy = mapLanes.Ps.product
     dbgs(s"Created unit pipe ${stm(pipe)}")
     pipe
   }

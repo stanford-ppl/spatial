@@ -25,7 +25,7 @@ import spatial.dsl._
         if (sram1(d0, d1) != 0.0f) {
           sram2(d0,d1) = - sram1(d0, d1)
         } else {
-          sram2(d0,d1) = sram1(d0, d1)
+          sram2(d0,d1) = sram2(d0, d1)
         }
       }
 

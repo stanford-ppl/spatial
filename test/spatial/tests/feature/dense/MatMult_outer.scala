@@ -61,10 +61,10 @@ import spatial.dsl._
           val accum = SRAM[X](bm, bn)
                                  
           // Load A and B tiles
-          Parallel {
-            tileA load A(i::i+bm, k::k+bp par ip)
-            tileB load B(k::k+bp, j::j+bn par ip)
-          }
+          // Parallel {
+          tileA load A(i::i+bm, k::k+bp par ip)
+          tileB load B(k::k+bp, j::j+bn par ip)
+          // }
           
           // Perform matrix multiply on tile
           MemReduce(accum)(bp by 1 par mp){ kk =>

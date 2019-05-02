@@ -31,6 +31,7 @@ class SpatialConfig extends Config {
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
   var enableForceBanking: Boolean = false
+  var enableParallelBinding: Boolean = true
   var unrollMetapipeOfParallels: Boolean = true
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false

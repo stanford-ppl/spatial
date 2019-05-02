@@ -276,6 +276,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
+    cli.opt[Unit]("noBindParallels").action{ (_,_) => 
+      spatialConfig.enableParallelBinding = false
+    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
+
     cli.opt[Unit]("mop").action{ (_,_) => 
       spatialConfig.unrollMetapipeOfParallels = true
       spatialConfig.unrollParallelOfMetapipes = false

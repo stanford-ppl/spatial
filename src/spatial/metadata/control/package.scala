@@ -396,6 +396,9 @@ package object control {
       }
     }
 
+    @stateful def nestedWrittenMems: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.writtenMems).toSet) }.getOrElse(Set.empty)
+    }
     def writtenMems: Set[Sym[_]] = {
       s.flatMap{sym => metadata[WrittenMems](sym).map(_.mems) }.getOrElse(Set.empty)
     }
@@ -403,6 +406,9 @@ package object control {
       s.foreach{sym => metadata.add(sym, WrittenMems(mems)) }
     }
 
+    @stateful def nestedReadMems: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.readMems).toSet) }.getOrElse(Set.empty)
+    }
     def readMems: Set[Sym[_]] = {
       s.flatMap{sym => metadata[ReadMems](sym).map(_.mems) }.getOrElse(Set.empty)
     }
@@ -553,9 +559,14 @@ package object control {
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
+    @stateful def nestedChildren: Seq[Ctrl.Node] = {
+      if (s.isControl) toCtrl.nestedChildren
+      else throw new Exception(s"Cannot get nestedChildren of non-controller ${stm(s)}")
+    }
+
     @stateful def siblings: Seq[Ctrl.Node] = {
       if (s.isControl) parent.children
-      else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
+      else throw new Exception(s"Cannot get siblings of non-controller ${stm(s)}")
     }
 
     def parent: Ctrl = s.rawParent
@@ -635,6 +646,7 @@ package object control {
     def isControl: Boolean = true
 
     @stateful def children: Seq[Ctrl.Node] = toCtrl.children
+    @stateful def nestedChildren: Seq[Ctrl.Node] = toCtrl.nestedChildren
     @stateful def siblings: Seq[Ctrl.Node] = toCtrl.siblings
     def parent: Ctrl = toCtrl.parent
     def scope: Scope = scp
@@ -678,6 +690,28 @@ package object control {
       }
       // Subcontroller case - return all children which have this subcontroller as an owner
       case Ctrl.Node(sym,_) => sym.rawChildren.filter(_.scope.toCtrl == ctrl)
+
+      // The children of the host controller is all Accel scopes in the program
+      case Ctrl.Host => AccelScopes.all
+    }
+
+    @stateful def nestedChildren: Seq[Ctrl.Node] = ctrl match {
+      // "Master" controller case
+      case Ctrl.Node(sym, -1) => sym match {
+        case Op(ctrl: Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body,id) =>
+          val stage = Ctrl.Node(sym,id)
+          // If this is a pseudostage, transparently return all controllers under this pseudostage
+          if (body.isPseudoStage) sym.rawChildren.filter(_.scope.toCtrl == stage) ++ sym.rawChildren.filter(_.scope.toCtrl == stage).flatMap(_.nestedChildren)
+          // Otherwise return the subcontroller for this "future" stage
+          else Seq(Ctrl.Node(sym, id))
+        }
+
+        case Op(ctrl: IfThenElse[_]) => sym.rawChildren ++ sym.rawChildren.flatMap(_.nestedChildren) // Fixme?
+
+        case _ => throw new Exception(s"Cannot get children of non-controller.")
+      }
+      // Subcontroller case - return all children which have this subcontroller as an owner
+      case Ctrl.Node(sym,_) => sym.rawChildren.filter(_.scope.toCtrl == ctrl) ++ sym.rawChildren.filter(_.scope.toCtrl == ctrl).flatMap(_.nestedChildren)
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all

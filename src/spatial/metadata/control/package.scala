@@ -426,6 +426,9 @@ package object control {
       s.foreach{sym => metadata.add(sym, TransientReadMems(mems)) }
     }
 
+    def shouldNotBind: Boolean = s.flatMap{sym => metadata[ShouldNotBind](sym).map(_.f) }.getOrElse(false)
+    def shouldNotBind_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, ShouldNotBind(f))}
+
     def getLoweredTransfer: Option[TransferType] = {
       s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ).headOption }.headOption
     }

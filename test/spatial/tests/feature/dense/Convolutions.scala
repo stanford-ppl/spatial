@@ -382,7 +382,7 @@ import spatial.dsl._
         // Fetch data
         // Parallel{
         in_fifos.zipWithIndex.map{case (f, i) => 
-          f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
         // }
 
@@ -496,7 +496,7 @@ import spatial.dsl._
         // Fetch data
         // Parallel{
         in_fifos.zipWithIndex.map{case (f, i) => 
-          f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
         // }
 
@@ -1132,7 +1132,7 @@ import spatial.dsl._
         // Fetch data
         // Parallel{
         in_fifos.zipWithIndex.map{case (f, i) => 
-          f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
         // }
 

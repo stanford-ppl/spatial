@@ -80,6 +80,8 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def noduplicate: C[A] = { this.isNoDuplicate = true; me }
   /** Do not attempt to bank memory with block-cyclic schemes */
   def noblockcyclic: C[A] = { this.noBlockCyclic = true; me }
+  /** Specify banking search effort for this memory */
+  def effort(e: Int): C[A] = { this.bankingEffort = e; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

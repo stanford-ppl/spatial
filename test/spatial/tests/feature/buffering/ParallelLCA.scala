@@ -16,11 +16,11 @@ import spatial.dsl._
     assert(getcol < 8)
     val arg = ArgIn[Int]
     setArg(arg, getcol)
-    val argout = ArgOut[Int]
+    //val argout = ArgOut[Int]
     val dram = DRAM[Int](8)
     Accel{
-      val mem = RegFile[Int](8,8)
-      val mem2 = RegFile[Int](8)
+      val mem = SRAM[Int](8,8)
+      val mem2 = SRAM[Int](8)
       Foreach(8 by 1 par 3){i => 
         Foreach(8 by 1) {_ => 
           val col = arg.value

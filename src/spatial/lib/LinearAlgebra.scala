@@ -189,8 +189,10 @@ trait LinearAlgebra {
       Stream.Foreach(M par MP, N par NP){(i,j) =>
         val prod = FIFO[T](2)
         Pipe{prod.enq(Reduce(Reg[T])(K by 1 par KP){k => getA(i,k) * getB(k,j) }{_+_})}
-        val out = prod.deq*alpha + getC(i,j)*beta
-        storeY(i,j, out)
+        Pipe{
+          val out = prod.deq*alpha + getC(i,j)*beta
+          storeY(i,j, out)
+        }
       }
       
       // // Proposed in issue #44:

@@ -33,7 +33,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   var regchainsMapping =  scala.collection.mutable.HashMap[Sym[_], List[BufMapping]]()
 
   /** Map between cchain and list of controllers it is copied for, due to stream controller logic */
-  var cchainCopies = scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]()
+  val cchainCopies = scala.collection.mutable.HashMap[Sym[_], List[Sym[_]]]()
 
   override def named(s: Sym[_], id: Int): String = {
     val name = s.op match {

@@ -177,8 +177,8 @@ object Math {
       result_upcast.r := a_upcast.r - b_upcast.r
 
       // Downcast to result
-      val expect_neg = if (a.s | b.s) a_upcast.msb & b_upcast.msb   else false.B
-      val expect_pos = if (a.s | b.s) !a_upcast.msb & !b_upcast.msb else true.B
+      val expect_neg = if (a.s | b.s) a_upcast.msb & !b_upcast.msb else true.B
+      val expect_pos = if (a.s | b.s) !a_upcast.msb & b_upcast.msb else false.B
       val fix2fixBox = Module(new fix2fixBox(result_upcast.s, result_upcast.d, result_upcast.f, result.s, result.d, result.f, round, overflow, latency, myName))
       fix2fixBox.io.a := result_upcast.r
       fix2fixBox.io.expect_neg := expect_neg

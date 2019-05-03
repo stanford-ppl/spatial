@@ -38,7 +38,8 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    type T = FixPt[TRUE,_32,_32]
+    //type T = FixPt[TRUE,_32,_32]
+    type T = Int
     val ii = args(0).to[Int]
     val cols = args(1).to[Int]
     val size = paddedCols
@@ -55,6 +56,7 @@ import spatial.dsl._
     println("src:" + gold)
     println("dst:" + dst)
     val cksum = gold == dst
+    println("PASS: " + cksum + " (UnalignedLoad1D)")
     assert(cksum)
   }
 }

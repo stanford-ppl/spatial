@@ -48,14 +48,15 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
     lhs.children.drop(1).zipWithIndex.foreach{case (cc,i) => 
       val c = cc.s.get
       val activeMems = c.nestedWrittenMems.toSet ++ c.nestedReadMems.toSet ++ c.nestedTransientReadMems
+      val addressableMems = (activeMems ++ prevMems).filter(!_.isReg)
       val activeWrMems = c.nestedWrittenMems.toSet
       val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind) | (c.isSwitch && c.op.exists(_.R.isBits))
       val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind) | (lhs.children.apply(i).s.get.isSwitch && lhs.children.apply(i).s.get.op.exists(_.R.isBits))
-      if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
+      if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems ++ addressableMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
         dbgs(s"Conflict between:")
         dbgs(s" - Prev rd/wr: $prevMems")
         dbgs(s" - Next rd/wr: $activeMems")
-        dbgs(s" - Next + Prev wr: ${prevWrMems ++ activeWrMems}")
+        dbgs(s" - Next wr + Prev wr + addressable: ${prevWrMems ++ activeWrMems ++ addressableMems}")
         dbgs(s" - (or someone should not bind next: $nextShouldNotBind prev: $prevShouldNotBind)!")
         dbgs(s"Placing $c in group ${bundling.toList.size}")
         prevMems.clear()

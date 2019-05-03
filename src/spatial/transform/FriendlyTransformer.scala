@@ -80,6 +80,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       def noHostGet(tp: String): Sym[A] = {
         error(ctx, s"Getting $tp outside Accel is disallowed. Use a HostIO or ArgOut.")
         error(ctx)
+        IR.logError()
         err[A](s"Get $tp in host")
       }
 
@@ -103,6 +104,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       def noHostRead(tp: String): Sym[A] = {
         error(ctx, s"Reading $tp outside Accel is disallowed. Use a HostIO or ArgOut.")
         error(ctx)
+        IR.logError()
         err[A](s"Read $tp in host")
       }
 
@@ -132,11 +134,13 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       def noHostWrite(tp: String): Sym[A] = {
         error(ctx, s"Writing $tp outside Accel is disallowed. Use a HostIO or ArgIn.")
         error(ctx)
+        IR.logError()
         err[A](s"Write $tp in host")
       }
       def noAccelWrite(tp: String): Sym[A] = {
         error(ctx, s"Writing $tp inside Accel is disallowed. Use a HostIO or ArgOut.")
         error(ctx)
+        IR.logError()
         err[A](s"Write $tp in Accel")
       }
       if (!inHw) {
@@ -165,11 +169,13 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       def noHostWrite(tp: String): Sym[A] = {
         error(ctx, s"Setting $tp outside Accel is disallowed. Use a HostIO or ArgIn.")
         error(ctx)
+        IR.logError()
         err[A](s"Write $tp in host")
       }
       def noAccelWrite(tp: String): Sym[A] = {
         error(ctx, s"Setting $tp inside Accel is disallowed. Use a HostIO or ArgOut.")
         error(ctx)
+        IR.logError()
         err[A](s"Write $tp in Accel")
       }
 

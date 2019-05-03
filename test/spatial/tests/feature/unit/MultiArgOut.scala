@@ -31,6 +31,7 @@ import spatial.dsl._
 
     println("xx = " + xx + ", yy = " + yy)
     val cksum = (xx == i) && (yy == j)
+    println("PASS: " + cksum + " (MultiArgOut)")
     assert(cksum)
   }
 }

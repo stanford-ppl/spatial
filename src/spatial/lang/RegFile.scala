@@ -65,6 +65,8 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   /** Do not buffer memory */
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
+  /** Specify banking search effort for this memory */
+  def effort(e: Int): C[A] = { this.bankingEffort = e; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)

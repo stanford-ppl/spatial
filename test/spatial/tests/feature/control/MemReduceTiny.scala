@@ -22,6 +22,8 @@ import spatial.dsl._
     val golden = Matrix.tabulate(32,32){(j,k) => (j + k)*32 }
     printMatrix(golden, "Wanted:")
     printMatrix(result, "Got:")
-    assert(result == golden)
+    val cksum = result == golden
+    println("PASS: " + cksum + " (MemReduceTiny)")
+    assert(cksum)
   }
 }

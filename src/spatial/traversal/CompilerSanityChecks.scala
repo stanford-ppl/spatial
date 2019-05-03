@@ -5,6 +5,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
 import spatial.metadata.control._
+import spatial.metadata.bounds._
 import spatial.issues.ControlPrimitiveMix
 
 /** Used to automatically detect invalid changes that occurred during transformations. */
@@ -30,7 +31,7 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
 
   def check[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     val inputs = rhs.nonBlockSymInputs
-    val unknownInputs = inputs.toSet diff nestedScope
+    val unknownInputs = (inputs.toSet diff nestedScope).filterNot { _.vecConst.nonEmpty }
     if (unknownInputs.nonEmpty) {
       bug(lhs.ctx, s"Statement $lhs = $rhs used one or more undefined values: ")
       unknownInputs.foreach { in =>

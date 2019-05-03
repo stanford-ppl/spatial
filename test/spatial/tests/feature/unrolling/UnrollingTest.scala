@@ -21,7 +21,9 @@ import spatial.dsl._
     }
 
     println(getArg(o))
-    assert(o == 32)
+    val cksum = (o == 32)
+    println("PASS: " + cksum + " (UnrollingTest)")
+    assert(cksum)
   }
 
 }

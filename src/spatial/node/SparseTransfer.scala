@@ -8,6 +8,7 @@ import spatial.metadata.memory._
 import spatial.metadata.control._
 import spatial.metadata.bounds._
 import spatial.util.memops._
+import spatial.util.spatialConfig
 import spatial.util.modeling.target
 
 /** A sparse transfer between on-chip and off-chip memory.
@@ -61,11 +62,14 @@ object SparseTransfer {
 
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 
-    // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
-    
-    val iters = mux(requestLength == 0.to[I32], 0.to[I32], 
+    val iters = if (spatialConfig.enablePIR) {
+      requestLength
+    } else {
+      // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
+      mux(requestLength == 0.to[I32], 0.to[I32], 
       mux(requestLength < 16.to[I32], 16.to[I32],
         mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) )))
+    }
 
     val top = Stream {
       val addrsFIFO = addrs.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}

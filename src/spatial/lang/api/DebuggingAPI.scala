@@ -13,7 +13,7 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   this: StaticAPI_Shadowing =>
 
   // TODO: Does this still work?
-  @api def sleep(cycles: I32): Void = Foreach(cycles by 1){_ =>  }
+  @api def sleep(cycles: I32): Void = Pipe.NoBind.Foreach(cycles by 1){_ =>  }
 
   /** Prints the given Array to the console, preceded by an optional heading. **/
   @virtualize

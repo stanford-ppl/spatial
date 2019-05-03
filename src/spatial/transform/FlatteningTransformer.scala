@@ -7,7 +7,7 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.traversal.AccelTraversal
 import spatial.util.spatialConfig
-import scala.collection.mutable.{Set,HashMap}
+import scala.collection.mutable.{Set,HashMap,ListBuffer}
 
 /** Converts inner pipes that contain switches into innerpipes with enabled accesses.
   * Also squashes outer unit pipes that contain only one child
@@ -28,11 +28,13 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
     val bundling: HashMap[Int,Seq[Sym[_]]] = HashMap((0 -> Seq(lhs.children.head.s.get)))
     val prevMems: Set[Sym[_]] = Set()
     (lhs.children.head.s.get.nestedWrittenMems.toSet ++ lhs.children.head.s.get.nestedReadMems.toSet ++ lhs.children.head.s.get.nestedTransientReadMems.toSet).foreach(prevMems += _)
-    lhs.children.drop(1).foreach{case cc => 
+    lhs.children.drop(1).zipWithIndex.foreach{case (cc,i) => 
       val c = cc.s.get
       val activeMems = c.nestedWrittenMems.toSet ++ c.nestedReadMems.toSet ++ c.nestedTransientReadMems
-      if (prevMems.intersect(activeMems).nonEmpty) {
-        dbgs(s"Conflict between $prevMems and $activeMems! Placing $c in group ${bundling.toList.size}")
+      val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind)
+      val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind)
+      if (prevMems.intersect(activeMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
+        dbgs(s"Conflict between $prevMems and $activeMems (or someone should not bind next: $nextShouldNotBind prev: $prevShouldNotBind)! Placing $c in group ${bundling.toList.size}")
         prevMems.clear()
         bundling += (bundling.toList.size -> Seq(c))
       } else {
@@ -49,7 +51,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
 
   private def applyBundling(bundling: HashMap[Int, Seq[Sym[_]]], block: Block[Void]): Block[Void] = {
     var curGrp = 0
-    val bundledStms: Set[Sym[_]] = Set()
+    val bundledStms: ListBuffer[Sym[_]] = ListBuffer()
     stageBlock{
       block.stms.foreach{ stm => 
         // Add stm to roster if it is a ctrl to be bundled

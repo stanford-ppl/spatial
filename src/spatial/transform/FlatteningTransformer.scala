@@ -9,6 +9,21 @@ import spatial.traversal.AccelTraversal
 import spatial.util.spatialConfig
 import scala.collection.mutable.{Set,HashMap,ListBuffer}
 
+
+import argon.node._
+import argon.codegen.Codegen
+import argon.node._
+import spatial.lang._
+import spatial.node._
+import spatial.metadata.bounds._
+import spatial.metadata.access._
+import spatial.metadata.retiming._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.types._
+import spatial.util.modeling.scrubNoise
+
+
 /** Converts inner pipes that contain switches into innerpipes with enabled accesses.
   * Also squashes outer unit pipes that contain only one child
   */
@@ -27,21 +42,31 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
     dbgs(s"Attempt to bundle children of $lhs (${lhs.children.map(_.s.get)})")
     val bundling: HashMap[Int,Seq[Sym[_]]] = HashMap((0 -> Seq(lhs.children.head.s.get)))
     val prevMems: Set[Sym[_]] = Set()
-    (lhs.children.head.s.get.nestedWrittenMems.toSet ++ lhs.children.head.s.get.nestedReadMems.toSet ++ lhs.children.head.s.get.nestedTransientReadMems.toSet).foreach(prevMems += _)
+    val prevWrMems: Set[Sym[_]] = Set()
+    (lhs.children.head.s.get.nestedWrittenMems ++ lhs.children.head.s.get.nestedReadMems ++ lhs.children.head.s.get.nestedTransientReadMems).foreach(prevMems += _)
+    (lhs.children.head.s.get.nestedWrittenMems).foreach{x => prevWrMems += x}
     lhs.children.drop(1).zipWithIndex.foreach{case (cc,i) => 
       val c = cc.s.get
       val activeMems = c.nestedWrittenMems.toSet ++ c.nestedReadMems.toSet ++ c.nestedTransientReadMems
-      val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind)
-      val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind)
-      if (prevMems.intersect(activeMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
-        dbgs(s"Conflict between $prevMems and $activeMems (or someone should not bind next: $nextShouldNotBind prev: $prevShouldNotBind)! Placing $c in group ${bundling.toList.size}")
+      val activeWrMems = c.nestedWrittenMems.toSet
+      val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind) | (c.isSwitch && c.op.exists(_.R.isBits))
+      val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind) | (lhs.children.apply(i).s.get.isSwitch && lhs.children.apply(i).s.get.op.exists(_.R.isBits))
+      if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
+        dbgs(s"Conflict between:")
+        dbgs(s" - Prev rd/wr: $prevMems")
+        dbgs(s" - Next rd/wr: $activeMems")
+        dbgs(s" - Next + Prev wr: ${prevWrMems ++ activeWrMems}")
+        dbgs(s" - (or someone should not bind next: $nextShouldNotBind prev: $prevShouldNotBind)!")
+        dbgs(s"Placing $c in group ${bundling.toList.size}")
         prevMems.clear()
+        prevWrMems.clear()
         bundling += (bundling.toList.size -> Seq(c))
       } else {
-        dbgs(s"No dependencies detected between next child deps (${activeMems}) and prev bundle deps (${prevMems}).  Grouping $c in group ${bundling.toList.size-1}")
+        dbgs(s"No dependencies detected between next child deps prev bundle deps.  Grouping $c in group ${bundling.toList.size-1}")
         bundling += ((bundling.toList.size - 1) -> (bundling(bundling.toList.size - 1) ++ Seq(c)))
       }
       activeMems.foreach{x => prevMems += x}
+      activeWrMems.foreach{x => prevWrMems += x}
     }
     bundling.toList.sortBy(_._1).map{case (grp, children) => 
       dbgs(s"Bundled child $grp contains $children")

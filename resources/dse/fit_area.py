@@ -36,6 +36,7 @@ XilinxFPGAResourceTargets = [
 type = "par"
 input_file = "regression_full." + type + ".csv"
 df = pd.read_csv(input_file, header=0)
+trained_model_dir = "./trained_models/"
 df.sort_values(by='nodetype', axis=0, inplace=True)
 names = df['nodetype'].unique().tolist()
 subframes = [df.loc[df.nodetype == name].dropna(axis=1, how='all') for name in names]

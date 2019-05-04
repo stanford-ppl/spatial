@@ -6,6 +6,7 @@ import spatial.dsl._
     override def dseModelArgs: Args = "512 512"
     override def finalModelArgs: Args = "512 512"
     override def runtimeArgs: Args = "512 512"
+    override def compileArgs: Args = super.compileArgs and "--noBindParallels"
    def main(args: Array[String]): Unit = {
     val M = ArgIn[Int] //8192
     setArg(M, args(0).to[Int])

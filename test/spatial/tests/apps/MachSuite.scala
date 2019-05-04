@@ -578,6 +578,7 @@ import utils.io.files._
                                                
   */
 
+  override def compileArgs: Args = super.compileArgs and "--noBindParallels"
 
 
   def main(args: Array[String]): Unit = {

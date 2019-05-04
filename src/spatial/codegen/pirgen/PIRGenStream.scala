@@ -9,7 +9,7 @@ trait PIRGenStream extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@StreamInNew(bus)  =>
-      stateMem(lhs, "FIFO()", None)
+      stateMem(lhs, "FIFO()")
       bus match {
         case bus:DRAMBus[_] =>
         case bus =>
@@ -17,7 +17,7 @@ trait PIRGenStream extends PIRCodegen {
       }
 
     case op@StreamOutNew(bus) =>
-      stateMem(lhs, "FIFO()", None)
+      stateMem(lhs, "FIFO()")
       bus match {
         case bus:DRAMBus[_] =>
         case bus =>

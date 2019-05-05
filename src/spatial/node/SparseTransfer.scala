@@ -89,7 +89,8 @@ object SparseTransfer {
         //   command or else the controller will stall
 
         (requestLength, iters) match {
-          case (Final(requestLength), Final(iters)) if iters >= requestLength => // Special case iters == requestLength
+          case (Final(requestLength), Final(iters)) if iters >= requestLength & spatialConfig.enablePIR => // Special case iters == requestLength
+            //TODO: some how this break FPAG backend
             Foreach(iters par p){i =>
               val addr: I64 = ((addrs.__read(Seq(i),Set()) + origin) * bytesPerWord).to[I64] + dram.address
               val addr_bytes = addr
@@ -126,7 +127,7 @@ object SparseTransfer {
         val ackBus = StreamIn[Bit](ScatterAckBus)
 
         (requestLength, iters) match {
-          case (Final(requestLength), Final(iters)) if iters >= requestLength => // Special case iters == requestLength
+          case (Final(requestLength), Final(iters)) if iters >= requestLength & spatialConfig.enablePIR => // Special case iters == requestLength
             // Send
             Foreach(iters par p){i =>
               val pad_addr = max(requestLength - 1, 0.to[I32])

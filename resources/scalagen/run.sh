@@ -1,3 +1,4 @@
 #!/bin/bash
 
-sbt -batch "run $@"
+args=$@
+sbt -batch "run $args"

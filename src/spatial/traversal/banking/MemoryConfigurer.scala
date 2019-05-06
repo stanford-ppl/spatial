@@ -37,7 +37,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   lazy val nStricts: Seq[NStrictness] = Seq(NPowersOf2, NBestGuess, NRelaxed)
   lazy val aStricts: Seq[AlphaStrictness] = Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
-  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isDuplicatable & !mem.isNoDuplicate) RegroupHelper.regroupAny(rank) else RegroupHelper.regroupNone
+  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isDuplicatable & !mem.isNoDuplicate & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) else RegroupHelper.regroupNone
 
 
   def configure(): Unit = {

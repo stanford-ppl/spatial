@@ -3,12 +3,13 @@ package spatial.traversal
 import argon._
 import argon.passes.Pass
 import poly.ISL
+import models.AreaEstimator
 
 import spatial.traversal.banking._
 import spatial.lang._
 import spatial.metadata.memory.LocalMemories
 
-case class MemoryAnalyzer(IR: State)(implicit isl: ISL) extends Pass {
+case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator) extends Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()
 
   override protected def process[R](block: Block[R]): Block[R] = {

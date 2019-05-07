@@ -3,6 +3,7 @@ package spatial
 import argon._
 import argon.passes.IRPrinter
 import poly.{ConstraintMatrix, ISL}
+import models.AreaEstimator
 import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
@@ -55,6 +56,8 @@ trait Spatial extends Compiler with ParamLoader {
   def runPasses[R](block: Block[R]): Block[R] = {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
+    implicit val areamodel: AreaEstimator = new AreaEstimator
+    areamodel.startup() 
 
     // --- Debug
     lazy val printer = IRPrinter(state, enable = config.enDbg)
@@ -193,6 +196,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
+        // (spatialConfig.useAreaModels ? areaModelReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
         (spatialConfig.enableTsth ? tsthCodegen) ==>
         irCodegen           
@@ -353,6 +357,10 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("noAreaModels").action { (_,_) => 
+      spatialConfig.useAreaModels = false
+    }.text("Only use crude models for estimating area during banking, and do not generate area report.  Use this flag if you do not have the correct python dependencies to run modeling")
 
     cli.opt[Unit]("instrument").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true

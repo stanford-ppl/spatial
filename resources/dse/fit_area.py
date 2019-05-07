@@ -14,6 +14,7 @@ from sklearn.pipeline import make_pipeline
 
 import xgboost as xgb
 
+# This is for querying the estimated area of a given spatial node
 
 class ReportStats(namedtuple('ReportStats', ['mse', 'mae', 'r2', 'abs_error', 'rel_error', \
                                              'failed_node_names', 'failed_node_gold', 'failed_node_pred'
@@ -268,7 +269,7 @@ FIFOSess = IRTrainingSession(
         "mem_p0"
     ]
 )
-
+# [1,1,1,1,1,8,1,1,1,1,1,1,1,1,1,32,2048,1,1,1,1,1,8,8,8,2,1,1,1,1,1,8,1,1,1,1]
 SRAMSess = IRTrainingSession(
     "SRAMNew",
     [

@@ -206,41 +206,109 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   [Space]   for all b in B: a and b do not conflict (never overlap or can be broadcast)
     * If no such groups exist, a is placed in a new group S' = {a}
     */
+  //protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
+    //val groups = ArrayBuffer[Set[AccessMatrix]]()
+    //val isWrite = accesses.exists(_.access.isWriter)
+    //val tp = if (isWrite) "Write" else "Read"
+
+    //dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
+
+    //import scala.math.Ordering.Implicits._  // Seq ordering
+    //val sortedAccesses = accesses.toSeq.sortBy{x => (x.access.toString, x.unroll)}
+
+    //sortedAccesses.foreach{a =>
+      //dbg(s"    Access: ${a.short} [${a.parent}]")
+      //val grpId = {
+        //if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
+        //else groups.zipWithIndex.indexWhere{case (grp, i) =>
+          //// Filter for accesses that require concurrent port access AND either don't overlap or are identical.
+          //// Should drop in data broadcasting node in this case
+          //val samePort = grp.filter{b => requireConcurrentPortAccess(a, b) }
+          //// A conflict occurs if there are accesses on the same port with overlapping addresses
+          //// for which we can cannot create a broadcaster read
+          //// (either because they are not lockstep, not reads, or because broadcasting is disabled)
+          //val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)}
+          //samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
+          //if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
+          //else                    dbg(s"      Group #$i conflicts: <none>")
+          //if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
+
+          //if (samePort.nonEmpty)  dbg(s"      Group #$i same port: <${samePort.size} accesses>")
+          //else                    dbg(s"      Group #$i same port: <none> ")
+          //if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
+
+          //samePort.nonEmpty && conflicts.isEmpty
+        //}
+      //}
+      //if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
+    //}
+
+    //if (config.enDbg) {
+      //if (groups.isEmpty) dbg(s"\n  <No $tp Groups>") else dbg(s"  ${groups.length} $tp Groups:")
+      //groups.zipWithIndex.foreach { case (grp, i) =>
+        //dbg(s"  Group #$i")
+        //grp.foreach{matrix => dbgss("    ", matrix) }
+      //}
+    //}
+    //groups.toSet
+  //}
+
+  /*
+   * Given a list and a reduction lambda, 
+   *  if a and b can be reduced, reduce return Some(c) else None
+   * continues call reduce function on list until no two element in the list can be
+   * further reduced. 
+   * Notice there might be different result based on the order called on elements in list
+   * */
+  def partialReduce[A](list:List[A])(reduce:(A,A) => Option[A]):List[A] = {
+    val queue = scala.collection.mutable.ListBuffer[A]()
+    val reduced = scala.collection.mutable.Queue[A]()
+    queue ++= list
+    while (queue.nonEmpty) {
+      val a = queue.remove(0)
+      val cs = queue.flatMap { b => reduce(a,b).map { c => (b,c) } }
+      if (cs.isEmpty) reduced += a
+      else {
+        cs.foreach { case (b,c) =>
+          queue -= b
+          queue +=c
+        }
+      }
+    }
+    reduced.toList
+  }
+
   protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
-    val groups = ArrayBuffer[Set[AccessMatrix]]()
     val isWrite = accesses.exists(_.access.isWriter)
     val tp = if (isWrite) "Write" else "Read"
 
     dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
 
-    import scala.math.Ordering.Implicits._  // Seq ordering
-    val sortedAccesses = accesses.toSeq.sortBy{x => (x.access.toString, x.unroll)}
+    val cache = scala.collection.mutable.Map[(AccessMatrix, AccessMatrix), Boolean]()
+    def canGroup(a:AccessMatrix, b:AccessMatrix) = cache.getOrElseUpdate((a,b),{
+      val samePort = requireConcurrentPortAccess(a, b)
+      val conflict = if (samePort) {
+        a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
+      } else false
+      val dephaseIter = if (samePort) dephasingIters(a,b,mem) else Set.empty
+      dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict dephaseIter:$dephaseIter")
+      samePort && !conflict
+    })
 
-    sortedAccesses.foreach{a =>
-      dbg(s"    Access: ${a.short} [${a.parent}]")
-      val grpId = {
-        if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
-        else groups.zipWithIndex.indexWhere{case (grp, i) =>
-          // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
-          // Should drop in data broadcasting node in this case
-          val samePort = grp.filter{b => requireConcurrentPortAccess(a, b) }
-          // A conflict occurs if there are accesses on the same port with overlapping addresses
-          // for which we can cannot create a broadcaster read
-          // (either because they are not lockstep, not reads, or because broadcasting is disabled)
-          val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)}
-          samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
-          if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
-          else                    dbg(s"      Group #$i conflicts: <none>")
-          if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
-
-          if (samePort.nonEmpty)  dbg(s"      Group #$i same port: <${samePort.size} accesses>")
-          else                    dbg(s"      Group #$i same port: <none> ")
-          if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
-
-          samePort.nonEmpty && conflicts.isEmpty
-        }
+    // Start to build groups within each access symbol. 
+    val accessGroups = accesses.groupBy { _.access }.map { case (access, as) =>
+      val grps = as.foldLeft(Seq[Set[AccessMatrix]]()) { case (grps, a) =>
+        val gid = grps.indexWhere { grp => grp.forall { b => canGroup(a,b) } }
+        if (gid == -1) grps :+ Set(a)
+        else grps.zipWithIndex.map { case (grp, `gid`) => grp+a; case (grp, gid) => grp }
       }
-      if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
+      dbg(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
+      grps
+    }
+
+    // Next try to merge groups across access symbols.
+    val groups = partialReduce(accessGroups.flatten.toList) { case (grp1, grp2) =>
+      if (grp1.forall { a => grp2.forall { b => canGroup(a,b) }}) Some(grp1 ++ grp2) else None
     }
 
     if (config.enDbg) {
@@ -250,6 +318,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         grp.foreach{matrix => dbgss("    ", matrix) }
       }
     }
+
     groups.toSet
   }
 

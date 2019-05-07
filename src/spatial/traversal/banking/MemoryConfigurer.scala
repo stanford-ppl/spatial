@@ -149,17 +149,16 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       instances.zipWithIndex.foreach { case (inst, dispatch) =>
         def checkAccess(groups:Set[Set[AccessMatrix]]) = {
           // Mapping of access matrix => group id
-          val groupMap = groups.zipWithIndex.flatMap { case (grp, gid) => grp.map { mat => (mat, gid) } }.toMap
-          groups.flatten.groupBy { _.access }.foreach { case (access, mats) =>
-            val gids = mats.map { mat => groupMap(mat) }
-            val castgroup = mats.map { mat => inst.ports(mat).castgroup}
-            if (gids.size > 1 && castgroup.size > 1) {
+          val groupMap = groups.zipWithIndex.flatMap { case (grp, gid) => grp.map { a => (a, gid) } }.toMap
+          groups.flatten.groupBy { _.access }.foreach { case (access, ams) =>
+            val gids = ams.map { a => groupMap(a) }
+            if (gids.size > 1) {
               error(s"//TODO: Plasticine does not support unbanked unrolled access at the moment. ")
               error(s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})")
               error(s"access=$access (${access.ctx})")
               error(s"AccessMatrix:")
-              mats.foreach { mat => 
-                error(s"$mat castgroup:${inst.ports(mat).castgroup}")
+              ams.foreach { a => 
+                error(s"$a")
               }
               state.logError()
             }
@@ -206,6 +205,10 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     else true
   }
 
+
+  protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = 
+    groupAccesses2(accesses)
+
   /** Group accesses on this memory.
     *
     * For some access a to this memory and some existing group S:
@@ -217,7 +220,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   [Space]   for all b in B: a and b do not conflict (never overlap or can be broadcast)
     * If no such groups exist, a is placed in a new group S' = {a}
     */
-  protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
+  protected def groupAccesses1(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val groups = ArrayBuffer[Set[AccessMatrix]]()
     val isWrite = accesses.exists(_.access.isWriter)
     val tp = if (isWrite) "Write" else "Read"
@@ -261,6 +264,78 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         grp.foreach{matrix => dbgss("    ", matrix) }
       }
     }
+    groups.toSet
+  }
+
+  /*
+   * Given a list and a reduction lambda, 
+   *  if a and b can be reduced, reduce return Some(c) else None
+   * continues call reduce function on list until no two element in the list can be
+   * further reduced. 
+   * Notice there might be different result based on the order called on elements in list
+   * */
+  def partialReduce[A](list:List[A])(reduce:(A,A) => Option[A]):List[A] = {
+    val queue = scala.collection.mutable.ListBuffer[A]()
+    val reduced = scala.collection.mutable.Queue[A]()
+    queue ++= list
+    while (queue.nonEmpty) {
+      val a = queue.remove(0)
+      val cs = queue.flatMap { b => reduce(a,b).map { c => (b,c) } }
+      if (cs.isEmpty) reduced += a
+      else {
+        cs.foreach { case (b,c) =>
+          queue -= b
+          queue +=c
+        }
+      }
+    }
+    reduced.toList
+  }
+
+  protected def groupAccesses2(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
+    val isWrite = accesses.exists(_.access.isWriter)
+    val tp = if (isWrite) "Write" else "Read"
+
+    dbgs(s"  Grouping ${accesses.size} ${tp}s: ")
+
+    // Cache results. Potentially improve performance
+    val cache = scala.collection.mutable.Map[(AccessMatrix, AccessMatrix), Boolean]()
+    // Two accesses can be grouped if they are in the same port and they don't conflict
+    def canGroup(a:AccessMatrix, b:AccessMatrix) = cache.getOrElseUpdate((a,b),{
+      val samePort = requireConcurrentPortAccess(a, b)
+      val conflict = if (samePort) {
+        a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
+      } else false
+      val dephaseIter = if (samePort) dephasingIters(a,b,mem) else Set.empty
+      dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict dephaseIter:$dephaseIter")
+      samePort && !conflict
+    })
+
+    // Start to build groups within each access symbol. 
+    import scala.math.Ordering.Implicits._  // Seq ordering
+    val accessGroups = accesses.groupBy { _.access }.map { case (access, as) =>
+      val grps = as.toList.sortBy { _.unroll }.foldLeft(Seq[Set[AccessMatrix]]()) { case (grps, a) =>
+        val gid = grps.indexWhere { grp => grp.forall { b => canGroup(a,b) } }
+        if (gid == -1) grps :+ Set(a)
+        else grps.zipWithIndex.map { case (grp, `gid`) => grp+a; case (grp, gid) => grp }
+      }
+      dbg(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
+      grps
+    }
+
+    // Next try to merge groups across access symbols.
+    val groups = partialReduce(accessGroups.flatten.toList) { case (grp1, grp2) =>
+      if (grp1.forall { a => grp2.forall { b => canGroup(a,b) }}) Some(grp1 ++ grp2) else None
+    }
+
+    if (config.enDbg) {
+      if (groups.isEmpty) dbg(s"\n  <No $tp Groups>") else dbg(s"  ${groups.length} $tp Groups:")
+      groups.zipWithIndex.foreach { case (grp, i) =>
+        dbg(s"  Group #$i")
+        grp.foreach{matrix => dbgss("    ", matrix) }
+      }
+    }
+
     groups.toSet
   }
 

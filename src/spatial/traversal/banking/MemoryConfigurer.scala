@@ -234,7 +234,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     sortedAccesses.foreach{a =>
       dbg(s"    Access: ${a.short} [${a.parent}]")
       val grpId = {
-        if (a.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
+        if (mem.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
           // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
           // Should drop in data broadcasting node in this case
@@ -312,8 +312,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       samePort && !conflict
     })
 
-
-    if (accesses.exists{ _.parent == Ctrl.Host }) return Set(accesses)
+    if (mem.parent == Ctrl.Host) return Set(accesses)
 
     // Start to build groups within each access symbol. 
     import scala.math.Ordering.Implicits._  // Seq ordering

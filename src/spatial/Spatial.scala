@@ -256,6 +256,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.groupUnrolledAccess = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
+      spatialConfig.enableParallelBinding = false
     }.text("Enable codegen to PIR [false]")
 
     cli.opt[Unit]("tsth").action { (_,_) =>

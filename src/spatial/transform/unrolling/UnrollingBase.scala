@@ -225,6 +225,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def size: Int = if (__doLanes.size != 0) __doLanes.size else P
     def prods: List[Int] = List.tabulate(N){i => Ps.slice(i+1,N).product }
 
+    // The lane id of each unrolled lane. Norally it will be a list of Seqs with single element. If
+    // the loop is vectorized it will be a List of single Seq() with vectorized lane ids
     lazy val ulanes:List[Lane] = {
       if (vectorize) List(List.tabulate(P)(i => i))
       else List.tabulate(P) { p => List(p) }

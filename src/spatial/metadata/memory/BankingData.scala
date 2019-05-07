@@ -350,6 +350,22 @@ case class NoHierarchicalBank(flag: Boolean) extends Data[NoHierarchicalBank](Se
   */
 case class NoBlockCyclic(flag: Boolean) extends Data[NoBlockCyclic](SetBy.User)
 
+/** Flag set by the user to enable for block-cyclic banking schemes only.  
+  *
+  * Getter:  sym.onlyBlockCyclic
+  * Setter:  sym.onlyBlockCyclic = (true | false)
+  * Default: false
+  */
+case class OnlyBlockCyclic(flag: Boolean) extends Data[OnlyBlockCyclic](SetBy.User)
+
+/** Flag set by the user for list of Bs to search for block cyclic banking schema
+  *
+  * Getter:  sym.blockCyclicBs
+  * Setter:  sym.blockCyclicBs = Seq(bs)
+  * Default: Seq(2, 4, 8, 16, 32, 64, 128, 256)
+  */
+case class BlockCyclicBs(bs: Seq[Int]) extends Data[BlockCyclicBs](SetBy.User)
+
 /** Flag set by the user to disable hierarchical banking and only attempt flat banking,
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search

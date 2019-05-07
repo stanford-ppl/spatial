@@ -49,6 +49,14 @@ package object memory {
     def noBlockCyclic: Boolean = metadata[NoBlockCyclic](s).exists(_.flag)
     def noBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, NoBlockCyclic(flag))
 
+    def onlyBlockCyclic: Boolean = metadata[OnlyBlockCyclic](s).exists(_.flag)
+    def onlyBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, OnlyBlockCyclic(flag))
+
+    def blockCyclicBs: Seq[Int] = metadata[BlockCyclicBs](s).map(_.bs).getOrElse {
+      Seq(2, 4, 8, 16, 32, 64, 128, 256)
+    }
+    def blockCyclicBs_=(bs: Seq[Int]): Unit = metadata.add(s, BlockCyclicBs(bs))
+
     def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
     def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
 

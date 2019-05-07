@@ -311,6 +311,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       samePort && !conflict
     })
 
+
+    if (accesses.exists{ _.parent == Ctrl.Host }) return Set(accesses)
+
     // Start to build groups within each access symbol. 
     import scala.math.Ordering.Implicits._  // Seq ordering
     val accessGroups = accesses.groupBy { _.access }.map { case (access, as) =>

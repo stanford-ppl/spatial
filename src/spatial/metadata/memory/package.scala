@@ -129,6 +129,15 @@ package object memory {
       case Some(set) => s.dispatches += (uid -> (set + d))
       case None      => s.dispatches += (uid -> Set(d))
     }
+    def getGroupIds: Option[Map[Seq[Int], Set[Int]]] = metadata[GroupId](s).map(_.m)
+    def getGroupId(uid: Seq[Int]): Option[Set[Int]] = getGroupIds.flatMap(_.get(uid))
+    def gid(uid: Seq[Int]): Set[Int] = getGroupId(uid).getOrElse{throw new Exception(s"No group id defined for $s {${uid.mkString(",")}}")}
+    def gids: Map[Seq[Int], Set[Int]] = getGroupIds.getOrElse{ Map.empty }
+    def gids_=(gs: Map[Seq[Int],Set[Int]]): Unit = metadata.add(s, GroupId(gs))
+    def addGroupId(uid: Seq[Int], g: Set[Int]): Unit = getGroupId(uid) match {
+      case Some(set) => s.gids += (uid -> (set ++ g))
+      case None      => s.gids += (uid -> g)
+    }
 
     def getPorts: Option[Map[Int, Map[Seq[Int],Port]]] = metadata[Ports](s).map(_.m)
     def getPorts(dispatch: Int): Option[Map[Seq[Int],Port]] = getPorts.flatMap(_.get(dispatch))

@@ -102,6 +102,17 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     mem.duplicates = duplicates
 
     instances.zipWithIndex.foreach{case (inst, dispatch) =>
+      List(inst.reads.iterator, inst.writes.iterator).foreach { 
+        _.zipWithIndex.foreach { case (grp, i) =>
+          grp.foreach { a =>
+            a.access.addGroupId(a.unroll, Set(i))
+            a.access.addPort(dispatch, a.unroll, inst.ports(a))
+            a.access.addDispatch(a.unroll, dispatch)
+            dbgs(s"  Added port ${inst.ports(a)} to ${a.short}")
+            dbgs(s"  Added dispatch $dispatch to ${a.short}")
+          }
+        }
+      }
       (inst.reads.iterator.flatten ++ inst.writes.iterator.flatten).foreach{a =>
         a.access.addPort(dispatch, a.unroll, inst.ports(a))
         a.access.addDispatch(a.unroll, dispatch)

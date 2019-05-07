@@ -11,7 +11,7 @@ import scala.collection.mutable
 
 trait PIRGenHelper extends PIRFormatGen {
 
-  def assertOne[T](vec:Seq[T]):T = {
+  def assertOne[T](vec:Iterable[T]):T = {
     assert(vec.size==1, s"More than one element in vector $vec for pir backend")
     vec.head
   }
@@ -56,6 +56,7 @@ trait PIRGenHelper extends PIRFormatGen {
           src".offset(${assertOne(ofs)})" + 
           src".port($bufferPort)" + 
           src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})" +
           src".tp(${field.map{_._2}.getOrElse(lhs.tp)})"
         case _ => 
           src"MemRead()" + 
@@ -63,6 +64,7 @@ trait PIRGenHelper extends PIRFormatGen {
           src".en(${assertOne(ens)})" + 
           src".port($bufferPort)" + 
           src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})" +
           src".tp(${field.map{_._2}.getOrElse(lhs.tp)})"
       }
     }
@@ -82,14 +84,16 @@ trait PIRGenHelper extends PIRFormatGen {
           src".offset(${assertOne(ofs)})" + 
           src".data(${Lhs(assertOne(data),name)})" + 
           src".port($bufferPort)" + 
-          src".muxPort($muxPort)"
+          src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})"
         case _ => 
           src"MemWrite()" + 
           src".setMem(${Lhs(mem,name)})" + 
           src".en(${assertOne(ens)})" + 
           src".data(${Lhs(assertOne(data),name)})" + 
           src".port($bufferPort)" +
-          src".muxPort($muxPort)"
+          src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})"
       }
     }
   }

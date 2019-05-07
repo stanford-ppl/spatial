@@ -207,7 +207,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
 
   protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = 
-    groupAccesses2(accesses)
+    if (spatialConfig.groupUnrolledAccess) groupAccessUnroll(accesses)
+    else groupAccessesDefault(accesses)
 
   /** Group accesses on this memory.
     *
@@ -220,7 +221,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   [Space]   for all b in B: a and b do not conflict (never overlap or can be broadcast)
     * If no such groups exist, a is placed in a new group S' = {a}
     */
-  protected def groupAccesses1(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
+  protected def groupAccessesDefault(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val groups = ArrayBuffer[Set[AccessMatrix]]()
     val isWrite = accesses.exists(_.access.isWriter)
     val tp = if (isWrite) "Write" else "Read"
@@ -292,7 +293,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     reduced.toList
   }
 
-  protected def groupAccesses2(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
+  protected def groupAccessUnroll(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val isWrite = accesses.exists(_.access.isWriter)
     val tp = if (isWrite) "Write" else "Read"
 

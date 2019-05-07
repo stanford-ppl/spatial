@@ -293,6 +293,11 @@ case class DarkVolume(b: Int) extends Data[DarkVolume](SetBy.Analysis.Self)
   */
 case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends Data[Dispatch](Transfer.Mirror)
 
+/*
+ * Mapping of uid to group id of access during banking analysis. 
+ * Annotated on access
+ * */
+case class GroupId(m: Map[Seq[Int],Set[Int]]) extends Data[GroupId](Transfer.Mirror)
 
 /** Map of buffer ports for each unrolled instance of an access node.
   * Unrolled instances are tracked by the unrolled IDs (duplicate number) of all surrounding iterators.

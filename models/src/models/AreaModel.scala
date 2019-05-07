@@ -115,7 +115,7 @@ class AreaEstimator {
     }
     val args = (fieldNames zip fieldValues).toMap
     val targetFields = evaluator.evaluate(args.asJava).toString
-    val resultExtractor = raw".*result=(\d+)\.(\d+).*".r
+    val resultExtractor = raw".*result=(-?\d+)\.(\d+).*".r
     val resultExtractor(dec,frac) = targetFields
     val result = (dec + "." + frac).toDouble
     result

@@ -251,6 +251,7 @@ package object memory {
 
     def isMemPrimitive: Boolean = (isSRAM || isLineBuffer || isRegFile || isFIFO || isLIFO || isFIFOReg || isReg || isLUT) && !isNBuffered && (!isRemoteMem && !isOptimizedReg)
 
+
     def isSRAM: Boolean = mem match {
       case _: SRAM[_,_] => true
       case _ => false
@@ -264,6 +265,7 @@ package object memory {
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
     def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
     def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
+    def hasDestructiveReads: Boolean = isFIFO || isLIFO || isFIFOReg
 
     def isLUT: Boolean = mem match {
       case _: LUT[_,_] => true

@@ -301,8 +301,8 @@ object modeling {
         val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
         var writeStage = 0.0
         orderedMuxPairs.foreach{pairs =>
-          val dlys = pairs.map(_._2) //:+ writeStage
-          val writeDelay = dlys.min //dlys.max
+          val dlys = pairs.map(_._2) :+ writeStage
+          val writeDelay = dlys.max 
           writeStage = writeDelay + 1
           pairs.foreach{case (access, dly, _) =>
             val oldPath = paths(access)

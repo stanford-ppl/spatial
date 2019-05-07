@@ -196,7 +196,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
               val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else myWrites.map(_.toSet)
-              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) {dbgs(s"aoeu repacking");myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet)} else {dbgs(s"aoeu not repacking");myReads.map(_.toSet)}
+              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) {myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet)} else {myReads.map(_.toSet)}
               val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
               selGrps.zipWithIndex.foreach{case (grp,i) =>
                 dbgs(s"Banking group #$i has (${grp.size} accesses)")

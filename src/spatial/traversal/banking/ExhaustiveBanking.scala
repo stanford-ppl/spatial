@@ -36,6 +36,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   private val lowRankMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], Set[SparseMatrix[Idx]]]()
   // Helper for replacing sparse matrix with its original access matrix
   private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
+  // Cache for skipping ahead to correct banking solution for patterns/axes that have already been solved
+  private val solutionCache = scala.collection.mutable.HashMap[(Set[Set[SparseMatrix[Idx]]], NStrictness, AlphaStrictness, Seq[Int]), Option[ModBanking]]()
 
   /** Returns a Map from Seq(banking schemes) to the readers for these schemes.  
     * Generally, it will contain Map(Seq(flat_scheme, nested_scheme) -> all readers) but in 
@@ -202,11 +204,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               }
               // If only 1 acc left per group, Unit banking, otherwise search
               val axisBankingScheme: Option[ModBanking] = 
-                if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(ModBanking.Unit(1, axes))
-                else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(ModBanking.Unit(rank, axes))
-                else {
-                  findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
-                }
+                if (solutionCache.contains((selGrps, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${selGrps.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job!")
+                solutionCache.getOrElseUpdate((selGrps, nStricts, aStricts, axes), {
+                  if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(ModBanking.Unit(1, axes))
+                  else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(ModBanking.Unit(rank, axes))
+                  else {
+                    findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
+                  }                  
+                })
               if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => (Set(reverseAM(a)) -> axisBankingScheme)}}.toMap else Map((selRdGrps.map{x => x.flatMap(reverseAM(_)).toSet ++ hostReads}) -> axisBankingScheme)
             }
             if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {

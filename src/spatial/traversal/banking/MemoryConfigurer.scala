@@ -3,6 +3,7 @@ package banking
 
 import argon._
 import poly.ISL
+import models.AreaEstimator
 import utils.implicits.collections._
 import utils.math._
 import utils.tags.instrument
@@ -10,6 +11,7 @@ import utils.tags.instrument
 import utils.math.isPow2
 import spatial.issues.UnbankableGroup
 import spatial.lang._
+import spatial.node._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.retiming._
@@ -21,7 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import spatial.metadata.types._
 
-class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL) {
+class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL, areamodel: AreaEstimator) {
   protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
@@ -299,94 +301,155 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Returns an approximation of the cost for the given banking strategy. */
-  def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Long = {
-    // Set up penalty model TODO: Make it more accurate
-    val mulCost = 6
-    val divCost = 20
-    val modCost = 20
-    val muxCost = 6
-    val volumePenalty = 1
+  def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Double = {
+    if (spatialConfig.useAreaModels) {
+      // Partition based on direct/xbar banking (TODO: Determine partial xBars here)
+      val (directR, xbarR) = rdGroups.flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
+      val (directW, xbarW) = wrGroups.flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
 
-    if (banking.nonEmpty) {
-      // Get powerOf2 composition
-      val padding          = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
-      val w                = mem.stagedDims.map(_.toInt).zip(padding).map{case (a:Int, b:Int) => a + b}
-      val D                = w.size
-      val numBanks         = banking.map    (_.nBanks).product
-      val Ns_not_pow2      = banking.map    (_.nBanks).map{x => if (isPow2(x)) 0 else 1}.sum
-      val alphas_not_pow2  = banking.flatMap(_.alphas).map{x => if (isPow2(x)) 0 else 1}.sum
-      val Ps               = banking.flatMap(_.Ps)
-      val Pss_not_pow2     = Ps.map{x => if (isPow2(x)) 0 else 1}.sum
-      val dimMultipliers   = Seq.tabulate(D){t => (w.slice(t+1,D).zip(Ps.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product)}
-      val mults_not_pow2   = dimMultipliers.map{x => if (isPow2(x)) 0 else 1}.sum
+      // Relative scarcity of resource, roughly % of board used (TODO: Extract from target device, these numbers were just ripped from zcu)
+      val lutWeight = 34260 / 100
+      val ffWeight = 548160 / 100
+      val bramWeight = 912 / 100
 
-      // Partition based on direct/xbar banking
-      val (direct, xbar) = (rdGroups ++ wrGroups).flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
+      // TODO: Add cost of arithmetic nodes used for bank/ofs resolution
 
-      // Compute penalty from offset calculation
-      val ofsDivPenalty = (direct.size + xbar.size) * Pss_not_pow2 * divCost //spatialConfig.target.latencyModel.model("FixDiv")("b" -> 32))
-      val ofsMulPenalty = (direct.size + xbar.size) * mults_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
-
-      // Compute penalty from bank calculation
-      val bankMulPenalty = xbar.size * alphas_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
-      val bankModPenalty = xbar.size * Ns_not_pow2 * modCost //spatialConfig.target.latencyModel.model("FixMod")("b" -> 32))
-
-      // Compute penalty from muxes for bank resolution
-      val wmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isWriter).size > 0) depth * muxCost * numBanks * numBanks * xbar.filter(_.access.isWriter).size else 0
-      val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isReader).size > 0) depth * muxCost * numBanks * numBanks * xbar.filter(_.access.isReader).size else 0
-
-      // Compute penalty from volume
-      val sizePenalty = depth * w.product * volumePenalty
-      
-      // dbgs(s"BANKING COST FOR $mem UNDER $banking:")
-      // dbgs(s"  depth            = ${depth}")
-      // dbgs(s"  volume           = ${w.product}")
-      // dbgs(s"  numBanks         = ${numBanks}")
-      // dbgs(s"    `- # not pow 2 = ${Ns_not_pow2}")
-      // dbgs(s"  alphas           = ${banking.map(_.alphas)}")
-      // dbgs(s"    `- # not pow 2 = ${alphas_not_pow2}")
-      // dbgs(s"  Ps               = ${banking.map(_.Ps)}")
-      // dbgs(s"    `- # not pow 2 = ${Pss_not_pow2}")
-      // dbgs(s"  dim multipliers  = ${dimMultipliers}")
-      // dbgs(s"    `- # not pow 2 = ${mults_not_pow2}")
-      // dbgs(s"  Directly banked accesses: ${direct.map(_.access)}")
-      // dbgs(s"  XBar banked accesses:     ${xbar.map(_.access)}")
-      // dbgs(s"")    
-      // dbgs(s"  ofsDivPenalty  = ${ofsDivPenalty}")
-      // dbgs(s"  ofsMulPenalty  = ${ofsMulPenalty}")
-      // dbgs(s"  bankMulPenalty  = ${bankMulPenalty}")
-      // dbgs(s"  bankModPenalty  = ${bankModPenalty}")
-      // dbgs(s"  wmuxPenalty  = ${wmuxPenalty}")
-      // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
-      // dbgs(s"  sizePenalty  = ${sizePenalty}")
-      // dbgs(s"")
-
-      val totalCost = (ofsDivPenalty + ofsMulPenalty + bankMulPenalty + bankModPenalty + wmuxPenalty + rmuxPenalty + sizePenalty).toLong
-
-      // dbgs(s"TOTAL COST: $totalCost")
-
-      totalCost
+      mem.asInstanceOf[Sym[_]] match {
+        case m:SRAM[_,_] => 
+          val allDims = mem.stagedDims.map(_.toInt).padTo(5,0)
+          val allB = banking.map(_.stride).padTo(5,0)
+          val allN = banking.map(_.nBanks).padTo(5,0)
+          val allAlpha = banking.map(_.alphas).flatten.padTo(5,0)
+          val allP = banking.map(_.Ps).flatten.padTo(5,0)
+          val hist = List(1, directR.size, directW.size, banking.map(_.nBanks).product, xbarR.size, xbarR.size, 0,0,0)
+          // TODO: Get real bitwidth
+          val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
+          val luts = (areamodel.estimate("LUTs", "SRAMNew", payload)) / lutWeight
+          val ffs = (areamodel.estimate("FFs", "SRAMNew", payload)) / ffWeight
+          val bram = (areamodel.estimate("RAMB18", "SRAMNew", payload) + areamodel.estimate("RAMB32", "SRAMNew", payload)) / bramWeight
+          val c = luts + ffs + bram
+          dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+          c
+        case m:RegFile[_,_] =>
+          val allDims = mem.stagedDims.map(_.toInt).padTo(2,0)
+          val allB = banking.map(_.stride).padTo(2,0)
+          val allN = banking.map(_.nBanks).padTo(2,0)
+          val allAlpha = banking.map(_.alphas).flatten.padTo(2,0)
+          val allP = banking.map(_.Ps).flatten.padTo(2,0)
+          val hist = List(1, directR.size, directW.size, banking.map(_.nBanks).product, xbarR.size, xbarR.size)
+          // TODO: Get real bitwidth
+          val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
+          val luts = (areamodel.estimate("LUTs", "RegFileNew", payload)) / lutWeight
+          val ffs = (areamodel.estimate("FFs", "RegFileNew", payload)) / ffWeight
+          val bram = (areamodel.estimate("RAMB18", "RegFileNew", payload) + areamodel.estimate("RAMB32", "RegFileNew", payload)) / bramWeight
+          val c = luts + ffs + bram
+          dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+          c
+        case m:LineBufferNew[_] =>
+          val allDims = mem.stagedDims.map(_.toInt).padTo(2,0)
+          val allB = banking.map(_.stride).padTo(2,0)
+          val allN = banking.map(_.nBanks).padTo(2,0)
+          val allAlpha = banking.map(_.alphas).flatten.padTo(2,0)
+          val allP = banking.map(_.Ps).flatten.padTo(2,0)
+          val hist = List(1, directR.size, directW.size, banking.map(_.nBanks).product, xbarR.size, xbarR.size)
+          // TODO: Get real bitwidth
+          val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
+          val luts = (areamodel.estimate("LUTs", "RegFileNew", payload)) / lutWeight
+          val ffs = (areamodel.estimate("FFs", "RegFileNew", payload)) / ffWeight
+          val bram = (areamodel.estimate("RAMB18", "RegFileNew", payload) + areamodel.estimate("RAMB32", "RegFileNew", payload)) / bramWeight
+          val c = luts + ffs + bram
+          dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+          c
+        case _ => 1
+      }
     } else {
-      val w                = mem.stagedDims.map(_.toInt)
-      val sizePenalty    = depth * w.product * volumePenalty
+      // Set up fall-back penalty model TODO: Make it more accurate
+      val mulCost = 6
+      val divCost = 20
+      val modCost = 20
+      val muxCost = 6
+      val volumePenalty = 1
 
-      val numWriters = wrGroups.flatten.size
+      if (banking.nonEmpty) {
+        // Get powerOf2 composition
+        val padding          = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
+        val w                = mem.stagedDims.map(_.toInt).zip(padding).map{case (a:Int, b:Int) => a + b}
+        val D                = w.size
+        val numBanks         = banking.map    (_.nBanks).product
+        val Ns_not_pow2      = banking.map    (_.nBanks).map{x => if (isPow2(x)) 0 else 1}.sum
+        val alphas_not_pow2  = banking.flatMap(_.alphas).map{x => if (isPow2(x)) 0 else 1}.sum
+        val Ps               = banking.flatMap(_.Ps)
+        val Pss_not_pow2     = Ps.map{x => if (isPow2(x)) 0 else 1}.sum
+        val dimMultipliers   = Seq.tabulate(D){t => (w.slice(t+1,D).zip(Ps.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product)}
+        val mults_not_pow2   = dimMultipliers.map{x => if (isPow2(x)) 0 else 1}.sum
 
-      // Assume direct banking for W, and crossbar for readers
-      val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn) depth * muxCost * numWriters * numWriters else 0
+        // Partition based on direct/xbar banking
+        val (direct, xbar) = (rdGroups ++ wrGroups).flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
 
-      // dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
-      // dbg(s"  depth            = ${depth}")
-      // dbg(s"  volume           = ${w.product}")
-      // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
-      // dbgs(s"")
+        // Compute penalty from offset calculation
+        val ofsDivPenalty = (direct.size + xbar.size) * Pss_not_pow2 * divCost //spatialConfig.target.latencyModel.model("FixDiv")("b" -> 32))
+        val ofsMulPenalty = (direct.size + xbar.size) * mults_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
 
-      val totalCost =  rdGroups.flatten.size * (sizePenalty + rmuxPenalty).toLong
+        // Compute penalty from bank calculation
+        val bankMulPenalty = xbar.size * alphas_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
+        val bankModPenalty = xbar.size * Ns_not_pow2 * modCost //spatialConfig.target.latencyModel.model("FixMod")("b" -> 32))
 
-      // dbgs(s"TOTAL COST: $sizePenalty")
+        // Compute penalty from muxes for bank resolution
+        val wmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isWriter).size > 0) depth * muxCost * numBanks * numBanks * xbar.filter(_.access.isWriter).size else 0
+        val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isReader).size > 0) depth * muxCost * numBanks * numBanks * xbar.filter(_.access.isReader).size else 0
 
-      totalCost
+        // Compute penalty from volume
+        val sizePenalty = depth * w.product * volumePenalty
+        
+        // dbgs(s"BANKING COST FOR $mem UNDER $banking:")
+        // dbgs(s"  depth            = ${depth}")
+        // dbgs(s"  volume           = ${w.product}")
+        // dbgs(s"  numBanks         = ${numBanks}")
+        // dbgs(s"    `- # not pow 2 = ${Ns_not_pow2}")
+        // dbgs(s"  alphas           = ${banking.map(_.alphas)}")
+        // dbgs(s"    `- # not pow 2 = ${alphas_not_pow2}")
+        // dbgs(s"  Ps               = ${banking.map(_.Ps)}")
+        // dbgs(s"    `- # not pow 2 = ${Pss_not_pow2}")
+        // dbgs(s"  dim multipliers  = ${dimMultipliers}")
+        // dbgs(s"    `- # not pow 2 = ${mults_not_pow2}")
+        // dbgs(s"  Directly banked accesses: ${direct.map(_.access)}")
+        // dbgs(s"  XBar banked accesses:     ${xbar.map(_.access)}")
+        // dbgs(s"")    
+        // dbgs(s"  ofsDivPenalty  = ${ofsDivPenalty}")
+        // dbgs(s"  ofsMulPenalty  = ${ofsMulPenalty}")
+        // dbgs(s"  bankMulPenalty  = ${bankMulPenalty}")
+        // dbgs(s"  bankModPenalty  = ${bankModPenalty}")
+        // dbgs(s"  wmuxPenalty  = ${wmuxPenalty}")
+        // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
+        // dbgs(s"  sizePenalty  = ${sizePenalty}")
+        // dbgs(s"")
 
+        val totalCost = (ofsDivPenalty + ofsMulPenalty + bankMulPenalty + bankModPenalty + wmuxPenalty + rmuxPenalty + sizePenalty).toLong
+
+        // dbgs(s"TOTAL COST: $totalCost")
+
+        totalCost
+      } else {
+        val w                = mem.stagedDims.map(_.toInt)
+        val sizePenalty    = depth * w.product * volumePenalty
+
+        val numWriters = wrGroups.flatten.size
+
+        // Assume direct banking for W, and crossbar for readers
+        val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn) depth * muxCost * numWriters * numWriters else 0
+
+        // dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
+        // dbg(s"  depth            = ${depth}")
+        // dbg(s"  volume           = ${w.product}")
+        // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
+        // dbgs(s"")
+
+        val totalCost =  rdGroups.flatten.size * (sizePenalty + rmuxPenalty).toLong
+
+        // dbgs(s"TOTAL COST: $sizePenalty")
+
+        totalCost
+      }
     }
   }
 
@@ -495,9 +558,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
-        val costs: Map[BankingOptions, Long] = bankings.map{case (scheme, banking) => 
-          val c = banking.toList.map{case (rds, b) => cost(b,depth,rds,reachingWrGroups)}.sum
+        val costs: Map[BankingOptions, Double] = bankings.map{case (scheme, banking) => 
           dbgs(s"Scheme $scheme:")
+          val c = banking.toList.map{case (rds, b) => cost(b,depth,rds,reachingWrGroups)}.sum
           banking.foreach{x => dbgs(s"  - ${x._1.map(_.size)} readers -> ${x._2}")}
           scheme -> c
         }

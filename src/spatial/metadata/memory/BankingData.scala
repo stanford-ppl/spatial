@@ -89,7 +89,7 @@ case class Instance(
   metapipe: Option[Ctrl],           // Controller if at least some accesses require n-buffering
   banking:  Seq[Banking],           // Banking information
   depth:    Int,                    // Depth of n-buffer
-  cost:     Long,                    // Cost estimate of this configuration
+  cost:     Double,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
   darkVolume: Int,                  // Number of elements inaccessible due to B > 1

@@ -30,6 +30,7 @@ class SpatialConfig extends Config {
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
+  var useAreaModels: Boolean = true
   var enableForceBanking: Boolean = false
   var bankingEffort: Int = 1
   var unrollMetapipeOfParallels: Boolean = true

@@ -423,17 +423,29 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     // Create bound symbols. bound takes in a counter and a list of counter indices. When not
     // vectorize, counter indices is just List(ctr idx), when it's vectorized, it's vec number of
     // indices indicating the counter index for each vectorized lane.
-    def createBounds[T<:Bits[_]](bound:(Counter[_], Lane) => T) = {
-      val default = cchain.counters.zipWithIndex.map { case (ctr, ci) =>
-        val par = if (vectorize) 1 else ctr.ctrPar.toInt
-        List.tabulate(par) { i =>
-          val ctrIdxs = if (vectorize) List.tabulate(V) { p => parAddr(p)(ci) } else List(i)
-          val b = bound(ctr, ctrIdxs)
-          b.counter = IndexCounterInfo(ctr, ctrIdxs)
-          b
-        } 
+    def createBounds[T<:Bits[_]](bound:(Counter[_], Lane) => T): Seq[Seq[T]] = {
+      if (mop) {
+        cchain.counters.zipWithIndex.map { case (ctr, ci) =>
+          val par = if (vectorize) 1 else ctr.ctrPar.toInt
+          List.tabulate(par) { i =>
+            val ctrIdxs = if (vectorize) List.tabulate(V) { p => parAddr(p)(ci) } else List(i)
+            val b = bound(ctr, ctrIdxs)
+            b.counter = IndexCounterInfo(ctr, ctrIdxs)
+            b
+          } 
+        }
+      } else {
+        List.tabulate(P){p => 
+          val uid = parAddr(p)
+          uid.zipWithIndex.map{case (q,i) => 
+            val ctr = cchain.counters.apply(i)
+            val ctrIdxs = List(q)
+            val b = bound(ctr, ctrIdxs)
+            b.counter = IndexCounterInfo(ctr, ctrIdxs)
+            b
+          }
+        }
       }
-      if (mop) default else List.tabulate(P){p => default.zip(parAddr(p)).map{case (vec,i) => vec(i)}}
     }
   }
 

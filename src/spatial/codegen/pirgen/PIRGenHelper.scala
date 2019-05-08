@@ -12,7 +12,10 @@ import scala.collection.mutable
 trait PIRGenHelper extends PIRFormatGen {
 
   def assertOne[T](vec:Iterable[T]):T = {
-    assert(vec.size==1, s"More than one element in vector $vec for pir backend")
+    if (vec.size != 1) {
+      error(s"More than one element in vector $vec for pir backend")
+      IR.logError()
+    }
     vec.head
   }
 

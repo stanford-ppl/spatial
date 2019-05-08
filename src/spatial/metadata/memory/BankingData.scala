@@ -293,6 +293,11 @@ case class DarkVolume(b: Int) extends Data[DarkVolume](SetBy.Analysis.Self)
   */
 case class Dispatch(m: Map[Seq[Int],Set[Int]]) extends Data[Dispatch](Transfer.Mirror)
 
+/*
+ * Mapping of uid to group id of access during banking analysis. 
+ * Annotated on access
+ * */
+case class GroupId(m: Map[Seq[Int],Set[Int]]) extends Data[GroupId](Transfer.Mirror)
 
 /** Map of buffer ports for each unrolled instance of an access node.
   * Unrolled instances are tracked by the unrolled IDs (duplicate number) of all surrounding iterators.
@@ -344,6 +349,22 @@ case class NoHierarchicalBank(flag: Boolean) extends Data[NoHierarchicalBank](Se
   * Default: false
   */
 case class NoBlockCyclic(flag: Boolean) extends Data[NoBlockCyclic](SetBy.User)
+
+/** Flag set by the user to enable for block-cyclic banking schemes only.  
+  *
+  * Getter:  sym.onlyBlockCyclic
+  * Setter:  sym.onlyBlockCyclic = (true | false)
+  * Default: false
+  */
+case class OnlyBlockCyclic(flag: Boolean) extends Data[OnlyBlockCyclic](SetBy.User)
+
+/** Flag set by the user for list of Bs to search for block cyclic banking schema
+  *
+  * Getter:  sym.blockCyclicBs
+  * Setter:  sym.blockCyclicBs = Seq(bs)
+  * Default: Seq(2, 4, 8, 16, 32, 64, 128, 256)
+  */
+case class BlockCyclicBs(bs: Seq[Int]) extends Data[BlockCyclicBs](SetBy.User)
 
 /** Flag set by the user to disable hierarchical banking and only attempt flat banking,
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 

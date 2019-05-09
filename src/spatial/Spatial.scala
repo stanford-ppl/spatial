@@ -57,7 +57,7 @@ trait Spatial extends Compiler with ParamLoader {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
     implicit val areamodel: AreaEstimator = new AreaEstimator
-    areamodel.startup() 
+    areamodel.startup(spatialConfig.useAreaModels) 
 
     // --- Debug
     lazy val printer = IRPrinter(state, enable = config.enDbg)

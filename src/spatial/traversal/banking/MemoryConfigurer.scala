@@ -302,180 +302,62 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   /** Returns an approximation of the cost for the given banking strategy. */
   def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Double = {
-    if (spatialConfig.useAreaModels) {
-      // Partition based on direct/xbar banking (TODO: Determine partial xBars here)
-      val histR: Map[Int, Int] = rdGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
-      val histW: Map[Int, Int] = wrGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
-      val histCombined: Map[Int, (Int,Int)] = histR.map{case (width, siz) => (width -> (siz, histW.getOrElse(width, 0)))} ++ histW.collect{case (width, siz) if !histR.contains(width) => (width -> (0,siz))}
+    // Partition based on direct/xbar banking (TODO: Determine partial xBars here)
+    val histR: Map[Int, Int] = rdGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
+    val histW: Map[Int, Int] = wrGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
+    val histCombined: Map[Int, (Int,Int)] = histR.map{case (width, siz) => (width -> (siz, histW.getOrElse(width, 0)))} ++ histW.collect{case (width, siz) if !histR.contains(width) => (width -> (0,siz))}
 
-      // Relative scarcity of resource, roughly % of board used (TODO: Extract from target device, these numbers were just ripped from zcu)
-      val lutWeight = 34260 / 100
-      val ffWeight = 548160 / 100
-      val bramWeight = 912 / 100
+    // Relative scarcity of resource, roughly % of board used (TODO: Extract from target device, these numbers were just ripped from zcu)
+    val lutWeight = 34260 / 100
+    val ffWeight = 548160 / 100
+    val bramWeight = 912 / 100
 
-      // TODO: Add cost of arithmetic nodes used for bank/ofs resolution
+    val allDims = mem.stagedDims.map(_.toInt)
+    val allB = banking.map(_.stride)
+    val allN = banking.map(_.nBanks)
+    val allAlpha = banking.map(_.alphas).flatten
+    val allP = banking.map(_.Ps).flatten
+    val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten
 
-      mem.asInstanceOf[Sym[_]] match {
-        case m:SRAM[_,_] => 
-          val allDims = mem.stagedDims.map(_.toInt).padTo(5,0)
-          val allB = banking.map(_.stride).padTo(5,0)
-          val allN = banking.map(_.nBanks).padTo(5,0)
-          val allAlpha = banking.map(_.alphas).flatten.padTo(5,0)
-          val allP = banking.map(_.Ps).flatten.padTo(5,0)
-          val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten.padTo(9,0)
-          val hist = if (histRaw.size > 9) {
-            warn(s"$mem read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
-            histRaw.takeRight(9)
-          } else histRaw
-          if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) warn(s"$mem histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
-          // TODO: Get real bitwidth
-          val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
-          val auxNodes = (rdGroups ++ wrGroups).flatten.map{x => x.arithmeticNodes(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.flatten.toList
-          val auxWeights = auxNodes.map{case (name,a,b) => 
-            val l = (areamodel.estimate("LUTs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / lutWeight 
-            val f = (areamodel.estimate("FFs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / ffWeight 
-            val br = (areamodel.estimate("RAMB18", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1)) + areamodel.estimate("RAMB32", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / bramWeight 
-            (l,f,br)
-          }
-          val auxLuts = auxWeights.map(_._1).sum
-          val auxFFs = auxWeights.map(_._2).sum
-          val auxBrams = auxWeights.map(_._3).sum
-          val luts = (areamodel.estimate("LUTs", "SRAMNew", payload)) / lutWeight
-          val ffs = (areamodel.estimate("FFs", "SRAMNew", payload)) / ffWeight
-          val bram = (areamodel.estimate("RAMB18", "SRAMNew", payload) + areamodel.estimate("RAMB32", "SRAMNew", payload)) / bramWeight
-          val c = luts + ffs + bram + auxLuts + auxFFs + auxBrams
-          dbgs(s"        - TOTAL COMPONENT COST = $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
-          c
-        case m:RegFile[_,_] =>
-          val allDims = mem.stagedDims.map(_.toInt).padTo(2,0)
-          val allB = banking.map(_.stride).padTo(2,0)
-          val allN = banking.map(_.nBanks).padTo(2,0)
-          val allAlpha = banking.map(_.alphas).flatten.padTo(2,0)
-          val allP = banking.map(_.Ps).flatten.padTo(2,0)
-          val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten.padTo(9,0)
-          val hist = if (histRaw.size > 9) {
-            warn(s"$mem read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
-            histRaw.takeRight(9)
-          } else histRaw
-          if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) warn(s"$mem histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
-          // TODO: Get real bitwidth
-          val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
-          val luts = (areamodel.estimate("LUTs", "RegFileNew", payload)) / lutWeight
-          val ffs = (areamodel.estimate("FFs", "RegFileNew", payload)) / ffWeight
-          val bram = (areamodel.estimate("RAMB18", "RegFileNew", payload) + areamodel.estimate("RAMB32", "RegFileNew", payload)) / bramWeight
-          val c = luts + ffs + bram
-          dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
-          c
-        case m:LineBufferNew[_] =>
-          val allDims = mem.stagedDims.map(_.toInt).padTo(2,0)
-          val allB = banking.map(_.stride).padTo(2,0)
-          val allN = banking.map(_.nBanks).padTo(2,0)
-          val allAlpha = banking.map(_.alphas).flatten.padTo(2,0)
-          val allP = banking.map(_.Ps).flatten.padTo(2,0)
-          val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten.padTo(9,0)
-          val hist = if (histRaw.size > 9) {
-            warn(s"$mem read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
-            histRaw.takeRight(9)
-          } else histRaw
-          if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) warn(s"$mem histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
-          // TODO: Get real bitwidth
-          val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
-          val luts = (areamodel.estimate("LUTs", "RegFileNew", payload)) / lutWeight
-          val ffs = (areamodel.estimate("FFs", "RegFileNew", payload)) / ffWeight
-          val bram = (areamodel.estimate("RAMB18", "RegFileNew", payload) + areamodel.estimate("RAMB32", "RegFileNew", payload)) / bramWeight
-          val c = luts + ffs + bram
-          dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
-          c
-        case _ => 1
-      }
-    } else {
-      // Set up fall-back penalty model TODO: Make it more accurate
-      val mulCost = 6
-      val divCost = 20
-      val modCost = 20
-      val muxCost = 6
-      val volumePenalty = 1
-
-      if (banking.nonEmpty) {
-        // Get powerOf2 composition
-        val padding          = mem.stagedDims.map(_.toInt).zip(banking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
-        val w                = mem.stagedDims.map(_.toInt).zip(padding).map{case (a:Int, b:Int) => a + b}
-        val D                = w.size
-        val numBanks         = banking.map    (_.nBanks).product
-        val Ns_not_pow2      = banking.map    (_.nBanks).map{x => if (isPow2(x)) 0 else 1}.sum
-        val alphas_not_pow2  = banking.flatMap(_.alphas).map{x => if (isPow2(x)) 0 else 1}.sum
-        val Ps               = banking.flatMap(_.Ps)
-        val Pss_not_pow2     = Ps.map{x => if (isPow2(x)) 0 else 1}.sum
-        val dimMultipliers   = Seq.tabulate(D){t => (w.slice(t+1,D).zip(Ps.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product)}
-        val mults_not_pow2   = dimMultipliers.map{x => if (isPow2(x)) 0 else 1}.sum
-
-        // Partition based on direct/xbar banking
-        val (direct, xbar) = (rdGroups ++ wrGroups).flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
-
-        // Compute penalty from offset calculation
-        val ofsDivPenalty = (direct.size + xbar.size) * Pss_not_pow2 * divCost //spatialConfig.target.latencyModel.model("FixDiv")("b" -> 32))
-        val ofsMulPenalty = (direct.size + xbar.size) * mults_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
-
-        // Compute penalty from bank calculation
-        val bankMulPenalty = xbar.size * alphas_not_pow2 * mulCost //spatialConfig.target.latencyModel.model("FixMul")("b" -> 32))
-        val bankModPenalty = xbar.size * Ns_not_pow2 * modCost //spatialConfig.target.latencyModel.model("FixMod")("b" -> 32))
-
-        // Compute penalty from muxes for bank resolution
-        val wmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isWriter).size > 0) depth * muxCost * numBanks * numBanks * xbar.filter(_.access.isWriter).size else 0
-        val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn && xbar.filter(_.access.isReader).size > 0) depth * muxCost * numBanks * numBanks * xbar.filter(_.access.isReader).size else 0
-
-        // Compute penalty from volume
-        val sizePenalty = depth * w.product * volumePenalty
-        
-        // dbgs(s"BANKING COST FOR $mem UNDER $banking:")
-        // dbgs(s"  depth            = ${depth}")
-        // dbgs(s"  volume           = ${w.product}")
-        // dbgs(s"  numBanks         = ${numBanks}")
-        // dbgs(s"    `- # not pow 2 = ${Ns_not_pow2}")
-        // dbgs(s"  alphas           = ${banking.map(_.alphas)}")
-        // dbgs(s"    `- # not pow 2 = ${alphas_not_pow2}")
-        // dbgs(s"  Ps               = ${banking.map(_.Ps)}")
-        // dbgs(s"    `- # not pow 2 = ${Pss_not_pow2}")
-        // dbgs(s"  dim multipliers  = ${dimMultipliers}")
-        // dbgs(s"    `- # not pow 2 = ${mults_not_pow2}")
-        // dbgs(s"  Directly banked accesses: ${direct.map(_.access)}")
-        // dbgs(s"  XBar banked accesses:     ${xbar.map(_.access)}")
-        // dbgs(s"")    
-        // dbgs(s"  ofsDivPenalty  = ${ofsDivPenalty}")
-        // dbgs(s"  ofsMulPenalty  = ${ofsMulPenalty}")
-        // dbgs(s"  bankMulPenalty  = ${bankMulPenalty}")
-        // dbgs(s"  bankModPenalty  = ${bankModPenalty}")
-        // dbgs(s"  wmuxPenalty  = ${wmuxPenalty}")
-        // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
-        // dbgs(s"  sizePenalty  = ${sizePenalty}")
-        // dbgs(s"")
-
-        val totalCost = (ofsDivPenalty + ofsMulPenalty + bankMulPenalty + bankModPenalty + wmuxPenalty + rmuxPenalty + sizePenalty).toLong
-
-        // dbgs(s"TOTAL COST: $totalCost")
-
-        totalCost
-      } else {
-        val w                = mem.stagedDims.map(_.toInt)
-        val sizePenalty    = depth * w.product * volumePenalty
-
-        val numWriters = wrGroups.flatten.size
-
-        // Assume direct banking for W, and crossbar for readers
-        val rmuxPenalty = if (!mem.isReg && !mem.isRegFile && !mem.isStreamOut && !mem.isStreamIn) depth * muxCost * numWriters * numWriters else 0
-
-        // dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
-        // dbg(s"  depth            = ${depth}")
-        // dbg(s"  volume           = ${w.product}")
-        // dbgs(s"  rmuxPenalty  = ${rmuxPenalty}")
-        // dbgs(s"")
-
-        val totalCost =  rdGroups.flatten.size * (sizePenalty + rmuxPenalty).toLong
-
-        // dbgs(s"TOTAL COST: $sizePenalty")
-
-        totalCost
-      }
+    mem.asInstanceOf[Sym[_]] match {
+      case m:SRAM[_,_] => 
+        val auxNodes = (rdGroups ++ wrGroups).flatten.map{x => x.arithmeticNodes(allN, allB, allAlpha)}.flatten.toList
+        val auxWeights = auxNodes.map{case (name,a,b) => 
+          val l = (areamodel.estimateArithmetic("LUTs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / lutWeight 
+          val f = (areamodel.estimateArithmetic("FFs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / ffWeight 
+          val br = (areamodel.estimateArithmetic("RAMB18", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1)) + areamodel.estimateArithmetic("RAMB32", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / bramWeight 
+          (l,f,br)
+        }
+        val auxLuts = auxWeights.map(_._1).sum
+        val auxFFs = auxWeights.map(_._2).sum
+        val auxBrams = auxWeights.map(_._3).sum
+        val luts = (areamodel.estimateMem("LUTs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
+        val ffs = (areamodel.estimateMem("FFs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val bram = (areamodel.estimateMem("RAMB18", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
+        val c = luts + ffs + bram + auxLuts + auxFFs + auxBrams
+        dbgs(s"        - TOTAL COMPONENT COST = $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
+        c
+      case m:RegFile[_,_] =>
+        val luts = (areamodel.estimateMem("LUTs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
+        val ffs = (areamodel.estimateMem("FFs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val bram = (areamodel.estimateMem("RAMB18", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
+        val c = luts + ffs + bram
+        dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+        c
+      case m:LineBufferNew[_] =>
+        val luts = (areamodel.estimateMem("LUTs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
+        val ffs = (areamodel.estimateMem("FFs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val bram = (areamodel.estimateMem("RAMB18", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
+        val c = luts + ffs + bram
+        dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+        c
+      case _ => 
+        val luts = areamodel.estimateMem("LUTs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
+        val ffs = (areamodel.estimateMem("FFs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val bram = (areamodel.estimateMem("RAMB18", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
+        val c = luts + ffs + bram
+        dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+        c
     }
   }
 

@@ -27,6 +27,7 @@ case class PinBus(valid: Pin, data: Seq[Pin]) extends Bus {
 @struct case class IssuedCmd(size: I32, start: I32, end: I32)
 
 abstract class DRAMBus[A:Bits] extends Bus { @rig def nbits: Int = Bits[A].nbits }
+case class FileBus[A:Bits](fileName:String) extends Bus { @rig def nbits: Int = Bits[A].nbits }
 
 case object BurstCmdBus extends DRAMBus[BurstCmd]
 case object BurstAckBus extends DRAMBus[Bit]

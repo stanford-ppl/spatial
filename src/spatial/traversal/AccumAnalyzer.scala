@@ -57,7 +57,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
         consumers diff c1.symbols
       }
 
-      // Intermediate accumulator values are allowed to be consumed as long by writes
+      // Intermediate accumulator values are allowed to be consumed by writes
       // as long as the value is not actually visible until the end of the accumulation
       val intermediates = c1.writer match {
         case Op(RegWrite(_,data,_)) => Seq(data)

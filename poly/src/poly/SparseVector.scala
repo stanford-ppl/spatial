@@ -1,5 +1,7 @@
 package poly
 
+import emul.ResidualGenerator._
+
 /** Represents a sparse vector of integers for use in representing affine functions of the form:
   *   a_1*k_1 + ... + a_N*k_N + c
   * Where {a_1...a_N} are integer multipliers and {k_1...k_N} are symbolic values of type K,
@@ -48,5 +50,17 @@ case class SparseVector[K](cols: Map[K,Int], c: Int, allIters: Map[K,Seq[K]])
   def -(b: (K,Int)): SparseVector[K] = SparseVector[K](this.cols + ((b._1,-b._2)), c, allIters)
   def +(b: Int): SparseVector[K] = SparseVector[K](this.cols, c + b, allIters)
   def -(b: Int): SparseVector[K] = SparseVector[K](this.cols, c - b, allIters)
+
+  def span(N: Int, B: Int): ResidualGenerator = {
+    import utils.math.{gcd, allLoops}
+    import utils.implicits.collections._
+    val P_raw = cols.values.map{v => val posV = ((v % N) + N) % N; if (posV == 0) 1 else N*B/gcd(N,posV)}
+    val allBanksAccessible = 
+      if (cols.size > 0) allLoops(P_raw.toList, cols.values.toList, B, Nil).map{x => (x+c)%N}.distinct.map{x => ((x%N) + N) % N}.distinct.sorted
+      else Seq(c%N)
+    if (allBanksAccessible.size == N) ResidualGenerator(1,0,N)
+    else if (allBanksAccessible.stepSizeUnderMod(N).isDefined) ResidualGenerator(allBanksAccessible.stepSizeUnderMod(N).get, 0, N)
+    else ResidualGenerator(0, allBanksAccessible, N)
+  }
 }
 

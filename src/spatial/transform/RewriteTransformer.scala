@@ -16,7 +16,7 @@ import spatial.node._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 
-import utils.math.{isPow2,log2}
+import utils.math.{isPow2,log2,gcd}
 
 /** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
@@ -88,7 +88,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def static(lin: scala.Int, iter: Num[_], y: scala.Int): Boolean = {
-    def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     if (iter.counter.ctr.isStaticStartAndStep) {
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt
@@ -101,7 +100,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def residual(lin: scala.Int, iter: Num[_], ofs: scala.Int, y: scala.Int): ResidualGenerator = {
-    def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     if (iter.getCounter.isDefined && iter.counter.ctr.isStaticStartAndStep) {
       val Final(start) = iter.counter.ctr.start
       val Final(step) = iter.counter.ctr.step

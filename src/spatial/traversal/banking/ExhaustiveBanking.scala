@@ -346,8 +346,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           ofs = ofschunk * exp(B,D) + intrablockofs
 
     */
-    def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
-    def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
     try {
       val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n,alpha(i))}
       val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted

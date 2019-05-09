@@ -19,6 +19,9 @@ package object math {
       case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
     }
 
+  def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+  def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
+
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),
     * determine what elements are possible via the equation: (address * a) / B.  This is used to figure out what banks
     * are visible within a certain region of a memory

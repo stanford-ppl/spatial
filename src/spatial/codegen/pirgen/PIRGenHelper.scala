@@ -104,9 +104,9 @@ trait PIRGenHelper extends PIRFormatGen {
   def genOp(lhs:Lhs, op:Option[String]=None, inputs:Option[Seq[Any]]=None) = {
     val rhs = lhs.sym.op.get
     val opStr = op.getOrElse(rhs.getClass.getSimpleName)
-    val ins = inputs.getOrElse(rhs.productIterator.toList)
+    val ins = inputs.getOrElse(rhs.productIterator.toList).map { in => src"$in"}.mkString(",")
     state(lhs) { 
-      src"""OpDef(op=$opStr).input($ins)""" + 
+      src"""OpDef(op=$opStr).addInput($ins)""" + 
       src""".tp(${lhs.sym.tp})"""
     }
   }

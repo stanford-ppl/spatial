@@ -17,6 +17,7 @@ trait PIRGenController extends PIRCodegen {
     cchain:Option[Sym[_]]=None, 
     iters:Seq[Seq[Bits[_]]]=Nil, 
     valids: Seq[Seq[Bits[_]]]=Nil, 
+    stopWhen:Option[Sym[_]]=None,
     ens:Set[Bit]=Set.empty
   )(blk: => Unit) = {
     var newCtrler = ctrler.getOrElse("UnitController()")
@@ -24,6 +25,9 @@ trait PIRGenController extends PIRCodegen {
     newCtrler += cchain.ms(chain => src".cchain($chain)")
     if (ens.nonEmpty) {
       newCtrler += src".en($ens)"
+    }
+    stopWhen.foreach { stopWhen =>
+      newCtrler += src".stopWhen(MemRead().setMem($stopWhen))"
     }
     lhs.sym.unrollBy.foreach { par =>
       newCtrler += src".par($par)"
@@ -58,11 +62,11 @@ trait PIRGenController extends PIRCodegen {
     case ParallelPipe(ens, func) =>
       emitController(lhs, ens=ens) { ret(func) }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids,_) =>
-      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
+    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
+      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens, stopWhen=stopWhen) { ret(func) }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
-      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
+    case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
+      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens, stopWhen=stopWhen) { ret(func) }
 
     case op@Switch(selects, body) =>
       emitController(lhs) { ret(body) }

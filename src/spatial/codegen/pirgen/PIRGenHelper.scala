@@ -34,14 +34,19 @@ trait PIRGenHelper extends PIRFormatGen {
     )
   }
 
-  def stateStruct[C[_]](lhs:Sym[_], A:Type[_], tp:Option[String]=None)(rhsFunc:Option[(String, Type[_])] => Any):Unit = {
+  def stateStruct(lhs:Sym[_], A:Type[_], tp:Option[String]=None)(rhsFunc:Option[(String, Type[_])] => Any):Unit = {
+    mapStruct(A) { 
+      case s@Some((fieldName, t)) => stateOrAlias(Lhs(lhs, Some(fieldName)))(rhsFunc(s))
+      case s@None => stateOrAlias(lhs, tp)(rhsFunc(s))
+    }
+  }
+
+  def mapStruct[T](A:Type[_])(func:Option[(String, Type[_])] => T):Seq[T] = {
     A match {
       case a:Struct[_] =>
-        a.fields.foreach { case (fieldName, t) =>
-          stateOrAlias(Lhs(lhs, Some(fieldName)))(rhsFunc(Some((fieldName, t))))
-        }
+        a.fields.map { case (fieldName, t) => func(Some((fieldName, t))) }
       case a => 
-        stateOrAlias(lhs, tp)(rhsFunc(None))
+        Seq(func(None))
     }
   }
 

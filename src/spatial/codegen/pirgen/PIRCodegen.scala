@@ -80,12 +80,17 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case s => super.quote(s)
   }
 
-  override protected def quoteConst(tp: Type[_], c: Any): String = c match {
-    case c:String => s"""Const("${c.replace("\n","\\n")}")"""
-    case c => src"Const($c).tp(${tp})"
+  def quoteString(x:Any) = x match {
+    case x:String => s""""${x.replace("\n","\\n")}""""
+    case x => x
+  }
+
+  override protected def quoteConst(tp: Type[_], c: Any): String = {
+    src"Const(${quoteString(c)}).tp(${tp})"
   }
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
+    case x:SrcCtx => x.toString
     case p: Set[_]   => 
       s"Set(${p.map(quoteOrRemap).mkString(", ")})" 
     case p: Iterable[_]   => 
@@ -96,6 +101,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case l: Long       => l.toString + "L"
     case None    => "None"
     case Some(x) => "Some(" + quoteOrRemap(x) + ")"
+    case x:Product => s"${x.productPrefix}(${x.productIterator.map{ f => quoteOrRemap(quoteString(f))}.mkString(",")})"
     case x => x.toString
   }
 

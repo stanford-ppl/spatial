@@ -759,8 +759,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       Some("Buffer conflict")
     else if (i3.cost > (i1.cost + i2.cost))
       Some(s"Too expensive: ${i3.cost} > ${i1.cost + i2.cost}")
-    else if (mem.hasDestructiveReads)
-      Some(s"Cannot merge instances when reads are destructive")
+    else if (mem.hasDestructiveReads && mem.consumers.exists{x => x match {case Op(x:OpMemReduce[_,_]) => x.accum == mem; case _ => false}})
+      Some(s"Cannot merge instances when reads are destructive and mem is used as an accumulator")
     else
       None
   }

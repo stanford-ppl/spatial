@@ -136,7 +136,7 @@ lazy val emul   = project.settings(emul_settings)
 lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
 lazy val models = project.settings(models_settings).dependsOn(utils)
 lazy val forge  = project.settings(common).dependsOn(utils)
-lazy val poly   = project.settings(common).dependsOn(utils)
+lazy val poly   = project.settings(common).dependsOn(utils, emul)
 lazy val argon  = project.settings(common).dependsOn(utils, forge, emul)
 
 lazy val spatial = (project in file(".")).settings(

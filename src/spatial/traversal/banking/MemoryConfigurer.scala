@@ -394,8 +394,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Double = {
     if (spatialConfig.useAreaModels) {
       // Partition based on direct/xbar banking (TODO: Determine partial xBars here)
-      val (directR, xbarR) = rdGroups.flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
-      val (directW, xbarW) = wrGroups.flatten.partition(_.isDirectlyBanked(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas)))
+      val histR: Map[Int, Int] = rdGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
+      val histW: Map[Int, Int] = wrGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
+      val histCombined: Map[Int, (Int,Int)] = histR.map{case (width, siz) => (width -> (siz, histW.getOrElse(width, 0)))} ++ histW.collect{case (width, siz) if !histR.contains(width) => (width -> (0,siz))}
 
       // Relative scarcity of resource, roughly % of board used (TODO: Extract from target device, these numbers were just ripped from zcu)
       val lutWeight = 34260 / 100
@@ -411,14 +412,29 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val allN = banking.map(_.nBanks).padTo(5,0)
           val allAlpha = banking.map(_.alphas).flatten.padTo(5,0)
           val allP = banking.map(_.Ps).flatten.padTo(5,0)
-          val hist = List(1, directR.size, directW.size, banking.map(_.nBanks).product, xbarR.size, xbarR.size, 0,0,0)
+          val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten.padTo(9,0)
+          val hist = if (histRaw.size > 9) {
+            warn(s"$mem read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
+            histRaw.takeRight(9)
+          } else histRaw
+          if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) warn(s"$mem histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
           // TODO: Get real bitwidth
           val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
+          val auxNodes = (rdGroups ++ wrGroups).flatten.map{x => x.arithmeticNodes(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.flatten.toList
+          val auxWeights = auxNodes.map{case (name,a,b) => 
+            val l = (areamodel.estimate("LUTs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / lutWeight 
+            val f = (areamodel.estimate("FFs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / ffWeight 
+            val br = (areamodel.estimate("RAMB18", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1)) + areamodel.estimate("RAMB32", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / bramWeight 
+            (l,f,br)
+          }
+          val auxLuts = auxWeights.map(_._1).sum
+          val auxFFs = auxWeights.map(_._2).sum
+          val auxBrams = auxWeights.map(_._3).sum
           val luts = (areamodel.estimate("LUTs", "SRAMNew", payload)) / lutWeight
           val ffs = (areamodel.estimate("FFs", "SRAMNew", payload)) / ffWeight
           val bram = (areamodel.estimate("RAMB18", "SRAMNew", payload) + areamodel.estimate("RAMB32", "SRAMNew", payload)) / bramWeight
-          val c = luts + ffs + bram
-          dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+          val c = luts + ffs + bram + auxLuts + auxFFs + auxBrams
+          dbgs(s"        - TOTAL COMPONENT COST = $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
           c
         case m:RegFile[_,_] =>
           val allDims = mem.stagedDims.map(_.toInt).padTo(2,0)
@@ -426,7 +442,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val allN = banking.map(_.nBanks).padTo(2,0)
           val allAlpha = banking.map(_.alphas).flatten.padTo(2,0)
           val allP = banking.map(_.Ps).flatten.padTo(2,0)
-          val hist = List(1, directR.size, directW.size, banking.map(_.nBanks).product, xbarR.size, xbarR.size)
+          val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten.padTo(9,0)
+          val hist = if (histRaw.size > 9) {
+            warn(s"$mem read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
+            histRaw.takeRight(9)
+          } else histRaw
+          if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) warn(s"$mem histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
           // TODO: Get real bitwidth
           val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
           val luts = (areamodel.estimate("LUTs", "RegFileNew", payload)) / lutWeight
@@ -441,7 +462,12 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val allN = banking.map(_.nBanks).padTo(2,0)
           val allAlpha = banking.map(_.alphas).flatten.padTo(2,0)
           val allP = banking.map(_.Ps).flatten.padTo(2,0)
-          val hist = List(1, directR.size, directW.size, banking.map(_.nBanks).product, xbarR.size, xbarR.size)
+          val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten.padTo(9,0)
+          val hist = if (histRaw.size > 9) {
+            warn(s"$mem read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
+            histRaw.takeRight(9)
+          } else histRaw
+          if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) warn(s"$mem histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
           // TODO: Get real bitwidth
           val payload = allB ++ allN ++ allAlpha ++ List(32) ++ allDims ++ hist ++ List(depth) ++ allP
           val luts = (areamodel.estimate("LUTs", "RegFileNew", payload)) / lutWeight

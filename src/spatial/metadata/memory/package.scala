@@ -49,6 +49,14 @@ package object memory {
     def noBlockCyclic: Boolean = metadata[NoBlockCyclic](s).exists(_.flag)
     def noBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, NoBlockCyclic(flag))
 
+    def onlyBlockCyclic: Boolean = metadata[OnlyBlockCyclic](s).exists(_.flag)
+    def onlyBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, OnlyBlockCyclic(flag))
+
+    def blockCyclicBs: Seq[Int] = metadata[BlockCyclicBs](s).map(_.bs).getOrElse {
+      Seq(2, 4, 8, 16, 32, 64, 128, 256)
+    }
+    def blockCyclicBs_=(bs: Seq[Int]): Unit = metadata.add(s, BlockCyclicBs(bs))
+
     def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
     def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
 
@@ -129,6 +137,15 @@ package object memory {
       case Some(set) => s.dispatches += (uid -> (set + d))
       case None      => s.dispatches += (uid -> Set(d))
     }
+    def getGroupIds: Option[Map[Seq[Int], Set[Int]]] = metadata[GroupId](s).map(_.m)
+    def getGroupId(uid: Seq[Int]): Option[Set[Int]] = getGroupIds.flatMap(_.get(uid))
+    def gid(uid: Seq[Int]): Set[Int] = getGroupId(uid).getOrElse{throw new Exception(s"No group id defined for $s {${uid.mkString(",")}}")}
+    def gids: Map[Seq[Int], Set[Int]] = getGroupIds.getOrElse{ Map.empty }
+    def gids_=(gs: Map[Seq[Int],Set[Int]]): Unit = metadata.add(s, GroupId(gs))
+    def addGroupId(uid: Seq[Int], g: Set[Int]): Unit = getGroupId(uid) match {
+      case Some(set) => s.gids += (uid -> (set ++ g))
+      case None      => s.gids += (uid -> g)
+    }
 
     def getPorts: Option[Map[Int, Map[Seq[Int],Port]]] = metadata[Ports](s).map(_.m)
     def getPorts(dispatch: Int): Option[Map[Seq[Int],Port]] = getPorts.flatMap(_.get(dispatch))
@@ -146,6 +163,16 @@ package object memory {
 
     /** Returns the final port after unrolling. For use after unrolling only. */
     def port: Port = getPorts(0).flatMap(_.values.headOption).getOrElse{ throw new Exception(s"No final port defined for $s") }
+    def setBufPort(p: Int): Unit = {
+      val originalPortMetadata = getPorts
+      if (originalPortMetadata.isDefined) {
+        val originalPort = port
+        val newPort = Port(Some(p), originalPort.muxPort, originalPort.muxOfs, originalPort.castgroup, originalPort.broadcast)
+        metadata.remove(s, classOf[Ports])
+        originalPortMetadata.get.foreach{case (k,v) => metadata.add(s, Ports(Map((k -> Map((v.toList.head._1 -> newPort))))))}
+      }
+    }
+
   }
 
 

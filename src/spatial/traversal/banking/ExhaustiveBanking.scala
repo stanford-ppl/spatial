@@ -26,7 +26,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   private val k = boundVar[I32]
   private val k0 = boundVar[I32]
   private val k1 = boundVar[I32]
-  private val Bs = Seq(2, 4, 8, 16, 32, 64, 128, 256)
+  //private val Bs = Seq(2, 4, 8, 16, 32, 64, 128, 256) // Now set in metadata
 
   // Mapping to keep track of which AccessMatrix is rewritten as which
   private val accMatrixMapping = scala.collection.mutable.HashMap[AccessMatrix, AccessMatrix]()
@@ -389,7 +389,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1
-        if (checkCyclic(N,alpha,grps)) {
+        if (!mem.onlyBlockCyclic && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val t = computeP(N,1,alpha,stagedDims,mem)
           val P = t._1
@@ -397,7 +397,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           banking = Some(ModBanking(N,1,alpha,axes,P,darkVolume))
         }
         else if (!mem.noBlockCyclic) {
-          val B = Bs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          val B = mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val t = computeP(N, b, alpha, stagedDims,mem)

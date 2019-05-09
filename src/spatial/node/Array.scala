@@ -72,6 +72,18 @@ import spatial.lang.host._
   override def binds = super.binds ++ Set(apply.inputB,reduce.inputA,reduce.inputB)
 }
 
+//@op case class ArrayGroupByReduce[A:Type, K:Type, B:Type](
+    //array:  Array[A],
+    //apply:  Lambda2[Array[A],I32,A],
+    //key:    Lambda1[A,K],
+    //map:    Lambda1[A,B],
+    //reduce: Lambda2[B,B,B])
+  //extends Op[Map[K,B]] {
+
+  //override def aliases: Set[Sym[_]] = Nul
+  //override def binds = super.binds ++ Set(apply.inputB,key.input,map.input,reduce.inputA,reduce.inputB)
+//}
+
 @op case class ArrayFold[A:Type](
     array:  Array[A],
     init:   Sym[A],

@@ -257,8 +257,10 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.vecInnerLoop = true
       //spatialConfig.ignoreParEdgeCases = true
       spatialConfig.enableBufferCoalescing = false
+      spatialConfig.groupUnrolledAccess = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
+      spatialConfig.enableParallelBinding = false
     }.text("Enable codegen to PIR [false]")
 
     cli.opt[Unit]("tsth").action { (_,_) =>
@@ -279,6 +281,9 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
+    cli.opt[Unit]("noBindParallels").action{ (_,_) => 
+      spatialConfig.enableParallelBinding = false
+    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
 
     cli.opt[Int]("bankingEffort").action{ (t,_) => 
       spatialConfig.bankingEffort = t
@@ -374,6 +379,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("forceBanking").action { (_,_) => 
       spatialConfig.enableForceBanking = true
     }.text("Ensures that memories will always get banked and compiler will never decide that it is cheaper to duplicate")
+
+    cli.opt[Unit]("bank-groupUnroll").action { (_,_) => 
+      spatialConfig.groupUnrolledAccess = true
+    }.text("Group access in memory configure will prioritize grouping unrolled accesses first")
 
     cli.opt[Unit]("tightControl").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableTightControl = true

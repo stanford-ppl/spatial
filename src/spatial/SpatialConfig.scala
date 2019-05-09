@@ -32,6 +32,8 @@ class SpatialConfig extends Config {
   var enableOptimizedReduce: Boolean = true
   var useAreaModels: Boolean = true
   var enableForceBanking: Boolean = false
+  var groupUnrolledAccess: Boolean = false
+  var enableParallelBinding: Boolean = true
   var bankingEffort: Int = 1
   var unrollMetapipeOfParallels: Boolean = true
   var unrollParallelOfMetapipes: Boolean = false
@@ -82,6 +84,7 @@ class SpatialConfig extends Config {
       dstSC.useCheapFifos = useCheapFifos
       dstSC.enableOptimizedReduce = enableOptimizedReduce
       dstSC.enableForceBanking = enableForceBanking
+      dstSC.groupUnrolledAccess = groupUnrolledAccess
       // dstSC.enableSplitting = enableSplitting
       dstSC.enableArchDSE = enableArchDSE
       dstSC.addRetimeRegisters = addRetimeRegisters

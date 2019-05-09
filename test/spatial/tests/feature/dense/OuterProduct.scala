@@ -36,12 +36,12 @@ import spatial.dsl._
         val outTile = SRAM[T](tsA, tsB)
         //val blkA = Reg[Int]
         //val blkB = Reg[Int]
-        Parallel {
-          b1 load vec1(i::i+tsA par ip)
-          b2 load vec2(j::j+tsB par ip)
+        // Parallel {
+        Pipe.NoBind{b1 load vec1(i::i+tsA par ip)} // Test NoBind directive
+        Pipe{b2 load vec2(j::j+tsB par ip)}
           //Pipe{ blkA := min(sizeA - i, tsA) }
           //Pipe{ blkB := min(sizeB - j, tsB) }
-        }
+        // }
         Foreach(tsA by 1, tsB par ip){ (ii,jj) => outTile(ii, jj) = b1(ii) * b2(jj) } // 2
         out(i::i+tsA, j::j+tsB par ip) store outTile
       }

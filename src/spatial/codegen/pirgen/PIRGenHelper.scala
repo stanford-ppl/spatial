@@ -11,21 +11,21 @@ import scala.collection.mutable
 
 trait PIRGenHelper extends PIRFormatGen {
 
-  def assertOne[T](vec:Seq[T]):T = {
-    assert(vec.size==1, s"More than one element in vector $vec for pir backend")
+  def assertOne[T](vec:Iterable[T]):T = {
+    if (vec.size != 1) {
+      error(s"More than one element in vector $vec for pir backend")
+      IR.logError()
+    }
     vec.head
   }
 
-  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Seq[Sym[_]]]=None, tp:Option[String]=None) = {
+  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Any]=None, tp:Option[String]=None) = {
     val padding = lhs.getPadding.getOrElse {
       lhs.constDims.map { _ => 0 }
     }
-    val constInits = inits.map { _.map { _.rhs.getValue.get } }.flatMap { inits =>
-      if (inits.size > 16) None else Some(inits) //TODO: hack. prevent generating inits that are too large
-    }
     stateStruct(lhs, lhs.asMem.A, tp=tp)(field => 
       src"$rhs" + 
-      constInits.ms(constInits => src".inits($constInits)") + 
+      inits.ms(inits => src".inits($inits)") + 
       src".depth(${lhs.instance.depth})" +
       src".dims(${lhs.constDims.zip(padding).map { case (d,p) => d + p }})" +
       src".banks(${lhs.instance.banking.map { b => b.nBanks}})" +
@@ -59,6 +59,7 @@ trait PIRGenHelper extends PIRFormatGen {
           src".offset(${assertOne(ofs)})" + 
           src".port($bufferPort)" + 
           src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})" +
           src".tp(${field.map{_._2}.getOrElse(lhs.tp)})"
         case _ => 
           src"MemRead()" + 
@@ -66,6 +67,7 @@ trait PIRGenHelper extends PIRFormatGen {
           src".en(${assertOne(ens)})" + 
           src".port($bufferPort)" + 
           src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})" +
           src".tp(${field.map{_._2}.getOrElse(lhs.tp)})"
       }
     }
@@ -85,14 +87,16 @@ trait PIRGenHelper extends PIRFormatGen {
           src".offset(${assertOne(ofs)})" + 
           src".data(${Lhs(assertOne(data),name)})" + 
           src".port($bufferPort)" + 
-          src".muxPort($muxPort)"
+          src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})"
         case _ => 
           src"MemWrite()" + 
           src".setMem(${Lhs(mem,name)})" + 
           src".en(${assertOne(ens)})" + 
           src".data(${Lhs(assertOne(data),name)})" + 
           src".port($bufferPort)" +
-          src".muxPort($muxPort)"
+          src".muxPort($muxPort)" +
+          src".gid(${assertOne(lhs.gids(Nil))})"
       }
     }
   }

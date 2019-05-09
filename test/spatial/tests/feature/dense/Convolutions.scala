@@ -380,11 +380,11 @@ import spatial.dsl._
         val C = pt * STRIDE
 
         // Fetch data
-        Parallel{
-          in_fifos.zipWithIndex.map{case (f, i) => 
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-          }
+        // Parallel{
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
+        // }
 
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)
@@ -494,11 +494,11 @@ import spatial.dsl._
         val C = pt * STRIDE
 
         // Fetch data
-        Parallel{
-          in_fifos.zipWithIndex.map{case (f, i) => 
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-          }
+        // Parallel{
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
+        // }
 
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)
@@ -1130,11 +1130,11 @@ import spatial.dsl._
         val C = pt * STRIDE
 
         // Fetch data
-        Parallel{
-          in_fifos.zipWithIndex.map{case (f, i) => 
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-          }
+        // Parallel{
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
+        // }
 
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)

@@ -5,6 +5,7 @@ import spatial.dsl._
 @spatial class EdgeDetector extends SpatialTest {
   override def dseModelArgs: Args = "16 1024"
   override def finalModelArgs: Args = "16 1024"
+  override def compileArgs: Args = super.compileArgs and "--noBindParallels"
 
   type T = FixPt[TRUE,_16,_16]
 

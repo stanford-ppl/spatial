@@ -35,4 +35,9 @@ trait PIRGenStream extends PIRCodegen {
     case _ => super.genAccel(lhs, rhs)
   }
 
+  override protected def quoteOrRemap(arg: Any): String = arg match {
+    case x:DRAMBus[_] => "DRAMBus"
+    case x => super.quoteOrRemap(arg)
+  }
+
 }

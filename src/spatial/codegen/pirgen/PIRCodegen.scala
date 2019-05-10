@@ -101,7 +101,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case l: Long       => l.toString + "L"
     case None    => "None"
     case Some(x) => "Some(" + quoteOrRemap(x) + ")"
-    case x:Product => s"${x.productPrefix}(${x.productIterator.map{ f => quoteOrRemap(quoteString(f))}.mkString(",")})"
+    case x:Product if x.productIterator.nonEmpty => s"${x.productPrefix}(${x.productIterator.map{ f => quoteOrRemap(quoteString(f))}.mkString(",")})"
     case x => x.toString
   }
 

@@ -289,8 +289,9 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.bankingEffort = t
     }.text("""Specify the level of effort to put into banking local memories.  i.e:
       0: Quit banking analyzer after first banking scheme is found
-      1: (default) Allow banking analyzer to find up to 4 valid schemes (flat, hierarchical, flat+duplication, hierarchical+duplication)
-      2: Allow banking analyzer to find banking scheme for every set of banking directives
+      1: (default) Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
+      2: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
+      3: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
 """)
 
     cli.opt[Unit]("mop").action{ (_,_) => 
@@ -344,7 +345,8 @@ trait Spatial extends Compiler with ParamLoader {
       overrideRetime = true
     }.text("Disable retiming (NOTE: May generate buggy verilog)")
 
-    cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c)")
+    cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c) [false]")
+    cli.opt[Unit]("forceFuseFMA").action{(_,_) => spatialConfig.forceFuseFMA = true}.text("Force all Add(Mul(a,b),c) patterns to become FMA(a,b,c), even if they increase initiation interval.  --noFuseFMA takes priority [false]")
 
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 

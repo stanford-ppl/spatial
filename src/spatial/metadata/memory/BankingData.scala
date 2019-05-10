@@ -370,11 +370,21 @@ case class BlockCyclicBs(bs: Seq[Int]) extends Data[BlockCyclicBs](SetBy.User)
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isNoBank
-  * Setter:  sym.isNoBank = (true | false)
+  * Getter:  sym.isOnlyDuplicate
+  * Setter:  sym.isOnlyDuplicate = (true | false)
   * Default: false
   */
-case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
+case class OnlyDuplicate(flag: Boolean) extends Data[OnlyDuplicate](SetBy.User)
+
+/** Flag set by the user to disable hierarchical banking and only attempt flat banking,
+  * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
+  * user knows that a flat scheme exists or is a simpler search
+  *
+  * Getter:  sym.duplicateOnAxes = Option[Seq[Seq[Int]]]
+  * Setter:  sym.duplicateOnAxes = Seq[Seq[Int]]
+  * Default: None
+  */
+case class DuplicateOnAxes(opts: Seq[Seq[Int]]) extends Data[DuplicateOnAxes](SetBy.User)
 
 /** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
   * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
@@ -473,15 +483,18 @@ case object NPowersOf2 extends NStrictness {
 }
 case object NBestGuess extends NStrictness {
   val P = 0
-  private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+  private def factorize(number: Int): List[Int] = {
+    List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
+  }
+  private def primeFactorize(number: Int, list: List[Int] = List()): List[Int] = {
     for(n <- 2 to number if number % n == 0) {
-      return factorize(number / n, list :+ n)
+      return primeFactorize(number / n, list :+ n)
     }
     list
   }
 
   def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = { 
-    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}    
+    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}.sorted
   }
 }
 case object NRelaxed extends NStrictness {
@@ -518,9 +531,12 @@ case object AlphaPowersOf2 extends AlphaStrictness {
 }
 case object AlphaBestGuess extends AlphaStrictness {
   val P = 0
-  private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+  private def factorize(number: Int): List[Int] = {
+    List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
+  }
+  private def primeFactorize(number: Int, list: List[Int] = List()): List[Int] = {
     for(n <- 2 to number if number % n == 0) {
-      return factorize(number / n, list :+ n)
+      return primeFactorize(number / n, list :+ n)
     }
     list
   }

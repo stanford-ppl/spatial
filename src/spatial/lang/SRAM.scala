@@ -74,8 +74,14 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def nohierarchical: C[A] = { this.isNoHierarchicalBank = true; me }
   /** Do not attempt to bank memory in a flattened manner */
   def noflat: C[A] = { this.isNoFlatBank = true; me }
-  /** Do not attempt to bank memory at all, and only use bank-by-duplication */
-  def nobank: C[A] = { this.isNoBank = true; me }
+  /** Do not attempt to bank memory at all, and only use bank-by-duplication for all lanes of all readers */
+  def onlyduplicate: C[A] = { this.isOnlyDuplicate = true; me }
+  /** Attempt to duplicate on the provided axes groups.  
+    *   i.e. To try either no-duplication, full-duplication, or duplication
+    *   along the axes with dimensions 32 and 64 for SRAM(32,8,64), use the flag
+    *   .duplicateaxes( List( List(), List(0,2), List(0,1,2) ) )
+    */
+  def duplicateaxes(opts: Seq[Seq[Int]]): C[A] = {this.duplicateOnAxes = opts; me }
   /** Do not attempt to bank memory by duplication */
   def noduplicate: C[A] = { this.isNoDuplicate = true; me }
   /** Do not attempt to bank memory with block-cyclic schemes */

@@ -38,7 +38,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
   // Cache for skipping ahead to correct banking solution for patterns/axes that have already been solved
   private val solutionCache = scala.collection.mutable.HashMap[(Set[Set[SparseMatrix[Idx]]], NStrictness, AlphaStrictness, Seq[Int]), Option[ModBanking]]()
-
+  // Map for tracking which kinds of schemes already have a solution, used depending on what the banking effort is set to
+  private val schemesFoundCount = scala.collection.mutable.HashMap[(BankingView,RegroupDims), Int]()
   /** Returns a Map from Seq(banking schemes) to the readers for these schemes.  
     * Generally, it will contain Map(Seq(flat_scheme, nested_scheme) -> all readers) but in 
     * the case of dephased accesses that cannot be banked together, there will be multiple 
@@ -147,25 +148,21 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
 
     def findSchemes(myReads: Set[Seq[SparseMatrix[Idx]]], myWrites: Set[Seq[SparseMatrix[Idx]]], hostReads: Set[AccessMatrix]): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
-      var flatSchemesFound = 0
-      var hierarchicalSchemesFound = 0
-      var flatDupSchemesFound = 0
-      var hierarchicalDupSchemesFound = 0
       val effort = mem.bankingEffort
+      schemesFoundCount.clear()
       def markFound(scheme: BankingOptions): Unit = {
-        if (scheme.view.isInstanceOf[Flat] && scheme.regroup.dims.size == 0) {dbgs(s"incrementing flatSchemesFound @ $flatSchemesFound"); flatSchemesFound = flatSchemesFound + 1}
-        else if (scheme.view.isInstanceOf[Flat] && scheme.regroup.dims.size > 0) {dbgs(s"incrementing flatDupSchemesFound @ $flatDupSchemesFound"); flatDupSchemesFound = flatDupSchemesFound + 1}
-        else if (scheme.view.isInstanceOf[Hierarchical] && scheme.regroup.dims.size == 0) {dbgs(s"incrementing hierarchicalSchemesFound @ $hierarchicalSchemesFound"); hierarchicalSchemesFound = hierarchicalSchemesFound + 1}
-        else if (scheme.view.isInstanceOf[Hierarchical] && scheme.regroup.dims.size > 0) {dbgs(s"incrementing hierarchicalDupSchemesFound @ $hierarchicalDupSchemesFound"); hierarchicalDupSchemesFound = hierarchicalDupSchemesFound + 1}
+        val count = schemesFoundCount.getOrElse((scheme.view, scheme.regroup), 0)
+        schemesFoundCount += (((scheme.view, scheme.regroup) -> {count + 1}))
+        dbgs(s"incrementing ${scheme.view}, ${scheme.regroup} to ${count + 1} ")
       }
       def wantScheme(scheme: BankingOptions): Boolean = {
-        if (effort == 0 && (flatSchemesFound + hierarchicalSchemesFound + flatDupSchemesFound + hierarchicalDupSchemesFound >= 1)) false
+        if (effort == 0 && (schemesFoundCount.map(_._2).sum > 1)) false
         else if (effort == 1 && (
-          (scheme.view.isInstanceOf[Flat] && scheme.regroup.dims.size == 0 && flatSchemesFound > 0) ||
-          (scheme.view.isInstanceOf[Flat] && scheme.regroup.dims.size == scheme.view.rank && flatDupSchemesFound > 0) ||
-          (scheme.view.isInstanceOf[Hierarchical] && scheme.regroup.dims.size == 0 && hierarchicalSchemesFound > 0) ||
-          (scheme.view.isInstanceOf[Hierarchical] && scheme.regroup.dims.size == scheme.view.rank && hierarchicalDupSchemesFound > 0) ||
-          (scheme.regroup.dims.size > 0 && scheme.regroup.dims.size < scheme.view.rank)
+          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0 ||
+          !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
+        )) false
+        else if (effort == 2 && (
+          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0
         )) false
         else true
       }
@@ -204,7 +201,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               }
               // If only 1 acc left per group, Unit banking, otherwise search
               val axisBankingScheme: Option[ModBanking] = {
-                if (solutionCache.contains((selGrps, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${selGrps.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job!")
+                if (solutionCache.contains((selGrps, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${selGrps.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job! (scheme ${solutionCache.get((selGrps, nStricts, aStricts, axes))})")
                 solutionCache.getOrElseUpdate((selGrps, nStricts, aStricts, axes), {
                   if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(ModBanking.Unit(1, axes))
                   else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(ModBanking.Unit(rank, axes))

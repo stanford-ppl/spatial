@@ -66,8 +66,11 @@ package object memory {
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
-    def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
-    def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
+    def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
+    def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
+
+    def duplicateOnAxes: Option[Seq[Seq[Int]]] = metadata[DuplicateOnAxes](s).map(_.opts)
+    def duplicateOnAxes_=(opts: Seq[Seq[Int]]): Unit = metadata.add(s, DuplicateOnAxes(opts))
 
     def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
     def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))

@@ -31,15 +31,18 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
   final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
   lazy val bankViews: Seq[BankingView] = if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
-                                         else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank && !mem.isNoBank) Seq(Flat(rank), Hierarchical(rank)) 
+                                         else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank) Seq(Flat(rank), Hierarchical(rank)) 
                                          else if (mem.isNoHierarchicalBank) Seq(Flat(rank)) 
                                          else if (mem.isNoFlatBank) Seq(Hierarchical(rank)) 
-                                         else if (mem.isNoBank) Seq() 
                                          else Seq(Flat(rank))
 
   lazy val nStricts: Seq[NStrictness] = Seq(NPowersOf2, NBestGuess, NRelaxed)
   lazy val aStricts: Seq[AlphaStrictness] = Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
-  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isDuplicatable & !mem.isNoDuplicate & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) else RegroupHelper.regroupNone
+  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isNoDuplicate) RegroupHelper.regroupNone
+                                                    else if (mem.isOnlyDuplicate) RegroupHelper.regroupAll(rank)
+                                                    else if (mem.duplicateOnAxes.isDefined) mem.duplicateOnAxes.get.map{x: Seq[Int] => RegroupDims(x.toList)}.toList
+                                                    else if (mem.isDuplicatable & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) 
+                                                    else RegroupHelper.regroupNone
 
 
   def configure(): Unit = {
@@ -425,28 +428,40 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         val ffs = (areamodel.estimateMem("FFs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram + auxLuts + auxFFs + auxBrams
-        dbgs(s"        - TOTAL COMPONENT COST = $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
+        dbgs(s"          Access Hist:")
+        dbgs(s"          | width | R | W |")
+        histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
+        dbgs(s"        - Duplicate costs $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
         c
       case m:RegFile[_,_] =>
         val luts = (areamodel.estimateMem("LUTs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
         val ffs = (areamodel.estimateMem("FFs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram
-        dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+        dbgs(s"          Access Hist:")
+        dbgs(s"          | width | R | W |")
+        histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
+        dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
         c
       case m:LineBufferNew[_] =>
         val luts = (areamodel.estimateMem("LUTs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
         val ffs = (areamodel.estimateMem("FFs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram
-        dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+        dbgs(s"          Access Hist:")
+        dbgs(s"          | width | R | W |")
+        histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
+        dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
         c
       case _ => 
         val luts = areamodel.estimateMem("LUTs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
         val ffs = (areamodel.estimateMem("FFs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram
-        dbgs(s"        - TOTAL COMPONENT COST = $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
+        dbgs(s"          Access Hist:")
+        dbgs(s"          | width | R | W |")
+        histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
+        dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
         c
     }
   }
@@ -550,19 +565,31 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         .map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }
         .sortBy{x => (x.view.P, x.N.P, x.alpha.P, x.regroup.P)}
         .filter{x => (x.view.isInstanceOf[Hierarchical] || (x.view.isInstanceOf[Flat] && (x.regroup.dims.size == 0 || x.regroup.dims.size == x.view.rank)))}
+    if (attemptDirectives.size == 0) {
+      error(s"Unable to search for banking on ${mem.fullname}:")
+      error(s"  ${mem.ctx})")
+      error(s"  ${mem.ctx.content.getOrElse("<???>")}")
+      throw new Exception(s"No banking options allowed!")
+    }
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
+        dbgs(s"**************************************************************************************")
+        dbgs(s"Analyzing costs for ${bankings.toList.size} banking schemes found for ${mem.fullname}")
         val costs: Map[BankingOptions, Double] = bankings.map{case (scheme, banking) => 
           dbgs(s"Scheme $scheme:")
-          val c = banking.toList.map{case (rds, b) => cost(b,depth,rds,reachingWrGroups)}.sum
-          banking.foreach{x => dbgs(s"  - ${x._1.map(_.size)} readers -> ${x._2}")}
+          val c = banking.toList.zipWithIndex.map{case ((rds, b),i) => 
+            dbgs(s"  - ${rds.map(_.size).sum} readers connect to duplicate #$i (${b})")
+            cost(b,depth,rds,reachingWrGroups)
+          }.sum
           scheme -> c
         }
+        dbgs(s"***** Cost summary *****")
         bankings.foreach{case (scheme,banking) => dbgs(s"Cost: ${costs(scheme)} for $scheme")}
+        dbgs(s"**************************************************************************************")
         val winningScheme = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
         val winner = bankings(winningScheme._1)
         Right(

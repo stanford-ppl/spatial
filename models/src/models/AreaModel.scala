@@ -34,7 +34,7 @@ class AreaEstimator {
       (python3Exists, pickleExists, xgboostExists, sklearnExists) match {
         case (0,0,0,0) => useML = true
         case (1,_,_,_) => println(s"python3 missing!  Cannot run ML area models!"); useML = false
-        case (_,_,_,_) => println(s"Missing python3 libraries: ${if (pickleExists == 1) "pickle" else ""} ${if (xgboostExists == 1) "xgboost" else ""} ${if (sklearnExists == 1) "sklearn" else ""} !  Cannot run ML area models!"); useML = false
+        case (_,_,_,_) => println(s"Missing python3 libraries: ${if (pickleExists == 1) "pickle" else ""}${if (xgboostExists == 1) " xgboost" else ""}${if (sklearnExists == 1) " sklearn" else ""}!  Cannot run ML area models!"); useML = false
       }
     } else {
       useML = false
@@ -61,7 +61,7 @@ class AreaEstimator {
       val hist = if (histRaw.size > 9) {
         println(s"WARNING: read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
         histRaw.takeRight(9)
-      } else histRaw
+      } else histRaw.padTo(9,0)
       if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) println(s"WARNING: histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
       val values = allB ++ allN ++ allAlpha ++ List(bitWidth) ++ allDims ++ hist ++ List(depth) ++ allP
 

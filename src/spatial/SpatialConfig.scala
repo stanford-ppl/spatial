@@ -48,6 +48,7 @@ class SpatialConfig extends Config {
   var enableRetiming = true
   var enableLooseIterDiffs = false
   var fuseAsFMA = true
+  var forceFuseFMA = false
 
   var enableBroadcast = true // Allow broadcasting reads
 

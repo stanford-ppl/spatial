@@ -303,7 +303,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
         case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
         case _ => false
       }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
+      if (lhs.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA)
         transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
       else 
         super.transform(lhs,rhs)
@@ -314,7 +314,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
         case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
         case _ => false
       }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
+      if (lhs.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA)
         transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
       else 
         super.transform(lhs,rhs)
@@ -325,7 +325,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
         case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
         case _ => false
       }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
+      if (lhs.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA)
         transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
       else 
         super.transform(lhs,rhs)
@@ -336,7 +336,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
         case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
         case _ => false
       }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
+      if (lhs.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA)
         transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
       else 
         super.transform(lhs,rhs)

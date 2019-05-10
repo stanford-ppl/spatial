@@ -13,7 +13,6 @@ trait PIRGenController extends PIRCodegen {
   def emitController(
     lhs:Lhs, 
     ctrler:Option[String]=None,
-    schedule:Option[Any]=None,
     cchain:Option[Sym[_]]=None, 
     iters:Seq[Seq[Bits[_]]]=Nil, 
     valids: Seq[Seq[Bits[_]]]=Nil, 
@@ -33,7 +32,7 @@ trait PIRGenController extends PIRCodegen {
       newCtrler += src".par($par)"
     }
     state(lhs, tp=Some(tp))(
-      src"""createCtrl(schedule="${schedule.getOrElse(lhs.sym.schedule)}")(${newCtrler})"""
+      src"""createCtrl(schedule=${lhs.sym.schedule})(${newCtrler})"""
     )
     def quoteIdx(sym:Bits[_]):String = {
       sym.counter.lanes.toString

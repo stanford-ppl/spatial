@@ -329,6 +329,28 @@ trait CppGenArray extends CppGenCommon {
         emit(src"$lhs = ${reduce.result};")
       close("}")
 
+    //case ArrayGroupByReduce(array, apply, key, map, reduce) =>
+      //if (isArrayType(lhs.tp)) {
+        //emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""") 
+      //} else {
+        //emit(src"${lhs.tp} $lhs;") 
+      //}
+      //open(src"if (${getSize(array)} > 0) { // Hack to handle reductions on things of length 0")
+        //emitApply(lhs, array, "0", false)
+      //close("}")
+      //open("else {")
+        //emit(src"$lhs = ${zeroElement(lhs.tp)};")
+      //close("}")
+
+      //open(src"for (int ${apply.inputB} = 1; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
+        //emitApply(key.input, array, src"${apply.inputB}")
+        //visitBlock(key)
+        //visitBlock(map)
+        //emit(src"""${reduce.inputB.tp}${if (isArrayType(reduce.inputB.tp)) "*" else ""} ${reduce.inputB} = $lhs;""")
+        //visitBlock(reduce)
+        //emit(src"$lhs = ${reduce.result};")
+      //close("}")
+
     case op@Switch(selects,block) if !inHw =>
 
       emit(src"/** BEGIN SWITCH $lhs **/")

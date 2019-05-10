@@ -47,12 +47,12 @@ import spatial.dsl._
         val quantsTile = SRAM[Int](ts)
         val disctsTile = SRAM[T](ts)
         val pricesTile = SRAM[T](ts)
-        Parallel {
-          datesTile  load dates(i::i+ts par lp)
-          quantsTile load quants(i::i+ts par lp)
-          disctsTile load discts(i::i+ts par lp)
-          pricesTile load prices(i::i+ts par lp)
-        }
+        // Parallel {
+        datesTile  load dates(i::i+ts par lp)
+        quantsTile load quants(i::i+ts par lp)
+        disctsTile load discts(i::i+ts par lp)
+        pricesTile load prices(i::i+ts par lp)
+        // }
         Reduce(Reg[T])(ts par ip){ j =>
           val date  = datesTile(j)
           val disct = disctsTile(j)

@@ -33,6 +33,7 @@ trait ForeachUnrolling extends UnrollingBase {
     if (mop || unrLanes.size == 1 || lhs.isInnerControl) {
       val blk   = inLanes(unrLanes){ substituteBlock(func) }
       val lhs2  = stageWithFlow(UnitPipe(newEns, blk)){lhs2 => transferData(lhs,lhs2) }
+      lhs2.unrollBy = unrLanes.Ps.product
       dbgs(s"Created unit pipe ${stm(lhs2)}")
       lhs2    
     } else {

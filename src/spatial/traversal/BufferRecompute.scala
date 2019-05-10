@@ -32,7 +32,7 @@ case class BufferRecompute(IR: State) extends BlkTraversal {
       if (lhs.getDuplicates.isDefined) {
         dbgs(s"Recomputing depth of $lhs")
         val (_, bufPorts, _) = computeMemoryBufferPorts(lhs, lhs.readers, lhs.writers)
-        val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
+        val depth = bufPorts.collect{case (acc, Some(p)) => acc.setBufPort(p); p}.maxOrElse(0) + 1
         if (depth != lhs.instance.depth) {
           dbgs(s"Memory $lhs had depth of ${lhs.instance.depth}, now has depth of $depth")
           lhs.duplicates = lhs.duplicates.map(_.updateDepth(depth)).toSeq

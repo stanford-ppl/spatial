@@ -50,8 +50,8 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
     case e@FringeSparseStore(dram,cmdStream,ackStream) =>
       state(lhs)(
         src"""FringeSparseStore($dram)""" +
-        src""".addr(MemRead().setMem(${Lhs(cmdStream,Some("addr"))}))""" + 
-        src""".data(MemRead().setMem(${Lhs(cmdStream,Some("data"))}))""" +
+        src""".addr(MemRead().setMem(${Lhs(cmdStream,Some("_2"))}))""" + 
+        src""".data(MemRead().setMem(${Lhs(cmdStream,Some("_1"))}))""" +
         src""".ack(MemWrite().setMem($ackStream).data)"""
       )
 

@@ -100,10 +100,10 @@ import spatial.lib.BLAS
           val a_tile = SRAM[T](tileSizeM, tileSizeK)
           val b_tile = SRAM[T](tileSizeK, tileSizeN)
           // Transfer tiles to sram
-          Parallel{
-            a_tile load A(i::i+elements_m, l::l+elements_k par load_par)
-            b_tile load B(l::l+elements_k, j::j+elements_n par load_par)
-          }
+          // Parallel{
+          a_tile load A(i::i+elements_m, l::l+elements_k par load_par)
+          b_tile load B(l::l+elements_k, j::j+elements_n par load_par)
+          // }
           Foreach(elements_m by 1 par m_inner_par){ii =>
             Foreach(elements_n by 1 par n_inner_par){jj =>
               c_tile_local(ii,jj) = Reduce(Reg[T])(elements_k by 1 par k_inner_par){ll =>

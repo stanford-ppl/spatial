@@ -72,6 +72,7 @@ import spatial.metadata.control._
     val cksum2 = got_2D == gold_2D 
     val cksum3 = got_3D == gold_3D
     val cksum = cksum1 & cksum2 & cksum3
+    //val cksum = cksum1
     println(r"1D: $cksum1, 2D: $cksum2, 3D: $cksum3")
     println(r"PASS: ${cksum} (FlatAffineAccess)")
     assert(cksum)

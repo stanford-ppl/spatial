@@ -29,10 +29,10 @@ import spatial.dsl._
       val lb2 = LineBuffer[I32](3,24)
       val sram2 = SRAM[I32](3,24)
       Foreach(10 by 1){i => 
-        Parallel{
-          lb1 load init_dram(i, 0::24 par 4)
-          lb2 load init_dram(i, 0::24 par 4)  
-        }
+        // Parallel{
+        lb1 load init_dram(i, 0::24 par 4)
+        lb2 load init_dram(i, 0::24 par 4)  
+        // }
         Foreach(24 by 1 par 3){j => 
           sram2(0,j) = lb1(0,j) + lb2(0,j) // <--- newest data (highest #s in this app)
           sram2(1,j) = lb1(1,j) + lb2(1,j) 

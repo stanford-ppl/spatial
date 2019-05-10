@@ -21,9 +21,7 @@ import spatial.dsl._
       Foreach(8 by 1) {i =>
         val start = id_sram(i)
         val end = id_sram(i+1)
-        Parallel{
-          data_sram load data_dram(start::end)
-        }
+        data_sram load data_dram(start::end)
         result_dram store data_sram
       }
     }

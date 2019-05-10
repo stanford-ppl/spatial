@@ -11,6 +11,7 @@ import scala.reflect.ClassTag
   override def dseModelArgs: Args = "640"
   override def finalModelArgs: Args = "640"
   override def runtimeArgs: Args = "640"
+  override def compileArgs: Args = super.compileArgs and "--noBindParallels"
   type X = FixPt[TRUE,_32,_0]
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
@@ -45,12 +46,10 @@ import scala.reflect.ClassTag
         //ts := min(B, N-i)
         val aBlk = SRAM[T](B)
         val bBlk = SRAM[T](B)
-        Parallel {
-          //aBlk load a(i::i+ts.value par P3)
-          //bBlk load b(i::i+ts.value par P3)
-          aBlk load a(i::i+B par P3)
-          bBlk load b(i::i+B par P3)
-        }
+        //aBlk load a(i::i+ts.value par P3)
+        //bBlk load b(i::i+ts.value par P3)
+        aBlk load a(i::i+B par P3)
+        bBlk load b(i::i+B par P3)
         val accI = Reg[T](0.to[T])
         Reduce(accI)(B par P2){ii => aBlk(ii) * bBlk(ii) }{_+_}
       }{_+_}

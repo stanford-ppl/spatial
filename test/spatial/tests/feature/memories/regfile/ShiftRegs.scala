@@ -39,7 +39,7 @@ import spatial.dsl._
       val triplebuf = RegFile[I32](8,Seq.tabulate[I32](8){i => i}).buffer
       Foreach(8 by 1){i => 
         triplebuf_dram(i, 0::8) store triplebuf
-        Pipe{dummy := i}
+        Pipe.NoBind{dummy := i}
         Foreach(8 by 1){j => triplebuf(j) = j + i + 1 }
       }
     }

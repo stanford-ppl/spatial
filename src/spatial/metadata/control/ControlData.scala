@@ -177,6 +177,23 @@ case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.C
   */
 case class ReadMems(mems: Set[Sym[_]]) extends Data[ReadMems](SetBy.Flow.Consumer)
 
+/** Memories which are read in order to set up a given controller (i.e. setting up counter bounds or enables).
+  *
+  * Getter: sym.transientReadMems
+  * Setter: sym.transientReadMems = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class TransientReadMems(mems: Set[Sym[_]]) extends Data[TransientReadMems](SetBy.Analysis.Self)
+
+/** Flag marking whether or not a controller should attempt to bind in parallel with another controlle.
+  * i.e. Controllers derived from "sleep(N)" api and that contain breakIf nodes should never be binded
+  *
+  * Getter: sym.shouldNotBind
+  * Setter: sym.shouldNotBind = Boolean
+  * Default: false
+  */
+case class ShouldNotBind(f: Boolean) extends Data[ShouldNotBind](SetBy.Analysis.Self)
+
 /** Marks top-level streaming controller as one derived from DRAM transfer during blackbox lowering.
   * Used for runtime performance modeling post-blackbox lowering
   *
@@ -202,3 +219,10 @@ case class LoweredTransferSize(info: (Sym[_], Sym[_], Int)) extends Data[Lowered
   */
 case class UnrollAsPOM(should: Boolean) extends Data[UnrollAsPOM](SetBy.User)
 case class UnrollAsMOP(should: Boolean) extends Data[UnrollAsMOP](SetBy.User)
+
+/** 
+  * Set on unrolled unit pipes when loops are fully unrolled. Mark how much the loops are unrolled. Used by pir.
+  * Getter:  sym.unrollby
+  * Setter:  sym.unrollby = (int)
+  */
+case class UnrollBy(par: Int) extends Data[UnrollBy](SetBy.Analysis.Self)

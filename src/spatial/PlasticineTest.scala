@@ -139,7 +139,7 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def parseMake(line:String) = {
-      if (line.contains("error")) Fail
+      if (line.contains("error") || line.contains("exception")) Fail
       else Unknown
     }
 
@@ -151,6 +151,9 @@ trait PlasticineTest extends DSLTest { test =>
         println(line)
         Pass
       } else if (line.contains("PASS: false")) {
+        println(line)
+        Fail
+      } else if (line.contains("exception")) {
         println(line)
         Fail
       } 
@@ -362,6 +365,10 @@ trait PlasticineTest extends DSLTest { test =>
   }
 
   case object Tst extends PIRBackend {
+    private val genName = name + "_" + property("project").getOrElse("")
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
     val row:Int=14
     val col:Int=14
     def runPasses():Result = {

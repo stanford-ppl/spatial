@@ -12,6 +12,7 @@ case class CtrlOpt(
   stopWhen: Option[Reg[Bit]] = None,
   mop: Boolean = false,
   pom: Boolean = false,
+  nobind: Boolean = false,
 ) {
   def set[A](x: Sym[A]): Unit = {
     name.foreach{n => x.name = Some(n) }
@@ -19,5 +20,6 @@ case class CtrlOpt(
     x.userII = ii.map(_.toDouble)
     if (mop) x.unrollAsMOP
     if (pom) x.unrollAsPOM
+    if (nobind) x.shouldNotBind = true
   }
 }

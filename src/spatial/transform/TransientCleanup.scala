@@ -74,6 +74,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
         val read = delayedMirror(lhs, rhs, block)
 
         dbgs(s" - ctrl: $block")
+        lhs.readMem.foreach{m => block.s.get.transientReadMems = block.s.get.transientReadMems ++ Set(m)}
 
         uses.foreach{ case User(use,_) =>
           val subs = (lhs -> read) +: statelessSubstRules.getOrElse((use,block), Nil)

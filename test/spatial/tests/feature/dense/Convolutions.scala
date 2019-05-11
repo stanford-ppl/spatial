@@ -840,7 +840,7 @@ import spatial.dsl._
 
     Accel {
       // Create local memory for kernel values
-      val kernel_sram = SRAM[T](window, IN_CHANS_MAX, OUT_CHANS_MAX)
+      val kernel_sram = SRAM[T](window, IN_CHANS_MAX, OUT_CHANS_MAX).hierarchical
       kernel_sram load KERNEL
 
       // Create stream controller to run once per output point (which includes all output channels per point)

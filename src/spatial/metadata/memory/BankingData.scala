@@ -187,15 +187,14 @@ case class Memory(
     import spatial.util.IntLike._
     val w = mem.stagedDims.map(_.toInt).zip(padding).map{case(x,y) => x+y}
     val D = mem.sparseRank.length
-    val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
+      val n = banking.map(_.nBanks).product
       val b = banking.head.stride
       val alpha = banking.head.alphas
       val P = banking.head.Ps
-      val banksInFence = allLoops(P,alpha,b,Nil)
+      val banksInFence = allLoops(P,alpha,b,Nil).map(_%n).sorted
       val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
       val degenerate = hist.map(_._2).max
-
       val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
         val p = P(t)
@@ -213,19 +212,29 @@ case class Memory(
       val alpha = banking.map(_.alphas).flatten
 
       val ofschunk = (0 until D).map{t =>
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val n = banking.map(_.nBanks).apply(t)
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
         val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
         val degenerate = hist.map(_._2).max
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
-        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product * degenerate
+        val prevDimsOfs = (t+1 until D).map{i => 
+          val n_i = banking.map(_.nBanks).apply(i)
+          val banksInFence_i = allLoops(Seq(P(i)),Seq(alphas(i)),b(i),Nil).map(_%n_i).sorted
+          val hist_i = banksInFence_i.distinct.map{x => (x -> banksInFence_i.count(_ == x))}
+          val degenerate_i = hist_i.map(_._2).max
+          math.ceil(w(i)/P(i)).toInt * degenerate_i
+        }.product
+        ofsdim_t * prevDimsOfs * degenerate
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val n = banking.map(_.nBanks).apply(t)
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
         val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
         val degenerate = hist.map(_._2).max
-        addr(t) % degenerate
+        // TODO: Want to mathematically prove addr(t) % degenerate resolves uniquely, but for now it seems to just work
+        addr(t) % degenerate 
       }.sumTree 
       ofschunk + intrablockofs
     }

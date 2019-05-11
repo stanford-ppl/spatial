@@ -175,9 +175,9 @@ class AreaEstimator {
         // Assume direct banking for W, and crossbar for readers
         val rmuxPenalty = if (nodetype == "SRAMNew" || nodetype == "LineBufferNew") depth * muxCost * numWriters * numWriters else 0
 
-        // dbg(s"BANKING COST FOR $mem UNDER DUPLICATION:")
-        // dbg(s"  depth            = ${depth}")
-        // dbg(s"  volume           = ${w.product}")
+        // println(s"BANKING COST FOR $mem UNDER DUPLICATION:")
+        // println(s"  depth            = ${depth}")
+        // println(s"  volume           = ${w.product}")
         // println(s"  rmuxPenalty  = ${rmuxPenalty}")
         // println(s"")
 

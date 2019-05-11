@@ -27,9 +27,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
-  // TODO: This may need to be tweaked based on the fix for issue #23
-  final lazy val FLAT_BANKS = Seq(List.tabulate(rank){i => i})
-  final lazy val NEST_BANKS = List.tabulate(rank){i => Seq(i)}
   lazy val bankViews: Seq[BankingView] = if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
                                          else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank) Seq(Flat(rank), Hierarchical(rank)) 
                                          else if (mem.isNoHierarchicalBank) Seq(Flat(rank)) 
@@ -44,6 +41,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                                                     else if (mem.isDuplicatable & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) 
                                                     else RegroupHelper.regroupNone
 
+  // Mapping from BankingOptions to its "duplicates."  Each "duplicate" contains a histogram (Seq[Int]), a Seq of auxilliary nodes (Seq[String]), and a 7-element Seq of its cost components (total, mem luts/ffs/brams, aux luts/ffs/brams) (Seq[Int])
+  type DUPLICATE = (Seq[Banking], Seq[Int], Seq[String], Seq[Double])
+  val schemesInfo = scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]()
 
   def configure(): Unit = {
     dbg(s"---------------------------------------------------------------------")
@@ -394,7 +394,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   /** Returns an approximation of the cost for the given banking strategy. */
-  def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Double = {
+  def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): DUPLICATE = {
     // Partition based on direct/xbar banking (TODO: Determine partial xBars here)
     val histR: Map[Int, Int] = rdGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
     val histW: Map[Int, Int] = wrGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
@@ -432,7 +432,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"          | width | R | W |")
         histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
         dbgs(s"        - Duplicate costs $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
-        c
+        (banking, histRaw, auxNodes.map{x => s"${x._1}(${x._2},${x._3})"}, Seq(c, luts, ffs, bram, auxLuts, auxFFs, auxBrams))
       case m:RegFile[_,_] =>
         val luts = (areamodel.estimateMem("LUTs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
         val ffs = (areamodel.estimateMem("FFs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
@@ -442,7 +442,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"          | width | R | W |")
         histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
         dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
-        c
+        (banking, histRaw, Seq(), Seq(c, luts, ffs, bram, 0,0,0))
       case m:LineBufferNew[_] =>
         val luts = (areamodel.estimateMem("LUTs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
         val ffs = (areamodel.estimateMem("FFs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
@@ -452,7 +452,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"          | width | R | W |")
         histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
         dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
-        c
+        (banking, histRaw, Seq(), Seq(c, luts, ffs, bram, 0,0,0))
       case _ => 
         val luts = areamodel.estimateMem("LUTs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
         val ffs = (areamodel.estimateMem("FFs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
@@ -462,7 +462,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"          | width | R | W |")
         histRaw.grouped(3).foreach{x => dbgs(s"          | ${x(0)} | ${x(1)} | ${x(2)} |")}
         dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
-        c
+        (banking, histRaw, Seq(), Seq(c, luts, ffs, bram, 0,0,0))
     }
   }
 
@@ -583,7 +583,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           dbgs(s"Scheme $scheme:")
           val c = banking.toList.zipWithIndex.map{case ((rds, b),i) => 
             dbgs(s"  - ${rds.map(_.size).sum} readers connect to duplicate #$i (${b})")
-            cost(b,depth,rds,reachingWrGroups)
+            val dup = cost(b,depth,rds,reachingWrGroups)
+            schemesInfo += (scheme -> {schemesInfo.getOrElse(scheme, Seq()) ++ Seq(dup)})
+            dup._4.head
           }.sum
           scheme -> c
         }

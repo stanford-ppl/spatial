@@ -314,7 +314,7 @@ import spatial.metadata.control._
     setArg(ONE, 1)
     val m = ArgOut[Int]
     Accel {
-      val x = SRAM[T](8, 16).noflat.noduplicate
+      val x = SRAM[T](8, 16).hierarchical.noduplicate
       Foreach(8 by 1, A by 1 par 4){(i,j) => x(i,j) = (i + j).to[T]}
 
       val y = SRAM[T](3, 3, 8).buffer

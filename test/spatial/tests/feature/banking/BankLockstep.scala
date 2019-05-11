@@ -67,7 +67,7 @@ import spatial.dsl._
     setMem(dram, data)
 
     Accel {
-      val sram = SRAM[Int](4,16).noflat.noduplicate // Only try to bank hierarchically to expose bug #123
+      val sram = SRAM[Int](4,16).hierarchical.noduplicate // Only try to bank hierarchically to expose bug #123
       val sram2 = SRAM[Int](4)
       sram load dram
       out := 'LOOP1.Reduce(Reg[Int])(4 by 1 par 2){i => 

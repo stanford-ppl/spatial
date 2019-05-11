@@ -63,7 +63,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
       if (bankings.nonEmpty) {
         val banking = bankings.head._2
-        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)
+        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)._4.head
         val ports = computePorts(rdGroups) ++ computePorts(wrGroups)
 
         Right(Seq(Instance(

@@ -52,10 +52,10 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
       (cost, scheme._1.toString)
     }.toList.sortBy(_._1).headOption.getOrElse((0.0, ""))
     emit("")
+    val coll = "data-role=\"collapsible\""
     emit("""<TABLE BORDER="1" CELLPADDING="1" CELLSPACING="0"><td>""")
     val typ = "\\[.*".r.replaceAllIn(mem.tp.toString, "")
-    emit(f"<h3>${mem.name.getOrElse(".")} ($typ): Cost ${totalCost}%.2f%% (${t*100/totalTime}%.1f%% of analysis time)</h3>")
-    val coll = "data-role=\"collapsible\""
+    emit(f"<h3>${mem.name.getOrElse(".")} ($typ): Cost ${totalCost}%.2f ($t%.0fms [${t*100/totalTime}%.1f%%])</h3>")
     emit(s"""<div $coll><h4> </h4>""")
       emit(s"""<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">""")
       emit(s"""<br><font size = "2">Sym $mem: ${mem.ctx} <font color="grey">- ${mem.ctx.content.getOrElse("<???>")}</font></font>""")
@@ -67,7 +67,6 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
       emit(s"""<br><font size = "2">NStrictness:   ${conf.nStricts}</font>""")
       emit(s"""<br><font size = "2">AlphaStrictness:   ${conf.aStricts}</font>""")
       emit(s"""<br><font size = "2">DimensionDuplication: ${conf.dimensionDuplication}</font>""")
-      emit("""<br><TABLE BORDER="1" CELLPADDING="1" CELLSPACING="0"><td>""")
       emit(s"<font size=4>Found ${conf.schemesInfo.toList.size} Alternative Schemes</font>")
       emit(s"""<div $coll><h5> </h5>""")
         conf.schemesInfo.foreach{scheme => 
@@ -87,12 +86,12 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
             emit(s"""<br>Banking Decision: $banking""")
             emit(s"""<br><br>Aux Nodes: ${aux.mkString(",")}""")
             emit(s"""<br>${hist}""")
-            emit(f"<br>Breakdown: Mem = LUTs <b>${breakdown(1)}%.2f%%</b> FFs <b>${breakdown(2)}%.2f%%</b> BRAMs <b>${breakdown(3)}%.2f%%</b>, Aux Nodes = LUTs <b>${breakdown(4)}%.2f%%</b> FFs <b>${breakdown(5)}%.2f%%</b> BRAMs <b>${breakdown(6)}%.2f%%</b>")
+            emit(f"<br>Breakdown: Mem = LUTs <b>${breakdown(1)}%.2f</b> FFs <b>${breakdown(2)}%.2f</b> BRAMs <b>${breakdown(3)}%.2f</b>, Aux Nodes = LUTs <b>${breakdown(4)}%.2f</b> FFs <b>${breakdown(5)}%.2f</b> BRAMs <b>${breakdown(6)}%.2f</b>")
           }
           emit(s"""</div></p>""")
         }
-      emit("</TABLE></div>")
-    emit(s"""</TABLE></div>""")
+      emit("</div>")
+    emit(s"""</TABLE></div></td></TABLE>""")
     emit(s"""<br>""")
     emit("")
   }
@@ -138,11 +137,17 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
       (t, m, conf, totalCost)
     }
     val totalTime = entries.map(_._1).sum
-    emit(src"""<TD>""")
+    emit(src"""<TD><div data-role="collapsible"><h4> Sorted by estimated area </h4>""")
     entries.sortBy(_._4).reverse.foreach{case (t, m, conf, _) => 
       report(m, conf, t, totalTime)
     }
-    emit(src"""</TD>""")
+
+    emit(src"""</div></TD>""")
+    emit(src"""<TD><div data-role="collapsible"><h4> Sorted by total search time (total time = ${totalTime.toInt}ms) </h4>""")
+    entries.sortBy(_._1).reverse.foreach{case (t, m, conf, _) => 
+      report(m, conf, t, totalTime)
+    }
+    emit(src"""</div></TD>""")
     memories.zip(entries.map(_._1)).sortBy(_._2).foreach{case (m, time) =>
       dbg(s"$m completed in: $time ms")
     }

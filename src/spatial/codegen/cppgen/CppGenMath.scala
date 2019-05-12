@@ -56,6 +56,7 @@ trait CppGenMath extends CppGenCommon {
         emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${toApproxFix(src"((${toTrueFix(quote(x), x.tp)} % ${toTrueFix(quote(y), y.tp)} + ${toTrueFix(quote(y), y.tp)}) % ${toTrueFix(quote(y), y.tp)}", lhs.tp)});")
     case FixRandom(x) => emit(src"${lhs.tp} $lhs = rand() % ${x.getOrElse(100)};")
     case FltRandom(x) => emit(src"${lhs.tp} $lhs = ((float) rand() / (float) RAND_MAX) * (float) ${x.getOrElse(100)};")
+    case BitRandom(x) => emit(src"${lhs.tp} $lhs = rand() % ${x.getOrElse(2)};")
     case And(x,y) => emit(src"${lhs.tp} $lhs = $x & $y;")
     case Or(x,y) => emit(src"${lhs.tp} $lhs = $x | $y;")
     case Xor(x,y) => emit(src"${lhs.tp} $lhs = $x ^ $y;")

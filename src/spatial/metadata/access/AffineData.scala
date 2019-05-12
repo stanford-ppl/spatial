@@ -70,8 +70,7 @@ case class AccessMatrix(
 
   /** True if the matrix always resolves to the same bank under banking scheme N, B, alpha */
   def isDirectlyBanked(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): Boolean = {
-    val bank = alpha flatMul matrix 
-    bank.cols.forall{case (k,v) => (v/B.head /*?*/) % N.head /*?*/ == 0}
+    bankMuxWidth(N, B, alpha) == 1
   }
 
   /** Computes how many banks this access can touch under the given banking scheme */
@@ -117,7 +116,7 @@ case class AccessMatrix(
           val modComponent: List[(String, Option[Int], Option[Int])] = if (N(i) == 1 || isPow2(N(i))) List() else List(("FixMod", None, Some(N(i))))
           combinePattern ++ partitionFactorComponent ++ divComponent ++ modComponent
         }
-        dimComponents.reduce(_++_)
+        dimComponents.reduce(_++_).filterNot{x => x._2 == Some(0) || x._3 == Some(0)}
       }
     }
   }

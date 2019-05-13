@@ -222,7 +222,7 @@ import spatial.targets._
     // val comp_dram_acdc = DRAM[comp_acdc](NUM_COMPONENT)
 
     Accel{
-      val jpg_sram = FIFO[UInt8](5207)
+      val jpg_sram = FIFO[UInt8](5207).noduplicate
 
       val component = SRAM[comp_struct](NUM_COMPONENT)
       val component_acdc = SRAM[comp_acdc](NUM_COMPONENT)

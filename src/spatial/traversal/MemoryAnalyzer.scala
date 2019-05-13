@@ -67,7 +67,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
       emit(s"""<br><font size = "2">NStrictness:   ${conf.nStricts}</font>""")
       emit(s"""<br><font size = "2">AlphaStrictness:   ${conf.aStricts}</font>""")
       emit(s"""<br><font size = "2">DimensionDuplication: ${conf.dimensionDuplication}</font>""")
-      emit(s"<font size=4>Found ${conf.schemesInfo.toList.size} Alternative Schemes</font>")
+      emit(s"<br><font size=4>Found ${conf.schemesInfo.toList.size} Alternative Schemes</font>")
       emit(s"""<div $coll><h5> </h5>""")
         conf.schemesInfo.foreach{scheme => 
           val cost = scheme._2.map(_._4.head).sum

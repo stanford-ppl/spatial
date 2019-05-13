@@ -55,26 +55,23 @@ trait PIRGenHelper extends PIRFormatGen {
     val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
-      (bank, ofs) match {
+      var body = (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
           src"BankedRead()" +
-          src".setMem(${Lhs(mem,name)})" + 
-          src".en(${assertOne(ens)})" + 
           src".bank(${assertOne(bank)})" + 
-          src".offset(${assertOne(ofs)})" + 
-          src".port($bufferPort)" + 
-          src".muxPort($muxPort)" +
-          src".gid(${assertOne(lhs.gids(Nil))})" +
-          src".tp(${field.map{_._2}.getOrElse(lhs.tp)})"
+          src".offset(${assertOne(ofs)})"
         case _ => 
-          src"MemRead()" + 
-          src".setMem(${Lhs(mem,name)})" + 
-          src".en(${assertOne(ens)})" + 
-          src".port($bufferPort)" + 
-          src".muxPort($muxPort)" +
-          src".gid(${assertOne(lhs.gids(Nil))})" +
-          src".tp(${field.map{_._2}.getOrElse(lhs.tp)})"
+          src"MemRead()"
       }
+      body += 
+        src".setMem(${Lhs(mem,name)})" + 
+        src".en(${assertOne(ens)})" + 
+        src".port($bufferPort)" + 
+        src".muxPort($muxPort)" +
+        src".gid(${assertOne(lhs.gids(Nil))})" +
+        src".tp(${field.map{_._2}.getOrElse(lhs.tp)})" +
+        (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
+      body
     }
   }
 
@@ -83,26 +80,23 @@ trait PIRGenHelper extends PIRFormatGen {
     val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
-      (bank, ofs) match {
+      var body = (bank, ofs) match {
         case (Some(bank), Some(ofs)) =>
           src"BankedWrite()" + 
-          src".setMem(${Lhs(mem,name)})" + 
-          src".en(${assertOne(ens)})" + 
           src".bank(${assertOne(bank)})" + 
-          src".offset(${assertOne(ofs)})" + 
-          src".data(${Lhs(assertOne(data),name)})" + 
-          src".port($bufferPort)" + 
-          src".muxPort($muxPort)" +
-          src".gid(${assertOne(lhs.gids(Nil))})"
+          src".offset(${assertOne(ofs)})"
         case _ => 
-          src"MemWrite()" + 
-          src".setMem(${Lhs(mem,name)})" + 
-          src".en(${assertOne(ens)})" + 
-          src".data(${Lhs(assertOne(data),name)})" + 
-          src".port($bufferPort)" +
-          src".muxPort($muxPort)" +
-          src".gid(${assertOne(lhs.gids(Nil))})"
+          src"MemWrite()"
       }
+      body += 
+        src".setMem(${Lhs(mem,name)})" + 
+        src".en(${assertOne(ens)})" + 
+        src".data(${Lhs(assertOne(data),name)})" + 
+        src".port($bufferPort)" + 
+        src".muxPort($muxPort)" +
+        src".gid(${assertOne(lhs.gids(Nil))})" +
+        (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
+      body
     }
   }
 
@@ -112,7 +106,8 @@ trait PIRGenHelper extends PIRFormatGen {
     val ins = inputs.getOrElse(rhs.productIterator.toList).map { in => src"$in"}.mkString(",")
     state(lhs) { 
       src"""OpDef(op=$opStr).addInput($ins)""" + 
-      src""".tp(${lhs.sym.tp})"""
+      src""".tp(${lhs.sym.tp})""" + 
+      (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
     }
   }
 

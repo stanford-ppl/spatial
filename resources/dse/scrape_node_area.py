@@ -54,6 +54,12 @@ class Node:
 	mem_dim2 = ""
 	mem_dim3 = ""
 	mem_dim4 = ""
+	mem_pad0 = ""
+	mem_pad1 = ""
+	mem_pad2 = ""
+	mem_pad3 = ""
+	mem_pad4 = ""
+	mem_darkVolume = ""
 	mem_N0 = ""
 	mem_N1 = ""
 	mem_N2 = ""
@@ -230,6 +236,12 @@ def collectMemData():
 					if line.find('>volume =') >= 0 and current.nodetype != "RegNew":
 						dims = re.search('dims List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
 						try: current.mem_dim0 = dims[0]; current.mem_dim1 = dims[1]; current.mem_dim2 = dims[2]; current.mem_dim3 = dims[3]; current.mem_dim4 = dims[4]
+						except: pass
+						pads = re.search('pads List\(([0-9, ]+)\)',line).group(1).replace(' ','').split(',')
+						try: current.mem_pad0 = pads[0]; current.mem_pad1 = pads[1]; current.mem_pad2 = pads[2]; current.mem_pad3 = pads[3]; current.mem_pad4 = pads[4]
+						except: pass
+						darkVolume = re.search('dv = ([0-9]+)', line).group(1)
+						try: current.mem_darkVolume = darkVolume
 						except: pass
 					if line.find('>volume =') >= 0:
 						bitwidth = re.search('bw = ([0-9]+)', line).group(1)

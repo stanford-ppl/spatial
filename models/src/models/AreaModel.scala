@@ -160,7 +160,7 @@ class AreaEstimator {
       } else histRaw.padTo(9,0)
       if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) println(s"WARNING: histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
       val values = allB ++ allN ++ allAlpha ++ List(bitWidth) ++ allDims ++ hist ++ List(depth) ++ allP
-      val modelName = nodetype + "_" + prop + ".pkl"
+      val modelName = nodetype + "_" + prop + ".pmml"
       val model = getClass.getClassLoader.getResourceAsStream(modelName)
       val model_exists = {model != null}
       val tryEvaluator: Option[Evaluator] = try { 
@@ -169,7 +169,7 @@ class AreaEstimator {
           val e = new LoadingModelEvaluatorBuilder().load(model)build()
           e.verify()
           e
-        })) else None} catch {case _:Throwable => None}
+        })) else None} catch {case x:Throwable => None}
       if (tryEvaluator.isDefined) {
         val evaluator = tryEvaluator.get
 
@@ -190,6 +190,7 @@ class AreaEstimator {
         } catch {
           case _: Throwable => 
             println(s"WARNING: Error using model for $prop of $nodetype node (${modelName})")
+            failedModels += ((nodetype,prop))
             crudeEstimateMem(prop, nodetype, dims, bitWidth, depth, B, N, alpha, P, histRaw)
         }
       } else {
@@ -202,32 +203,41 @@ class AreaEstimator {
 
   def estimateArithmetic(prop: String, nodetype: String, values: Seq[Int]): Double = {
     if (useML) {
-      val path = "/home/tianzhao/area_analyzer/pmmls_bak/"
       val modelName = nodetype + "_" + prop + ".pmml"
-      val model_exists = javafile.Files.exists(javafile.Paths.get(path + modelName))
-      if (model_exists) {
-        val evaluator: Evaluator = openedModels.getOrElseUpdate((nodetype,prop), {
+      val model = getClass.getClassLoader.getResourceAsStream(modelName)
+      val model_exists = {model != null}
+      val tryEvaluator: Option[Evaluator] = try { 
+          if (model_exists && !failedModels.contains((nodetype,prop))) Some(openedModels.getOrElseUpdate((nodetype,prop), {
           println(s"Loading area model for $prop of $nodetype")
-          val e = new LoadingModelEvaluatorBuilder().load(new File(path + modelName))build()
+          val e = new LoadingModelEvaluatorBuilder().load(model)build()
           e.verify()
           e
-        })
+        })) else None} catch {case x:Throwable => None}
+      if (tryEvaluator.isDefined) {
+        val evaluator = tryEvaluator.get
 
-        // Java part
-        val inputFields: Array[InputField] = evaluator.getInputFields.toArray.map(f => f.asInstanceOf[InputField])
-        val fieldNames: Array[FieldName] = inputFields.map(f => f.getName)
-        val fieldValues: Array[FieldValue] = (inputFields zip values).map {
-          case (f, d) =>
-            f.prepare(d)
+        try {
+          // Java part
+          val inputFields: Array[InputField] = evaluator.getInputFields.toArray.map(f => f.asInstanceOf[InputField])
+          val fieldNames: Array[FieldName] = inputFields.map(f => f.getName)
+          val fieldValues: Array[FieldValue] = (inputFields zip values).map {
+            case (f, d) =>
+              f.prepare(d)
+          }
+          val args = (fieldNames zip fieldValues).toMap
+          val targetFields = evaluator.evaluate(args.asJava).toString
+          val resultExtractor = raw".*result=(-?\d+)\.(\d+).*".r
+          val resultExtractor(dec,frac) = targetFields
+          val result = (dec + "." + frac).toDouble
+          result
+        } catch {
+          case _: Throwable => 
+            failedModels += ((nodetype,prop))
+            println(s"WARNING: Error using model for $prop of $nodetype node (${modelName})")
+            0.0
         }
-        val args = (fieldNames zip fieldValues).toMap
-        val targetFields = evaluator.evaluate(args.asJava).toString
-        val resultExtractor = raw".*result=(-?\d+)\.(\d+).*".r
-        val resultExtractor(dec,frac) = targetFields
-        val result = (dec + "." + frac).toDouble
-        result
       } else {
-        if (!failedModels.contains((nodetype,prop))) println(s"WARNING: No model for $prop of $nodetype node (${path + modelName})!")
+        if (!failedModels.contains((nodetype,prop))) println(s"WARNING: No model for $prop of $nodetype node (${modelName})!")
         failedModels += ((nodetype,prop))
         0.0
       }

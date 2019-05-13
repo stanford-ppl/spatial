@@ -95,5 +95,9 @@ case class SegmentMapping(mapping: Map[Int,Int]) extends Data[SegmentMapping](Se
 /*
  * A marker for inner loop accumulator. Used by pir
  * */
-
 case class InnerAccum(isInnerAccum:Boolean) extends Data[InnerAccum](SetBy.Analysis.Self)
+
+/*
+ * A marker for inner loop reduction operations. Used by pir
+ * */
+case class InnerReduceOp(flag:Boolean) extends Data[InnerReduceOp](SetBy.Analysis.Self)

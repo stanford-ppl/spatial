@@ -13,4 +13,7 @@ trait BitsAPI {
 
   @api def cat(c: Vec[Bit]*): Vec[Bit] = Vec.concat(c.reverse)
 
+  @api def popcount(c : Seq[Bit]) : U8 = Vec.popcount(c)
+
+ // @api def popcount[A:Bits](c : A) : U8 = Vec.popcount(c.asInstanceOf[Seq[Bit]])
 }

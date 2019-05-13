@@ -32,7 +32,8 @@ import utils.implicits._
 
 	/* Parameters to tune */
 	val k_const 				= 3 /* Number of nearest neighbors to handle */
-	val par_factor  			= 40
+	val par_factor  			= 16 //40
+	val par_factor_double		= par_factor * 2
 	val parLoad 				= 2
 
 	def network_sort(knn_set 		: RegFile2[Int], 
@@ -99,23 +100,23 @@ import utils.implicits._
 						   sorted_label_set	: RegFile1[LabelType]) : Unit = {
 
 
+		//val insert_this_label = Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32]))
 		val partition_index_list = RegFile[I32](par_factor)
-		//partition_index_list.reset
 		Foreach(par_factor by 1 par par_factor) { p => partition_index_list(p) = 0.to[Int] }
 
-		val insert_this_label = Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32]))
-		Sequential.Foreach(k_const by 1) { k => //doesn't work without Sequential 
-			insert_this_label :=  Reduce(Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32])))(par_factor by 1 par par_factor) { p =>
+		Sequential.Foreach(k_const by 1) { k => //Sequential leads to smaller II value for some reason
+			val insert_this_label = List.tabulate(par_factor) { p =>
+			 						  //Reduce(Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32])))(par_factor by 1 par par_factor) { p =>
 										val check_at_index = partition_index_list(p)
 										
 										val current_label = par_label_set(p, check_at_index)
 										val current_dist  = par_knn_set(p, check_at_index)
 
 										LabelAndIndex(current_dist, current_label, p)
-									}{ (a, b) => mux(a.dist < b.dist, a, b) }
+									}.reduceTree{ (a, b) => mux(a.dist < b.dist, a, b) }
 			
-			sorted_label_set(k) = insert_this_label.value.label 
-			partition_index_list(insert_this_label.value.inx) = partition_index_list(insert_this_label.value.inx) + 1.to[I32]
+			sorted_label_set(k) = insert_this_label.label 
+			partition_index_list(insert_this_label.inx) = partition_index_list(insert_this_label.inx) + 1.to[I32]
 		}
 
 	} 
@@ -125,7 +126,7 @@ import utils.implicits._
 
 	
 		// simplest implementation for counting 1-bits in bitstring
-		val bits_d1 = List.tabulate(64){ i =>
+	/*	val bits_d1 = List.tabulate(64){ i =>
 						val d1 = x1.d1 
 						d1.bit(i).to[Int16]
 					  }.reduceTree(_ + _)
@@ -145,7 +146,12 @@ import utils.implicits._
 						d4.bit(i).to[Int16] 
 					  }.reduceTree(_ + _)
 		
-		bits_d1 + bits_d2 + bits_d3 + bits_d4
+		bits_d1 + bits_d2 + bits_d3 + bits_d4 */
+		val seq_bits1 = Seq.tabulate(64){ i => x1.d1.bit(i) }
+		val seq_bits2 = Seq.tabulate(64){ i => x1.d2.bit(i) }
+		val seq_bits3 = Seq.tabulate(64){ i => x2.d3.bit(i) }
+		val seq_bits4 = Seq.tabulate(64){ i => x2.d4.bit(i) }
+		popcount(seq_bits1 ++ seq_bits2 ++ seq_bits3 ++ seq_bits4).to[Int16] 
 	}
 
 	def update_knn(test_inst1 	: DigitType1, 
@@ -186,9 +192,10 @@ import utils.implicits._
 
 		merge_sorted_lists(knn_set, label_list, sorted_label_list)
 
-		Foreach(sorted_label_list.length by 1){ i =>
+		//Foreach(sorted_label_list.length by 1){ i =>
+		List.tabulate(k_const) { i =>
 			vote_list( sorted_label_list(i).to[I32] ) = vote_list( sorted_label_list(i).to[I32] ) + 1
-		}
+		}	
 
 		val best_label = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
 		best_label := IntAndIndex(0.to[Int], 0.to[I32]) //best_label.reset
@@ -294,7 +301,7 @@ import utils.implicits._
 		/* output */
 		val results_dram	  =  DRAM[LabelType](max_num_test)
 
-		val num_test_tile 		= 20
+		val num_test_tile 		= 40
 		val num_train_tile  	= 18000
 
 		initialize_train_data(training_set_dram_1, training_set_dram_2, label_set_dram)
@@ -347,20 +354,21 @@ import utils.implicits._
 					val test_local2 = test_set_local2(test_inx)
 					
 
-					Foreach(num_training by par_factor) { train_inx  =>
+					Pipe.II(1).Foreach(num_training by 1 par par_factor) { train_inx  =>
 
-						List.tabulate(par_factor) { p =>
+						//List.tabulate(par_factor) { p =>
 						//Foreach(par_factor by 1 par par_factor) { p => 
-							val curr_train_inx = train_inx * par_factor + p
-							update_knn(test_local1, test_local2,
-									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
-									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx))	
-						}
+						val curr_train_inx = train_inx // * par_factor + p
+						val p = train_inx //% par_factor
+						update_knn(test_local1, test_local2,
+								   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
+								   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx))	
+					//	}
 
 					}
 					
-					//Foreach(par_factor by 1 par par_factor)  { p =>
-					List.tabulate(par_factor) { p =>					
+					Foreach(par_factor by 1 par par_factor)  { p =>
+					//List.tabulate(par_factor) { p =>					
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 					
 					}
 					/*

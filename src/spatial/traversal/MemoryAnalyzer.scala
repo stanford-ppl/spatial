@@ -55,7 +55,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
     val coll = "data-role=\"collapsible\""
     emit("""<TABLE BORDER="1" CELLPADDING="1" CELLSPACING="0"><td>""")
     val typ = "\\[.*".r.replaceAllIn(mem.tp.toString, "")
-    emit(f"<h3>${mem.name.getOrElse(".")} ($typ): Cost ${totalCost}%.2f ($t%.0fms [${t*100/totalTime}%.1f%%])</h3>")
+    emit(f"<h3> ${mem.name.getOrElse(s".")} ($typ $mem): Cost ${totalCost}%.2f ($t%.0fms [${t*100/totalTime}%.1f%%])</h3>")
     emit(s"""<div $coll><h4> </h4>""")
       emit(s"""<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">""")
       emit(s"""<br><font size = "2">Sym $mem: ${mem.ctx} <font color="grey">- ${mem.ctx.content.getOrElse("<???>")}</font></font>""")

@@ -226,4 +226,6 @@ object Array {
   /** Returns an immutable Array with the given elements. */
   @api def apply[A:Type](elements: A*): Array[A] = stage(ArrayFromSeq[A](elements.map{s => box(s)}))
 
+  /** Returns an immutable Array with the given elements. */
+  @api def fromSeq[A:Type](elements: Seq[A]): Array[A] = stage(ArrayFromSeq[A](elements.map{s => box(s)}))
 }

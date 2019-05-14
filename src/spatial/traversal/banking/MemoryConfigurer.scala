@@ -163,7 +163,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
               error(s"access=$access (${access.ctx})")
               error(s"AccessMatrix:")
               ams.foreach { a => 
-                error(s"$a")
+                error(s"$a gid:${groupMap(a)}")
               }
               state.logError()
             }

@@ -34,6 +34,9 @@ package object memory {
 
     def isInnerAccum: Boolean = metadata[InnerAccum](s).map(_.isInnerAccum).getOrElse(false)
     def isInnerAccum_=(v: Boolean): Unit = metadata.add(s, InnerAccum(v))
+
+    def isInnerReduceOp: Boolean = metadata[InnerReduceOp](s).map(_.flag).getOrElse(false)
+    def isInnerReduceOp_=(v: Boolean): Unit = metadata.add(s, InnerReduceOp(v))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {

@@ -13,10 +13,10 @@ trait PIRGenController extends PIRCodegen {
   def emitController(
     lhs:Lhs, 
     ctrler:Option[String]=None,
-    schedule:Option[Any]=None,
     cchain:Option[Sym[_]]=None, 
     iters:Seq[Seq[Bits[_]]]=Nil, 
     valids: Seq[Seq[Bits[_]]]=Nil, 
+    stopWhen:Option[Sym[_]]=None,
     ens:Set[Bit]=Set.empty
   )(blk: => Unit) = {
     var newCtrler = ctrler.getOrElse("UnitController()")
@@ -25,11 +25,14 @@ trait PIRGenController extends PIRCodegen {
     if (ens.nonEmpty) {
       newCtrler += src".en($ens)"
     }
+    stopWhen.foreach { stopWhen =>
+      newCtrler += src".stopWhen(MemRead().setMem($stopWhen))"
+    }
     lhs.sym.unrollBy.foreach { par =>
       newCtrler += src".par($par)"
     }
     state(lhs, tp=Some(tp))(
-      src"""createCtrl(schedule="${schedule.getOrElse(lhs.sym.schedule)}")(${newCtrler})"""
+      src"""createCtrl(schedule=${lhs.sym.schedule})(${newCtrler})"""
     )
     def quoteIdx(sym:Bits[_]):String = {
       sym.counter.lanes.toString
@@ -58,11 +61,11 @@ trait PIRGenController extends PIRCodegen {
     case ParallelPipe(ens, func) =>
       emitController(lhs, ens=ens) { ret(func) }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids,_) =>
-      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
+    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
+      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens, stopWhen=stopWhen) { ret(func) }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
-      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens) { ret(func) }
+    case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
+      emitController(lhs, ctrler=Some("LoopController()"), cchain=Some(cchain), iters=iters, valids=valids, ens=ens, stopWhen=stopWhen) { ret(func) }
 
     case op@Switch(selects, body) =>
       emitController(lhs) { ret(body) }

@@ -80,6 +80,30 @@ object LUT {
     stage(LUTNew[A,LUT5](Seq(d0,d1,d2,d3,d4), elems))
   }
 
+  /** Allocates a 1-dimensional [[LUT1]] with capacity of `length` elements of type A. */
+  @api def fromSeq[A:Bits](length: Int)(elems: Seq[Bits[A]]): LUT1[A] = {
+    stage(LUTNew[A,LUT1](Seq(length),elems))
+  }
+
+  /** Allocates a 2-dimensional [[LUT2]] with `rows` x `cols` elements of type A. */
+  @api def fromSeq[A:Bits](rows: Int, cols: Int)(elems: Seq[Bits[A]]): LUT2[A] = {
+    stage(LUTNew[A,LUT2](Seq(rows,cols), elems))
+  }
+
+  /** Allocates a 3-dimensional [[LUT3]] with the given dimensions and elements of type A. */
+  @api def fromSeq[A:Bits](d0: Int, d1: Int, d2: Int)(elems: Seq[Bits[A]]): LUT3[A] = {
+    stage(LUTNew[A,LUT3](Seq(d0,d1,d2), elems))
+  }
+
+  /** Allocates a 4-dimensional [[LUT4]] with the given dimensions and elements of type A. */
+  @api def fromSeq[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int)(elems: Seq[Bits[A]]): LUT4[A] = {
+    stage(LUTNew[A,LUT4](Seq(d0,d1,d2,d3), elems))
+  }
+
+  /** Allocates a 5-dimensional [[LUT5]] with the given dimensions and elements of type A. */
+  @api def fromSeq[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int, d4: Int)(elems: Seq[Bits[A]]): LUT5[A] = {
+    stage(LUTNew[A,LUT5](Seq(d0,d1,d2,d3,d4), elems))
+  }
   /** Allocates a 1-dimensional [[LUT1]] with capacity of `length` and elements of type A.  
     * Elements are read from csv file at compile time with delimiter ",". 
     */

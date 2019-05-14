@@ -14,16 +14,16 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
 
   override def shouldRun: Boolean = enable
 
-  def busWidthCheck(tp: Bits[_], bus: Bus, mem: String): Unit = {
+  def busWidthCheck(lhs:Sym[_], tp: Bits[_], bus: Bus, mem: String): Unit = {
     if (tp.nbits < bus.nbits) {
-      warn(ctx, s"Bus bits is greater than number of bits of $mem type.")
+      warn(lhs.ctx, s"Bus bits is greater than number of bits of $mem type.")
       warn(s"Hardware will drive only the first ${tp.nbits} bits of the bus.")
-      warn(ctx)
+      warn(lhs.ctx)
     }
     else if (tp.nbits > bus.nbits) {
-      warn(ctx, s"Bus bits is smaller than number of bits of $mem type.")
+      warn(lhs.ctx, s"Bus bits is smaller than number of bits of $mem type.")
       warn(s"Hardware will use only the first ${tp.nbits} bits in the word")
-      warn(ctx)
+      warn(lhs.ctx)
     }
   }
 
@@ -134,8 +134,8 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
       error(lhs.ctx)
       IR.logError()
 
-    case op @ StreamInNew(bus)  => busWidthCheck(op.A,bus,"StreamIn")
-    case op @ StreamOutNew(bus) => busWidthCheck(op.A,bus,"StreamOut")
+    case op @ StreamInNew(bus)  => busWidthCheck(lhs, op.A,bus,"StreamIn")
+    case op @ StreamOutNew(bus) => busWidthCheck(lhs, op.A,bus,"StreamOut")
 
     case LUTNew(dims,elems) =>
       val size = dims.map(_.toInt).product

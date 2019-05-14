@@ -69,7 +69,7 @@ trait ReduceUnrolling extends UnrollingBase {
         else {
           dbgs("Fully unrolling inner reduce")
           val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
-          if (spatialConfig.enablePIR && values.size > 1) {
+          if (spatialConfig.enablePIR) {
             val rop = pirUnrollInnerReduce(None, reduce, result, load, store, accum)
           } else {
             store.reapply(accum, result)
@@ -195,7 +195,7 @@ trait ReduceUnrolling extends UnrollingBase {
         unrollReduceTree[A](inputs, valids, ident, reduce.toFunction2)
       }
 
-      if (spatialConfig.enablePIR && isInner && inputs.size > 1) {
+      if (spatialConfig.enablePIR && isInner) {
         pirUnrollInnerReduce(fold, reduce, treeResult, load, store, accum)
       } else {
         val result: A = inReduce(redType, isInner) {

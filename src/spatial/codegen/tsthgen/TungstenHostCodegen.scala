@@ -49,6 +49,7 @@ using namespace std;
         emit(src"""if (std::string(argv[i]) == "--help" | std::string(argv[i]) == "-h") {printHelp();}""")
       close("}")
       gen(block)
+      emit(s"""cout << "Complete Simulation" << endl;""")
     close(s"""}""")
   }
 

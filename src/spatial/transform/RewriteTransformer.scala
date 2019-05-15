@@ -15,6 +15,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
+import forge.tags._
 
 import utils.math.{isPow2,log2,gcd}
 
@@ -118,8 +119,31 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     res.resolvesTo.get
   }
 
+  def stage[R:Type](op: Op[R]): R = {
+    op match {
+      case VecConstRewrite(tp) => tp
+      case op => argon.stage(op)
+    }
+  }
+
+  object VecConstRewrite {
+    def unapply[R:Type](op:Op[R]):Option[R] = rewrite[R](op)
+    def rewrite[R:Type](op:Op[R]):Option[R] = op match {
+      case op@FixSRA(a, b) => 
+        VecConst.broadcast(f(a),f(b)) { 
+          case (x, y) if y >= 0 => x >> y
+          case (x, y) if y < 0 => x << -y
+        }
+      case op:Binary[c,r] => 
+        VecConst.broadcast(f(op.a), f(op.b)) { (a,b) => op.unstaged(a.asInstanceOf[c], b.asInstanceOf[c]) }
+      case _ => None
+    }
+  }
+
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+
+    case VecConstRewrite(sym) => sym
 
     case RegWrite(F(reg), F(data), F(en)) => data match {
       // Look for very specific FixFMA pattern and replace with FixFMAAccum node (Issue #63).. This gives error about not wanting to match Node[Fix[S,I,F]] <: Node[Any] because Op is type R and not +R
@@ -342,41 +366,41 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
         super.transform(lhs,rhs)
 
     // Not rewrite, but set residual metadata on certain patterns
-    case Op(FixAdd(F(xx), Final(ofs))) if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(1, xx, ofs, 0)
-      m
+    //case Op(FixAdd(F(xx), Final(ofs))) if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(1, xx, ofs, 0)
+      //m
         
-    case Op(FixAdd(Final(ofs), F(xx)))  if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(1, xx, ofs, 0)
-      m
+    //case Op(FixAdd(Final(ofs), F(xx)))  if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(1, xx, ofs, 0)
+      //m
 
         
-    case Op(FixSub(F(xx), Final(ofs)))  if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(1, xx, -ofs, 0)
-      m
+    //case Op(FixSub(F(xx), Final(ofs)))  if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(1, xx, -ofs, 0)
+      //m
 
-    case Op(FixMul(Final(lin), F(xx)))  if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(lin, xx, 0, 0)
-      m
+    //case Op(FixMul(Final(lin), F(xx)))  if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(lin, xx, 0, 0)
+      //m
 
-    case Op(FixMul(F(xx), Final(lin)))  if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(lin, xx, 0, 0)
-      m
+    //case Op(FixMul(F(xx), Final(lin)))  if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(lin, xx, 0, 0)
+      //m
 
-    case Op(FixFMA(Final(lin), F(xx), Final(ofs)))  if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(lin, xx, ofs, 0)
-      m
+    //case Op(FixFMA(Final(lin), F(xx), Final(ofs)))  if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(lin, xx, ofs, 0)
+      //m
 
-    case Op(FixFMA(F(xx), Final(lin), Final(ofs)))  if inHw => 
-      val m = super.transform(lhs,rhs)
-      m.residual = residual(lin, xx, ofs, 0)
-      m
+    //case Op(FixFMA(F(xx), Final(lin), Final(ofs)))  if inHw => 
+      //val m = super.transform(lhs,rhs)
+      //m.residual = residual(lin, xx, ofs, 0)
+      //m
 
     case _ => super.transform(lhs,rhs)
   }

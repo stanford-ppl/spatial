@@ -3,6 +3,7 @@ package spatial.codegen.dotgen
 import argon._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.util.spatialConfig
 
 case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
@@ -12,6 +13,7 @@ case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
 
   override protected def quote(s: Sym[_]): String = s.rhs match {
+    case rhs if s.vecConst.nonEmpty => s"[${s.vecConst.get.mkString(",")}]"
     case (_:Def.Node[_] | _:Def.Bound[_]) => 
       val q = super.quote(s)
       elem("a", q, "href"->s"IR.html#$q")

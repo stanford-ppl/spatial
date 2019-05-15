@@ -255,7 +255,6 @@ trait ReduceUnrolling extends UnrollingBase {
       case None => treeResult
     }
     val dummy = boundVar[Bit]
-    dummy.vecConst = List(0)
     val m = mux(dummy, treeResult, initOrInput)
     dbg(s"mux = $m treeResult=$treeResult, initOrInput=$initOrInput")
     val rop = reduce.reapply(m, accValue)

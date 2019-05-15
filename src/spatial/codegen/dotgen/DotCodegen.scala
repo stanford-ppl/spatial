@@ -5,6 +5,7 @@ import scala.collection.mutable
 import utils.io.files._
 import sys.process._
 import scala.language.postfixOps
+import spatial.metadata.bounds._
 
 trait DotCodegen extends argon.codegen.Codegen {
   override val lang: String = "info"
@@ -29,7 +30,9 @@ trait DotCodegen extends argon.codegen.Codegen {
   case class Scope(sym:Option[Sym[_]]) {
     val _nodes = mutable.ListBuffer[Sym[_]]()
     def nodes = _nodes.toList
-    def addNode(sym:Sym[_]) = if (!_nodes.contains(sym) && !sym.isConst) _nodes += sym
+    def addNode(sym:Sym[_]) = if (!_nodes.contains(sym) && !sym.isConst && sym.vecConst.isEmpty) {
+      _nodes += sym
+    }
     val externNodes = mutable.ListBuffer[Sym[_]]()
     val edges = mutable.ListBuffer[Edge]()
     val fileName = sym match {
@@ -39,7 +42,10 @@ trait DotCodegen extends argon.codegen.Codegen {
     val htmlPath = s"${out}${sep}$fileName.html"
     val dotPath = s"${out}${sep}$fileName.dot"
 
-    def addExternNode(node:Sym[_]):this.type = { if (!node.isConst) externNodes += node; this }
+    def addExternNode(node:Sym[_]):this.type = { 
+      if (!externNodes.contains(node) && !node.isConst && node.vecConst.isEmpty) externNodes += node
+      this
+    }
     def addEdge(edge:Edge):this.type = { 
       val (from, to, alias) = edge
       if (!from.isConst && !to.isConst) edges += edge
@@ -109,7 +115,7 @@ trait DotCodegen extends argon.codegen.Codegen {
 
   def emitNode(lhs:Sym[_], nodeAttr:Map[String, String]):Unit = {
     emit(src"""$lhs [ ${nodeAttr.map { case (k,v) => s"$k=$v" }.mkString(" ")} ]""")
-    inputGroups(lhs).foreach { case (name, inputs) =>
+    inputGroupsNoConst(lhs).foreach { case (name, inputs) =>
       emit(src""" ${lhs}_${name} [ label="$name" shape=invhouse]""")
       emit(src"${lhs}_${name} -> $lhs")
     }
@@ -117,12 +123,27 @@ trait DotCodegen extends argon.codegen.Codegen {
 
   def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = Map.empty
 
+  def inputGroupsNoConst(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = {
+    inputGroups(lhs).map { case (name, inputs) =>
+      name -> inputs.filterNot { case VecConst(_) => true; case _ => false }
+    }
+  }
+
   def inputs(lhs:Sym[_]):Seq[Sym[_]] = {
     lhs.op.map { rhs =>
-      rhs.inputs intersect syms(rhs.productIterator.filterNot { field =>
-        field.isInstanceOf[Block[_]]
+      rhs.inputs intersect syms(rhs.productIterator.filterNot { 
+        case field:Block[_] => true
+        case VecConst(_) => true
+        case _ => false
       }).toSeq
     }.getOrElse(Nil)
+  }
+  def inputsNoConsts(lhs:Sym[_]):Seq[Sym[_]] = {
+    inputs(lhs).filterNot {
+      case field:Block[_] => true
+      case VecConst(_) => true
+      case _ => false
+    }
   }
 
   def blocks(lhs:Sym[_]) = lhs.op.map { _.blocks }.getOrElse(Nil)
@@ -173,17 +194,22 @@ trait DotCodegen extends argon.codegen.Codegen {
   }
 
   def addInputs(lhs:Sym[_]) = {
-    val groups = inputGroups(lhs)
+    val groups = inputGroupsNoConst(lhs)
     groups.foreach { case (name, inputs) => 
       inputs.foreach { in =>
         addEdge(in, lhs, Map(lhs -> src"${lhs}_${name}"))
       }
     }
-    (inputs(lhs) diff groups.values.flatten.toSeq).foreach { in => 
+    (inputsNoConsts(lhs) diff groups.values.flatten.toSeq).foreach { in => 
       addEdge(in, lhs)
     }
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
+
+  override def quote(s:Sym[_]) = s match {
+    case VecConst(cs) => s"[${cs.mkString(",")}]"
+    case _ => super.quote(s)
+  }
 
 }

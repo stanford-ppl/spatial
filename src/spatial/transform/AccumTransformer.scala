@@ -8,6 +8,7 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.retiming._
 import spatial.traversal.AccelTraversal
+import spatial.util.spatialConfig
 
 case class AccumTransformer(IR: State) extends MutateTransformer with AccelTraversal {
 
@@ -20,7 +21,7 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
     if (inHw && rhs.blocks.nonEmpty) dbgs(stm(lhs))
 
     rhs match {
-      case ctrl: Control[_] if !(lhs.isSwitch && lhs.isInnerControl) =>
+      case ctrl: Control[_] if !(lhs.isSwitch && lhs.isInnerControl) && !spatialConfig.enablePIR =>
         ctrl.bodies.foreach{body =>
           if (body.isInnerStage || lhs.isInnerControl) {
             body.blocks.foreach{case (_, block) =>

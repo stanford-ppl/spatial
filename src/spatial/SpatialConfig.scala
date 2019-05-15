@@ -30,6 +30,7 @@ class SpatialConfig extends Config {
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
+  var useAreaModels: Boolean = true
   var enableForceBanking: Boolean = false
   var groupUnrolledAccess: Boolean = false
   var enableParallelBinding: Boolean = true
@@ -47,6 +48,7 @@ class SpatialConfig extends Config {
   var enableRetiming = true
   var enableLooseIterDiffs = false
   var fuseAsFMA = true
+  var forceFuseFMA = false
 
   var enableBroadcast = true // Allow broadcasting reads
 

@@ -1,3 +1,6 @@
 [submodule "pir"]
 	path = pir
   url = git@github.com:stanford-ppl/pir.git 
+[submodule "models/resources"]
+	path = models/resources
+	url = git@github.com:stanford-ppl/resource-pmmls.git

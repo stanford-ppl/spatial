@@ -89,7 +89,7 @@ case class Instance(
   metapipe: Option[Ctrl],           // Controller if at least some accesses require n-buffering
   banking:  Seq[Banking],           // Banking information
   depth:    Int,                    // Depth of n-buffer
-  cost:     Long,                    // Cost estimate of this configuration
+  cost:     Double,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
   darkVolume: Int,                  // Number of elements inaccessible due to B > 1
@@ -187,15 +187,14 @@ case class Memory(
     import spatial.util.IntLike._
     val w = mem.stagedDims.map(_.toInt).zip(padding).map{case(x,y) => x+y}
     val D = mem.sparseRank.length
-    val n = banking.map(_.nBanks).product
     if (banking.lengthIs(1)) {
+      val n = banking.map(_.nBanks).product
       val b = banking.head.stride
       val alpha = banking.head.alphas
       val P = banking.head.Ps
-      val banksInFence = allLoops(P,alpha,b,Nil)
+      val banksInFence = allLoops(P,alpha,b,Nil).map(_%n).sorted
       val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
       val degenerate = hist.map(_._2).max
-
       val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
         val p = P(t)
@@ -213,19 +212,29 @@ case class Memory(
       val alpha = banking.map(_.alphas).flatten
 
       val ofschunk = (0 until D).map{t =>
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val n = banking.map(_.nBanks).apply(t)
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
         val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
         val degenerate = hist.map(_._2).max
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
-        ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product * degenerate
+        val prevDimsOfs = (t+1 until D).map{i => 
+          val n_i = banking.map(_.nBanks).apply(i)
+          val banksInFence_i = allLoops(Seq(P(i)),Seq(alphas(i)),b(i),Nil).map(_%n_i).sorted
+          val hist_i = banksInFence_i.distinct.map{x => (x -> banksInFence_i.count(_ == x))}
+          val degenerate_i = hist_i.map(_._2).max
+          math.ceil(w(i)/P(i)).toInt * degenerate_i
+        }.product
+        ofsdim_t * prevDimsOfs * degenerate
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil) // TODO: Are all b's the same?
+        val n = banking.map(_.nBanks).apply(t)
+        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
         val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
         val degenerate = hist.map(_._2).max
-        addr(t) % degenerate
+        // TODO: Want to mathematically prove addr(t) % degenerate resolves uniquely, but for now it seems to just work
+        addr(t) % degenerate 
       }.sumTree 
       ofschunk + intrablockofs
     }
@@ -370,11 +379,21 @@ case class BlockCyclicBs(bs: Seq[Int]) extends Data[BlockCyclicBs](SetBy.User)
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isNoBank
-  * Setter:  sym.isNoBank = (true | false)
+  * Getter:  sym.isOnlyDuplicate
+  * Setter:  sym.isOnlyDuplicate = (true | false)
   * Default: false
   */
-case class NoBank(flag: Boolean) extends Data[NoBank](SetBy.User)
+case class OnlyDuplicate(flag: Boolean) extends Data[OnlyDuplicate](SetBy.User)
+
+/** Flag set by the user to disable hierarchical banking and only attempt flat banking,
+  * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
+  * user knows that a flat scheme exists or is a simpler search
+  *
+  * Getter:  sym.duplicateOnAxes = Option[Seq[Seq[Int]]]
+  * Setter:  sym.duplicateOnAxes = Seq[Seq[Int]]
+  * Default: None
+  */
+case class DuplicateOnAxes(opts: Seq[Seq[Int]]) extends Data[DuplicateOnAxes](SetBy.User)
 
 /** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
   * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
@@ -473,15 +492,18 @@ case object NPowersOf2 extends NStrictness {
 }
 case object NBestGuess extends NStrictness {
   val P = 0
-  private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+  private def factorize(number: Int): List[Int] = {
+    List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
+  }
+  private def primeFactorize(number: Int, list: List[Int] = List()): List[Int] = {
     for(n <- 2 to number if number % n == 0) {
-      return factorize(number / n, list :+ n)
+      return primeFactorize(number / n, list :+ n)
     }
     list
   }
 
   def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = { 
-    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}    
+    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}.sorted
   }
 }
 case object NRelaxed extends NStrictness {
@@ -518,9 +540,12 @@ case object AlphaPowersOf2 extends AlphaStrictness {
 }
 case object AlphaBestGuess extends AlphaStrictness {
   val P = 0
-  private def factorize(number: Int, list: List[Int] = List()): List[Int] = {
+  private def factorize(number: Int): List[Int] = {
+    List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
+  }
+  private def primeFactorize(number: Int, list: List[Int] = List()): List[Int] = {
     for(n <- 2 to number if number % n == 0) {
-      return factorize(number / n, list :+ n)
+      return primeFactorize(number / n, list :+ n)
     }
     list
   }

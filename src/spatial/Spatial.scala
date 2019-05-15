@@ -3,6 +3,7 @@ package spatial
 import argon._
 import argon.passes.IRPrinter
 import poly.{ConstraintMatrix, ISL}
+import models.AreaEstimator
 import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
 import spatial.codegen.scalagen._
@@ -55,6 +56,8 @@ trait Spatial extends Compiler with ParamLoader {
   def runPasses[R](block: Block[R]): Block[R] = {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
+    implicit val areamodel: AreaEstimator = new AreaEstimator
+    areamodel.startup(spatialConfig.useAreaModels) 
 
     // --- Debug
     lazy val printer = IRPrinter(state, enable = config.enDbg)
@@ -193,6 +196,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
+        // (spatialConfig.useAreaModels ? areaModelReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
         (spatialConfig.enableTsth ? tsthCodegen) ==>
         irCodegen           
@@ -285,8 +289,9 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.bankingEffort = t
     }.text("""Specify the level of effort to put into banking local memories.  i.e:
       0: Quit banking analyzer after first banking scheme is found
-      1: (default) Allow banking analyzer to find up to 4 valid schemes (flat, hierarchical, flat+duplication, hierarchical+duplication)
-      2: Allow banking analyzer to find banking scheme for every set of banking directives
+      1: (default) Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
+      2: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
+      3: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
 """)
 
     cli.opt[Unit]("mop").action{ (_,_) => 
@@ -340,7 +345,8 @@ trait Spatial extends Compiler with ParamLoader {
       overrideRetime = true
     }.text("Disable retiming (NOTE: May generate buggy verilog)")
 
-    cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c)")
+    cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c) [false]")
+    cli.opt[Unit]("forceFuseFMA").action{(_,_) => spatialConfig.forceFuseFMA = true}.text("Force all Add(Mul(a,b),c) patterns to become FMA(a,b,c), even if they increase initiation interval.  --noFuseFMA takes priority [false]")
 
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 
@@ -353,6 +359,10 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableRetiming = true
       overrideRetime = true
     }.text("Enable counters for each loop to assist in balancing pipelines")
+
+    cli.opt[Unit]("noAreaModels").action { (_,_) => 
+      spatialConfig.useAreaModels = false
+    }.text("Only use crude models for estimating area during banking, and do not generate area report.  Use this flag if you do not have the correct python dependencies to run modeling")
 
     cli.opt[Unit]("instrument").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true

@@ -3,6 +3,7 @@ package banking
 
 import argon._
 import poly.ISL
+import models.AreaEstimator
 import utils.implicits.collections._
 import utils.math._
 
@@ -12,7 +13,7 @@ import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 
-class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL)
+class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL, areamodel: AreaEstimator)
   extends MemoryConfigurer[C](mem,strategy)
 {
 
@@ -62,7 +63,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
       if (bankings.nonEmpty) {
         val banking = bankings.head._2
-        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)
+        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)._4.head
         val ports = computePorts(rdGroups) ++ computePorts(wrGroups)
 
         Right(Seq(Instance(

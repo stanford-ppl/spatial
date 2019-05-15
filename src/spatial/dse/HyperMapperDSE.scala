@@ -13,6 +13,7 @@ import spatial.metadata.bounds._
 import spatial.metadata.types._
 import spatial.traversal._
 import poly.ISL
+import models.AreaEstimator
 import spatial.util.spatialConfig
 
 trait HyperMapperDSE { this: DSEAnalyzer =>
@@ -99,7 +100,7 @@ trait HyperMapperDSE { this: DSEAnalyzer =>
         localMems = LocalMemories.all.toSeq,
         workQueue = workQueue,
         outQueue  = fileQueue
-      )(threadState, isl)
+      )(threadState, isl, areamodel)
     }
     val HEADER = space.map(_.name).mkString(",") + "," + workers.head.areaHeading.mkString(",") + ",Cycles,Valid,Timestamp"
 

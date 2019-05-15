@@ -63,11 +63,11 @@ trait ISL {
           val curVersion = source_string
           val verFromCode = raw".*float version[ ]+=[ ]+(\d)\.(\d).*".r
           val verFromCode(curDec,curFrac) = source_string.split("\n").filter(_.contains("float version =")).head
-          println(s"emptiness (${emptiness_path}): Installed Version = $binDec.$binFrac, Required Version = $curDec.$curFrac")
+          println("[" + Console.BLUE + "info" + Console.RESET + s"] emptiness (${emptiness_path}): Installed Version = $binDec.$binFrac, Required Version = $curDec.$curFrac")
           binDec != curDec || binFrac != curFrac
         } else {true}
       } catch {
-        case e: Throwable => println("Unsure if emptiness needs to be recompiled... Recompiling to be safe"); true 
+        case e: Throwable => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Unsure if emptiness needs to be recompiled... Recompiling to be safe"); true 
       }
       
       // step 4: if emptiness does not exist, compile it.
@@ -76,7 +76,7 @@ trait ISL {
           val pkg_config_proc = BackgroundProcess("", "pkg-config", "--cflags", "--libs", "isl")
           val pkg_config = pkg_config_proc.blockOnLine()
 
-          println(s"Pkg Config: $pkg_config")
+          println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Pkg Config: $pkg_config")
 
           val split_config = pkg_config.split("\\s") map {
             _.trim
@@ -89,10 +89,10 @@ trait ISL {
           println(source_string)
           compile_proc send source_string
           val retcode = compile_proc.waitFor()
-          println(s"Compile Retcode: $retcode")
+          println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Compile Retcode: $retcode")
           compile_proc.checkErrors()
 
-          println("Finished Compiling")
+          println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Finished Compiling")
         }
 
         // step 4: Now that emptiness is guaranteed to exist, release lock

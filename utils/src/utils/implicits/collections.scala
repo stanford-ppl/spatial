@@ -16,6 +16,15 @@ object collections {
       x.foreach{i => map.getOrElseUpdate(i % N, i) }
       map.values.toList.sorted
     }
+    /** Returns the constant step size between all values under modulo N, if it is constant  */
+    def stepSizeUnderMod(N: Int): Option[Int] = {
+      if (x.size == 1) None
+      else {
+        val diffs = (x.sorted.drop(1).zipWithIndex.map{case (a, i) => a - x.sorted.apply(i)}.distinct ++ Seq(x.head + N - x.last)).distinct
+        if (diffs.size == 1) Some(diffs.head)
+        else None
+      }
+    }
 
   }
 

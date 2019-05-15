@@ -34,6 +34,9 @@ package object memory {
 
     def isInnerAccum: Boolean = metadata[InnerAccum](s).map(_.isInnerAccum).getOrElse(false)
     def isInnerAccum_=(v: Boolean): Unit = metadata.add(s, InnerAccum(v))
+
+    def isInnerReduceOp: Boolean = metadata[InnerReduceOp](s).map(_.flag).getOrElse(false)
+    def isInnerReduceOp_=(v: Boolean): Unit = metadata.add(s, InnerReduceOp(v))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {
@@ -66,8 +69,11 @@ package object memory {
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
-    def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
-    def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
+    def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
+    def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
+
+    def duplicateOnAxes: Option[Seq[Seq[Int]]] = metadata[DuplicateOnAxes](s).map(_.opts)
+    def duplicateOnAxes_=(opts: Seq[Seq[Int]]): Unit = metadata.add(s, DuplicateOnAxes(opts))
 
     def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
     def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
@@ -278,6 +284,7 @@ package object memory {
 
     def isMemPrimitive: Boolean = (isSRAM || isLineBuffer || isRegFile || isFIFO || isLIFO || isFIFOReg || isReg || isLUT) && !isNBuffered && (!isRemoteMem && !isOptimizedReg)
 
+
     def isSRAM: Boolean = mem match {
       case _: SRAM[_,_] => true
       case _ => false
@@ -291,6 +298,7 @@ package object memory {
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
     def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
     def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
+    def hasDestructiveReads: Boolean = isFIFO || isLIFO || isFIFOReg
 
     def isLUT: Boolean = mem match {
       case _: LUT[_,_] => true

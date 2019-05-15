@@ -47,9 +47,9 @@ trait PIRFormatGen extends Codegen {
 
   def comment(lhs:Lhs, tp:String) = {
     lhs.sym match {
-      case Def(LUTNew(dims, elems)) => src"[$tp] $lhs = LUTNew($dims, elems)"
-      case Def(op) => src"[$tp] $lhs = $op"
-      case lhs => src"[$tp] $lhs"
+      case Def(LUTNew(dims, elems)) => s"[$tp] ${quoteOrRemap(lhs)} = LUTNew($dims, elems)"
+      case Def(op) => s"[$tp] ${quoteOrRemap(lhs)} = $op"
+      case lhs => s"[$tp] ${quoteOrRemap(lhs)}"
     }
   }
 

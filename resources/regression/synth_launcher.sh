@@ -35,10 +35,12 @@ if [[ ! -f ${REGRESSION_HOME}/lock ]]; then
 	rm -rf ${REGRESSION_HOME}/next-spatial/
 	mkdir ${REGRESSION_HOME}/next-spatial
 	cd ${REGRESSION_HOME}/next-spatial
-	git clone git@github.com:stanford-ppl/spatial
-	git clone git@github.com:stanford-ppl/test-data.git
+    git clone git@github.com:stanford-ppl/spatial
+    git clone git@github.com:stanford-ppl/test-data.git
 	cd spatial
-	export 
+	git checkout develop
+	git pull
+	git submodule update --init
 	export branchname=`git rev-parse --abbrev-ref HEAD | sed "s/HEAD/unknown/g"`
 	export hash=`git rev-parse HEAD`
 	export timestamp=`git show -s --format=%ci`

@@ -4,7 +4,7 @@ import argon._
 import argon.lang._
 import forge.tags._
 
-@op case class VecAlloc[T](elems: Seq[T])(implicit val tV: Vec[T]) extends Primitive[Vec[T]] {
+@op case class VecAlloc[T:Bits](elems: Seq[T])(implicit val tV: Vec[T]) extends Primitive[Vec[T]] {
   override val isTransient: Boolean = true
 }
 

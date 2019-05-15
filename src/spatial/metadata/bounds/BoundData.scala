@@ -1,6 +1,7 @@
 package spatial.metadata.bounds
 
 import argon._
+import argon.node._
 import spatial.metadata.params._
 import forge.tags.stateful
 import spatial.metadata.SpatialMetadata
@@ -96,4 +97,20 @@ object VecConst {
     case x:Sym[_] if x.vecConst.nonEmpty => Some(x.vecConst.get)
     case x => None
   }
+  def broadcast[R:Type,C1,C2](a:Exp[C1,_], b:Exp[C2,_])(func:(C1,C2) => Any)(implicit state:State):Option[R] = {
+    val c = (a,b) match {
+      case (VecConst(x), Const(y)) => Some(x.map { x => func(as(x),as(y)) })
+      case (Const(x), VecConst(y)) => Some(y.map { y => func(as(x),as(y)) })
+      case (VecConst(x), VecConst(y)) => 
+        assert(x.size == y.size)
+        Some(x.zip(y).map { case (x,y) => func(as(x),as(y)) })
+      case _ => None
+    }
+    c.map { c =>
+      val b = boundVar[R]
+      b.asInstanceOf[Sym[R]].vecConst = c
+      b
+    }
+  }
+  def as[T](x:Any) = x.asInstanceOf[T]
 }

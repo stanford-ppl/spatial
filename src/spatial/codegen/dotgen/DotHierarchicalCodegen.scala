@@ -6,6 +6,7 @@ import utils.io.files._
 import sys.process._
 import scala.language.postfixOps
 import spatial.metadata.control._
+import spatial.metadata.bounds._
 
 trait DotHierarchicalCodegen extends DotCodegen {
 
@@ -52,6 +53,7 @@ trait DotHierarchicalCodegen extends DotCodegen {
 
   override def addEdge(from:Sym[_], to:Sym[_], alias:Map[Sym[_], String]=Map.empty):Unit = {
     if (!nodes.contains(from)) dbgblk(src"emitEscapeEdge($from, $to):"){
+      assert(from.vecConst.isEmpty)
       val (shared, fromBranch, toBranch) = ancestryBetween(from, to)
       dbgs(src"from=$from")
       dbgs(src"to=$to")

@@ -34,6 +34,7 @@ trait LUTConstReadRewriteRules extends RewriteRules {
           }
           Some(stage(VecAlloc[a](faddr.map { a => elems(a)})(op.A.asInstanceOf[Bits[a]], op.vT.asInstanceOf[Vec[a]])))
       }
+    case _ => None
   })
 
   def flattenND(inds:Seq[Int], dims:Seq[Int]):Int = {

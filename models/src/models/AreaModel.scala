@@ -33,8 +33,8 @@ class AreaEstimator {
       
       (python3Exists, pickleExists, xgboostExists, sklearnExists) match {
         case (0,0,0,0) => useML = true
-        case (1,_,_,_) => println(s"python3 missing!  Cannot run ML area models!"); useML = false
-        case (_,_,_,_) => println(s"Missing python3 libraries: ${if (pickleExists == 1) "pickle" else ""}${if (xgboostExists == 1) " xgboost" else ""}${if (sklearnExists == 1) " sklearn" else ""}!  Cannot run ML area models!"); useML = false
+        case (1,_,_,_) => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] python3 missing!  Cannot run ML area models!"); useML = false
+        case (_,_,_,_) => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Missing python3 libraries: ${if (pickleExists == 1) "pickle" else ""}${if (xgboostExists == 1) " xgboost" else ""}${if (sklearnExists == 1) " sklearn" else ""}!  Cannot run ML area models!"); useML = false
       }
     } else {
       useML = false
@@ -155,17 +155,17 @@ class AreaEstimator {
       val allAlpha = alpha.padTo(padsize,0)
       val allP = P.padTo(padsize,0)
       val hist = if (histRaw.size > 9) {
-        println(s"WARNING: read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
+        println("[" + Console.YELLOW + "warn" + Console.RESET + s"] read/write muxWidth histogram ($histRaw) is larger than what is supported by modeling.  Taking last 3 width sizes!")
         histRaw.takeRight(9)
       } else histRaw.padTo(9,0)
-      if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) println(s"WARNING: histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
+      if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
       val values = allB ++ allN ++ allAlpha ++ List(bitWidth) ++ allDims ++ hist ++ List(depth) ++ allP
       val modelName = nodetype + "_" + prop + ".pmml"
       val model = getClass.getClassLoader.getResourceAsStream(modelName)
       val model_exists = {model != null}
       val tryEvaluator: Option[Evaluator] = try { 
           if (model_exists && !failedModels.contains((nodetype,prop))) Some(openedModels.getOrElseUpdate((nodetype,prop), {
-          println(s"Loading area model for $prop of $nodetype")
+          println("[" + Console.BLUE + "info" + Console.RESET + s"] Loading area model for $prop of $nodetype")
           val e = new LoadingModelEvaluatorBuilder().load(model)build()
           e.verify()
           e
@@ -189,12 +189,12 @@ class AreaEstimator {
           result
         } catch {
           case _: Throwable => 
-            println(s"WARNING: Error using model for $prop of $nodetype node (${modelName})")
+            println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error using model for $prop of $nodetype node (${modelName})")
             failedModels += ((nodetype,prop))
             crudeEstimateMem(prop, nodetype, dims, bitWidth, depth, B, N, alpha, P, histRaw)
         }
       } else {
-        if (!failedModels.contains((nodetype,prop))) println(s"WARNING: Error getting model for $prop of $nodetype node (${modelName})!")
+        if (!failedModels.contains((nodetype,prop))) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error getting model for $prop of $nodetype node (${modelName})!")
         failedModels += ((nodetype,prop))
         crudeEstimateMem(prop, nodetype, dims, bitWidth, depth, B, N, alpha, P, histRaw)
       }
@@ -208,7 +208,7 @@ class AreaEstimator {
       val model_exists = {model != null}
       val tryEvaluator: Option[Evaluator] = try { 
           if (model_exists && !failedModels.contains((nodetype,prop))) Some(openedModels.getOrElseUpdate((nodetype,prop), {
-          println(s"Loading area model for $prop of $nodetype")
+          println("[" + Console.BLUE + "info" + Console.RESET + s"] Loading area model for $prop of $nodetype")
           val e = new LoadingModelEvaluatorBuilder().load(model)build()
           e.verify()
           e
@@ -233,11 +233,11 @@ class AreaEstimator {
         } catch {
           case _: Throwable => 
             failedModels += ((nodetype,prop))
-            println(s"WARNING: Error using model for $prop of $nodetype node (${modelName})")
+            println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error using model for $prop of $nodetype node (${modelName})")
             0.0
         }
       } else {
-        if (!failedModels.contains((nodetype,prop))) println(s"WARNING: No model for $prop of $nodetype node (${modelName})!")
+        if (!failedModels.contains((nodetype,prop))) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] No model for $prop of $nodetype node (${modelName})!")
         failedModels += ((nodetype,prop))
         0.0
       }

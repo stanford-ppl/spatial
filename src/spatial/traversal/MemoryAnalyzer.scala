@@ -105,6 +105,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
       enWarn = Some(false)  // Disable warnings after the first run
       emitFooter()
     }
+    info(s"Banking summary report written to $out/decisions.html")
     config.enGen = enGen
     block
   }

@@ -86,7 +86,9 @@ object DenseTransfer {
     val p = pars.toSeq.maxBy(_._1)._2
     val lastPar = pars.last._2 match {case Expect(p) => p.toInt; case _ => 1}
     val requestLength: I32 = lens.toSeq.maxBy(_._1)._2
-    val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
+    val bytesPerWord = {A.nbits / 8} max 1
+    val wordsPackedInByte = {8 / A.nbits} max 1 // Misnomer
+    if ((A.nbits * lastPar) % 8 != 0) throw new Exception(s"Cannot transfer to/from DRAM ${A.nbits * lastPar} bits per cycle, since it cannot be packed into bytes. ${dram} (${dram.name.getOrElse("")}) <-> ${local} (${local.name.getOrElse("")}) ")
     p match {case Expect(p) => assert(p.toInt*A.nbits <= target.burstSize, s"Cannot parallelize by more than the burst size! Please shrink par (par ${p.toInt} * ${A.nbits} > ${target.burstSize})"); case _ =>}
 
     val outerLoopCounters = counters.dropRight(1)
@@ -98,7 +100,7 @@ object DenseTransfer {
         val indicesPadded = dram.rawRank.map{i => if (dram.sparseRank.contains(i)) indices(dram.sparseRank.indexOf(i)) else 0.to[I32]}
         val stridesPadded = dram.rawRank.map{i => strides.getOrElse(i, 1.to[I32])}
 
-        val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims)
+        val dramAddr = () => flatIndex((rawDramOffsets,indicesPadded,stridesPadded).zipped.map{case (ofs,i,s) => ofs + i*s }, rawDims) / wordsPackedInByte
         val localAddr = if (normalCounting) {i: I32 => is :+ i } else {_: I32 => is}
         if (isLoad) load(dramAddr, localAddr)
         else        store(dramAddr, localAddr)
@@ -109,7 +111,7 @@ object DenseTransfer {
     }
     else {
       val top = Stream {
-        val dramAddr = () => flatIndex(rawDramOffsets, rawDims)
+        val dramAddr = () => flatIndex(rawDramOffsets, rawDims) / wordsPackedInByte
         val localAddr = {i: I32 => Seq(i) }
         if (isLoad) load(dramAddr, localAddr)
         else        store(dramAddr, localAddr)
@@ -154,8 +156,7 @@ object DenseTransfer {
       // Command generator
       Pipe {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
-        val size = requestLength
-        val size_bytes = size * bytesPerWord
+        val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
         cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
         // issueQueue.enq(size)
       }
@@ -216,15 +217,15 @@ object DenseTransfer {
 
       val maddr_bytes  = dramAddr() * bytesPerWord     // Raw address in bytes
       val start_bytes  = maddr_bytes % bytesPerBurst    // Number of bytes offset from previous burst aligned address
-      val length_bytes = requestLength * bytesPerWord   // Raw length in bytes
+      val length_bytes = requestLength * bytesPerWord / wordsPackedInByte   // Raw length in bytes
       val offset_bytes = maddr_bytes - start_bytes      // Burst-aligned start address, in bytes
       val raw_end      = maddr_bytes + length_bytes     // Raw end, in bytes, with burst-aligned start
 
       val end_bytes = mux(raw_end % bytesPerBurst === 0.to[I32],  0.to[I32], bytesPerBurst - raw_end % bytesPerBurst) // Extra useless bytes at end
 
       // FIXME: What to do for bursts which split individual words?
-      val start = start_bytes / bytesPerWord     // Number of WHOLE elements to ignore at start
-      val extra = end_bytes / bytesPerWord       // Number of WHOLE elements that will be ignored at end
+      val start = wordsPackedInByte * start_bytes / bytesPerWord     // Number of WHOLE elements to ignore at start
+      val extra = wordsPackedInByte * end_bytes / bytesPerWord       // Number of WHOLE elements that will be ignored at end
       val end   = start + requestLength          // Index of WHOLE elements to start ignoring at again
       val size  = requestLength + start + extra  // Total number of WHOLE elements to expect
 
@@ -292,10 +293,8 @@ object DenseTransfer {
       // Command generator
       Pipe {
         val addr = (dramAddr() * bytesPerWord).to[I64] + dram.address
-        val size = requestLength
-
         val addr_bytes = addr
-        val size_bytes = size * bytesPerWord
+        val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
 
         cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, true), dram.isAlloc)
       }

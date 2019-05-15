@@ -77,6 +77,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}
+  def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .onlyduplicate instead")}
 
   /** Do not attempt to bank memory at all, and only use bank-by-duplication for all lanes of all readers */
   def onlyduplicate: C[A] = { this.isOnlyDuplicate = true; me }

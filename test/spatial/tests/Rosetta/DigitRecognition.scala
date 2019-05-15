@@ -32,16 +32,16 @@ import utils.implicits._
 
 	/* Parameters to tune */
 	val k_const 				= 3 /* Number of nearest neighbors to handle */
-	val par_factor  			= 16 //40
+	val par_factor  			= 32 //40
 	val par_factor_double		= par_factor * 2
 	val parLoad 				= 2
-
+ 
 	def network_sort(knn_set 		: RegFile2[Int], 
 					 label_set 		: RegFile2[LabelType],
 					 p : I32) : Unit = {
 		/* Odd-Even network sort on knn_set in-place */
 		val num_elems = k_const /* should be size of each knn_set */
-		val oe_par_factor = num_elems >> 1  // might not work if regfile size is even 
+		//val oe_par_factor = num_elems >> 1  // might not work if regfile size is even 
 	
 		val knn_val1 = LabelAndDist(knn_set(p,0), label_set(p,0))
 		val knn_val2 = LabelAndDist(knn_set(p,1), label_set(p,1))
@@ -95,33 +95,6 @@ import utils.implicits._
 	}
 
 	
-	def merge_sorted_lists(par_knn_set 		: RegFile2[Int], 
-						   par_label_set	: RegFile2[LabelType],
-						   sorted_label_set	: RegFile1[LabelType]) : Unit = {
-
-
-		//val insert_this_label = Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32]))
-		val partition_index_list = RegFile[I32](par_factor)
-		Foreach(par_factor by 1 par par_factor) { p => partition_index_list(p) = 0.to[Int] }
-
-		Sequential.Foreach(k_const by 1) { k => //Sequential leads to smaller II value for some reason
-			val insert_this_label = List.tabulate(par_factor) { p =>
-			 						  //Reduce(Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32])))(par_factor by 1 par par_factor) { p =>
-										val check_at_index = partition_index_list(p)
-										
-										val current_label = par_label_set(p, check_at_index)
-										val current_dist  = par_knn_set(p, check_at_index)
-
-										LabelAndIndex(current_dist, current_label, p)
-									}.reduceTree{ (a, b) => mux(a.dist < b.dist, a, b) }
-			
-			sorted_label_set(k) = insert_this_label.label 
-			partition_index_list(insert_this_label.inx) = partition_index_list(insert_this_label.inx) + 1.to[I32]
-		}
-
-	} 
-
-
 	def hamming_distance(x1 : 	DigitType1, x2 : DigitType2 ) : Int16 = {
 
 	
@@ -147,11 +120,12 @@ import utils.implicits._
 					  }.reduceTree(_ + _)
 		
 		bits_d1 + bits_d2 + bits_d3 + bits_d4 */
-		val seq_bits1 = Seq.tabulate(64){ i => x1.d1.bit(i) }
-		val seq_bits2 = Seq.tabulate(64){ i => x1.d2.bit(i) }
-		val seq_bits3 = Seq.tabulate(64){ i => x2.d3.bit(i) }
-		val seq_bits4 = Seq.tabulate(64){ i => x2.d4.bit(i) }
-		popcount(seq_bits1 ++ seq_bits2 ++ seq_bits3 ++ seq_bits4).to[Int16] 
+	// val seq_bits1 = Seq.tabulate(64){ i => x1.d1.bit(i) }
+	// val seq_bits2 = Seq.tabulate(64){ i => x1.d2.bit(i) }
+	// val seq_bits3 = Seq.tabulate(64){ i => x2.d3.bit(i) }
+	// val seq_bits4 = Seq.tabulate(64){ i => x2.d4.bit(i) }
+		(popcount(Seq.tabulate(64){ i => x1.d1.bit(i) }) + popcount(Seq.tabulate(64){ i => x1.d2.bit(i) }) +
+		   popcount(Seq.tabulate(64){ i => x2.d3.bit(i) }) + popcount(Seq.tabulate(64){ i => x2.d4.bit(i) })).to[Int16] 
 	}
 
 	def update_knn(test_inst1 	: DigitType1, 
@@ -183,6 +157,33 @@ import utils.implicits._
 		
 	}
 
+	def merge_sorted_lists(par_knn_set 		: RegFile2[Int], 
+						   par_label_set	: RegFile2[LabelType],
+						   sorted_label_set	: RegFile1[LabelType]) : Unit = {
+
+
+		//val insert_this_label = Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32]))
+		val partition_index_list = RegFile[I32](par_factor)
+		Foreach(par_factor by 1 par par_factor) { p => partition_index_list(p) = 0.to[Int] }
+
+		Sequential.Foreach(k_const by 1) { k => //Sequential leads to smaller II value for some reason
+			val insert_this_label = List.tabulate(par_factor) { p =>
+			 						  //Reduce(Reg[LabelAndIndex](LabelAndIndex(0.to[Int], 0.to[LabelType], 0.to[I32])))(par_factor by 1 par par_factor) { p =>
+										val check_at_index = partition_index_list(p)
+										
+										val current_label = par_label_set(p, check_at_index)
+										val current_dist  = par_knn_set(p, check_at_index)
+
+										LabelAndIndex(current_dist, current_label, p)
+									}.reduceTree{ (a, b) => mux(a.dist < b.dist, a, b) }
+			
+			sorted_label_set(k) = insert_this_label.label 
+			partition_index_list(insert_this_label.inx) = partition_index_list(insert_this_label.inx) + 1.to[I32]
+		}
+
+	} 
+
+
 	def knn_vote(knn_set  	: RegFile2[Int],
 				 label_list : RegFile2[LabelType],
 				 vote_list	: RegFile1[Int]) : LabelType = {
@@ -197,13 +198,16 @@ import utils.implicits._
 			vote_list( sorted_label_list(i).to[I32] ) = vote_list( sorted_label_list(i).to[I32] ) + 1
 		}	
 
-		val best_label = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
-		best_label := IntAndIndex(0.to[Int], 0.to[I32]) //best_label.reset
+		//val best_label = Reg[IntAndIndex](IntAndIndex(0.to[Int], 0.to[I32]))
+		//best_label := IntAndIndex(0.to[Int], 0.to[I32]) 
 
-		Reduce(best_label)(vote_list.length by 1) { j =>
-			IntAndIndex(vote_list(j), j)
-		} {(l1,l2) => mux(l1.value > l2.value, l1, l2) }
+		//Reduce(best_label)(vote_list.length by 1) { j =>
+		//	IntAndIndex(vote_list(j), j)
+		//} {(l1,l2) => mux(l1.value > l2.value, l1, l2) }
 
+		val best_label = List.tabulate(10) { j =>
+							 IntAndIndex(vote_list(j), j)
+				   		}.reduceTree{(l1,l2) => mux(l1.value > l2.value, l1, l2)}
 
 		best_label.inx.to[LabelType]
 	}
@@ -356,35 +360,18 @@ import utils.implicits._
 
 					Pipe.II(1).Foreach(num_training by 1 par par_factor) { train_inx  =>
 
-						//List.tabulate(par_factor) { p =>
-						//Foreach(par_factor by 1 par par_factor) { p => 
 						val curr_train_inx = train_inx // * par_factor + p
 						val p = train_inx //% par_factor
 						update_knn(test_local1, test_local2,
 								   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 								   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx))	
-					//	}
-
+					
 					}
 					
 					Foreach(par_factor by 1 par par_factor)  { p =>
 					//List.tabulate(par_factor) { p =>					
 						network_sort(knn_tmp_large_set, label_list_tmp, p) 					
 					}
-					/*
-					Foreach(par_factor by 1 par par_factor) { p => 
-						Pipe.II(1).Foreach(train_set_num_per_partition by 1) { train_inx =>
-
-							val curr_train_inx = p * train_set_num_per_partition + train_inx
-							update_knn(test_local1, test_local2,
-									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
-									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
-						}
-
-
-						network_sort(knn_tmp_large_set, label_list_tmp, p) 
-
-					} */
 
 					/* Do KNN */
 					results_local(test_inx) = knn_vote(knn_tmp_large_set, label_list_tmp, vote_list) 
@@ -410,3 +397,18 @@ import utils.implicits._
 
 
 }
+
+					/*
+					Foreach(par_factor by 1 par par_factor) { p => 
+						Pipe.II(1).Foreach(train_set_num_per_partition by 1) { train_inx =>
+
+							val curr_train_inx = p * train_set_num_per_partition + train_inx
+							update_knn(test_local1, test_local2,
+									   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
+									   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx)) 
+						}
+
+
+						network_sort(knn_tmp_large_set, label_list_tmp, p) 
+
+					} */

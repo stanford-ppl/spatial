@@ -70,7 +70,7 @@ trait ReduceUnrolling extends UnrollingBase {
           dbgs("Fully unrolling inner reduce")
           val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
           if (spatialConfig.enablePIR) {
-            val rop = pirUnrollInnerReduce(None, reduce, result, load, store, accum)
+            pirUnrollInnerReduce(None, reduce, result, load, store, accum)
           } else {
             store.reapply(accum, result)
           }
@@ -248,6 +248,7 @@ trait ReduceUnrolling extends UnrollingBase {
   ) = withFlow("inInnerReduce", { e =>
     e.isInnerReduceOp = true
   }) { 
+
     dbgs(s"inInnerReduce(accum=$accum)")
     val accValue = load.reapply(accum)
     val initOrInput: A = fold match {

@@ -16,6 +16,7 @@ import spatial.node._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 import forge.tags._
+import emul.FixedPoint
 
 import utils.math.{isPow2,log2,gcd}
 
@@ -119,31 +120,9 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     res.resolvesTo.get
   }
 
-  def stage[R:Type](op: Op[R]): R = {
-    op match {
-      case VecConstRewrite(tp) => tp
-      case op => argon.stage(op)
-    }
-  }
-
-  object VecConstRewrite {
-    def unapply[R:Type](op:Op[R]):Option[R] = rewrite[R](op)
-    def rewrite[R:Type](op:Op[R]):Option[R] = op match {
-      case op@FixSRA(a, b) => 
-        VecConst.broadcast(f(a),f(b)) { 
-          case (x, y) if y >= 0 => x >> y
-          case (x, y) if y < 0 => x << -y
-        }
-      case op:Binary[c,r] => 
-        VecConst.broadcast(f(op.a), f(op.b)) { (a,b) => op.unstaged(a.asInstanceOf[c], b.asInstanceOf[c]) }
-      case _ => None
-    }
-  }
-
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
 
-    case VecConstRewrite(sym) => sym
+    case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
 
     case RegWrite(F(reg), F(data), F(en)) => data match {
       // Look for very specific FixFMA pattern and replace with FixFMAAccum node (Issue #63).. This gives error about not wanting to match Node[Fix[S,I,F]] <: Node[Any] because Op is type R and not +R
@@ -401,7 +380,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       //val m = super.transform(lhs,rhs)
       //m.residual = residual(lin, xx, ofs, 0)
       //m
-
+      
     case _ => super.transform(lhs,rhs)
   }
 

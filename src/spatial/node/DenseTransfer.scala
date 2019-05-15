@@ -84,6 +84,8 @@ object DenseTransfer {
     val counters: Seq[() => Counter[I32]] = sparseRank.map{d => () => Counter[I32](start = 0, end = lens(d), par = pars(d)) }
 
     val p = pars.toSeq.maxBy(_._1)._2
+    val upperPars = pars.dropRight(1).map(_._2 match {case Expect(p) => p.toInt; case _ => 1})
+    if (upperPars.exists(_ > 1)) throw new Exception(s"Cannot parallelize non-leading dimension of tile transfer by more than 1 (${dram.name.getOrElse("")}) <-> ${local} (${local.name.getOrElse("")}).  Please rewrite with metaprogramming.  See Spatial issue #238 for details")
     val lastPar = pars.last._2 match {case Expect(p) => p.toInt; case _ => 1}
     val requestLength: I32 = lens.toSeq.maxBy(_._1)._2
     val bytesPerWord = {A.nbits / 8} max 1

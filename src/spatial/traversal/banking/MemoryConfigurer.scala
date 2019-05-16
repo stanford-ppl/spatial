@@ -172,12 +172,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         checkAccess(inst.reads)
         checkAccess(inst.writes)
       }
-      // TODO: after lid is added. check access with same outer loop uid but different inner loop
-      // uid touch the same instance
-      //used.foreach { access =>
-        //access.dispatches { case (uid, dispatches) =>
-        //}
-      //}
     }
 
   }
@@ -322,6 +316,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     // Start to build groups within each access symbol. 
     import scala.math.Ordering.Implicits._  // Seq ordering
     val accessGroups = accesses.groupBy { _.access }.map { case (access, as) =>
+      if (access.segmentMapping.values.exists { _ > 0 }) {
+        error(s"Cannot group by unrolled access for banking on ${access} (${access.ctx}) due to dependency between iterations")
+        error(s"Try turn off --bank-groupUnroll")
+        state.logError()
+      }
       val grps = as.toList.sortBy { _.unroll }.foldLeft(Seq[Set[AccessMatrix]]()) { case (grps, a) =>
         val gid = grps.indexWhere { grp => grp.forall { b => canGroup(a,b) } }
         if (gid == -1) grps :+ Set(a)

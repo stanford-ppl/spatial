@@ -15,5 +15,5 @@ trait BitsAPI {
 
   @api def popcount(c : Seq[Bit]) : U8 = Vec.popcount(c)
 
- // @api def popcount[A:Bits](c : A) : U8 = Vec.popcount(c.asInstanceOf[Seq[Bit]])
+//  @api def popcount[A:Bits](c : Bits, size : Int) : U8 = Vec.popcount(Seq.tabulate(size) {i => c.asBits.apply(i) })
 }

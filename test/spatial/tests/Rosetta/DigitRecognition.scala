@@ -124,7 +124,7 @@ import utils.implicits._
 	// val seq_bits3 = Seq.tabulate(64){ i => x2.d3.bit(i) }
 	// val seq_bits4 = Seq.tabulate(64){ i => x2.d4.bit(i) }
 
-		(popcount(Seq.tabulate(64){ i => x1.d1.bit(i) }) + popcount(Seq.tabulate(64){ i => x1.d2.bit(i) }) +
+		(popcount(/*Seq.tabulate(64){ i => x1.d1.bit(i) }*/ x1.d1) + popcount(Seq.tabulate(64){ i => x1.d2.bit(i) }) +
 		   popcount(Seq.tabulate(64){ i => x2.d3.bit(i) }) + popcount(Seq.tabulate(4){ i => x2.d4.bit(63-i) })).to[Int16] 
 	//  popcount(Seq.tabulate(64){ i => x1.d1.bit(i) } ++ Seq.tabulate(64){ i => x1.d2.bit(i) }).to[Int16] +  
 	//  popcount(Seq.tabulate(64){ i => x2.d3.bit(i) } ++ Seq.tabulate(64){ i => x2.d4.bit(i) }).to[Int16]

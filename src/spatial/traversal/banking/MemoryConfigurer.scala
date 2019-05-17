@@ -620,7 +620,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
-    val trueConflict = concurrent && conflicting
+    val trueConflict = concurrent && conflicting && !mem.isReg
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict
   }

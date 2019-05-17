@@ -50,6 +50,11 @@ class Rewrites {
   def apply[A:Type](op: Op[A])(implicit ctx: SrcCtx, state: State): Option[A] = {
     Option(op.rewrite)
           .orElse{ rule(op).mapFind{rule => applyRule[A](op,ctx,state, rule) } }
-          .orElse{ globals.mapFind{rule => applyRule[A](op,ctx,state, rule) } }
+          .orElse{ globals.mapFind{rule => applyRule[A](op,ctx,state, rule) } }.map { op2 =>
+      if (state.config.enLog) {
+        dbgs(s"Rewrite $op => $op2")
+      }
+      op2
+    }
   }
 }

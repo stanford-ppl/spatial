@@ -21,13 +21,21 @@ case class Readers(readers: Set[Sym[_]]) extends Data[Readers](SetBy.Flow.Consum
 case class Writers(writers: Set[Sym[_]]) extends Data[Writers](SetBy.Flow.Consumer)
 
 
-/** Set of resetters for a given memory.
+/** Set of resetters or a given memory.
   *
   * Getter:  sym.resetters
   * Setter:  sym.resetters = (Set[ Sym[_] ])
   * Default: empty set
   */
 case class Resetters(resetters: Set[Sym[_]]) extends Data[Resetters](SetBy.Flow.Consumer)
+
+/** Symbol of pre-unrolled node that this memory was created from. (Used for accum/fma analysis)
+  *
+  * Getter:  sym.originalSym
+  * Setter:  sym.originalSym = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class OriginalSym(forbiddenFruit: Sym[_]) extends Data[OriginalSym](SetBy.Analysis.Self)
 
 /** Marks that a memory is a break for some controller
   *

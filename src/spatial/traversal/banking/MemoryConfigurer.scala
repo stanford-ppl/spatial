@@ -172,12 +172,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         checkAccess(inst.reads)
         checkAccess(inst.writes)
       }
-      // TODO: after lid is added. check access with same outer loop uid but different inner loop
-      // uid touch the same instance
-      //used.foreach { access =>
-        //access.dispatches { case (uid, dispatches) =>
-        //}
-      //}
     }
 
   }
@@ -322,6 +316,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     // Start to build groups within each access symbol. 
     import scala.math.Ordering.Implicits._  // Seq ordering
     val accessGroups = accesses.groupBy { _.access }.map { case (access, as) =>
+      if (access.segmentMapping.values.exists { _ > 0 }) {
+        error(s"Cannot group by unrolled access for banking on ${access} (${access.ctx}) due to dependency between iterations")
+        error(s"Try turn off --bank-groupUnroll")
+        state.logError()
+      }
       val grps = as.toList.sortBy { _.unroll }.foldLeft(Seq[Set[AccessMatrix]]()) { case (grps, a) =>
         val gid = grps.indexWhere { grp => grp.forall { b => canGroup(a,b) } }
         if (gid == -1) grps :+ Set(a)
@@ -621,7 +620,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
     val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
-    val trueConflict = concurrent && conflicting
+    val trueConflict = concurrent && conflicting && !mem.isReg
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict
   }
@@ -668,7 +667,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def getMergeError(i1: Instance, i2: Instance, i3: Instance): Option[String] = {
     if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
       Some("Buffer conflict")
-    else if (i3.cost > (i1.cost + i2.cost) && !mem.hasDestructiveReads)
+    else if (i3.cost > (i1.cost + i2.cost) && !mem.hasDestructiveReads && !mem.isReg)
       Some(s"Too expensive to merge addressable instances: ${i3.cost} > ${i1.cost + i2.cost}")
     else if (mem.hasDestructiveReads && mem.consumers.exists{x => x match {case Op(x:OpMemReduce[_,_]) => x.accum == mem; case _ => false}})
       Some(s"Cannot merge instances when reads are destructive and mem is used as an accumulator")

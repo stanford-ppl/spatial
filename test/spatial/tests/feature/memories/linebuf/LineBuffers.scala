@@ -10,6 +10,10 @@ import spatial.dsl._
     val last_dram = DRAM[I32](3,24)
     val last_dram2 = DRAM[I32](3,24)
     val last_dram3 = DRAM[I32](3,24)
+    val init4 = (0::12,0::26){(i,j) => i*26 + j}
+    val init4_dram = DRAM[I32](12,26)
+    val last_dram4 = DRAM[I32](7,25)
+    setMem(init4_dram, init4)
     setMem(init_dram, init)
 
     Accel {
@@ -55,6 +59,28 @@ import spatial.dsl._
       }
       last_dram3 store sram3
 
+      val lb4 = LineBuffer.strided[I32](8,26,2)
+      val sram4 = SRAM[I32](7,25)
+      Foreach(12 by 2){i => 
+        lb4 load init4_dram(i::i+2, 0::25)
+        // Foreach(2 by 1, 25 by 1 par 1){(r,j) => 
+        //   lb4.enqAt(r, (i+r)*26 + j)
+        // }
+        // Foreach(25 by 1 par 3, 7 by 1){(j,i) =>
+        //   sram4(i,j) = lb4(1+i,j)
+        // } 
+        Foreach(25 by 1 par 3){j => 
+          sram4(0,j) = lb4(1,j) // <--- newest data (highest #s in this app)
+          sram4(1,j) = lb4(2,j) 
+          sram4(2,j) = lb4(3,j)
+          sram4(3,j) = lb4(4,j)
+          sram4(4,j) = lb4(5,j) 
+          sram4(5,j) = lb4(6,j) 
+          sram4(6,j) = lb4(7,j) // <--- oldest data (lowest #s in this app)
+        }
+      }
+      last_dram4 store sram4
+
     }
 
     val got = getMatrix(last_dram)
@@ -72,11 +98,17 @@ import spatial.dsl._
     printMatrix(got3, "EnqAt LCA Got")
     printMatrix(gold3, "EnqAt LCA Gold")
 
+    val got4 = getMatrix(last_dram4)
+    val gold4 = (0::7,0::25){(i,j) => init4(9 + (1-i), j)}
+    printMatrix(got4, "EnqAt 7-row LCA Got")
+    printMatrix(gold4, "EnqAt 7-row LCA Gold")
+
     println(r"Pass: ${got == gold}")
     println(r"Parallel Pass: ${got2 == gold2}")
     println(r"EnqAt Pass: ${got3 == gold3}")
+    println(r"EnqAt 7-row Pass: ${got4 == gold4}")
 
-    assert(got == gold && got2 == gold2 && got3 == gold3)
+    assert(got == gold && got2 == gold2 && got3 == gold3 && got4 == gold4)
 
   }
 }

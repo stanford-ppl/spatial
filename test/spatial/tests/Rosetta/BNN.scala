@@ -72,6 +72,7 @@ import spatial.targets._
    	setMem(fc_weight_DRAM, fc_weights)
 
     //other values for pooling
+    //TODO: these are random values --> need to be replcaed with actual model values
     val mu    = 0.2
     val theta = 0.2
     val gamma = 0.4
@@ -80,15 +81,16 @@ import spatial.targets._
 
     val k = (gamma / ( sqrt(theta*theta + e) )).to[TS]
     val h = (beta - ( mu * gamma) / (sqrt(theta*theta + e) )).to[TS]
-
-    val BATCH_SIZE_USERDEF = args(0).to[Int]
+ 
+    val BATCH_SIZE_USERDEF = ArgIn[Int]; 
+    setArg(BATCH_SIZE_USERDEF, args(0).to[Int])
 
   	Accel {
 
       /* Load some weights first */
       // 3x3x3 filter represent by 32-bit vector 
       val fp_all_weights = SRAM[TB](128, 3, 3)
-      //fp_all_weights load fp_weight_DRAM(0::128, 0::3, 0::3)
+      fp_all_weights load fp_weight_DRAM(0::128, 0::3, 0::3 par 8)
 
       val fc_all_layer_values = SRAM[TB](2, 128, SIZE, SIZE)
 
@@ -110,7 +112,7 @@ import spatial.targets._
 
   			val max_nr = SIZE 
   			val max_nc = SIZE 
-  			val max_or = SIZE 
+  			val max_or = SIZE  
   			val max_oc = SIZE 
 
   			val max_out_channels = 128
@@ -150,6 +152,9 @@ import spatial.targets._
                                        mux(do_set_to_0, 0.to[T], fp_pix)
                                     }.flatten.flatten.reduceTree(_ + _)
 
+          //  val conv_3x3_result = List.tabulate(in_channels) { k =>
+          //    fp_rgb_image_lb(k)(0.to[I32], 0.to[I32])
+          //  }.reduceTree(_+_)
               //perform batch norm and binarization
               result(mux(c >= 1, c-1, 0)) = batch_norm(conv_3x3_result)
             }
@@ -276,47 +281,46 @@ import spatial.targets._
         //Bin-Fully-Connected-Layer 
         val tmp_SRAM_fc = SRAM[TB](2, fc_max_in_channels)
 
-        val output_dim = SIZE/8
-        val curr_L = 5
-        //512 = 128 * 4 
-        Foreach(128 by 1, 16 by 1) { (ch, r) =>
-            //row load conv_temp_DRAM(batch_img, curr_L.to[I32], j, i, 0::4 par 4) 
-            // This should be 0::(SIZE/32) but then won't be aligned
-            Foreach(output_dim by 1 par output_dim) { k =>
-              tmp_SRAM_fc(0, ch*16 + r*output_dim + k) = fc_all_layer_values(1.to[I32], ch, r, k)
-            }
-        }
-        
-       val fc_in_channels     = LUT[Int](3)( 8192, 1024, 1024 )
-       val fc_out_channels    = LUT[Int](3)( 1024, 1024, 10 )
+  //    val output_dim = SIZE/8
+  //    val curr_L = 5
+  //    //512 = 128 * 4 
+  //    Foreach(128 by 1, 16 by 1) { (ch, r) =>
+  //        //row load conv_temp_DRAM(batch_img, curr_L.to[I32], j, i, 0::4 par 4) 
+  //        // This should be 0::(SIZE/32) but then won't be aligned
+  //        Foreach(output_dim by 1 par output_dim) { k =>
+  //          tmp_SRAM_fc(0, ch*16 + r*output_dim + k) = fc_all_layer_values(1.to[I32], ch, r, k)
+  //        }
+  //    }
+  //    
+  //   val fc_in_channels     = LUT[Int](3)( 8192, 1024, 1024 )
+  //   val fc_out_channels    = LUT[Int](3)( 1024, 1024, 10 )
 
-       Foreach(0 until 3) { L =>          
-         val fc_in_channels_c = fc_in_channels(L)
-         // Note: Can block this loop if needed
-         Foreach(fc_out_channels(L) by 1 par par_fc_outer) { out_i =>
-           // Load 1 row of weight matrix
-           val weight_SRAM = SRAM[TB](fc_max_in_channels)
-           //weight_SRAM load fc_weight_DRAM(L, out_i, 0::fc_in_channels_c)
+  //   Foreach(0 until 3) { L =>          
+  //     val fc_in_channels_c = fc_in_channels(L)
+  //     // Note: Can block this loop if needed
+  //     Foreach(fc_out_channels(L) by 1 par par_fc_outer) { out_i =>
+  //       // Load 1 row of weight matrix
+  //       val weight_SRAM = SRAM[TB](fc_max_in_channels)
+  //       weight_SRAM load fc_weight_DRAM(L, out_i, 0::fc_in_channels_c par 8)
 
-           // XOR op in lieu of dot product
-           Pipe {
-             val prod = Reduce(Reg[T](0.to[T]))(fc_in_channels_c by 1 par par_fc_inner){ in_i =>
-                           val prod_tmp = !(tmp_SRAM_fc(L%2, in_i) ^ weight_SRAM(in_i))
-                           prod_tmp.to[T] //popcount here 
-                        }{_+_}
-             tmp_SRAM_fc(1-L%2, out_i) = batch_norm(prod.value).to[TB] 
-           }
-         }
+  //       // XOR + Popcount op in lieu of dot product
+  //       Pipe {
+  //         val prod = Reduce(Reg[T](0.to[T]))(fc_in_channels_c by 1 par par_fc_inner){ in_i =>
+  //                       val prod_tmp = !(tmp_SRAM_fc(L%2, in_i) ^ weight_SRAM(in_i))
+  //                       prod_tmp.to[T] //popcount here 
+  //                    }{_+_}
+  //         tmp_SRAM_fc(1-L%2, out_i) = batch_norm(prod.value).to[TB] 
+  //       }
+  //     }
+  //   } 
+       //out_DRAM(batch_img, 0::2, 0::fc_max_in_channels par par_store_1) store tmp_SRAM_fc
 
-       } 
-       out_DRAM(batch_img, 0::2, 0::fc_max_in_channels par par_store_1) store tmp_SRAM_fc
-
-  		}
+  		} 
 
   	}
 
-	val out_bnn = getTensor3(out_DRAM)
-	//printTensor3(out_bnn)
+	  val out_bnn = getTensor3(out_DRAM)
+	  //printTensor3(out_bnn)
 
 
   }

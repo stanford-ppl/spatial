@@ -398,3 +398,34 @@ import spatial.metadata.control._
   }
 
 }
+
+@spatial class Blur extends SpatialTest { 
+  // A tricky case for iteration diff analyzer
+  def main(args: Array[String]): Void = {
+    val M = 8
+    val N = 8
+
+    val iters = ArgIn[Int]
+    setArg(iters, 5)
+    val out = DRAM[Int](1,N)
+
+    Accel {
+      val sram = SRAM[Int](M,N).noduplicate.buffer
+      Foreach(iters.value by 1) { _ => 
+        Foreach(N by 1){j => sram(0,j) = j}
+        Foreach(1 until M by 1, N by 1 par N/8 /*2*/){(i,j) =>  // II = 1 for par = 1 and then increases for higher pars
+          sram(i,j) = mux(j == 0, 0, sram(i-1, j-1)) + sram(i-1, j) + mux(j == N-1, 0, sram(i-1, j+1))
+        }
+        out(0::1, 0::N) store sram(M-1 :: M, 0::N)
+      }
+    }
+
+    val numNeighbors = 2*(M-1) + 1
+    // Too lazy to derive the answer :(
+    val gold = Array[Int](1437,2993,4689,6358,7600,7848,6611,3813)
+    val result = getMatrix(out).flatten
+    printArray(result, "Got")
+    printArray(gold, "Gold")
+    assert(result == gold)
+  }
+}  

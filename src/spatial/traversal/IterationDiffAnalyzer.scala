@@ -9,6 +9,7 @@ import spatial.metadata.control._
 import spatial.metadata.access._
 import spatial.metadata.memory._
 import spatial.metadata.bounds.Expect
+import poly.SparseMatrix
 import utils.implicits.collections._
 
 case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
@@ -37,123 +38,144 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
           cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem && reader != writer) => 
 
             if (reader.affineMatrices.nonEmpty && writer.affineMatrices.nonEmpty) {
-              val read = reader.affineMatrices.head.matrix
-              val write = writer.affineMatrices.head.matrix
-              val diff = write - read
+              val huge = 99999
               if (iters.nonEmpty) {
-                val stride = iters.last.ctrStep match {case Expect(c) => Some(c.toInt); case _ => None}
-                val par = iters.last.ctrParOr1
-                if (stride.isDefined) {
-                  // iterDiff between iters
-                  val thisIterReads  = reader.affineMatrices.map(_.matrix)
-                  val thisIterWrites = writer.affineMatrices.map(_.matrix)
-                  val nextIterReads  = reader.affineMatrices.map(_.matrix.increment(iters.last,1))
-                  val diff = thisIterWrites.last - thisIterReads.head // How far is the last write from the first read?
-                  val advancePerInc = nextIterReads.head - thisIterReads.head // How far do we advance in one tick?
-
-                  // Figure out how many iterations pass between writing to an addr and then needing that addr due to iterator advancement
-                  val dynamicDiff = diff.collapse.zip(advancePerInc.collapse).map{case (a,b) => 
-                    if(a != 0 && b == 0) 0       // i.e. A(i,j) = A(i-1,j) + 1, relative to iterator i advances "0" per iter, reads from 1 ago each iter
-                    else if(a == 0 && b == 0) 1  // i.e. A(0) = A(0) + 1, iterators involved in access don't increment with cchain AND don't change from iter to iter
-                    else  a / b}
-                  .sorted.headOption
-
-                  // Also figure out how many iterations pass before an addr is used a second time (i.e. Foreach(0::L,0::M,0::N){(l,m,n) => A(l,n) = A(l,n) + 1} requires A(l,n) every N iters)
-                  dbgs(s"iterators $iters, keys ${thisIterWrites.head.keys}")
-                  val repeatDist: Option[Int] = if (!iters.forall(thisIterWrites.head.keys.contains)) {
-                    val missingIterator = iters.reverse.collectFirst{case iter if !thisIterWrites.head.keys.contains(iter) => iter}.get
-                    val otherIters = iters.reverse.takeWhile(_ != missingIterator)//.filter(_ != missingIterator)
-                    dbgs(s"$missingIterator is missing!  Iter Diff could be dependent on $otherIters")
-                    val starts: Seq[Option[Int]] = otherIters.map(_.ctrStart match {case Expect(c) => Some(c.toInt); case _ => None})
-                    val stops: Seq[Option[Int]] = otherIters.map(_.ctrEnd match {case Expect(c) => Some(c.toInt); case _ => None})
-                    val steps: Seq[Option[Int]] = otherIters.map(_.ctrStep match {case Expect(c) => Some(c.toInt); case _ => None})
-                    val pars: Seq[Int] = otherIters.map(_.ctrParOr1)
-                    if (starts.forall(_.isDefined) && stops.forall(_.isDefined) && steps.forall(_.isDefined)) {
-                      Some((starts,stops,steps).zipped.toList.zip(pars).map{case ((s,e,st),p) => (scala.math.ceil((e.get - s.get) / (st.get)) / p).toInt}.product)
-                    }
-                    else if (spatialConfig.enableLooseIterDiffs) {
-                      warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but --looseIterDiffs flag is set!  Assuming you won't reduce on ${mem.ctx} so rapidly that you run into data correctness issues!")
-                      None
-                    } else if (lhs.userII.isDefined) {
-                      warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but II for this controller is set so this is ok (II = ${lhs.userII.get}).")
-                      None
-                    } else {
-                      warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx})! You should:")
-                      val conservative = Some((starts,stops,steps).zipped.collect{case (s,e,st) if s.isDefined && e.isDefined && st.isDefined => (s,e,st)}.toList.zip(pars).map{case ((s,e,st),p) => (scala.math.ceil((e.get - s.get) / (st.get)) / p).toInt}.product)
-                      warn(s"    1) Set iterators $otherIters to static start/stop/step values")
-                      warn(s"    2) Be ok with compiler using the most conservative possible II for this loop (Iter Diff = $conservative)")
-                      warn(s"    3) Compile with --looseIterDiffs flag to ignore potential loop-carry dependency issues on ${mem.ctx}")
-                      warn(s"    4) Explicitly set II for this loop")
-                      conservative
-                    }
-                  } else None
-
-                  val minIterDiff = if (repeatDist.isDefined && dynamicDiff.isDefined && dynamicDiff.get != 0) Some(repeatDist.get min dynamicDiff.get)
-                                    else if (repeatDist.isDefined && dynamicDiff.isDefined) repeatDist
-                                    else if (dynamicDiff.isDefined) dynamicDiff
-                                    else if (repeatDist.isDefined) repeatDist
-                                    else None
-                  dbgs(s"Each iter needs result written ${minIterDiff} (or more) iters ago (i.e. Iter Diff = ${minIterDiff} (dynamic: $dynamicDiff min repeat: $repeatDist)")
-                  if (minIterDiff.isDefined) {
-                    reader.iterDiff = minIterDiff.get
-                    writer.iterDiff = minIterDiff.get
-                    mem.iterDiff = minIterDiff.get                  
-                    if (par > 1) { 
-                      // iterDiff within iter
-                      /* 
-                          TODO: This metadata probably needs to be worked on better.  Here
-                                are the motivating examples used to get to this point
-
-                
-                                    Foreach(N by 1 par 2){i => mem(i) = mem(i-1)}
-                              MEM     O   O   O   O 
-                             ACCESS   |___^|__^
-                
-                      LANE RETIMING       0   1 
-                                          |   
-                                          |
-                                              |
-                                              |     II  = lat
-                                                    lat = 2 * single lane's latency 
-                                                    segmentMapping = Map( 0 -> 0, 1 -> 1 )
-                
-                                    Foreach(N by 1 par 3){i => mem(i) = mem(i-2)}
-                                      O   O   O   O   O
-                                      |___|___^|  ^   ^
-                                          |____|__|   |
-                                               |______|
-                                                                          
-                       LANE RETIMING           0   1  2                                                 
-                                               |   |                                                 
-                                               |   |                                               
-                                                      |                                                
-                                                      |
-                                                        II  = lat
-                                                        lat = 2 * single lane's latency 
-                                                        segmentMapping = Map( 0 -> 0, 1 -> 0, 2 -> 1)
-                      */
-
-                      // Want to figure out if this read at an upper lane has any overlap with the write range of a previous lane
-
-                      val upperLaneStart = thisIterReads(1).collapse.max
-                      val overlapLimit = if (advancePerInc.collapse.max > 0) allWritePositions.max else allWritePositions.min
-                      // If the diff within a lane requires data from a previous lane, we must segment
-                      if ((advancePerInc.collapse.max > 0 && upperLaneStart <= overlapLimit) || (advancePerInc.collapse.max < 0 && upperLaneStart <= overlapLimit)) { 
-                        // Figure out how many times to rewind loop until the write bounds contain the upperLaneStart
-                        val dependsOnRelativeIter = (upperLaneStart - overlapLimit) / (advancePerInc.collapse.max/par) - 1
-                        val segMapping = List.tabulate(par){i =>
-                          val segment = 0 max {i + dependsOnRelativeIter + 1}
-                          (i -> segment)
-                        }.toMap
-                        dbgs(s"upperLaneStart = $upperLaneStart, advancePerInc = ${advancePerInc.collapse.max}, relativeIter = $dependsOnRelativeIter")
-                        dbgs(s"segmentMapping = ${segMapping}")
-                        reader.segmentMapping = segMapping
-                        writer.segmentMapping = segMapping
-                        mem.segmentMapping = segMapping
+                // Figure out the minimum "ticks until exhaustion" of each iterator relative to itself.  One "tick" is 
+                //   one cycle where the iterator increments.  Sorry about using MaxJ terminology here
+                val accumIters = iters.dropWhile(!writer.affineMatrices.head.matrix.keys.contains(_))
+                val selfRelativeData = iters.map{i => 
+                  val p = i.ctrParOr1
+                  (i.ctrStart, i.ctrEnd, i.ctrStep) match {
+                    case (Expect(start), Expect(end), Expect(step)) => 
+                      ((scala.math.ceil((end-start) / step) / p).toInt, step*p)
+                    case _ => 
+                      val step = i.ctrStep match {case Expect(st) => st; case _ => huge}
+                      if (spatialConfig.enableLooseIterDiffs && i != accumIters.head) {
+                        warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but --looseIterDiffs flag is set!  Assuming you won't reduce on ${mem.ctx} so rapidly that you run into data correctness issues!")
+                        (huge, step*p)
+                      } else if (lhs.userII.isDefined) {
+                        warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but II for this controller is set so this is ok (II = ${lhs.userII.get}).")
+                        (huge, step*p)
+                      } else if (i != accumIters.head) {
+                        warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx})! You should:")
+                        warn(s"    1) Set bounds for $i to static start/stop/step values")
+                        warn(s"    2) Be ok with compiler using the most conservative possible II for this loop")
+                        warn(s"    3) Compile with --looseIterDiffs flag to ignore potential loop-carry dependency issues on ${mem.ctx}")
+                        warn(s"    4) Explicitly set II for this loop")
+                        (1, step*p)
+                      } else {
+                        (1, step*p)
                       }
-                    }
                   }
                 }
+                val selfRelativeTicks: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => (i -> d._1)}.toMap
+                val strides: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => (i -> d._2)}.toMap
+
+                // Figure out number of ticks of innermost iterator that each iterator takes to increment. 
+                // TODO: What to do when iterators come from different levels of control hierarchy?
+                val ticks: Map[I32, Int] = List.tabulate(iters.size){i => (iters(i) -> selfRelativeTicks.values.drop(i+1).product)}.toMap
+
+                dbgs(s"Iter info:")
+                iters.map{it => dbgs(s"$it:");dbgs(s"  ${selfRelativeTicks(it)} personal ticks to exhaust");dbgs(s"  ${ticks(it)} global ticks to increment");dbgs(s"  ${strides(it)} stride")}
+
+                // Figure out distances between accesses 
+                // TODO: Assumes last write lane of current tick and first read lane of next tick are closest in "tick-space."  i.e. no x(5-j) = x(j)
+                val thisIterReads  = reader.affineMatrices.map(_.matrix)
+                val thisIterWrites = writer.affineMatrices.map(_.matrix)
+                // val nextIterReads  = reader.affineMatrices.map(_.matrix.increment(iters.last,1))
+
+                def isMoreInner(a: I32, b: I32): Boolean = iters.indexOf(a) > iters.indexOf(b)
+
+                def ticksToCoverDist(w: SparseMatrix[Idx], r: SparseMatrix[Idx]): Int = {
+                  val diff = w - r
+                  // Compute ticks required to cover this distance
+                  val itersContributingToDim = r.rows.map{a => a.cols.collect{case (k,v) if v != 0 => k}}
+                  val innermostIterNotContributing = iters.filter(!itersContributingToDim.flatten.contains(_)).sortBy(iters.indexOf(_)).reverse.headOption
+                  val ticksToCoverDist = diff.collapse.zip(itersContributingToDim).zipWithIndex.map{case ((dist, its),i) => 
+                    // Figure out which iterator closes gap the fastest. TODO: What if both are required to close it?
+                    if (its.nonEmpty) {
+                      val innermostDep = its.toList.sortBy(accumIters.indexOf(_)).last
+                      (dist * ticks(innermostDep.asInstanceOf[I32])) / strides(innermostDep.asInstanceOf[I32])
+                    } else 0
+                  }.sum
+                  val variantTicksPerInvariantTick = if (innermostIterNotContributing.isDefined) ticks(innermostIterNotContributing.get) else 0
+
+                  // Minimum ticks between repeat addresses are issues is the smaller nonzero value of ticks due to distance and due to invariance
+                  val ticksBeforeRepeatAddr = 
+                    if (ticksToCoverDist > 0 && variantTicksPerInvariantTick > 0) variantTicksPerInvariantTick min ticksToCoverDist
+                    else if (ticksToCoverDist == 0) variantTicksPerInvariantTick
+                    else ticksToCoverDist
+                  dbgs(s"Interference Info:")
+                  dbgs(s"$ticksBeforeRepeatAddr required before a repeat address is seen ($ticksToCoverDist ticks to cover gap, $variantTicksPerInvariantTick before invariant iter ($innermostIterNotContributing) increments")
+                  dbgs(s"write: ${w}")
+                  dbgs(s"read: ${r}")
+                  dbgs(s"diff: ${diff}")
+                  ticksBeforeRepeatAddr
+                }
+
+                // Figure out worst-case-scenario number of ticks (i.e. smallest positive value) for the very first reader to catch up to a writer
+                //   If all values are 0, then take 0
+                val minTicksPairings = thisIterWrites.map{w => ticksToCoverDist(w, thisIterReads.head)}.toList
+                val minTicksToOverlap = if (minTicksPairings.forall(_ == 0)) 0 else minTicksPairings.filter(_ != 0).sorted.head
+                dbgs(s"minTickslist is ${minTicksPairings}")
+                dbgs(s"This accumulation needs result written ${minTicksToOverlap} (or more) ticks prior")
+
+                reader.iterDiff = if (reader.getIterDiff.isDefined && reader.iterDiff != 0) {reader.iterDiff min minTicksToOverlap} else minTicksToOverlap
+                writer.iterDiff = if (writer.getIterDiff.isDefined && writer.iterDiff != 0) {writer.iterDiff min minTicksToOverlap} else minTicksToOverlap
+                mem.iterDiff = if (mem.getIterDiff.isDefined && mem.iterDiff != 0) {mem.iterDiff min minTicksToOverlap} else minTicksToOverlap
+
+                // Check for segmentation due to inter-lane conflicts
+                if (thisIterReads.size > 1) {
+                  // iterDiff within iter
+                  /* 
+                            Here are the motivating examples used to get to this point
+
+                                              Foreach(N by 1 par 2){i => mem(i) = mem(i-1)}
+                          MEM     O   O   O   O 
+                         ACCESS   |___^|__^
+                                LANE RETIMING       0   1 
+                                      |   
+                                      |
+                                          |
+                                          |     II  = lat
+                                                lat = 2 * single lane's latency 
+                                                segmentMapping = Map( 0 -> 0, 1 -> 1 )
+                                              Foreach(N by 1 par 3){i => mem(i) = mem(i-2)}
+
+                                  O   O   O   O   O
+                                  |___|___^|  ^   ^
+                                      |____|__|   |
+                                           |______|
+                                                                      
+                   LANE RETIMING           0   1  2                                                 
+                                           |   |                                                 
+                                           |   |                                               
+                                                  |                                                
+                                                  |
+                                                    II  = lat
+                                                    lat = 2 * single lane's latency 
+                                                    segmentMapping = Map( 0 -> 0, 1 -> 0, 2 -> 1)
+                  */
+
+                  // For each reader, figure out first writer who requires the same address and push to next available segment
+                  
+                  val segments = scala.collection.mutable.HashMap[Int, Int]((0 -> 0))
+                  val existingSegments = reader.segmentMapping
+                  thisIterReads.drop(1).zipWithIndex.foreach{case (r,i) => 
+                    val laneDep = thisIterWrites.take(i+1).zipWithIndex.collectFirst{case (w, j) if ((w-r).collapse.forall(_ == 0)) => j}.getOrElse(-1)
+                    val segmentDep = segments.getOrElse(laneDep,-1) + 1
+                    val existingDep = existingSegments.getOrElse(i+1, 0)
+                    segments += ({i + 1} -> {existingDep max segmentDep})
+                  }
+                  dbgs(s"Establishing segmentation")
+                  segments.foreach{case (lane, segment) => 
+                    dbgs(s"Lane $lane is part of segment $segment")
+                  }
+                  reader.segmentMapping = segments.toMap
+                  writer.segmentMapping = segments.toMap
+                  mem.segmentMapping = segments.toMap
+                }
+                
               }
             }
           }

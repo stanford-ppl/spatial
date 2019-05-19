@@ -56,7 +56,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                       } else if (lhs.userII.isDefined) {
                         warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx}), but II for this controller is set so this is ok (II = ${lhs.userII.get}).")
                         (huge, step*p)
-                      } else if (i != accumIters.head) {
+                      } else if (accumIters.size > 0 && i != accumIters.head) {
                         warn(s"Cannot determine lower bound for iteration difference on controller $lhs (${lhs.ctx})! You should:")
                         warn(s"    1) Set bounds for $i to static start/stop/step values")
                         warn(s"    2) Be ok with compiler using the most conservative possible II for this loop")
@@ -95,7 +95,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                     // Figure out which iterator closes gap the fastest. TODO: What if both are required to close it?
                     if (its.nonEmpty) {
                       val innermostDep = its.toList.sortBy(accumIters.indexOf(_)).last
-                      (dist * ticks(innermostDep.asInstanceOf[I32])) / strides(innermostDep.asInstanceOf[I32])
+                      (dist * ticks.getOrElse(innermostDep.asInstanceOf[I32], 1)) / strides.getOrElse(innermostDep.asInstanceOf[I32], 1)
                     } else 0
                   }.sum
                   val variantTicksPerInvariantTick = if (innermostIterNotContributing.isDefined) ticks(innermostIterNotContributing.get) else 0

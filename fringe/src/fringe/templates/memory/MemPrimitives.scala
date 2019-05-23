@@ -57,7 +57,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   // Get info on physical dims
   // TODO: Upcast dims to evenly bank
   val numMems = p.banks.product
-  val bankDim = math.ceil(p.depth.toDouble / numMems.toDouble).toInt
+  val bankDim = p.banks.zip(p.logicalDims).map{case (b, d) => math.ceil(d.toDouble / b.toDouble).toInt}.product
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until numMems).map{ i =>

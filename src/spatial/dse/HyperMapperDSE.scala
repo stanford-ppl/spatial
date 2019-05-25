@@ -14,12 +14,16 @@ import spatial.metadata.types._
 import spatial.traversal._
 import poly.ISL
 import models.AreaEstimator
+import spatial.SpatialConfig
 import spatial.util.spatialConfig
 
-trait HyperMapperDSE { this: DSEAnalyzer =>
+trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
 
-  def hyperMapperDSE(space: Seq[Domain[_]], program: Block[_], file: String = config.name + "_data.csv"): Unit = {
+  def hyperMapperDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_], file: String = config.name + "_data.csv"): Unit = {
+
+    val names = params.map{p => p.name.getOrElse(p.toString) }
     val N = space.size
+    val P = space.map{d => BigInt(d.len) }.product
     val T = spatialConfig.threads
     val dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
     val filename = dir + file
@@ -29,9 +33,18 @@ trait HyperMapperDSE { this: DSEAnalyzer =>
     dbgs("Space Statistics: ")
     dbgs("-------------------------")
     dbgs(s"  # of parameters: $N")
+    dbgs(s"  # of points:     $P")
     dbgs("")
     dbgs(s"Using $T threads")
     dbgs(s"Writing results to file $filename")
+
+    println("Space Statistics: ")
+    println("-------------------------")
+    println(s"  # of parameters: $N")
+    println(s"  # of points:     $P")
+    println("")
+    println(s"Using $T threads")
+    println(s"Writing results to file $filename")
 
     val workQueue = new LinkedBlockingQueue[Seq[Any]](5000)  // Max capacity specified here
     val fileQueue = new LinkedBlockingQueue[String](5000)
@@ -89,8 +102,8 @@ trait HyperMapperDSE { this: DSEAnalyzer =>
     val start = System.currentTimeMillis()
     val workers = workerIds.map{id =>
       val threadState = new State(state.app)
-      implicit val isl = this.isl
-      this.IR.copyTo(threadState)
+      threadState.config = new SpatialConfig
+      state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
       HyperMapperThread(
         threadId  = id,
         start     = start,

@@ -77,7 +77,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
       case DSEMode.Heuristic => heuristicDSE(params, space, Restrictions.all, block, false)
       case DSEMode.Bruteforce => bruteForceDSE(params, space, block) 
       case DSEMode.Experiment => heuristicDSE(params, space, Restrictions.all, block, true)
-      case DSEMode.HyperMapper => hyperMapperDSE(space, block)
+      case DSEMode.HyperMapper => hyperMapperDSE(params, space, block)
     }
   
     dbg("Freezing parameters")

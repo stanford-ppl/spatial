@@ -370,8 +370,7 @@ object modeling {
       val reg = regWrite.writtenMem.get
       val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
       val writePosition = parentScope.indexOf(regWrite)
-      val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && x.readMem.isDefined && x.readMem.get == reg) => x}
-      dbgs(s"raw cycle on $regWrite, $reg?, readers ${readsAfter}")
+      val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && paths(x).toInt == paths(regWrite).toInt && x.readMem.isDefined && x.readMem.get == reg) => x}
       readsAfter.foreach{r => 
         warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
         val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)

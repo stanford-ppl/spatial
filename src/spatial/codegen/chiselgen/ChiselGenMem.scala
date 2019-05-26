@@ -172,24 +172,28 @@ trait ChiselGenMem extends ChiselGenCommon {
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
     val strides = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
+    val pdims = paddedDims(mem,name)
+    val N = inst.nBanks
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     createMemObject(mem) {
       mem.writers.zipWithIndex.foreach{ case (w, i) => 
-        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product+mem.darkVolume)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
-                         else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
-        val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-                          else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+        val ofsWidth = if (!mem.isLineBuffer && N.size == pdims.size) Math.max(1, Math.ceil(scala.math.log(pdims.zip(N).map{case (d,b) => scala.math.ceil(d.toDouble / b.toDouble).toInt}.product + mem.darkVolume/N.product)/scala.math.log(2)).toInt)
+                       else if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((pdims.product+mem.darkVolume)/N.product)/scala.math.log(2)).toInt)
+                       else Math.max(1, Math.ceil(scala.math.log(scala.math.ceil(pdims.last.toDouble/N.last.toDouble).toInt)/scala.math.log(2)).toInt)
+        val banksWidths = if (mem.isRegFile || mem.isLUT) pdims.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+                          else N.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
         val resids = w.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
         emit(src"val w$i = Access(${w.hashCode}, ${w.port.muxPort}, ${w.port.muxOfs}, ${w.port.castgroup.mkString("List(",",",")")}, ${w.port.broadcast.mkString("List(",",",")")}, ${w.shiftAxis}, PortInfo(${w.port.bufferPort}, ${1 max w.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
       }
       if (mem.writers.isEmpty) {emit(src"val w0 = AccessHelper.singular(32)")}
       mem.readers.zipWithIndex.foreach{ case (r, i) => 
-        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product+mem.darkVolume)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
-                         else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
-        val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-                          else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+        val ofsWidth = if (!mem.isLineBuffer && N.size == pdims.size) Math.max(1, Math.ceil(scala.math.log(pdims.zip(N).map{case (d,b) => scala.math.ceil(d.toDouble / b.toDouble).toInt}.product + mem.darkVolume/N.product)/scala.math.log(2)).toInt)
+                       else if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((pdims.product+mem.darkVolume)/N.product)/scala.math.log(2)).toInt)
+                       else Math.max(1, Math.ceil(scala.math.log(scala.math.ceil(pdims.last.toDouble/N.last.toDouble).toInt)/scala.math.log(2)).toInt)
+        val banksWidths = if (mem.isRegFile || mem.isLUT) pdims.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
+                          else N.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
 
         val resids = r.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
         if (!r.port.bufferPort.isDefined && mem.isNBuffered && !mem.isLineBuffer) throw new Exception(src"Unsure how to handle broadcasted read @ ${r.ctx.content.getOrElse("<?:?:?>")} ($mem port $r)")

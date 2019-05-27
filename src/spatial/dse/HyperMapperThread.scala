@@ -48,6 +48,10 @@ case class HyperMapperThread(
   // --- Space Stuff
   private val target = spatialConfig.target
   private val capacity: Area = target.capacity
+  private val indexedSpace = space.zipWithIndex
+  private val N = space.length
+  private val dims = space.map{d => BigInt(d.len) }
+  private val prods = List.tabulate(N){i => dims.slice(i+1,N).product }
   val areaHeading: Seq[String] = capacity.nonZeroFields
 
   private lazy val scalarAnalyzer = new ScalarAnalyzer(state)
@@ -61,15 +65,15 @@ case class HyperMapperThread(
     cycleAnalyzer.init()
     scalarAnalyzer.init()
     memoryAnalyzer.init()
-    contentionAnalyzer.init()
+    // contentionAnalyzer.init()
 
     config.setV(-1)
     scalarAnalyzer.silence()
     memoryAnalyzer.silence()
-    contentionAnalyzer.silence()
+    // contentionAnalyzer.silence()
     areaAnalyzer.silence()
     cycleAnalyzer.silence()
-    areaAnalyzer.run(program)
+    // areaAnalyzer.run(program)//(mtyp(program.tp)) // Can't run analyzer if we haven't banked yet...
   }
 
   def run(): Unit = {
@@ -98,11 +102,14 @@ case class HyperMapperThread(
     hasTerminated = true
   }
 
-  def run(request: Seq[Any]): String = {
+  def run(requests: Seq[Any]): String = {
     state.resetErrors()
-    request.indices.foreach{i => space(i).setValueUnsafe(request(i)) }
+    requests.indices.foreach{i => space(i).setValueUnsafe(requests(i)) }
 
-    val runtime = 0L // TODO: cycleAnalyzer.totalCycles
+    // val paramRewrites = requests.map{pt => indexedSpace.flatMap{case (domain,d) => Seq(domain.name, domain.options( ((pt / prods(d)) % dims(d)).toInt ))}}
+    println(s"requests are $requests")
+
+    val runtime = 0L//evaluateLatency(paramRewrites)
     val area = evaluate()
     val valid = area <= capacity && !state.hadErrors // Encountering errors makes this an invalid design point
     val time  = System.currentTimeMillis()
@@ -110,6 +117,12 @@ case class HyperMapperThread(
 
     // Only report the area resources that the target gives maximum capacities for
     space.map(_.value).mkString(",") + "," + area.seq(areaHeading:_*).mkString(",") + "," + runtime + "," + valid + "," + timestamp
+  }
+
+  private def evaluateLatency(paramRewrites: Seq[Seq[Any]]): Seq[Long] = {
+    cycleAnalyzer.test(paramRewrites)//rerun(accel, program)
+    if (PROFILING) endCycles()
+    cycleAnalyzer.totalCycles
   }
 
   private def evaluate(): Area = {

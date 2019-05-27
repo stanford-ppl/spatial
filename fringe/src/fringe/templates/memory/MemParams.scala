@@ -27,10 +27,7 @@ case class MemParams(
   def widestW: Int = WMapping.map(_.par).sorted.reverse.headOption.getOrElse(0)
   def totalOutputs: Int = RMapping.map(_.par).sum
   def numBanks: Int = banks.product
-  def bankDepth: Int = 
-    if (banks.size == logicalDims.size) banks.zip(logicalDims).map{case (b, d) => math.ceil(d.toDouble / b.toDouble).toInt}.product + scala.math.ceil(darkVolume.toDouble / banks.product.toDouble).toInt
-    else math.ceil(depth.toDouble / banks.product.toDouble).toInt
-  def ofsWidth: Int = log2Up(bankDepth)
+  def ofsWidth: Int = log2Up(depth/banks.product)
   def banksWidths: List[Int] = banks.map(log2Up)
   def elsWidth: Int = log2Up(depth) + 2
   def axes: Seq[Int] = WMapping.collect{case w if (w.shiftAxis.isDefined) => w.shiftAxis.get}
@@ -50,7 +47,7 @@ case class NBufParams(
 ) {
   def depth = p.logicalDims.product + {if (mem == LineBufferType) (numBufs-1)*p.strides(0)*p.logicalDims(1) else 0} + p.darkVolume// Size of memory
   def totalOutputs = p.totalOutputs
-  def ofsWidth = log2Up(p.bankDepth)
+  def ofsWidth = log2Up(p.depth/p.banks.product)
   def banksWidths = p.banks.map(log2Up(_))
   def portsWithWriter: List[Int] = p.WMapping.collect{case x if x.port.bufPort.isDefined => x.port.bufPort.get}.distinct
 }

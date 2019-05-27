@@ -60,12 +60,12 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
     println("Creating PCS file")
     withLog(workDir, pcsFile){
       space.foreach{domain =>
-        msg(s"""${domain.name} ${domain.tp} {${domain.options.mkString(", ")}}""", 100)
+        log(s"""${domain.name} ${domain.tp} {${domain.options.mkString(", ")}}""", 100)
       }
     }
     println("Creating Hypermapper config JSON file")
     withLog(workDir, jsonFile){
-      msg(s"""{
+      log(s"""{
              |  "application_name": "${config.name}",
              |  "pcs_file": "$workDir/$pcsFile",
              |  "max_number_of_predictions": 1000000,

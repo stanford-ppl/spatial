@@ -366,6 +366,24 @@ object modeling {
 
     }
 
+    def protectRAWCycle(regWrite: Sym[_]): Unit = {
+      val reg = regWrite.writtenMem.get
+      val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
+      val writePosition = parentScope.indexOf(regWrite)
+      val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && paths.contains(x) && paths.contains(regWrite) && paths(x).toInt <= paths(regWrite).toInt && x.readMem.isDefined && x.readMem.get == reg) => x}
+      readsAfter.foreach{r => 
+        val dist = paths(regWrite).toInt - paths(r).toInt
+        warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
+        val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)
+        affectedNodes.foreach{
+          case x if (paths.contains(x)) => 
+            dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle")
+            paths(x) = paths(x) + dist
+          case _ => 
+        }
+      }
+    }
+
     debugs(s"----------------------------------")
     debugs(s"Computing pipeLatencies for scope:")
     schedule.foreach{ e => debugs(s"  ${stm(e)}") }
@@ -412,7 +430,12 @@ object modeling {
       }
     }
 
-    scope.foreach{case x if x.isWriter && x.writtenMem.isDefined && x.writtenMem.get.isBreaker => pushBreakNodes(x); case _ => }
+    scope.foreach{
+      case x if x.isWriter && x.writtenMem.isDefined => 
+        if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
+        if (x.writtenMem.get.isReg) protectRAWCycle(x)
+      case _ => 
+    }
 
     pushSegmentationAccesses()
 

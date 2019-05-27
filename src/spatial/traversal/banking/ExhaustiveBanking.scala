@@ -353,7 +353,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             .collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible.distinct) => p}
       val PandCostandBloat = options.map{option => 
         // Extra elements per dimension so that yards cover entire memory
-        val padding = stagedDims.zip(option).zipWithIndex.map{case ((d,p),i) if i > 0 => (p - d%p) % p; case _ => 0}
+        val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
         // Number of inaccessible address (caused by B > 1).  TODO: Does it matter which dimension we add these to?
         val degenerate = hist.map(_._2).max

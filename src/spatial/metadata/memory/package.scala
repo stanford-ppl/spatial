@@ -78,6 +78,9 @@ package object memory {
     def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
     def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
 
+    def shouldNotMerge: Boolean = metadata[ShouldNotMerge](s).exists(_.flag)
+    def shouldNotMerge_=(flag: Boolean): Unit = metadata.add(s, ShouldNotMerge(flag))
+
     def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
     def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
 

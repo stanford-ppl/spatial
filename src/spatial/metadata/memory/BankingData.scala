@@ -414,6 +414,15 @@ case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
   */
 case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
 
+/** Flag set by the user to instance merging.  Experimntal metadata for situations
+  * where compiler wrongly decides that it is safe to merge even when it is not
+  *
+  * Getter:  sym.shouldNotMerge
+  * Setter:  sym.shouldNotMerge = (true | false)
+  * Default: false
+  */
+case class ShouldNotMerge(flag: Boolean) extends Data[ShouldNotMerge](SetBy.User)
+
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
   *

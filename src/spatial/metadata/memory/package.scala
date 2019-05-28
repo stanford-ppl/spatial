@@ -208,6 +208,22 @@ package object memory {
       case _ => throw new Exception(s"Could not get static size of $mem")
     }
 
+    def hotSwapPairings: Map[Sym[_], Set[Sym[_]]] = {
+      metadata[HotSwapPairings](mem).map(_.pairings).getOrElse(Map.empty)
+    }
+    def substHotSwap(src: Sym[_], dst: Sym[_]): Unit = {
+      if (hotSwapPairings.map(_._1).toList.contains(src)) {
+        hotSwapPairings = hotSwapPairings.filter(_._1 != src) ++ Map((dst -> hotSwapPairings(src)))
+      } else if (hotSwapPairings.map(_._2).flatten.toList.contains(src)) {
+        val editKey = hotSwapPairings.collectFirst{case x if x._2.contains(src) => x._1}.get
+        val editValue = hotSwapPairings.collectFirst{case x if x._2.contains(src) => x._2}.get
+        hotSwapPairings = hotSwapPairings.filter(_._1 != editKey) ++ Map((editKey -> {editValue.filter(_ != src) ++ Set(dst)}))
+      }
+    }
+    def hotSwapPairings_=(pairings: Map[Sym[_], Set[Sym[_]]]): Unit = {
+      metadata.add(mem, HotSwapPairings(pairings)) 
+    }
+
     /** Returns constant values of the dimensions of the given memory. */
     @stateful def constDims: Seq[Int] = {
       if (stagedDims.forall{case Expect(c) => true; case _ => false}) {

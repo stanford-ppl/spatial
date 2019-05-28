@@ -215,9 +215,11 @@ package object memory {
       if (hotSwapPairings.map(_._1).toList.contains(src)) {
         hotSwapPairings = hotSwapPairings.filter(_._1 != src) ++ Map((dst -> hotSwapPairings(src)))
       } else if (hotSwapPairings.map(_._2).flatten.toList.contains(src)) {
-        val editKey = hotSwapPairings.collectFirst{case x if x._2.contains(src) => x._1}.get
-        val editValue = hotSwapPairings.collectFirst{case x if x._2.contains(src) => x._2}.get
-        hotSwapPairings = hotSwapPairings.filter(_._1 != editKey) ++ Map((editKey -> {editValue.filter(_ != src) ++ Set(dst)}))
+        val newMap = hotSwapPairings.map{case (k,v) => 
+          if (v.contains(src)) (k -> (v.filter(_ != src) ++ Set(dst)))
+          else (k -> v)
+        }
+        hotSwapPairings = newMap
       }
     }
     def hotSwapPairings_=(pairings: Map[Sym[_], Set[Sym[_]]]): Unit = {

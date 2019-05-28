@@ -97,8 +97,6 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def blockcyclic_Bs(bs:Seq[Int]): C[A] = { this.blockCyclicBs = bs; me }
   /** Specify banking search effort for this memory */
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
-  /** Indicate that this memory should not try to merge instances when banking for different groups */
-  def nomerge: C[A] = { this.shouldNotMerge = true; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

@@ -638,7 +638,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   1. The two instances have a common LCA controller (means they require separate banking)
     *   2. The two instances result in hierarchical buffers (for now)
     *   3. Either instance is an accumulator and there is at least one pipelined ancestor controller.
-    *   4. The reads on either instance may happen simultaneously and result in bank conflicts
     */
   protected def getMergeAttemptError(a: Instance, b: Instance): Option[String] = {
     lazy val reads = a.reads.flatten ++ b.reads.flatten
@@ -656,8 +655,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       Some("Ambiguous metapipes")
     else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce && !mem.shouldCoalesce)
       Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
-    else if (mem.shouldNotMerge)
-      Some(s"Memory flagged as one that should not merge")
     else
       None
   }

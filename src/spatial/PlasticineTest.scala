@@ -80,7 +80,8 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def parsepir(line:String) = {
-      if (line.contains("error")) Fail
+      if (line.contains("failed dot")) Unknown
+      else if (line.contains("error")) Fail
       else if (line.contains("fail")) Fail
       else if (line.contains("Compilation succeed in")) Pass
       else Unknown

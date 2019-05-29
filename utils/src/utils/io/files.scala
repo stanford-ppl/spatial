@@ -48,6 +48,18 @@ object files {
     }.toList
   }
 
+  /** 
+    * Write a 2-D Seq to CSV
+    */
+  def writeCSVNow2D[A](seq:Seq[Seq[Any]], filename: String, delim1: String=",", delim2:String="\n"): Unit = {
+    import java.io._
+    val pw = new PrintWriter(new File(filename))
+    seq.foreach { seq =>
+      pw.write(s"${seq.mkString(delim1)}$delim2")
+    }
+    pw.close
+  }
+
   /**
     * Delete a directory
     */

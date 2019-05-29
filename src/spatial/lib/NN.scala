@@ -13,9 +13,12 @@ object NN {
    *  +-----+       |          |        +----------+
    *                +----------+
    * tiled on-chip neural net layer
+   * @param ip inner reduce par. If the I dimension == ip, the reduction dimension will not be
+   * tiled.
+   * @param inPar number of parallel tiles of the inner reduce
    * i: Reduction dimension is tiled by ip
-   * @param in: Can either be a input SRAM1 or a lambda which takes a index and return a T
-   * @param out: Can either be a input SRAM1 or a lambda which takes a index and a data T and writes
+   * @param in Can either be a input SRAM1 or a lambda which takes a index and return a T
+   * @param out Can either be a input SRAM1 or a lambda which takes a index and a data T and writes
    * to an externally allocated SRAM
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
@@ -35,8 +38,7 @@ object NN {
     val O = dims(1)
 
     def InnerNN(o:Int) = {
-      val dot = Reg[T]
-      Reduce(dot)(I par inPar by ip) { io =>
+      def InnerDot(io:Int) = {
         val dotInner = Reg[T]
         Reduce(dotInner)(ip par ip) { ii =>
           val i = io + ii
@@ -47,8 +49,17 @@ object NN {
           input * w(i, o)
         } { _ + _ }
         dotInner.value
-      } { _ + _ }
-      val d = activation(dot.value + b(o))
+      }
+      val innerDot = I match {
+        case `ip` => InnerDot(0)
+        case _ => 
+          val dot = Reg[T]
+          Reduce(dot)(I par inPar by ip) { io =>
+            InnerDot(io)
+          } { _ + _ }
+          dot.value
+      }
+      val d = activation(innerDot + b(o))
       out match {
         case Left(write) => write(o,d)
         case Right(out) => out(o) = d

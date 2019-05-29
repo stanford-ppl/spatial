@@ -4,6 +4,8 @@ import java.io.PrintStream
 import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
 
 import argon._
+
+import utils.process.BackgroundProcess
 import spatial.metadata.control._
 import spatial.metadata.params._
 import spatial.metadata.memory._
@@ -18,6 +20,7 @@ import spatial.SpatialConfig
 import spatial.util.spatialConfig
 
 trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
+  final val PROFILING = true
 
   def hyperMapperDSE(params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_], file: String = config.name + "_data.csv"): Unit = {
 
@@ -46,32 +49,31 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
     println(s"Using $T threads")
     println(s"Writing results to file $filename")
 
-    val workQueue = new LinkedBlockingQueue[Seq[Any]](5000)  // Max capacity specified here
-    val fileQueue = new LinkedBlockingQueue[String](5000)
+    val workQueue    = new LinkedBlockingQueue[Seq[DesignPoint]](5000)  // Max capacity specified here
+    val resultQueue  = new LinkedBlockingQueue[Array[String]](5000)
+    val requestQueue = new LinkedBlockingQueue[DSERequest](5000)
+    val doneQueue    = new LinkedBlockingQueue[Boolean](100) // TODO: Could be better
 
     val workerIds = (0 until T).toList
+    val commPool = Executors.newFixedThreadPool(2)
 
     val pool = Executors.newFixedThreadPool(T)
 
-    val pcsFile = config.name + ".pcs"
     val jsonFile = config.name + ".json"
     val workDir = config.cwd + "/dse_hm"
 
-    println("Creating PCS file")
-    withLog(workDir, pcsFile){
-      space.foreach{domain =>
-        log(s"""${domain.name} ${domain.tp} {${domain.options.mkString(", ")}}""", 100)
-      }
-    }
     println("Creating Hypermapper config JSON file")
     withLog(workDir, jsonFile){
-      log(s"""{
-             |  "application_name": "${config.name}",
-             |  "pcs_file": "$workDir/$pcsFile",
+      msg(s"{")
+      msg(s"""  "application_name": "${config.name}",
+             |  "models": {
+             |    "model": "random_forest",
+             |    "number_of_trees": 20
+             |  },
              |  "max_number_of_predictions": 1000000,
              |  "max_number_AL_iterations": 5,
-             |  "number_of_repetitions": 1,
              |  "number_of_cpus": 6,
+             |  "number_of_repetitions": 1,
              |  "hypermapper_mode": {
              |    "mode": "interactive"
              |  },
@@ -79,141 +81,131 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |  "feasible_output": {
              |    "name": "Valid",
              |    "true_value": "true",
-             |    "false_value": "false"
+             |    "false_value": "false",
+             |    "enable_feasible_predictor": true
              |  },
              |  "timestamp": "Timestamp",
              |  "max_runs_in_one_AL_iteration": 100,
              |  "run_directory": "$dir",
              |  "output_data_file": "${config.name}_output_dse_samples.csv",
              |  "output_pareto_file": "${config.name}_output_pareto.csv",
-             |  "number_of_startup_random_sampling": 1000,
+             |  "bootstrap_sampling": {
+             |    "bootstrap_type": "random sampling",
+             |    "number_of_samples": 10000
+             |  },
              |  "output_image": {
              |    "output_image_pdf_file": "${config.name}_output_pareto.pdf",
              |    "optimization_objectives_labels_image_pdf": ["Logic Utilization (%)", "Cycles (log)"],
              |    "image_xlog": false,
-             |    "image_ylog": true,
+             |    "image_ylog": false,
              |    "objective_1_max": 262400
-             |  }
-             |}""".stripMargin)
+             |  },
+             |  "input_parameters": {""".stripMargin)
+      space.zipWithIndex.foreach{case (domain, i) =>
+        msg(s"""    "${domain.name}": {
+             |      "parameter_type" : "${domain.tp}",
+             |      "values" : [${domain.optionsString}],
+             |      "parameter_default" : ${domain.valueString},
+             |      "prior" : ${domain.prior}
+             |    }${if (i == space.length-1) "" else ","}""".stripMargin)
+      }
+      msg("  }")
+      msg("}")
     }
 
     case class SpatialError(t: Throwable) extends Throwable
 
     val start = System.currentTimeMillis()
+
     val workers = workerIds.map{id =>
       val threadState = new State(state.app)
       threadState.config = new SpatialConfig
       state.config.asInstanceOf[SpatialConfig].copyTo(threadState.config) // Extra params
-      HyperMapperThread(
+      DSEThread(
         threadId  = id,
-        start     = start,
+        params    = params,
         space     = space,
         accel     = TopCtrl.get,
         program   = program,
         localMems = LocalMemories.all.toSeq,
         workQueue = workQueue,
-        outQueue  = fileQueue
-      )(threadState, isl, areamodel)
+        outQueue  = resultQueue,
+        PROFILING = PROFILING
+      )(threadState, this.isl, this.areamodel)
     }
+
     val HEADER = space.map(_.name).mkString(",") + "," + workers.head.areaHeading.mkString(",") + ",Cycles,Valid,Timestamp"
 
-    val HYPERMAPPER: String = sys.env.getOrElse("HYPERMAPPER_HOME", {error(ctx, "Please set the HYPERMAPPER_HOME environment variable."); sys.exit() })
-    Console.println(s"python ${HYPERMAPPER}/scripts/hypermapper.py $workDir/$jsonFile")
-    val hm = Subproc("python", HYPERMAPPER + "/scripts/hypermapper.py", workDir + "/" + jsonFile) { (cmd,reader) =>
-      if ((cmd ne null) && !cmd.startsWith("Pareto")) { // TODO
-        try {
-          println(s"[Master] Received Line: $cmd")
-          val parts = cmd.split(" ").map(_.trim)
-          val command = parts.head
+    val hm = BackgroundProcess(workDir, List("python", spatialConfig.HYPERMAPPER + "/scripts/hypermapper.py", workDir + "/" + jsonFile))
+    println("Starting up HyperMapper...")
+    println(s"python ${spatialConfig.HYPERMAPPER}/scripts/hypermapper.py $workDir/$jsonFile")
+    val (hmOutput, hmInput) = hm.run()
 
-          command match {
-            case "Request" =>
-              val nPoints = parts.last.toInt
-              val head    = reader.readLine()
-              val header  = head.split(",").map(_.trim)
-              val order   = space.map{d => header.indexOf(d.name) }
-              if (order.exists(_ < 0)) {
-                bug(s"[Master] Received Line: $head")
-                order.zipWithIndex.filter{case (idx, i) => idx < 0 }.foreach{case (idx, i) =>
-                  bug(s"Header was missing: ${space(i).name}")
-                }
-                throw SpatialError(new Exception(s"Missing header names"))
-              }
-              val points  = (0 until nPoints).map{i =>
-                print(s"[Master] Receiving Point $i: ")
-                val pt = reader.readLine()
-                println(pt)
-                pt
-              }
+    val receiver = HyperMapperReceiver(
+      input      = hmOutput,
+      workOut    = workQueue,
+      requestOut = requestQueue,
+      doneOut    = doneQueue,
+      space      = space,
+      HEADER     = HEADER,
+      THREADS    = T,
+      DIR        = workDir
+    )
+    val sender = HyperMapperSender(
+      output    = hmInput,
+      requestIn = requestQueue,
+      resultIn  = resultQueue,
+      doneOut   = doneQueue,
+      HEADER    = HEADER
+    )
 
-              try {
-                println(s"[Master] Received Line: $head")
-                points.foreach { point =>
-                  println(s"[Master] Received Line: $point")
-                  val values = point.split(",").map(_.trim.toLowerCase).map {
-                    case "true" => true
-                    case "false" => false
-                    case x => x.toInt
-                  }
-                  workQueue.put(order.map { i => values(i) })
-                }
-                val result = HEADER + "\n" + points.indices.map { _ => fileQueue.take() }.mkString("\n")
-                println("[Master] Sending back:")
-                println(result)
-                Some(result)
-              }
-              catch {case t: Throwable =>
-                bug(s"$cmd")
-                bug(s"$head")
-                points.foreach{point => bug(s"$point") }
-                bug(s"${t.getMessage}")
-                throw SpatialError(t)
-                None
-              }
+    println("Starting up workers...")
+    val startTime = System.currentTimeMillis()
+    workers.foreach{worker => pool.submit(worker) }
+    workers.foreach{worker => worker.START = startTime }
+    commPool.submit(receiver)
+    commPool.submit(sender)
 
-            case "Pareto" =>
-              // TODO: Do something with the pareto
-              //val data = new PrintStream(config.name + "_hm_data.csv")
-              //data.println(HEADER)
-              //points.foreach{pt => data.println(pt) }
-              //data.close()
-              None
-        }}
-        catch {
-          case SpatialError(e) => throw e
-          case t:Throwable =>
-            println(s"[Ignored] $cmd")
-            println(s"[Ignored] Reason: ${t.getMessage}")
-            None
-        }
-      }
-      else None
+    val done = doneQueue.take()
+    if (done) {
+      println("Waiting for workers to complete...")
+      pool.shutdown()
+      pool.awaitTermination(10L, TimeUnit.HOURS)
+      commPool.shutdown()
+      commPool.awaitTermination(10L, TimeUnit.HOURS)
+
+      val endTime = System.currentTimeMillis()
+      val totalTime = (endTime - startTime)/1000.0
+
+      println(s"Completed space search in $totalTime seconds.")
+    }
+    else {
+      println("Connected process terminated early!")
+      pool.shutdownNow()
+      commPool.shutdownNow()
+      pool.awaitTermination(1L, TimeUnit.MINUTES)
+      commPool.awaitTermination(1L, TimeUnit.MINUTES)
+      sys.exit(-1) // Bail for now
     }
 
-    // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
-    println("Initializing models...")
-    workers.foreach{worker => worker.init() }
-    println("Starting up workers...")
-    workers.foreach{worker => pool.submit(worker) }
+    if (PROFILING) {
+      val bndTime = workers.map(_.bndTime).sum
+      val memTime = workers.map(_.memTime).sum
+      val conTime = workers.map(_.conTime).sum
+      val areaTime = workers.map(_.areaTime).sum
+      val cyclTime = workers.map(_.cyclTime).sum
+      val total = bndTime + memTime + conTime + areaTime + cyclTime
+      println("Profiling results: ")
+      println(s"Combined runtime: $total")
+      println(s"Scalar analysis:     $bndTime"  + " (%.3f)".format(100*bndTime.toDouble/total) + "%")
+      println(s"Memory analysis:     $memTime"  + " (%.3f)".format(100*memTime.toDouble/total) + "%")
+      println(s"Contention analysis: $conTime"  + " (%.3f)".format(100*conTime.toDouble/total) + "%")
+      println(s"Area analysis:       $areaTime" + " (%.3f)".format(100*areaTime.toDouble/total) + "%")
+      println(s"Runtime analysis:    $cyclTime" + " (%.3f)".format(100*cyclTime.toDouble/total) + "%")
+    }
 
-    val startTime = System.currentTimeMillis
-    println("Starting up HyperMapper...")
-    hm.block(Some(workDir))
-
-    println("Ending work queue.")
-
-    // Poison the work queue (make sure to use enough to kill them all!)
-    workerIds.foreach{_ => workQueue.put(Seq.empty[Int]) }
-
-    println("Waiting for workers to complete...")
-    pool.shutdown()
-    pool.awaitTermination(10L, TimeUnit.HOURS)
-
-    val endTime = System.currentTimeMillis()
-    val totalTime = (endTime - startTime)/1000.0
-
-    println(s"Completed space search in $totalTime seconds.")
     sys.exit(0) // Bail for now
+
   }
 
 }

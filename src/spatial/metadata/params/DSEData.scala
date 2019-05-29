@@ -136,9 +136,15 @@ case class REqualOrOne(ps: Seq[Sym[_]]) extends Restrict {
   override def toString = s"$ps equal or one"
 }
 
+sealed trait Prior
+case object Gaussian extends Prior { override def toString = "gaussian" }
+case object Exponential extends Prior { override def toString = "exponential" }
+case object Decay extends Prior { override def toString = "decay" }
+case object Uniform extends Prior { override def toString = "uniform" }
+
 sealed trait SpaceType
-case object Ordinal extends SpaceType { override def toString = "ordinal" }
-case object Categorical extends SpaceType { override def toString = "categorical" }
+case class Ordinal(prior: Prior) extends SpaceType { override def toString = "ordinal" }
+case class Categorical(prior: Seq[Double]) extends SpaceType { override def toString = "categorical" }
 
 case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) => Unit, getter: State => T, tp: SpaceType) {
   def apply(i: Int): T = options(i)
@@ -159,6 +165,25 @@ case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) =
   }
 
   @stateful def filter(cond: => Boolean) = new Domain(name, id, options.filter{t => setValue(t); cond}, setter, getter, tp)
+
+  def optionsString: String = {
+    options.map{
+      case s: String  => s"${s}"
+      case s: Boolean => s.toString
+      case s => s.toString
+    }.mkString(", ")
+  }
+  @stateful def valueString: String = value match {
+    case s: String => s"${s}"
+    case s: Boolean => s.toString
+    case s => s.toString
+  }
+  @stateful def prior: String = tp match {
+    case Ordinal(prior)     => "\"" + prior + "\""
+    case Categorical(prior) => s"[${prior.mkString(",")}]"
+  }
+
+
 }
 object Domain {
   def apply(name: String, id: Int, range: Either[Range, Seq[Int]], setter: (Int,State) => Unit, getter: State => Int, tp: SpaceType): Domain[Int] = {

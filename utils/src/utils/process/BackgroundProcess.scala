@@ -30,7 +30,7 @@ case class BackgroundProcess(dir: String, args: List[String]) {
     if (errs.nonEmpty) throw new Exception(s"Subprocess $args returned error(s):\n${errs.mkString("\n")}")
   }
 
-  def run(): Unit = if (p eq null) {
+  def run(): (BufferedReader, BufferedWriter) = if (p eq null) {
     import scala.collection.JavaConverters._
     val pb = new ProcessBuilder(args.asJava)
     if (dir.nonEmpty) pb.directory(new File(dir))
@@ -39,6 +39,7 @@ case class BackgroundProcess(dir: String, args: List[String]) {
     reader = new BufferedReader(new InputStreamReader(p.getInputStream))
     writer = new BufferedWriter(new OutputStreamWriter(p.getOutputStream))
     logger = new BufferedReader(new InputStreamReader(p.getErrorStream))
+    (reader, writer)
   } else {
     throw new Exception(s"Cannot run process $args while it is already running.")
   }

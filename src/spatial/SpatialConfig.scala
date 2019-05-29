@@ -50,6 +50,8 @@ class SpatialConfig extends Config {
   var fuseAsFMA = true
   var forceFuseFMA = false
 
+  lazy val HYPERMAPPER: String = sys.env.getOrElse("HYPERMAPPER_HOME", {throw new Exception("Please set the HYPERMAPPER_HOME environment variable."); sys.exit() })
+
   var enableBroadcast = true // Allow broadcasting reads
 
   // Internal flag used to mark whether unit pipe transformer has been run or not

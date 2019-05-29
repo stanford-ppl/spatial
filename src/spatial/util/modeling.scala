@@ -377,7 +377,7 @@ object modeling {
         val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)
         affectedNodes.foreach{
           case x if (paths.contains(x)) => 
-            dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle")
+            dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")
             paths(x) = paths(x) + dist
           case _ => 
         }
@@ -430,7 +430,7 @@ object modeling {
       }
     }
 
-    scope.foreach{
+    schedule.foreach{
       case x if x.isWriter && x.writtenMem.isDefined => 
         if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
         if (x.writtenMem.get.isReg) protectRAWCycle(x)

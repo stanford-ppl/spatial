@@ -534,7 +534,7 @@ sealed trait AlphaStrictness extends SearchPriority {
 case object AlphaPowersOf2 extends AlphaStrictness {
   val P = 1
   def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
-    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N)
+    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank)
   }
 }
@@ -552,14 +552,14 @@ case object AlphaBestGuess extends AlphaStrictness {
   def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = { 
     val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product).uniqueModN(N)
     val dimBased = Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N).uniqueModN(N)
-    val possibleAs = List(0,1) ++ accessBased ++ dimBased
+    val possibleAs = (List(0,1) ++ accessBased ++ dimBased).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank)
   }
 }
 case object AlphaRelaxed extends AlphaStrictness {
   val P = 2
   def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
-    val possibleAs = (0 to 2*N).uniqueModN(N)
+    val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank).filterNot(_.forall(x => isPow2(x) || x == 1))
   }
 }

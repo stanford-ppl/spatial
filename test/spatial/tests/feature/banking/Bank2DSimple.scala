@@ -10,21 +10,32 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
     val dram = DRAM[Int](R,C)
+    val Y = DRAM[Int](3,3,8)
+    setMem(Y, (0::3,0::3,0::8){(i,j,k) => i+j+k})
+    val out = ArgOut[Int]
 
     Accel {
       val x = SRAM[Int](R,C)//.effort(2)
-
+      val y = SRAM[Int](3,3,8)
+      y load Y(0::3, 0::3, 0::8 par 2)
       Foreach(0 until R par P, 0 until C par Q){(i,j) =>
         x(i,j) = i + j
       }
+      val r = RegFile[Int](2)
+      Foreach(0 until 3 by 1 par 2){i => 
+        r(i) = List.tabulate(3){i => List.tabulate(3){j => List.tabulate(8){k => y(i,j,k)}}.flatten}.flatten.reduce{_+_}
+      }
+      out := r(1)
       dram store x
     }
 
     val gold = (0::R,0::C){(i,j) => i + j}
     val data = getMatrix(dram)
+    val gold2 = (0::3, 0::3, 0::8){(i,j,k) => i+j+k}.flatten.reduce{_+_}
     printMatrix(data, "data")
     printMatrix(gold, "gold")
-    assert(data == gold)
+    println(r"got ${getArg(out)} =?= $gold2")
+    assert(data == gold && gold2 == getArg(out))
   }
 }
 

@@ -154,6 +154,8 @@ object files {
     parts.mkString(sep)
   }
 
+  def dirName(fullPath:String) = fullPath.split(sep).dropRight(1).mkString(sep)
+
   def createDirectories(dir:String) = {
     val path = Paths.get(dir)
     if (!Files.exists(path)) Files.createDirectories(path)

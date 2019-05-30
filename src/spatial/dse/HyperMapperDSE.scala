@@ -89,8 +89,8 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |  "run_directory": "$dir",
              |  "output_data_file": "${config.name}_output_dse_samples.csv",
              |  "output_pareto_file": "${config.name}_output_pareto.csv",
-             |  "bootstrap_sampling": {
-             |    "bootstrap_type": "random sampling",
+             |  "warmup_sampling": {
+             |    "warmup_type": "random sampling",
              |    "number_of_samples": 10000
              |  },
              |  "output_image": {

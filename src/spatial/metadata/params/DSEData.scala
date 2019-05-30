@@ -169,13 +169,13 @@ case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) =
   def optionsString: String = {
     options.map{
       case s: String  => s"${s}"
-      case s: Boolean => s.toString
+      case s: Boolean => s""""${s.toString}""""
       case s => s.toString
     }.mkString(", ")
   }
   @stateful def valueString: String = value match {
     case s: String => s"${s}"
-    case s: Boolean => s.toString
+    case s: Boolean => s""""${s.toString}""""
     case s => s.toString
   }
   @stateful def prior: String = tp match {

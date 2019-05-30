@@ -13,8 +13,9 @@ trait PIRGenHelper extends PIRFormatGen {
 
   def assertOne[T](vec:Iterable[T]):T = {
     if (vec.size != 1) {
-      error(s"More than one element in vector $vec for pir backend")
-      IR.logError()
+      //error(s"More than one element in vector $vec for pir backend")
+      //IR.logError()
+      throw new Exception(s"More than one element in vector $vec for pir backend")
     }
     vec.head
   }
@@ -73,7 +74,6 @@ trait PIRGenHelper extends PIRFormatGen {
         src".muxPort($muxPort)" +
         src".broadcast($broadcast)" + 
         src".castgroup($castgroup)" + 
-        src".gid(${assertOne(lhs.gids(Nil))})" +
         src".tp(${field.map{_._2}.getOrElse(lhs.tp)})" +
         (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
       body
@@ -103,7 +103,6 @@ trait PIRGenHelper extends PIRFormatGen {
         src".muxPort($muxPort)" +
         src".broadcast($broadcast)" + 
         src".castgroup($castgroup)" + 
-        src".gid(${assertOne(lhs.gids(Nil))})" +
         (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
       body
     }

@@ -53,6 +53,8 @@ trait PIRGenHelper extends PIRFormatGen {
 
   def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
     val bufferPort = lhs.port.bufferPort
+    val broadcast = assertOne(lhs.port.broadcast)
+    val castgroup = assertOne(lhs.port.castgroup)
     val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
@@ -69,6 +71,8 @@ trait PIRGenHelper extends PIRFormatGen {
         src".en(${assertOne(ens)})" + 
         src".port($bufferPort)" + 
         src".muxPort($muxPort)" +
+        src".broadcast($broadcast)" + 
+        src".castgroup($castgroup)" + 
         src".gid(${assertOne(lhs.gids(Nil))})" +
         src".tp(${field.map{_._2}.getOrElse(lhs.tp)})" +
         (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
@@ -79,6 +83,8 @@ trait PIRGenHelper extends PIRFormatGen {
   def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
     val bufferPort = lhs.port.bufferPort
     val muxPort = lhs.port.muxPort
+    val broadcast = assertOne(lhs.port.broadcast)
+    val castgroup = assertOne(lhs.port.castgroup)
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
       var body = (bank, ofs) match {
@@ -95,6 +101,8 @@ trait PIRGenHelper extends PIRFormatGen {
         src".data(${Lhs(assertOne(data),name)})" + 
         src".port($bufferPort)" + 
         src".muxPort($muxPort)" +
+        src".broadcast($broadcast)" + 
+        src".castgroup($castgroup)" + 
         src".gid(${assertOne(lhs.gids(Nil))})" +
         (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
       body

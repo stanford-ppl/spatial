@@ -4,7 +4,7 @@ import forge.tags._
 import spatial.dsl._
 import spatial.metadata.memory._
 
-object NN {
+object NN extends HostNN {
 
   /*                                                       
    *                     o
@@ -23,7 +23,7 @@ object NN {
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
   @virtualize 
-  @api def nnlayer_tiled[T:Num](
+  @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
     b:LUT1[T], 
     ip:scala.Int,
@@ -80,5 +80,4 @@ object NN {
 
   @virtualize 
   @api def relu[T:Num](x:T) = max(x,0.to[T])
-
 }

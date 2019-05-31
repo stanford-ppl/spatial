@@ -47,6 +47,9 @@ case class FileBusLastBit[A:Bits](fileName:String)(implicit state:State) extends
   }
   @rig def nbits: Int = Bits[A].nbits
 }
+case class BlackBoxBus[A:Bits](name:String) extends Bus {
+  @rig def nbits: Int = Bits[A].nbits
+}
 
 case object BurstCmdBus extends DRAMBus[BurstCmd]
 case object BurstAckBus extends DRAMBus[Bit]

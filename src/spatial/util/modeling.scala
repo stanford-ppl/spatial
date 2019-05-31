@@ -40,7 +40,13 @@ object modeling {
     def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
-        else inputsDfs(x.inputs.toSet, nodes + x)
+        else if (x.isMem) {
+          val w = (x.writers.toSet intersect scope).filterNot(nodes.contains)
+          inputsDfs(w, nodes + x)
+        }
+        else {
+          inputsDfs(x.inputs.toSet, nodes + x)
+        }
       }
       else Set.empty[Sym[_]]
     }
@@ -127,6 +133,7 @@ object modeling {
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val memories = readersByMem.keySet intersect writersByMem.keySet
+    dbgs(s"Memories with both reads and writes in this scope: $memories")
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)

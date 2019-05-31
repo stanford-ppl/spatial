@@ -413,8 +413,19 @@ import spatial.metadata.control._
       val sram = SRAM[Int](M,N).noduplicate.buffer
       Foreach(iters.value by 1) { _ => 
         Foreach(N by 1){j => sram(0,j) = j}
-        Foreach(1 until M by 1, N by 1 par N/8 /*2*/){(i,j) =>  // II = 1 for par = 1 and then increases for higher pars
-          sram(i,j) = mux(j == 0, 0, sram(i-1, j-1)) + sram(i-1, j) + mux(j == N-1, 0, sram(i-1, j+1))
+        Foreach(1 until M by 1, N by 1 par N/2){(i,j) =>  // II = 1 for par = 1 and then increases for higher pars
+          val left = Reg[Int]
+          val mid = Reg[Int]
+          val right = Reg[Int]
+          left := mux(j == 0, 0, sram(i-1, j-1))
+          mid := sram(i-1, j)
+          right := mux(j == N-1, 0, sram(i-1, j+1))
+          sram(i,j) = left.value + mid.value + right.value
+
+          // val left = mux(j == 0, 0, sram(i-1, j-1))
+          // val mid = sram(i-1, j)
+          // val right = mux(j == N-1, 0, sram(i-1, j+1))
+          // sram(i,j) = left + mid + right
         }
         out(0::1, 0::N) store sram(M-1 :: M, 0::N)
       }

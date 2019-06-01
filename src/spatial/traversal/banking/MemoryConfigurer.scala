@@ -378,9 +378,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
-      ((lca.isOuterPipeLoop || lca.isOuterStreamLoop) && !isWrittenIn(lca)) ||
+      (lca.isOuterPipeLoop && !isWrittenIn(lca)) ||
       (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
-      lca.isParallel
+      (lca.isParallel || lca.isOuterStreamLoop)
   }
 
 

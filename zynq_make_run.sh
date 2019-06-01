@@ -7,6 +7,6 @@ else
 fi
 
 rm -r gen/$APP
-bin/spatial $APP --fpga=ZCU --instrument
+bin/spatial $APP --fpga=ZCU --instrumentation
 cd gen/$APP
 make 

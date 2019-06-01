@@ -32,7 +32,7 @@ import utils.implicits._
 
 	/* Parameters to tune */
 	val k_const 				= 3 /* Number of nearest neighbors to handle */
-	val par_factor  			= 16 //40
+	val par_factor  			= 20 //40
 	val par_factor_double		= par_factor * 2
 	val parLoad 				= 2
  
@@ -124,7 +124,7 @@ import utils.implicits._
 	// val seq_bits3 = Seq.tabulate(64){ i => x2.d3.bit(i) }
 	// val seq_bits4 = Seq.tabulate(64){ i => x2.d4.bit(i) }
 
-		(popcount(/*Seq.tabulate(64){ i => x1.d1.bit(i) }*/ x1.d1) + popcount(Seq.tabulate(64){ i => x1.d2.bit(i) }) +
+		(popcount(Seq.tabulate(64){ i => x1.d1.bit(i) }) + popcount(Seq.tabulate(64){ i => x1.d2.bit(i) }) +
 		   popcount(Seq.tabulate(64){ i => x2.d3.bit(i) }) + popcount(Seq.tabulate(4){ i => x2.d4.bit(63-i) })).to[Int16] 
 	//  popcount(Seq.tabulate(64){ i => x1.d1.bit(i) } ++ Seq.tabulate(64){ i => x1.d2.bit(i) }).to[Int16] +  
 	//  popcount(Seq.tabulate(64){ i => x2.d3.bit(i) } ++ Seq.tabulate(64){ i => x2.d4.bit(i) }).to[Int16]
@@ -363,7 +363,7 @@ import utils.implicits._
 					Pipe.II(1).Foreach(num_training by 1 par par_factor) { train_inx  =>
 
 						val curr_train_inx = train_inx // * par_factor + p
-						val p = train_inx //% par_factor
+						val p = train_inx % par_factor
 						update_knn(test_local1, test_local2,
 								   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 								   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx))	

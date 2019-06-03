@@ -18,7 +18,7 @@ trait LUTConstReadRewriteRules extends RewriteRules {
           assert(vecs.size == 1, s"Different vector width for plasticine $addr")
           val vaddr = addr.map {
             case seq:Seq[_] => seq
-            case e:Int => List.fill(vecs.size)(e)
+            case e:Int => List.fill(vecs.head)(e)
           }.asInstanceOf[Seq[Seq[Int]]]
           val bank = vaddr.transpose
           val faddr = bank.map { addrs =>

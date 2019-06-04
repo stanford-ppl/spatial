@@ -34,7 +34,7 @@ import spatial.metadata.control._
       val result_1D = SRAM[Int](4096)
       val result_2D = SRAM[Int](16,256)
       val result_3D = SRAM[Int](16,16,16)
-      val result_rand = SRAM[Int](16)
+      val result_rand = SRAM[Int](16).conflictable
       'LOOP1D.Foreach(0 until 16, 0 until 16 par 4, 0 until 16){(a,b,c) => 
         result_1D(c * size2 + a * oc + b) = a + b + c
       }

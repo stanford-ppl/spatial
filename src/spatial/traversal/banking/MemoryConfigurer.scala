@@ -257,7 +257,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
               warn(s"    Consider either:")
               warn(s"       1) Remove parallelization on all ancestor controllers")
               warn(s"       2) Declare this memory inside the innermost outer controller with parallelization > 1")
-              warn(s"       3) Manually deconflicting them and add .conflictable flag to the memory.")
+              warn(s"       3) Manually deconflicting them and add .conflictable flag to the memory. Use this if you know the address pattern is bankable, or unbankable accesses are timed so they won't conflict")
               warn(s"    Note that banking analysis may hang here...")
               true
             } else if (conflicts.nonEmpty && mem.shouldIgnoreConflicts) {
@@ -395,7 +395,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       (lca.isOuterPipeLoop && !isWrittenIn(lca)) ||
       (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
-      (lca.isParallel || (Seq(lca) ++ lca.ancestors).exists(_.willUnroll)) || lca.isOuterStreamLoop
+      (lca.isParallel || (a.access.parent == b.access.parent && (Seq(lca) ++ lca.ancestors).exists(_.willUnroll))) || lca.isOuterStreamLoop
   }
 
 

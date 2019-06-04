@@ -10,7 +10,7 @@ trait CppGenFileIO extends CppGenCommon {
     case OpenBinaryFile(filename, isWr) =>
       val dir = if (isWr) "o" else "i"
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")
-      emit(src"""assert(${lhs}.good() && "File ${s"$filename".replace("\"","")} does not exist"); """)
+      emit(src"""assert(${lhs}.good() && "File ${src"$filename".replace("\"","")} does not exist"); """)
 
     case op @ ReadBinaryFile(file) =>
       // Pull raw data out of file

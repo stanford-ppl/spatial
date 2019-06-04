@@ -25,6 +25,6 @@ case class Point(params: Seq[AnyVal]) extends DesignPoint {
     indexedSpace.foreach{case (domain,d) => domain.setValueUnsafe(params(d)) }
   }
   @stateful def show(indexedSpace: Seq[(Domain[_], Int)], prods: Seq[BigInt], dims: Seq[BigInt]): Seq[Any] = {
-  	throw new Exception("Cannot show space for a Point Param")
+    params.zipWithIndex.map{case (p,i) => Seq(indexedSpace(i)._1.name, p)}
   } 
 }

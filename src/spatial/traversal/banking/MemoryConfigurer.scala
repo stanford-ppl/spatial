@@ -251,7 +251,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           else                    dbg(s"      Group #$i same port: <none> ")
           if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
 
-          samePort.nonEmpty && conflicts.isEmpty
+          val noConflicts = if (isWrite) {
+            if (conflicts.nonEmpty && !mem.shouldIgnoreConflicts) {
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              warn(s"    Consider either:")
+              warn(s"       1) Remove parallelization on all ancestor controllers")
+              warn(s"       2) Declare this memory inside the innermost outer controller with parallelization > 1")
+              warn(s"       3) Manually deconflicting them and add .conflictable flag to the memory.")
+              warn(s"    Note that banking analysis may hang here...")
+              true
+            } else if (conflicts.nonEmpty && mem.shouldIgnoreConflicts) {
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+              false
+            } else conflicts.isEmpty
+          } else conflicts.isEmpty
+          samePort.nonEmpty && noConflicts
         }
       }
       if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
@@ -380,7 +395,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       (lca.isOuterPipeLoop && !isWrittenIn(lca)) ||
       (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
-      (lca.isParallel || lca.isOuterStreamLoop)
+      (lca.isParallel || (Seq(lca) ++ lca.ancestors).exists(_.willUnroll)) || lca.isOuterStreamLoop
   }
 
 

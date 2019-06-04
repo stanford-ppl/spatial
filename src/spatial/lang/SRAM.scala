@@ -97,6 +97,11 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def blockcyclic_Bs(bs:Seq[Int]): C[A] = { this.blockCyclicBs = bs; me }
   /** Specify banking search effort for this memory */
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
+  /** Allow "unsafe" banking, where two writes can technically happen simultaneously and one will be dropped.
+    * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
+    * due to data-dependent control flow or that you don't care if one write gets dropped
+    */
+  def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

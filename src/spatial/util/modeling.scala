@@ -40,7 +40,13 @@ object modeling {
     def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
-        else inputsDfs(x.inputs.toSet, nodes + x)
+        else if (x.isMem) {
+          val w = (x.writers.toSet intersect scope).filterNot(nodes.contains)
+          inputsDfs(w, nodes + x)
+        }
+        else {
+          inputsDfs(x.inputs.toSet, nodes + x)
+        }
       }
       else Set.empty[Sym[_]]
     }
@@ -127,6 +133,7 @@ object modeling {
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val memories = readersByMem.keySet intersect writersByMem.keySet
+    dbgs(s"Memories with both reads and writes in this scope: $memories")
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
@@ -370,14 +377,14 @@ object modeling {
       val reg = regWrite.writtenMem.get
       val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
       val writePosition = parentScope.indexOf(regWrite)
-      val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && paths.contains(x) && paths.contains(regWrite) && paths(x).toInt <= paths(regWrite).toInt && x.readMem.isDefined && x.readMem.get == reg) => x}
+      val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && paths.contains(x) && paths.contains(regWrite) && paths(x).toInt <= paths(regWrite).toInt && x.readMem.isDefined && x.readMem.get == reg && !reg.hotSwapPairings.getOrElse(x,Set()).contains(regWrite)) => x}
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
         warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
         val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)
         affectedNodes.foreach{
           case x if (paths.contains(x)) => 
-            dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle")
+            dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")
             paths(x) = paths(x) + dist
           case _ => 
         }
@@ -430,7 +437,7 @@ object modeling {
       }
     }
 
-    scope.foreach{
+    schedule.foreach{
       case x if x.isWriter && x.writtenMem.isDefined => 
         if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
         if (x.writtenMem.get.isReg) protectRAWCycle(x)

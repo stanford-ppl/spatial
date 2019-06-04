@@ -125,7 +125,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"  Added dispatch $dispatch to ${a.short}")
       }
 
-      if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValues) {
+      if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValues && !mem.isStreamIn) {
         inst.reads.iterator.flatten.foreach{read =>
           warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
           warn(read.access.ctx)
@@ -251,7 +251,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           else                    dbg(s"      Group #$i same port: <none> ")
           if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
 
-          samePort.nonEmpty && conflicts.isEmpty
+          val noConflicts = if (isWrite) {
+            if (conflicts.nonEmpty && !mem.shouldIgnoreConflicts) {
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              warn(s"    Consider either:")
+              warn(s"       1) Remove parallelization on all ancestor controllers")
+              warn(s"       2) Declare this memory inside the innermost outer controller with parallelization > 1")
+              warn(s"       3) Manually deconflicting them and add .conflictable flag to the memory. Use this if you know the address pattern is bankable, or unbankable accesses are timed so they won't conflict")
+              warn(s"    Note that banking analysis may hang here...")
+              true
+            } else if (conflicts.nonEmpty && mem.shouldIgnoreConflicts) {
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+              false
+            } else conflicts.isEmpty
+          } else conflicts.isEmpty
+          samePort.nonEmpty && noConflicts
         }
       }
       if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
@@ -378,9 +393,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
-      ((lca.isOuterPipeLoop || lca.isOuterStreamLoop) && !isWrittenIn(lca)) ||
+      (lca.isOuterPipeLoop && !isWrittenIn(lca)) ||
       (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
-      lca.isParallel
+      (lca.isParallel || (a.access.parent == b.access.parent && (Seq(lca) ++ lca.ancestors).exists(_.willUnroll))) || lca.isOuterStreamLoop
   }
 
 

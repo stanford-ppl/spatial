@@ -62,3 +62,17 @@ case class UnusedMemory(flag: Boolean) extends Data[UnusedMemory](SetBy.Analysis
   * Default: empty set
   */
 case class DephasedAccess(accesses: Set[Sym[_]]) extends Data[DephasedAccess](SetBy.Analysis.Self)
+
+/** Metadata defined on a RegRead that indicates which RegWrites to ignore when detecting RAW cycles.
+  * A RegWrite should be ignored for this analysis if the RegRead occurs after the RegWrite in program order
+  * but the RegWrite occurs in an if/then/else block and the RegRead is used to resolve a condition of that
+  * same if/then/else.  I.E there is a if, else if, else, where the first branch writes to a reg and the second
+  * branch is conditional on the value of this reg and the branches get squashed and the accesses absorb the conditions.
+  *
+  * Getter: sym.hotSwapPairings
+  * Setter: sym.hotSwapPairings = Map[Sym[_], Set[Sym[_]]]
+  * Setter: sym.hotSwapPairings(rd: Sym[_]) = Set[Sym[_]]
+  * Default: Map()
+  */
+case class HotSwapPairings(pairings: Map[Sym[_], Set[Sym[_]]]) extends Data[HotSwapPairings](SetBy.Analysis.Self)
+

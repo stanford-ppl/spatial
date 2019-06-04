@@ -184,7 +184,7 @@ trait MemoryUnrolling extends UnrollingBase {
 
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
-          val a2 = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
+          val a2:Seq[NDAddressInLane] = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
           dbgs(s"a2 = ")
           a2.foreach{aa => dbgs(s"  lane ${aa.lane} (castgrp/broadcast ${port.castgroup(laneIds.indexOf(aa.lane))}/${port.broadcast(laneIds.indexOf(aa.lane))}) = ${aa.addr}")}
           val distinct = a2.groupBy{_.addr}
@@ -219,7 +219,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
 
 
-        val broadcast = port.broadcast.map(_ > 0)
+        //val broadcast = port.broadcast.map(_ > 0)
 
         val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
         val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
@@ -264,6 +264,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addDispatch(Nil, 0)
           s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
+          mem2.substHotSwap(lhs, s)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); //strMeta(s)
         }
@@ -368,7 +369,7 @@ trait MemoryUnrolling extends UnrollingBase {
           bug(access.ctx)
         }
         dispatches.map{dispatchId =>
-          val ports = vids.map { vid => access.port(dispatchId, vid) }.distinct
+          val ports:Seq[Port] = vids.map { vid => access.port(dispatchId, vid) }.distinct
           assert(ports.size == 1, s"More than one ports across lanes for ${access} ${access.ctx} vids=$vids")
           val port = ports.head
           if (!memories.contains((mem, dispatchId))) {

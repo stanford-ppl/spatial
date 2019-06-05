@@ -119,44 +119,50 @@ abstract class AreaModel(target: HardwareTarget) extends SpatialModel[AreaFields
   }
 
   @stateful def areaOfMem(mem: Sym[_]): Area = {
-    val instances = mem.duplicates
-    instances.map{instance => areaOfMemory(mem, instance) }.fold(NoArea){_+_}
+    if (mem.getDuplicates.isDefined) {
+      val instances = mem.duplicates
+      instances.map{instance => areaOfMemory(mem, instance) }.fold(NoArea){_+_}
+    } else NoArea
   }
   @stateful def areaOfAccess(access: Sym[_], mem: Sym[_]): Area = {
-    val nbits: Int = wordWidth(mem)
-    val dims: Seq[Int] = mem.constDims.mapOrElse[Int]{x => x}(1)
-    val instances = mem.duplicates.zipWithIndex
-                                  .filter{case (d,i) => access.dispatches.exists(_._2.contains(i)) }
-                                  .map(_._1)
+    if (mem.getDuplicates.isDefined) {
+      val nbits: Int = wordWidth(mem)
+      val dims: Seq[Int] = mem.constDims.mapOrElse[Int]{x => x}(1)
+      val instances = mem.duplicates.zipWithIndex
+                                    .filter{case (d,i) => access.dispatches.exists(_._2.contains(i)) }
+                                    .map(_._1)
 
-    val addrSize = dims.map{d => log2(d) + (if (isPow2(d)) 1 else 0) }.max
-    val multiplier = model("FixMulBig")("b"->18)
-    val adder = model("FixAdd")("b"->addrSize)
-    val mod   = model("FixMod")("b"->addrSize)
-    val flattenCost = dims.indices.map{i => multiplier*i }.fold(NoArea){_+_} + adder*(dims.length - 1)
+      val addrSize = dims.map{d => log2(d) + (if (isPow2(d)) 1 else 0) }.max
+      val multiplier = model("FixMulBig")("b"->18)
+      val adder = model("FixAdd")("b"->addrSize)
+      val mod   = model("FixMod")("b"->addrSize)
+      val flattenCost = dims.indices.map{i => multiplier*i }.fold(NoArea){_+_} + adder*(dims.length - 1)
 
-    // TODO[3]: Cost of address calculation logic
-    //val bankAddrCost =
+      // TODO[3]: Cost of address calculation logic
+      //val bankAddrCost =
 
-    log(s"Address size: $addrSize")
-    log(s"Adder area:   $adder")
-    log(s"Mult area:    $multiplier")
-    log(s"Mod area:     $mod")
-    log(s"Flatten area: $flattenCost")
-    //log(s"Banking area: $bankAddrCost")
-    flattenCost //+ bankAddrCost
+      log(s"Address size: $addrSize")
+      log(s"Adder area:   $adder")
+      log(s"Mult area:    $multiplier")
+      log(s"Mod area:     $mod")
+      log(s"Flatten area: $flattenCost")
+      //log(s"Banking area: $bankAddrCost")
+      flattenCost //+ bankAddrCost
+    } else NoArea
   }
 
   @stateful def rawRegArea(reg: Sym[_]): Area = model("Reg")("b" -> wordWidth(reg))
 
   @stateful def areaOfReg(reg: Sym[_]): Area = {
-    val instances = reg.duplicates
-    instances.map{instance =>
-      rawRegArea(reg) + rawBufferControlArea(wordWidth(reg),instance)
-    }.fold(NoArea){_+_}
+    if (reg.getDuplicates.isDefined) {
+      val instances = reg.duplicates
+      instances.map{instance =>
+        rawRegArea(reg) + rawBufferControlArea(wordWidth(reg),instance)
+      }.fold(NoArea){_+_}
+    } else NoArea
   }
 
-  @stateful def nDups(e: Sym[_]): Int = e.duplicates.length
+  @stateful def nDups(e: Sym[_]): Int = if (e.getDuplicates.isDefined) e.duplicates.length else 0
 
   @stateful def areaInReduce(e: Sym[_], d: Op[_]): Area = areaOfNode(e, d)
 

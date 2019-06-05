@@ -147,7 +147,7 @@ case class DSEThread(
     // contentionAnalyzer.run()
     // if (PROFILING) endCon()
 
-    // areaAnalyzer.rerun(accel, program)
+    areaAnalyzer.rerun(accel, program)
     if (PROFILING) endArea()
 
     areaAnalyzer.totalArea._1

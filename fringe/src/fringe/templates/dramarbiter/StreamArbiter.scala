@@ -15,7 +15,10 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
   io <> DontCare
   
   val cmdValids = io.app.map { _.cmd.valid }
-  val cmdIdx = PriorityEncoder(cmdValids)
+  val priorityActive = PriorityEncoder(cmdValids)
+  // Ensure we service a full request before switching to a new one
+  val cmdIdx = Wire(UInt(log2Ceil(cmdValids.size).max(1).W))
+  cmdIdx := Mux(VecInit(cmdValids)(getRetimed(cmdIdx, 1)), getRetimed(cmdIdx, 1), priorityActive)
   val cmdInDecoder = UIntToOH(cmdIdx)
 
   // some apps have many streams, so we need to pipeline these muxes to meet timing

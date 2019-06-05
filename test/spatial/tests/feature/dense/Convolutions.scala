@@ -380,11 +380,11 @@ import spatial.dsl._
         val C = pt * STRIDE
 
         // Fetch data
-        Parallel{
-          in_fifos.zipWithIndex.map{case (f, i) => 
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-          }
+        // Parallel{
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
+        // }
 
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)
@@ -494,11 +494,11 @@ import spatial.dsl._
         val C = pt * STRIDE
 
         // Fetch data
-        Parallel{
-          in_fifos.zipWithIndex.map{case (f, i) => 
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-          }
+        // Parallel{
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
+        // }
 
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)
@@ -840,7 +840,7 @@ import spatial.dsl._
 
     Accel {
       // Create local memory for kernel values
-      val kernel_sram = SRAM[T](window, IN_CHANS_MAX, OUT_CHANS_MAX)
+      val kernel_sram = SRAM[T](window, IN_CHANS_MAX, OUT_CHANS_MAX).hierarchical
       kernel_sram load KERNEL
 
       // Create stream controller to run once per output point (which includes all output channels per point)
@@ -1130,11 +1130,11 @@ import spatial.dsl._
         val C = pt * STRIDE
 
         // Fetch data
-        Parallel{
-          in_fifos.zipWithIndex.map{case (f, i) => 
-            f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)
-          }
+        // Parallel{
+        in_fifos.zipWithIndex.map{case (f, i) => 
+          Pipe{f load DATA(max(0,min(C - (window/2) + i, IN_POINTS-1)), 0::IN_CHANS par LP)}
         }
+        // }
 
         // Allocate temp accumulator
         val line_out_sram = SRAM[T](OUT_CHANS_MAX)

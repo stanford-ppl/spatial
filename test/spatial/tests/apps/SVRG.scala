@@ -129,10 +129,10 @@ import spatial.dsl._
           MemReduce(g_k, 0.to[TM])(N by tileSize par P4){i => 
             val y_tile = SRAM[TX](tileSize)
             val x_tile = SRAM[TX](tileSize,D)
-            Parallel{
-              y_tile load y(i::i + tileSize)
-              x_tile load x(i::i + tileSize, 0::D par loadPar)            
-            }
+            // Parallel{
+            y_tile load y(i::i + tileSize)
+            x_tile load x(i::i + tileSize, 0::D par loadPar)            
+            // }
             val g_k_partial = SRAM[TM](D)
             // Full update tile (inner loop)
             MemReduce(g_k_partial, 0.to[TM])(tileSize by 1 par P6){ii =>

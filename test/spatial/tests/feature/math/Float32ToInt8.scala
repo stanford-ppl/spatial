@@ -50,11 +50,11 @@ import spatial.dsl._
     val maxDelta = 2.0.to[T]*maxGold/127.to[T]
     val goldArray = inputArray.map{a => (a/maxDelta).to[B] }
 
-    assert(outputArray === goldArray)
-
     (0 until N).foreach{ i =>
       println("input: " + inputArray(i) + ", gold: " + goldArray(i) + ", actual: " + outputArray(i))
     }
+
+    assert(outputArray === goldArray)
 
   }
 }

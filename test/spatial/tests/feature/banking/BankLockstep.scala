@@ -20,8 +20,8 @@ import spatial.dsl._
     Accel {
       val dataInConfl = SRAM[Int](16,16)   // Should bank N = 8
       val dataInNoConfl = SRAM[Int](16,16) // Should duplicate (can't broadcast), N = 4 and 2
-      val dataOut = SRAM[Int](4,16,16)     // Should bank N = 4
-      val cols_todo = SRAM[Int](16)
+      val dataOut = SRAM[Int](4,16,16).hierarchical     // Should bank N = 4
+      val cols_todo = SRAM[Int](16).noduplicate
       cols_todo load cols_dram
       dataInConfl load dram
       dataInNoConfl load dram
@@ -67,7 +67,7 @@ import spatial.dsl._
     setMem(dram, data)
 
     Accel {
-      val sram = SRAM[Int](4,16).noflat.noduplicate // Only try to bank hierarchically to expose bug #123
+      val sram = SRAM[Int](4,16).hierarchical.noduplicate // Only try to bank hierarchically to expose bug #123
       val sram2 = SRAM[Int](4)
       sram load dram
       out := 'LOOP1.Reduce(Reg[Int])(4 by 1 par 2){i => 

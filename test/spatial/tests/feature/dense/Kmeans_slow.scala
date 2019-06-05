@@ -68,39 +68,40 @@ import spatial.dsl._
         val newCents = List.fill(P3)(SRAM[T](MAXK,MAXD))
         val centCounts = List.fill(P3)(SRAM[T](MAXK))
   
-        Foreach(K by 1 par P0) {i => Parallel{centCounts.map(_(i) = 0.to[T])}}
+        // Foreach(K by 1 par P0) {i => Parallel{centCounts.map(_(i) = 0.to[T])}}
+        Foreach(K by 1 par P0) {i => centCounts.map(_(i) = 0.to[T])}
         // Foreach(K by 1, D by 1 par P0){(i,j) => newCents(i,j) = 0.to[T]}
 
         // For each set of batch
 
-        Parallel{
-          List.tabulate(P3){p => 
-            Foreach(N by P3 par PX){i =>
-              val accum = Reg[Tup2[Int,T]]( pack(0.to[Int], 100000.to[T]) )
-              val pts = SRAM[T](BD)
-              pts load points(i+p, 0::BD par par_load)
+        // Parallel{
+        List.tabulate(P3){p => 
+          Foreach(N by P3 par PX){i =>
+            val accum = Reg[Tup2[Int,T]]( pack(0.to[Int], 100000.to[T]) )
+            val pts = SRAM[T](BD)
+            pts load points(i+p, 0::BD par par_load)
 
-              // Find the index of the closest centroid
-              Reduce(accum)(K par PX){ct =>
-                val dist = Reg[T](0.to[T])
-                Reduce(dist)(D par P2){d => (pts(d) - cts(ct,d)) ** 2 }{_+_}
-                pack(ct, dist.value)
-              }{(a,b) =>
-                mux(a._2 < b._2, a, b)
-              }
+            // Find the index of the closest centroid
+            Reduce(accum)(K par PX){ct =>
+              val dist = Reg[T](0.to[T])
+              Reduce(dist)(D par P2){d => (pts(d) - cts(ct,d)) ** 2 }{_+_}
+              pack(ct, dist.value)
+            }{(a,b) =>
+              mux(a._2 < b._2, a, b)
+            }
 
-              // println("mincent on " + i + " = idx " + accum.value._1 + " dist " + accum.value._2)
+            // println("mincent on " + i + " = idx " + accum.value._1 + " dist " + accum.value._2)
 
-              // Store this point to the set of accumulators
-              Sequential{ // Sequential avoids centCounts being buffered
-                // println("pt " + {i + p} + " -> " + accum.value._1)
-                Foreach(D by 1 par P5){ d => newCents(p)(accum.value._1, d) = pts(d) + mux(centCounts(p)(accum.value._1) == 0.to[T], 0.to[T], newCents(p)(accum.value._1, d)) }
-                centCounts(p)(accum.value._1) = centCounts(p)(accum.value._1) + 1.to[T]
-              }
+            // Store this point to the set of accumulators
+            Sequential{ // Sequential avoids centCounts being buffered
+              // println("pt " + {i + p} + " -> " + accum.value._1)
+              Foreach(D by 1 par P5){ d => newCents(p)(accum.value._1, d) = pts(d) + mux(centCounts(p)(accum.value._1) == 0.to[T], 0.to[T], newCents(p)(accum.value._1, d)) }
+              centCounts(p)(accum.value._1) = centCounts(p)(accum.value._1) + 1.to[T]
             }
           }
-          ()
         }
+        ()
+        // }
 
         // Average each new centroid
         // val centsOut = SRAM[T](MAXK, MAXD)

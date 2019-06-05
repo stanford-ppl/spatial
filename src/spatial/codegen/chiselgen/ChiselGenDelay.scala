@@ -4,6 +4,7 @@ import argon._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
+import spatial.metadata.retiming._
 import spatial.util.spatialConfig
 
 
@@ -17,7 +18,7 @@ trait ChiselGenDelay extends ChiselGenCommon {
     case DelayLine(delay, data) =>
       if (delay > maxretime) maxretime = delay
 
-      data.rhs match {
+      data.trace.rhs match {
         case Def.Const(_) => 
         case Def.Param(_,_) => 
         case _ =>

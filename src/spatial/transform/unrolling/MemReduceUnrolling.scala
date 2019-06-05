@@ -7,7 +7,6 @@ import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
 import utils.tags.instrument
-
 trait MemReduceUnrolling extends ReduceUnrolling {
 
   override def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A], mop: Boolean)(implicit ctx: SrcCtx): Sym[_] = rhs match {
@@ -77,12 +76,14 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes, mop)
       })){lhs2 =>
         transferData(lhs,lhs2)
+        lhs2.unrollBy = redLanes.Ps.product
       }
     
     }
 
     val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
       transferData(lhs,lhs2)
+      lhs2.unrollBy = mapLanes.Ps.product
     }
     //accumulatesTo(lhs2) = accum
 
@@ -143,6 +144,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         // unrollReduceAccumulate[A,C](accum, values, mvalids(), ident, foldValue, reduce, loadAcc, storeAcc, isMap2.map(_.head), start, redLanes, isInner = false)
       })){lhs2 =>
         transferData(lhs,lhs2)
+        lhs2.unrollBy = redLanes.Ps.product
       }
     
     }
@@ -207,6 +209,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
       transferData(lhs,lhs2)
+      lhs2.unrollBy = mapLanes.Ps.product
     }
     //accumulatesTo(lhs2) = accum
 
@@ -314,7 +317,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val mvalids = () => mapLanes.valids.map{_.andTree}
 
     val values: Seq[Seq[A]] = inReduce(redType,false){
-      mapLanes.map{i =>
+      mapLanes.map{ case List(i) =>
         register(intermed -> mems(i))
         unroll(loadRes, redLanes)
       }
@@ -327,7 +330,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     }
 
     logs(s"[Accum-fold $lhs] Unrolling reduction trees and cycles")
-    val results = redLanes.map{p =>
+    val results = redLanes.map{ case List(p) =>
       val laneValid = if (redLanes.valids(p).isEmpty) Bit(true) else redLanes.valids(p).andTree
 
       logs(s"Lane #$p:")

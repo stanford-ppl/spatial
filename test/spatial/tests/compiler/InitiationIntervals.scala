@@ -34,7 +34,7 @@ import spatial.metadata.control._
       val result_1D = SRAM[Int](4096)
       val result_2D = SRAM[Int](16,256)
       val result_3D = SRAM[Int](16,16,16)
-      val result_rand = SRAM[Int](16)
+      val result_rand = SRAM[Int](16).conflictable
       'LOOP1D.Foreach(0 until 16, 0 until 16 par 4, 0 until 16){(a,b,c) => 
         result_1D(c * size2 + a * oc + b) = a + b + c
       }
@@ -72,6 +72,7 @@ import spatial.metadata.control._
     val cksum2 = got_2D == gold_2D 
     val cksum3 = got_3D == gold_3D
     val cksum = cksum1 & cksum2 & cksum3
+    //val cksum = cksum1
     println(r"1D: $cksum1, 2D: $cksum2, 3D: $cksum3")
     println(r"PASS: ${cksum} (FlatAffineAccess)")
     assert(cksum)
@@ -313,7 +314,7 @@ import spatial.metadata.control._
     setArg(ONE, 1)
     val m = ArgOut[Int]
     Accel {
-      val x = SRAM[T](8, 16).noflat.noduplicate
+      val x = SRAM[T](8, 16).hierarchical.noduplicate
       Foreach(8 by 1, A by 1 par 4){(i,j) => x(i,j) = (i + j).to[T]}
 
       val y = SRAM[T](3, 3, 8).buffer
@@ -397,3 +398,45 @@ import spatial.metadata.control._
   }
 
 }
+
+@spatial class Blur extends SpatialTest { 
+  // A tricky case for iteration diff analyzer
+  def main(args: Array[String]): Void = {
+    val M = 8
+    val N = 8
+
+    val iters = ArgIn[Int]
+    setArg(iters, 5)
+    val out = DRAM[Int](1,N)
+
+    Accel {
+      val sram = SRAM[Int](M,N).noduplicate.buffer
+      Foreach(iters.value by 1) { _ => 
+        Foreach(N by 1){j => sram(0,j) = j}
+        Foreach(1 until M by 1, N by 1 par N/2){(i,j) =>  // II = 1 for par = 1 and then increases for higher pars
+          val left = Reg[Int]
+          val mid = Reg[Int]
+          val right = Reg[Int]
+          left := mux(j == 0, 0, sram(i-1, j-1))
+          mid := sram(i-1, j)
+          right := mux(j == N-1, 0, sram(i-1, j+1))
+          sram(i,j) = left.value + mid.value + right.value
+
+          // val left = mux(j == 0, 0, sram(i-1, j-1))
+          // val mid = sram(i-1, j)
+          // val right = mux(j == N-1, 0, sram(i-1, j+1))
+          // sram(i,j) = left + mid + right
+        }
+        out(0::1, 0::N) store sram(M-1 :: M, 0::N)
+      }
+    }
+
+    val numNeighbors = 2*(M-1) + 1
+    // Too lazy to derive the answer :(
+    val gold = Array[Int](1437,2993,4689,6358,7600,7848,6611,3813)
+    val result = getMatrix(out).flatten
+    printArray(result, "Got")
+    printArray(gold, "Gold")
+    assert(result == gold)
+  }
+}  

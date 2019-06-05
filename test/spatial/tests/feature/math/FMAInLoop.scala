@@ -14,8 +14,8 @@ import spatial.dsl._
     Accel {
       val rf1 = RegFile[I16](3,3,Seq.fill[I16](9)(0))
       Foreach(N by 1){i => 
-        val temp = (i * i)
-        rf1(0,0) = rf1(0,0) + temp.to[I16] // Should not fuse
+        val temp = (i.to[I16] * i.to[I16])
+        rf1(0,0) = rf1(0,0) + temp // Should not fuse
       }
       val rf2 = RegFile[I16](3,3,Seq.fill[I16](9)(0))
       Foreach(M by 1){i => 
@@ -24,7 +24,7 @@ import spatial.dsl._
       }
       val reg = Reg[I16](0)
       Foreach(N by 1){i => 
-        val temp = (i * i).to[I16]
+        val temp = (i.to[I16] * i.to[I16])
         reg := reg.value + temp // Fuse is ok (because specialized reduce)
       }
       x := Result(rf1(0,0), rf2(0,0), reg.value)

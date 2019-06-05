@@ -129,7 +129,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
     val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
     dbgs(s"Inputs for $lhs are (${used} ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
-    (allUsed diff made).filterNot{s => s.isValue}.toSeq    
+    (allUsed diff made).filterNot{s => s.trace.isValue}.toSeq    
   }
 
   private def groupInputs(ins: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {

@@ -57,6 +57,24 @@ import utils.implicits.Readable._
     stage(ArrayReduce(this,applyBlk,reduceBlk))
   }
 
+  /** Group by followed by reduce on this Array into a single element.
+   * @param kFunc function to generate key for group by
+   * @param mFunc map function on each grouped element
+   * @param rFunc reduce function between elements within the same group
+   *  */
+  //@api def groupByReduce[K:Type,B:Type](kFunc:A => K)(mFunc:A => B)(rfunc: (B,B) => B): Map[K,B] = {
+    //val i   = boundVar[I32]
+    //val b1  = boundVar[A]
+    //val b2  = boundVar[A]
+    //val b3  = boundVar[B]
+    //val b4  = boundVar[B]
+    //val applyBlk  = stageLambda2(this,i){ this(i) }
+    //val keyBlk = stageLambda1(b1) { kFunc(b1) }
+    //val mapBlk = stageLambda1(b2) { mFunc(b2) }
+    //val reduceBlk = stageLambda2(b3,b4){ rfunc(b3,b4) }
+    //stage(ArrayGroupByReduce(this,applyBlk, keyBlk, mapBlk ,reduceBlk))
+  //}
+
   @api def sum(implicit aA: Num[A]): A = this.fold(aA.zero){(a,b) => a + b }
   @api def product(implicit aA: Num[A]): A = this.fold(aA.one){(a,b) => a * b }
   @api def min(implicit aA: Num[A]): A = this.reduce{(a,b) => aA.min(a,b) }
@@ -208,4 +226,6 @@ object Array {
   /** Returns an immutable Array with the given elements. */
   @api def apply[A:Type](elements: A*): Array[A] = stage(ArrayFromSeq[A](elements.map{s => box(s)}))
 
+  /** Returns an immutable Array with the given elements. */
+  @api def fromSeq[A:Type](elements: Seq[A]): Array[A] = stage(ArrayFromSeq[A](elements.map{s => box(s)}))
 }

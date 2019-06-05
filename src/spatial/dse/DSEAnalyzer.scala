@@ -11,6 +11,7 @@ import spatial.metadata.bounds._
 import spatial.metadata.types._
 import spatial.traversal._
 import poly.ISL
+import models.AreaEstimator
 import spatial.util.spatialConfig
 
 import models.Sensitivity
@@ -19,7 +20,7 @@ import java.nio.file.StandardOpenOption
 import java.nio.channels._
 import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
 
-case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
+case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: AreaEstimator) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
   final val PROFILING = true
 
   override protected def process[R](block: Block[R]): Block[R] = {
@@ -342,7 +343,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL) extends argon.passe
         workQueue = workQueue,
         outQueue  = fileQueue,
         PROFILING = PROFILING
-      )(threadState, isl)
+      )(threadState, isl, areamodel)
     }
     dbgs("Initializing models...")
 

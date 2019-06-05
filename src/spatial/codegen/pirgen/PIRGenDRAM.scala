@@ -50,8 +50,8 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
     case e@FringeSparseStore(dram,cmdStream,ackStream) =>
       state(lhs)(
         src"""FringeSparseStore($dram)""" +
-        src""".addr(MemRead().setMem(${Lhs(cmdStream,Some("addr"))}))""" + 
-        src""".data(MemRead().setMem(${Lhs(cmdStream,Some("data"))}))""" +
+        src""".addr(MemRead().setMem(${Lhs(cmdStream,Some("_2"))}))""" + 
+        src""".data(MemRead().setMem(${Lhs(cmdStream,Some("_1"))}))""" +
         src""".ack(MemWrite().setMem($ackStream).data)"""
       )
 
@@ -74,30 +74,6 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
       //close("}")
 
     case _ => super.genAccel(lhs, rhs)
-  }
-
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@DRAMHostNew(dims,zero) =>
-      super.genHost(lhs, rhs)
-      genInAccel(lhs, rhs)
-
-    //case op@SetMem(dram, data) =>
-      //open(src"val $lhs = {")
-      //open(src"for (i <- 0 until $data.length) {")
-      //oobUpdate(op.A,dram,lhs,Nil){ oobApply(op.A,data,lhs,Nil){ emit(src"$dram(i) = $data(i)") } }
-      //close("}")
-      //close("}")
-
-    //case op@GetMem(dram, data) =>
-      //open(src"val $lhs = {")
-      //open(src"for (i <- 0 until $data.length) {")
-      //oobUpdate(op.A,data,lhs,Nil){ oobApply(op.A,dram,lhs,Nil){ emit(src"$data(i) = $dram(i)") } }
-      //close("}")
-      //close("}")
-
-    // Fringe templates expect byte-based addresses and sizes, while PIR gen expects word-based
-
-    case _ => super.genHost(lhs, rhs)
   }
 
 }

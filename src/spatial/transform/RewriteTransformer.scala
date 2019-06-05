@@ -15,11 +15,27 @@ import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
+import forge.tags._
+import emul.FixedPoint
 
-import utils.math.{isPow2,log2}
+import utils.math.{isPow2,log2,gcd}
 
 /** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
+
+  /** Check whether it is a good idea to fuse.  It is a good idea if either:
+    *  1) The mul and the add are both in a reduction cycle, OR neither are in a reduction cycle
+    *  2) The add is marked as a to-be-specialized node, i.e. will become part of RegAccumFMA
+    *  3) forceFuseFMA flag was set
+    */
+  private def specializationFuse(add: Sym[_], mul: Sym[_]): Boolean = {
+    val specialAccum = if (add.getReduceCycle.isDefined) {add.reduceCycle.marker match {
+      case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
+      case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
+      case _ => false
+    }} else false
+    add.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA
+  }
 
   def selectMod[S,I,F](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
     implicit val S: BOOL[S] = x.fmt.s
@@ -37,7 +53,9 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     if (y.size==1) {
       x.from(y.head)
     } else {
-      stage(FixVecConstNew[S,I,F](y))
+      val b = boundVar[FixPt[S,I,F]]
+      b.vecConst = y
+      b
     }
   }
 
@@ -86,7 +104,6 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def static(lin: scala.Int, iter: Num[_], y: scala.Int): Boolean = {
-    def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     if (iter.counter.ctr.isStaticStartAndStep) {
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt
@@ -99,16 +116,21 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def residual(lin: scala.Int, iter: Num[_], ofs: scala.Int, y: scala.Int): ResidualGenerator = {
-    def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
     if (iter.getCounter.isDefined && iter.counter.ctr.isStaticStartAndStep) {
       val Final(start) = iter.counter.ctr.start
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt
       val lanes = iter.counter.lanes
-      val A = gcd(par * step * lin, y)
-      val B = lanes.map { lane => (((start + ofs + lane * step * lin) % y) + y) % y }
-      dbgs(s"Residual Generator for lane $lanes with step $step, lin $lin and start $start + $ofs under mod $y = $A, $B")
-      ResidualGenerator(A, B, y)
+      if (y != 0) {
+        val A = gcd(par * step * lin, y)
+        val B = lanes.map { lane => (((start + ofs + lane * step * lin) % y) + y) % y }
+        dbgs(s"Residual Generator for lane $lanes with step $step, lin $lin and start $start + $ofs under mod $y = $A, $B")
+        ResidualGenerator(A, B, y)
+      } else {
+        val A = par * step * lin
+        val B = lanes.map { lane => start + ofs + lane * step * lin }
+        ResidualGenerator(A, B, y)
+      }
     }
     else ResidualGenerator(1, 0, y)
   }
@@ -119,6 +141,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
 
     case RegWrite(F(reg), F(data), F(en)) => data match {
@@ -297,87 +320,55 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       super.transform(lhs,rhs)
 
     // m1*m2 + add --> fma(m1,m2,add)
-    case FixAdd((mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
-      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
-        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
-        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
-        case _ => false
-      }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
-        transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
-      else 
-        super.transform(lhs,rhs)
+    case FixAdd((mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
+      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
 
-    case FixAdd(F(add: Fix[s,i,f]), F(mul@Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
-      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
-        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
-        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
-        case _ => false
-      }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
-        transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
-      else 
-        super.transform(lhs,rhs)
+    case FixAdd(F(add: Fix[s,i,f]), F(mul@Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
+      transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
 
-    case FltAdd(F(mul@Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
-      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
-        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
-        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
-        case _ => false
-      }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
-        transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
-      else 
-        super.transform(lhs,rhs)
+    case FltAdd(F(mul@Op(FltMul(m1,m2))), F(add: Flt[m,e])) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
+      transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
-    case FltAdd(F(add: Flt[m,e]), F(mul@Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA && spatialConfig.fuseAsFMA =>
-      val specialAccum = if (lhs.getReduceCycle.isDefined) {lhs.reduceCycle.marker match {
-        case AccumMarker.Reg.Op(_,_,_,_,_,_,_) => true
-        case AccumMarker.Reg.FMA(_,_,_,_,_,_,_) => true
-        case _ => false
-      }} else false
-      if (lhs.inCycle == mul.inCycle || specialAccum)
-        transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
-      else 
-        super.transform(lhs,rhs)
+    case FltAdd(F(add: Flt[m,e]), F(mul@Op(FltMul(m1,m2)))) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
+      transferDataToAllNew(lhs){ fltFMA(m1,m2,add).asInstanceOf[Sym[A]] }
 
     // Not rewrite, but set residual metadata on certain patterns
-    case Op(FixAdd(F(xx), Final(ofs))) if inHw => 
+    case FixAdd(F(xx), Final(ofs)) if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(1, xx, ofs, 0)
       m
         
-    case Op(FixAdd(Final(ofs), F(xx)))  if inHw => 
+    case FixAdd(Final(ofs), F(xx))  if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(1, xx, ofs, 0)
       m
 
         
-    case Op(FixSub(F(xx), Final(ofs)))  if inHw => 
+    case FixSub(F(xx), Final(ofs))  if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(1, xx, -ofs, 0)
       m
 
-    case Op(FixMul(Final(lin), F(xx)))  if inHw => 
+    case FixMul(Final(lin), F(xx))  if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(lin, xx, 0, 0)
       m
 
-    case Op(FixMul(F(xx), Final(lin)))  if inHw => 
+    case FixMul(F(xx), Final(lin))  if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(lin, xx, 0, 0)
       m
 
-    case Op(FixFMA(Final(lin), F(xx), Final(ofs)))  if inHw => 
+    case FixFMA(Final(lin), F(xx), Final(ofs))  if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(lin, xx, ofs, 0)
       m
 
-    case Op(FixFMA(F(xx), Final(lin), Final(ofs)))  if inHw => 
+    case FixFMA(F(xx), Final(lin), Final(ofs))  if inHw => 
       val m = super.transform(lhs,rhs)
       m.residual = residual(lin, xx, ofs, 0)
       m
-
+      
     case _ => super.transform(lhs,rhs)
   }
 

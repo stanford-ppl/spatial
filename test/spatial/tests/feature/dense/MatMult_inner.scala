@@ -51,10 +51,10 @@ import spatial.dsl._
         Foreach(P by bp par px){k =>
           val tileA = SRAM[T](bm, bp)
           val tileB = SRAM[T](bp, bn)
-          Parallel {
-            tileA load a(i::i+bm, k::k+bp par 1) // Reads M*N*P times
-            tileB load b(k::k+bp, j::j+bn par 1)
-          }
+          // Parallel {
+          tileA load a(i::i+bm, k::k+bp par 1) // Reads M*N*P times
+          tileB load b(k::k+bp, j::j+bn par 1)
+          // }
           Pipe.POM.Foreach(bm by 1, bn by 1 par mp){ (ii,jj) =>    // MetaPipe?
             val prod = Reduce(Reg[T])(bp by 1 par ip){kk => tileA(ii, kk) * tileB(kk, jj) }{_+_}
             val prev = mux(k == 0, 0.to[T], tileC(ii,jj))

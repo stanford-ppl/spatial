@@ -29,7 +29,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
           warn(mem.ctx)
         }
       }
-      else if ((mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker) {
+      else if (!mem.isStreamOut && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker) {
         if (mem.name.isDefined) {
           warn(mem.ctx, s"${mem.name.get} is defined here but never read.")
           warn(mem.ctx)
@@ -51,6 +51,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
 
     if (lhs.isControl) {
+      lhs.transientReadMems = Set()
       lhs match {
         case Op(OpForeach(_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(OpReduce(_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true

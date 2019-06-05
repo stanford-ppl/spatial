@@ -85,10 +85,10 @@ import spatial.dsl._
     Accel{
       val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, KERNEL_COLS, KERNEL_ROWS, INPUT_CHANS_MAX)
       val bias_sram = SRAM[T](OUTPUT_CHANS_MAX)
-      Parallel{
-        kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS)
-        bias_sram load BIAS_DATA(0::OUTPUT_CHANS)        
-      }
+      // Parallel{
+      kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS)
+      bias_sram load BIAS_DATA(0::OUTPUT_CHANS)        
+      // }
       val rowspan = if (STRIDE.value == 1) INPUT_ROWS-(KERNEL_ROWS-STRIDE) else (INPUT_ROWS-(KERNEL_ROWS-STRIDE) >> 1)
       val colspan = if (STRIDE.value == 1) INPUT_COLS-(KERNEL_COLS-STRIDE) else (INPUT_COLS-(KERNEL_COLS-STRIDE) >> 1)
       Foreach(rowspan par P1){ R =>
@@ -270,10 +270,10 @@ import spatial.dsl._
     Accel{
       val kernel_sram = SRAM[T](OUTCHANS_MAX_UPPERBOUND, KERNEL_COLS, KERNEL_ROWS, INCHANS_MAX_UPPERBOUND)
       val bias_sram = SRAM[T](OUTCHANS_MAX_UPPERBOUND)
-      Parallel{
-        kernel_sram load KERNEL_DATA(0::OUTCHANS_MAX, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INCHANS_MAX)
-        bias_sram load BIAS_DATA(0::OUTCHANS_MAX)        
-      }
+      // Parallel{
+      kernel_sram load KERNEL_DATA(0::OUTCHANS_MAX, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INCHANS_MAX)
+      bias_sram load BIAS_DATA(0::OUTCHANS_MAX)        
+      // }
       Foreach(OMAX_0 par P1){ C =>
         Foreach(OMAX_1 par P2){ R =>
           val idx0 = C*STRIDE
@@ -445,10 +445,10 @@ import spatial.dsl._
     Accel{
       val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, KERNEL_COLS, KERNEL_ROWS, INPUT_CHANS_MAX)
       val bias_sram = SRAM[T](OUTPUT_CHANS_MAX)
-      Parallel{
-        kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS)
-        bias_sram load BIAS_DATA(0::OUTPUT_CHANS)        
-      }
+      // Parallel{
+      kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS)
+      bias_sram load BIAS_DATA(0::OUTPUT_CHANS)        
+      // }
       val rowspan = if (STRIDE.value == 1) INPUT_ROWS-(KERNEL_ROWS-STRIDE) else (INPUT_ROWS-(KERNEL_ROWS-STRIDE) >> 1)
       val colspan = if (STRIDE.value == 1) INPUT_COLS-(KERNEL_COLS-STRIDE) else (INPUT_COLS-(KERNEL_COLS-STRIDE) >> 1)
       val colstart = mux(STRIDE.value == 1, -2, -1)
@@ -633,7 +633,7 @@ import spatial.dsl._
         val lb2 = LineBuffer.strided[T](KERNEL_ROWS, INPUT_COLS_MAX, 2)
         Foreach(INPUT_ROWS by STRIDE){ row => 
           // val bias_srams = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX) // / STRIDE?
-          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.nohierarchical
+          val accum_lines = SRAM[T](OUTPUT_CHANS_MAX, INPUT_COLS_MAX).buffer.flat
           Parallel {
             Foreach(OUTPUT_CHANS by 1 par P3) {oc => 
               if (ic == 0) accum_lines(oc::oc+1, 0::INPUT_COLS/STRIDE) load BIAS_DATA(oc, row/STRIDE::(row/STRIDE)+1, 0::INPUT_COLS/STRIDE par loadPar)
@@ -819,11 +819,11 @@ import spatial.dsl._
             val bias_sram = SRAM[T](INPUT_COLS_MAX) // / STRIDE?
             val accum_line = SRAM[T](INPUT_COLS_MAX).buffer
             if (ic == 0) bias_sram load BIAS_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
-            Parallel{
-              accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
-              if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
-              else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
-            }
+            // Parallel{
+            accum_line load OUTPUT_DATA(oc, row/STRIDE, 0::INPUT_COLS/STRIDE par loadPar)
+            if (STRIDE.value == 1) lb1 load INPUT_DATA(ic, row,0::INPUT_COLS par loadPar)
+            else lb2 load INPUT_DATA(ic, row::row+2,0::INPUT_COLS par loadPar)
+            // }
             Foreach(INPUT_COLS by STRIDE par PX){ col =>
               val sr1 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)
               val sr2 = RegFile[T](KERNEL_ROWS,KERNEL_COLS)

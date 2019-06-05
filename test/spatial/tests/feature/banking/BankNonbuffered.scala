@@ -33,8 +33,9 @@ import spatial.dsl._
 
     val gold_ceil  = array.map{x => ceil(x) }
     val gold_floor = array.map{x => floor(x) }
-    assert(gold_ceil == getMem(out_ceil))
-    assert(gold_floor == getMem(out_floor))
+    val cksum = (gold_ceil == getMem(out_ceil)) && (gold_floor == getMem(out_floor))
+    println("PASS: " + cksum + " (BankNonbuffered)")
+    assert(cksum)
   }
 
   override def checkIR(block: Block[_]): Result = {

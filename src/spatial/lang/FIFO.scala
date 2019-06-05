@@ -48,6 +48,8 @@ import scala.collection.mutable.Queue
     * knows are mutually exclusive
     */
   def conflictable: FIFO[A] = { this.shouldIgnoreConflicts = true; me }
+  /** Do not attempt to bank memory by duplication */
+  def noduplicate: FIFO[A] = { this.isNoDuplicate = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(FIFODeq(this,ens))

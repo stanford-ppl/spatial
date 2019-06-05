@@ -5,6 +5,7 @@ import argon.node._
 import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
+import spatial.metadata.math._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.retiming._
@@ -29,73 +30,73 @@ trait ChiselGenMath extends ChiselGenCommon {
                        else {newEnsig(backpressure_raw)}
     val lat = if ((lhs.fullDelay + nodelat).toInt != (lhs.fullDelay.toInt + nodelat.toInt)) s"Some($nodelat + 1.0)" else s"Some($nodelat)"
     rhs match {
-      case FixMul(x,y) => emit(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Truncate, Wrapping)).r")
-      case UnbMul(x,y) => emit(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Unbiased, Wrapping)).r")
-      case SatMul(x,y) => emit(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Truncate, Saturating)).r")
-      case UnbSatMul(x,y) => emit(src"$lhs.r := ($x.mul($y, $lat, $backpressure, Unbiased, Saturating)).r")
-      case FixDiv(x,y) => emit(src"$lhs.r := ($x.div($y, $lat, $backpressure, Truncate, Wrapping)).r")
-      case UnbDiv(x,y) => emit(src"$lhs.r := ($x.div($y, $lat, $backpressure, Unbiased, Wrapping)).r")
-      case SatDiv(x,y) => emit(src"$lhs.r := ($x.div($y, $lat, $backpressure, Truncate, Saturating)).r")
-      case UnbSatDiv(x,y) => emit(src"$lhs.r := ($x.div($y, $lat, $backpressure, Unbiased, Saturating)).r")
-      case FixMod(x,y) => emit(src"$lhs.r := ($x.mod($y, $lat, $backpressure)).r")
-      case FixRecip(x) => emit(src"$lhs.r := (${lhs}_one.div($x, $lat, $backpressure)).r")
-      case FixSqrt(x) => emit(src"$lhs.r := Math.sqrt($x, $lat, $backpressure).r")
-      case FixSin(x) => emit(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
-      case FixCos(x) => emit(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
-      case FixAtan(x) => emit(src"$lhs.r := Math.tan($x, $lat, $backpressure).r")
-      case FixSinh(x) => emit(src"$lhs.r := Math.sin($x, $lat, $backpressure).r")
-      case FixCosh(x) => emit(src"$lhs.r := Math.cos($x, $lat, $backpressure).r")
-      case FixRecipSqrt(x) => emit(src"$lhs.r := (${lhs}_one.div(Math.sqrt($x, ${s"""latencyOption("FixSqrt", Some(bitWidth(lhs.tp)))"""}, $backpressure), $lat, $backpressure)).r")
-      case FixFMA(x,y,z) => emit(src"$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).toFixed($lhs).r")
-      case FltFMA(x,y,z) => emit(src"$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure).r")
-      case FltSqrt(x) => emit(src"$lhs.r := Math.fsqrt($x, $lat, $backpressure).r")
-      case FltAdd(x,y) => emit(src"$lhs.r := Math.fadd($x, $y, $lat, $backpressure).r")
-      case FltSub(x,y) => emit(src"$lhs.r := Math.fsub($x, $y, $lat, $backpressure).r")
-      case FltMul(x,y) => emit(src"$lhs.r := Math.fmul($x, $y, $lat, $backpressure).r")
-      case FltDiv(x,y) => emit(src"$lhs.r := Math.fdiv($x, $y, $lat, $backpressure).r")
-      case FixLst(x,y) => emit(src"$lhs.r := Math.lt($x, $y, $lat, $backpressure).r")
-      case FixLeq(x,y) => emit(src"$lhs.r := Math.lte($x, $y, $lat, $backpressure).r")
-      case FixNeq(x,y) => emit(src"$lhs.r := Math.neq($x, $y, $lat, $backpressure).r")
-      case FixEql(x,y) => emit(src"$lhs.r := Math.eql($x, $y, $lat, $backpressure).r")
-      case FltLst(x,y) => emit(src"$lhs.r := Math.flt($x, $y, $lat, $backpressure).r")
-      case FltLeq(x,y) => emit(src"$lhs.r := Math.flte($x, $y, $lat, $backpressure).r")
-      case FltNeq(x,y) => emit(src"$lhs.r := Math.fneq($x, $y, $lat, $backpressure).r")
-      case FltEql(x,y) => emit(src"$lhs.r := Math.feql($x, $y, $lat, $backpressure).r")
-      case FltRecip(x) => emit(src"$lhs.r := Math.frec($x, $lat, $backpressure).r")
-      case FixInv(x)   => emit(src"$lhs.r := Math.inv($x,$lat, $backpressure).r")
-      case FixNeg(x)   => emit(src"$lhs.r := Math.neg($x,$lat, $backpressure).r")
-      case FixAdd(x,y) => emit(src"$lhs.r := Math.add($x,$y,$lat, $backpressure, Truncate, Wrapping).r")
-      case FixSub(x,y) => emit(src"$lhs.r := Math.sub($x,$y,$lat, $backpressure, Truncate, Wrapping).r")
-      case FixAnd(x,y)  => emit(src"$lhs.r := Math.and($x,$y,$lat, $backpressure).r")
-      case FixOr(x,y)   => emit(src"$lhs.r := Math.or($x,$y,$lat, $backpressure).r")
-      case FixXor(x,y)  => emit(src"$lhs.r := Math.xor($x,$y,$lat, $backpressure).r")
-      case SatAdd(x,y) => emit(src"$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating).r")
-      case SatSub(x,y) => emit(src"$lhs.r := Math.sub($x, $y,$lat, $backpressure, Truncate, Saturating).r")
-      case FixToFix(x, fmt) => emit(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Wrapping).r")
-      case FixToFixSat(x, fmt) => emit(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating).r")
-      case FixToFixUnb(x, fmt) => emit(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping).r")
-      case FixToFixUnbSat(x, fmt) => emit(src"$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Saturating).r")
+      case FixMul(x,y) => emit(src"""$lhs.r := (Math.mul($x, $y, $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
+      case UnbMul(x,y) => emit(src"""$lhs.r := (Math.mul($x, $y, $lat, $backpressure, Unbiased, Wrapping, "$lhs")).r""")
+      case SatMul(x,y) => emit(src"""$lhs.r := (Math.mul($x, $y, $lat, $backpressure, Truncate, Saturating, "$lhs")).r""")
+      case UnbSatMul(x,y) => emit(src"""$lhs.r := (Math.mul($x, $y, $lat, $backpressure, Unbiased, Saturating, "$lhs")).r""")
+      case FixDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
+      case UnbDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Unbiased, Wrapping, "$lhs")).r""")
+      case SatDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Truncate, Saturating, "$lhs")).r""")
+      case UnbSatDiv(x,y) => emit(src"""$lhs.r := (Math.div($x, $y, $lat, $backpressure, Unbiased, Saturating, "$lhs")).r""")
+      case FixMod(x,y) => emit(src"""$lhs.r := (Math.mod($x, $y, $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
+      case FixRecip(x) => emit(src"""$lhs.r := (Math.div(${lhs}_one, $x, $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
+      case FixSqrt(x) => emit(src"""$lhs.r := Math.sqrt($x, $lat, $backpressure,"$lhs").r""")
+      case FixSin(x) => emit(src"""$lhs.r := Math.sin($x, $lat, $backpressure,"$lhs").r""")
+      case FixCos(x) => emit(src"""$lhs.r := Math.cos($x, $lat, $backpressure,"$lhs").r""")
+      case FixAtan(x) => emit(src"""$lhs.r := Math.tan($x, $lat, $backpressure,"$lhs").r""")
+      case FixSinh(x) => emit(src"""$lhs.r := Math.sin($x, $lat, $backpressure,"$lhs").r""")
+      case FixCosh(x) => emit(src"""$lhs.r := Math.cos($x, $lat, $backpressure,"$lhs").r""")
+      case FixRecipSqrt(x) => emit(src"""$lhs.r := (Math.div(${lhs}_one, Math.sqrt($x, ${s"""latencyOption("FixSqrt", Some(bitWidth(lhs.tp)))"""}, $backpressure), $lat, $backpressure, Truncate, Wrapping, "$lhs")).r""")
+      case FixFMA(x,y,z) => emit(src"""$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure, "$lhs").toFixed($lhs, "cast_$lhs").r""")
+      case FltFMA(x,y,z) => emit(src"""$lhs.r := Math.fma($x,$y,$z,$lat, $backpressure,"$lhs").r""")
+      case FltSqrt(x) => emit(src"""$lhs.r := Math.fsqrt($x, $lat, $backpressure,"$lhs").r""")
+      case FltAdd(x,y) => emit(src"""$lhs.r := Math.fadd($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltSub(x,y) => emit(src"""$lhs.r := Math.fsub($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltMul(x,y) => emit(src"""$lhs.r := Math.fmul($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltDiv(x,y) => emit(src"""$lhs.r := Math.fdiv($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FixLst(x,y) => emit(src"""$lhs.r := Math.lt($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FixLeq(x,y) => emit(src"""$lhs.r := Math.lte($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FixNeq(x,y) => emit(src"""$lhs.r := Math.neq($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FixEql(x,y) => emit(src"""$lhs.r := Math.eql($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltLst(x,y) => emit(src"""$lhs.r := Math.flt($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltLeq(x,y) => emit(src"""$lhs.r := Math.flte($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltNeq(x,y) => emit(src"""$lhs.r := Math.fneq($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltEql(x,y) => emit(src"""$lhs.r := Math.feql($x, $y, $lat, $backpressure,"$lhs").r""")
+      case FltRecip(x) => emit(src"""$lhs.r := Math.frec($x, $lat, $backpressure,"$lhs").r""")
+      case FixInv(x)   => emit(src"""$lhs.r := Math.inv($x,$lat, $backpressure,"$lhs").r""")
+      case FixNeg(x)   => emit(src"""$lhs.r := Math.neg($x,$lat, $backpressure,"$lhs").r""")
+      case FixAdd(x,y) => emit(src"""$lhs.r := Math.add($x,$y,$lat, $backpressure, Truncate, Wrapping, "$lhs").r""")
+      case FixSub(x,y) => emit(src"""$lhs.r := Math.sub($x,$y,$lat, $backpressure, Truncate, Wrapping, "$lhs").r""")
+      case FixAnd(x,y)  => emit(src"""$lhs.r := Math.and($x,$y,$lat, $backpressure,"$lhs").r""")
+      case FixOr(x,y)   => emit(src"""$lhs.r := Math.or($x,$y,$lat, $backpressure,"$lhs").r""")
+      case FixXor(x,y)  => emit(src"""$lhs.r := Math.xor($x,$y,$lat, $backpressure,"$lhs").r""")
+      case SatAdd(x,y) => emit(src"""$lhs.r := Math.add($x, $y,$lat, $backpressure, Truncate, Saturating, "$lhs").r""")
+      case SatSub(x,y) => emit(src"""$lhs.r := Math.sub($x, $y,$lat, $backpressure, Truncate, Saturating, "$lhs").r""")
+      case FixToFix(x, fmt) => emit(src"""$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Wrapping, "$lhs").r""")
+      case FixToFixSat(x, fmt) => emit(src"""$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Truncate, Saturating, "$lhs").r""")
+      case FixToFixUnb(x, fmt) => emit(src"""$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Wrapping, "$lhs").r""")
+      case FixToFixUnbSat(x, fmt) => emit(src"""$lhs.r := Math.fix2fix(${x}, ${fmt.sign}, ${fmt.ibits}, ${fmt.fbits}, $lat, $backpressure, Unbiased, Saturating, "$lhs").r""")
       case FixSLA(x,y) => 
         val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-        emit(src"$lhs.r := Math.arith_left_shift($x, $shift, $lat, $backpressure).r")
+        emit(src"""$lhs.r := Math.arith_left_shift($x, $shift, $lat, $backpressure,"$lhs").r""")
       case FixSRA(x,y) => 
         val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-        emit(src"$lhs.r := Math.arith_right_shift($x, $shift, $lat, $backpressure).r")
+        emit(src"""$lhs.r := Math.arith_right_shift($x, $shift, $lat, $backpressure,"$lhs").r""")
       case FixSRU(x,y) => 
         val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
-        emit(src"$lhs.r := Math.logic_right_shift($x, $shift, $lat, $backpressure).r")
+        emit(src"""$lhs.r := Math.logic_right_shift($x, $shift, $lat, $backpressure,"$lhs").r""")
 
       case FixToFlt(x, fmt) => 
         val FixPtType(s,d,f) = x.tp
         val FltPtType(m,e) = lhs.tp
-        emit(src"$lhs.r := Math.fix2flt($x,$m,$e,$lat,$backpressure).r")
+        emit(src"""$lhs.r := Math.fix2flt($x,$m,$e,$lat,$backpressure,"$lhs").r""")
       case FltToFix(x, fmt) => 
         val FixPtType(s,d,f) = lhs.tp
         val FltPtType(m,e) = x.tp
-        emit(src"$lhs.r := Math.flt2fix($x, $s,$d,$f,$lat,$backpressure, Truncate, Wrapping).r")
+        emit(src"""$lhs.r := Math.flt2fix($x, $s,$d,$f,$lat,$backpressure, Truncate, Wrapping, "$lhs").r""")
       case FltToFlt(x, fmt) => 
         val FltPtType(m,e) = lhs.tp
-        emit(src"$lhs.r := Math.flt2flt($x, $m, $e, $lat, $backpressure).r")
+        emit(src"""$lhs.r := Math.flt2flt($x, $m, $e, $lat, $backpressure,"$lhs").r""")
 
     }
   }
@@ -145,8 +146,8 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixSLA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRU(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
-    case BitRandom(None) if lhs.parent.s.isDefined => emit(src"val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn) === 1.U")
-    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn).r")
+    case BitRandom(None) if lhs.parent.s.isDefined => emit(src"""val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn, "$lhs") === 1.U""")
+    case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"""$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn, "$lhs").r""")
     case FixRandom(x) =>
       val FixPtType(s,d,f) = lhs.tp
       emit(createWire(quote(lhs),remap(lhs.tp)))
@@ -157,14 +158,14 @@ trait ChiselGenMath extends ChiselGenCommon {
         case None => "4096"
       }
       emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
-      emit(src"val ${lhs}_rng = Module(new PRNG($seed))")
+      emit(src"""val ${lhs}_rng = Module(new PRNG($seed)); ${lhs}_rng.suggestName("$lhs")""")
       val en = if (lhs.parent.s.isDefined) src"$datapathEn" else "true.B"
       emit(src"${lhs}_rng.io.en := $en")
       emit(src"${lhs}.r := ${lhs}_rng.io.output(${lhs}_bitsize,0)")
     case FltRandom(None) if lhs.parent.s.isDefined => 
       val FltPtType(m,e) = lhs.tp
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, $datapathEn).r")
+      emit(src"""$lhs.r := Math.frand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, $m, $e, $datapathEn, "$lhs").r""")
     case FltRandom(x) => throw new Exception(s"Can only generate random float with no bounds right now!")
 
     case FixAbs(x) =>
@@ -232,13 +233,13 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case FixMin(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux(($a < $b), $a, $b).r")
     case FixMax(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux(($a > $b), $a, $b).r")
-    case FixToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFix", Some(bitWidth(lhs.tp))))
-    case FixToFixSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixSat", Some(bitWidth(lhs.tp))))
-    case FixToFixUnb(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnb", Some(bitWidth(lhs.tp))))
-    case FixToFixUnbSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnbSat", Some(bitWidth(lhs.tp))))
-    case FltToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFlt", Some(bitWidth(lhs.tp))))
-    case FixToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFlt", Some(bitWidth(lhs.tp))))
-    case FltToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFix", Some(bitWidth(lhs.tp))))
+    case FixToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFix", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFixSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixSat", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFixUnb(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnb", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFixUnbSat(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFixUnbSat", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FltToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFlt", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FixToFlt(a, fmt) => MathDL(lhs, rhs, latencyOption("FixToFlt", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
+    case FltToFix(a, fmt) => MathDL(lhs, rhs, latencyOption("FltToFix", Some(bitWidth(lhs.tp)))); lhs.setSrcType(a.tp)
     case FltRecip(x) => MathDL(lhs, rhs, latencyOption("FltRecip", Some(bitWidth(lhs.tp)))) 
     
     case And(a, b) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs := $a & $b")

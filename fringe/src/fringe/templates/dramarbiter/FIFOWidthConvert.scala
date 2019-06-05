@@ -30,13 +30,21 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
   }
 
   def bytify(inVec: UInt, outbytes: Int, win: Int): UInt = {
-    assert(win / 8 > 0)
-    val boolVec = VecInit(List.tabulate(outbytes){i => 
-      val id = (i / (win/8)).toInt
-      inVec(id)
-    }.reverse)
+    if (win >= 8) {
+      val boolVec = VecInit(List.tabulate(outbytes){i => 
+        val id = (i / (win/8)).toInt
+        inVec(id)
+      }.reverse)
 
-    boolVec.reduce[UInt](Cat(_,_))
+      boolVec.reduce[UInt](Cat(_,_))
+    } else {
+      val clusterSize = inVec.getWidth / outbytes //8 / win // or inVec.width / outbytes?
+      val boolVec = VecInit(List.tabulate(outbytes){i => 
+        inVec((i+1)*clusterSize-1, i * clusterSize).orR
+      }.reverse)
+
+      boolVec.reduce[UInt](Cat(_,_))      
+    }
   }
 
   /**
@@ -47,7 +55,8 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
   val outWidth = wout * vout
 
   if ((inWidth < outWidth) || (inWidth == outWidth && wout < win)) {
-    Predef.assert(outWidth % inWidth == 0, s"ERROR: Width conversion attempted between widths that are not multiples (in: $inWidth, out: $outWidth)")
+    Predef.assert(outWidth % inWidth == 0, s"ERROR: Width conversion attempted between widths that are not multiples (in: $inWidth, out: $outWidth).  Be sure you load/store at least 8 bits per cycle")
+    if (vin * win <= 8) Console.println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Sub-byte level strobe required (stream has $vin x $win bit elements). Any valid lane sets the entire byte strobe valid.")
     val v = outWidth / inWidth
     val fifo = Module(new FIFOVec(UInt(inWidth.W), d, v)); fifo.io <> DontCare
     val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, v)); fifoStrb.io <> DontCare
@@ -67,7 +76,8 @@ class FIFOWidthConvert(val win: Int, val vin: Int, val wout: Int, val vout: Int,
     fifoStrb.io.out.ready := io.out.ready
   }
   else if ((inWidth > outWidth) || (inWidth == outWidth && wout > win)) {
-    Predef.assert(inWidth % outWidth == 0, s"ERROR: Width conversion attempted between widths that are not multiples (in: $inWidth, out: $outWidth)")
+    Predef.assert(inWidth % outWidth == 0, s"ERROR: Width conversion attempted between widths that are not multiples (in: $inWidth, out: $outWidth).  Be sure that you load/store at least 8 bits per cycle")
+    if (vin * win <= 8) Console.println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Sub-byte level strobe required (stream has $vin x $win bit elements). Any valid lane sets the entire byte strobe valid.")
     val v = inWidth / outWidth
     val fifo = Module(new FIFOVec(UInt(outWidth.W), d, v)); fifo.io <> DontCare
     val fifoStrb = Module(new FIFOVec(UInt(vin.W), d, 1)); fifoStrb.io <> DontCare

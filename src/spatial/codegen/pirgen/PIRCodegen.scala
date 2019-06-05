@@ -4,6 +4,7 @@ import argon._
 import argon.codegen.{Codegen, FileDependencies}
 import spatial.metadata.CLIArgs
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.lang._
 import spatial.util.spatialConfig
 
@@ -11,6 +12,7 @@ import scala.collection.mutable
 import spatial.traversal.AccelTraversal
 import spatial.codegen.scalagen.ScalaCodegen
 import scala.language.reflectiveCalls
+import spatial.node._
 
 trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with PIRFormatGen with PIRGenHelper { self =>
   override val lang: String = "pir"
@@ -21,46 +23,39 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
 
   private var globalBlockID: Int = 0
 
-  override def entryFile: String = s"Main.$ext"
+  override def entryFile: String = s"AccelMain.$ext"
 
-  val hostGen = new spatial.codegen.scalagen.ScalaGenSpatial(IR) {
-    override def out = self.out
-    override protected def gen(block: Block[_], withReturn: Boolean = false): Unit = self.gen(block, withReturn)
-    def genHost(lhs: Sym[_], rhs: Op[_]): Unit = gen(lhs, rhs)
+  final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
+    rhs match {
+      case AccelScope(func) => inAccel { genAccel(lhs, rhs) }
+      case ArgInNew(init) => genAccel(lhs, rhs)
+      case ArgOutNew(init) => genAccel(lhs, rhs)
+      case StreamInNew(init) => genAccel(lhs, rhs)
+      case StreamOutNew(init) => genAccel(lhs, rhs)
+      case DRAMHostNew(dims,zero) => genAccel(lhs, rhs)
+      case rhs if (inHw) => genAccel(lhs, rhs)
+      case rhs => rhs.blocks.foreach(ret)
+    }
   }
-
-  final override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = if (inHw) genAccel(lhs, rhs) else genHost(lhs, rhs)
-
-  val hostFile = "Main.scala.1"
-  val accelFile = "AccelMain.scala"
-
-  def openHost(blk: => Unit) = inGen(out, hostFile)(blk)
-
-  def openAccel(blk: => Unit) = inGen(out, accelFile)(blk)
 
   final override def emitHeader(): Unit = {
     super.emitHeader()
-    openHost { emitHostHeader }
-    openAccel { emitAccelHeader }
+    emitAccelHeader
   }
 
   final override def emitFooter():Unit = {
-    openHost { emitHostFooter }
-    openAccel { emitAccelFooter }
+    emitAccelFooter
     super.emitFooter()
   }
 
   def emitHostHeader = {
-    hostGen.emitHeader
     open(src"object Main {")
       open(src"def main(args: Array[String]): Unit = {")
   }
 
   def emitHostFooter = {
       close(s"""}""")
-      hostGen.emitHelp
     close(s"""}""")
-    hostGen.emitFooter
   }
 
   def emitAccelHeader = {
@@ -71,6 +66,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     emit("")
     open(s"""object AccelMain extends PIRApp {""")
     open(src"def staging(top:Top) = {")
+    emit("""import pirgenStaging._""")
     emit("""import top._""")
   }
 
@@ -79,9 +75,22 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     close("}")
   }
 
-  override protected def quoteConst(tp: Type[_], c: Any): String = s"Const($c)"
+  override def quote(s: Sym[_]): String = s match {
+    case VecConst(vs) => src"Const(${vs}).tp(${s.tp})"
+    case s => super.quote(s)
+  }
+
+  def quoteString(x:Any) = x match {
+    case x:String => s""""${x.replace("\n","\\n")}""""
+    case x => x
+  }
+
+  override protected def quoteConst(tp: Type[_], c: Any): String = {
+    src"Const(${quoteString(c)}).tp(${tp})"
+  }
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
+    case x:SrcCtx => x.toString
     case p: Set[_]   => 
       s"Set(${p.map(quoteOrRemap).mkString(", ")})" 
     case p: Iterable[_]   => 
@@ -92,6 +101,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case l: Long       => l.toString + "L"
     case None    => "None"
     case Some(x) => "Some(" + quoteOrRemap(x) + ")"
+    case x:Product if x.productIterator.nonEmpty => s"${x.productPrefix}(${x.productIterator.map{ f => quoteOrRemap(quoteString(f))}.mkString(",")})"
     case x => x.toString
   }
 
@@ -104,22 +114,11 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     case tp => super.remap(tp)
   }
 
-  protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = {
-    //hostGen.genHost(lhs, rhs)
-    rhs.blocks.foreach(ret)
-  }
-
   protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = {
     emit(s"// $lhs = $rhs TODO: Unmatched Node")
     rhs.blocks.foreach(ret)
   }
 
-  final def genInAccel(lhs: Sym[_], rhs: Op[_]): Unit = openAccel { genAccel(lhs, rhs) }
-
-  override protected def emitEntry(block: Block[_]): Unit = {
-    openHost {
-      gen(block)
-    }
-  }
+  override protected def emitEntry(block: Block[_]): Unit = gen(block)
 
 }

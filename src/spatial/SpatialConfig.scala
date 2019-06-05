@@ -30,7 +30,11 @@ class SpatialConfig extends Config {
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
+  var useAreaModels: Boolean = true
   var enableForceBanking: Boolean = false
+  var groupUnrolledAccess: Boolean = false
+  var enableParallelBinding: Boolean = true
+  var bankingEffort: Int = 1
   var unrollMetapipeOfParallels: Boolean = true
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false
@@ -44,6 +48,7 @@ class SpatialConfig extends Config {
   var enableRetiming = true
   var enableLooseIterDiffs = false
   var fuseAsFMA = true
+  var forceFuseFMA = false
 
   var enableBroadcast = true // Allow broadcasting reads
 
@@ -80,6 +85,7 @@ class SpatialConfig extends Config {
       dstSC.useCheapFifos = useCheapFifos
       dstSC.enableOptimizedReduce = enableOptimizedReduce
       dstSC.enableForceBanking = enableForceBanking
+      dstSC.groupUnrolledAccess = groupUnrolledAccess
       // dstSC.enableSplitting = enableSplitting
       dstSC.enableArchDSE = enableArchDSE
       dstSC.addRetimeRegisters = addRetimeRegisters

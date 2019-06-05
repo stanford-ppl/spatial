@@ -8,17 +8,17 @@ import spatial.metadata.memory._
 trait PIRGenReg extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@RegNew(init)    =>
-      stateMem(lhs, "Reg()", Some(List(init)))
+    case op@RegNew(Const(init))    =>
+      stateMem(lhs, "Reg()", Some(init))
 
-    case op@ArgInNew(init)  =>
-      stateMem(lhs, s"""argIn("${lhs.name.getOrElse(s"$lhs")}")""", tp=Some("Reg"), inits=Some(List(init)))
+    case op@ArgInNew(Const(init))  =>
+      stateMem(lhs, s"""argIn("${lhs.name.getOrElse(s"$lhs")}")""", tp=Some("Reg"), inits=Some(init))
 
-    case op@HostIONew(init)  =>
-      stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(List(init)))
+    case op@HostIONew(Const(init))  =>
+      stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(init))
 
-    case op@ArgOutNew(init) =>
-      stateMem(lhs, "argOut()", tp=Some("Reg"), inits=Some(List(init)))
+    case op@ArgOutNew(Const(init)) =>
+      stateMem(lhs, "argOut()", tp=Some("Reg"), inits=Some(init))
 
     case RegReset(reg, ens) =>
       stateStruct(lhs, reg)(field => src"RegReset(reg=${Lhs(reg,field.map{_._1})}, ens=$ens)")
@@ -43,18 +43,6 @@ trait PIRGenReg extends PIRCodegen {
       }
 
     case _ => super.genAccel(lhs, rhs)
-  }
-
-  override protected def genHost(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@ArgInNew(init)  =>
-      super.genHost(lhs, rhs)
-      genInAccel(lhs, rhs)
-
-    case op@ArgOutNew(init) =>
-      super.genHost(lhs, rhs)
-      genInAccel(lhs, rhs)
-
-    case _ => super.genHost(lhs, rhs)
   }
 
 }

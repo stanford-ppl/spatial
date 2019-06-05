@@ -5,6 +5,7 @@ import spatial.dsl._
 @spatial class Differentiator extends SpatialTest {
   override def dseModelArgs: Args = "1024"
   override def finalModelArgs: Args = "1024"
+  override def compileArgs: Args = super.compileArgs and "--noBindParallels"
 
   // Set low pass filter window size
   val window: scala.Int = 16

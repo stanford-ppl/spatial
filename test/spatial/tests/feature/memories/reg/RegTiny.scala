@@ -22,3 +22,19 @@ import spatial.dsl._
     assert(getArg(out) == args(0).to[Int])
   }
 }
+
+@spatial class RegTinyReadWrite extends SpatialTest {
+  override def runtimeArgs: Args = "32"
+
+  def main(args: Array[String]): Unit = {
+    val out = ArgOut[Int]
+
+    Accel {
+      val reg = Reg[Int](0)
+      reg := 3
+      out := reg + 2
+    }
+
+    assert(getArg(out) == 5)
+  }
+}

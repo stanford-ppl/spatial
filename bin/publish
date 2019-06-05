@@ -8,6 +8,7 @@ export FRINGE_PACKAGE=''
 export EMUL_PACKAGE=''
 export MODELS_PACKAGE=''
 export UTILS_PACKAGE=''
+git submodule update --init
 
 if [[ $1 = "remoteSnapshot" ]]; then 
 	changes=`git ls-files -m | wc -l`

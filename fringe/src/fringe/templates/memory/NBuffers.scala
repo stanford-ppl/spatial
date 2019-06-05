@@ -189,22 +189,32 @@ class NBufMem(np: NBufParams) extends Module {
                                np.p.WMapping.map(_.randomBanks), np.p.RMapping.map(_.randomBanks),
                                np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, numActives = np.p.numActives, "lb"))
       lb.io <> DontCare
+      val rowChanged = Wire(Bool()).suggestName("rowChanged")
+      rowChanged := io.wPort.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_}
+
       val numWriters = np.p.WMapping.map(_.par).sum
       val par = np.p.WMapping.map(_.par).max
       val writeCol = Module(new SingleCounter(par, Some(0), Some(numcols), Some(1), false))
       writeCol.io <> DontCare
       val en = io.wPort.flatMap(_.en).reduce{_||_}
       writeCol.io.input.enable := en
-      writeCol.io.input.reset := ctrl.io.swap
+      writeCol.io.input.reset := ctrl.io.swap || rowChanged
       writeCol.io.setup.saturate := false.B
 
-      val rowChanged = io.wPort.map{p => getRetimed(p.banks(0),1) =/= p.banks(0)}.reduce{_||_}
+      // Hack for when rowChanged happens without a dead cycle to react to it (i.e. Foreach(2 by 1, M by 1){(i,j) => lb.enqAt(i) = })
+      val resetEnableCorrection = Module(new SRFF())
+      resetEnableCorrection.io.input.set := rowChanged && en
+      resetEnableCorrection.io.input.reset := ctrl.io.swap || rowChanged
+      resetEnableCorrection.io.input.asyn_reset := false.B
+      val writeColAddrs = writeCol.io.output.count.map(_.asUInt + mux(resetEnableCorrection.io.output, 1.U, 0.U))
+
+
       val gotFirstInRow = Module(new SRFF())
       gotFirstInRow.io.input.set := risingEdge(en) || (en && rowChanged)
       gotFirstInRow.io.input.reset :=  rowChanged | ctrl.io.swap
       gotFirstInRow.io.input.asyn_reset := false.B
 
-      val base = chisel3.util.PriorityMux(io.wPort.flatMap(_.en), writeCol.io.output.count)
+      val base = chisel3.util.PriorityMux(io.wPort.flatMap(_.en), writeColAddrs)
       val colCorrection = Module(new FF(32))
       colCorrection.io <> DontCare
       colCorrection.io.wPort(0).data.head := base.asUInt
@@ -217,23 +227,23 @@ class NBufMem(np: NBufParams) extends Module {
       val writeRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), 0, wCRN_width))
       writeRow.io <> DontCare
       writeRow.io.input.enable := ctrl.io.swap
-      writeRow.io.input.countUp := false.B
+      writeRow.io.input.countUp := true.B
 
       // Connect wPorts
       lb.io.wPort.zip(io.wPort).foreach { case (mem, nbuf) =>
         mem.en := nbuf.en
         mem.data := nbuf.data
-        mem.ofs := writeCol.io.output.count.map{x => (x.asUInt - colCorrectionValue) / np.p.banks(1).U}
+        mem.ofs := writeColAddrs.map{x => (x.asUInt - colCorrectionValue) / np.p.banks(1).U}
         mem.banks.zipWithIndex.map{case (b,i) => 
-          if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - nbuf.banks(0)
-          else b := (writeCol.io.output.count(i/2).asUInt - colCorrectionValue) % np.p.banks(1).U
+          if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - (((np.numBufs-1)*rowstride - 1).U - nbuf.banks(0))
+          else b := (writeColAddrs(i/2).asUInt - colCorrectionValue) % np.p.banks(1).U
         }
       }
 
-      val readRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), (np.numBufs-1)*rowstride, wCRN_width))
+      val readRow = Module(new NBufCtr(rowstride, Some(0), Some(numrows), numrows - (np.numBufs-1)*rowstride, wCRN_width))
       readRow.io <> DontCare
       readRow.io.input.enable := ctrl.io.swap
-      readRow.io.input.countUp := false.B
+      readRow.io.input.countUp := true.B
 
       // Connect rPorts and the associated outputs
       lb.io.rPort.zip(io.rPort).foreach { case (mem, nbuf) =>
@@ -242,7 +252,7 @@ class NBufMem(np: NBufParams) extends Module {
         nbuf.output := mem.output
         mem.ofs := nbuf.ofs
         mem.banks.odd.zip(nbuf.banks.odd).foreach{case (a: UInt, b:UInt) => a := b}
-        mem.banks.even.zip(nbuf.banks.even).foreach{case (a:UInt,b:UInt) => a := (b + readRow.io.output.count) % numrows.U}
+        mem.banks.even.zip(nbuf.banks.even).foreach{case (a:UInt,b:UInt) => a := (((np.numBufs-1)*rowstride - 1).U + readRow.io.output.count - b + numrows.U /*ensure always positive*/) % numrows.U}
       }
 
     case LIFOType => throw new Exception("NBuffered LIFO should be impossible?")

@@ -99,3 +99,52 @@ import spatial.dsl._
     assert(result1 == gold && result2 == gold)
   }
 }
+
+
+@spatial class NoMerge1D extends SpatialTest {
+  val C = 64
+  val tile = 16
+
+  def main(args: Array[String]): Unit = {
+    val in = ArgIn[Int]
+    setArg(in,1)
+    val out1 = ArgOut[Int]
+    val out2 = ArgOut[Int]
+    val dummy = ArgOut[Int]
+
+    Accel {
+      val f1 = FIFO[Int](64)
+      val comm1 = FIFOReg[Bit]
+      val comm2 = FIFOReg[Bit]
+      val problem = SRAM[Int](64)
+      Stream.Foreach(8 by 1){i => 
+        Foreach(8 by 1){j => 
+          f1.enq(i*8 + j)
+        }
+        Pipe{
+          Foreach(8 by 1){j => 
+            problem(i*8 + j) = f1.deq()
+          }
+          comm1.enq(true)
+          comm2.enq(true)
+        }
+        Pipe{
+          dummy := comm1.deq().to[Int]
+          out1 := problem(i*8 + 7)
+        }
+        Pipe{
+          dummy := comm2.deq().to[Int]
+          out2 := problem(in.value*8 - 1)
+        }
+      }
+    }
+
+    println(r"${getArg(dummy)}")
+    val got1 = getArg(out1)
+    val gold1 = 63
+    val got2 = getArg(out2)
+    val gold2 = 7
+    println(r"Answers: $got1 =?= $gold1, $got2 =?= $gold2")
+    assert(got1 == gold1 && got2 == gold2)
+  }
+}

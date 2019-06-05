@@ -14,7 +14,7 @@ import spatial.dsl._
   val margin = 1
 
   def gda[T:Num](xCPU: Array[T], yCPU: Array[Int], mu0CPU: Array[T], mu1CPU: Array[T]): Array[T] = {
-    val ts = loadParam("ts", 20 (96 -> 19200))
+    val ts = loadParam("ts", 32 (96 -> 19200))
     val op = loadParam("op", 2 (1 -> 8))
     val mp = loadParam("mp", 2 (1 -> 8))
     val ip = loadParam("ip", 16 (1 -> 12))
@@ -44,10 +44,10 @@ import spatial.dsl._
     Accel {
       val mu0Tile = SRAM[T](MAXC)
       val mu1Tile = SRAM[T](MAXC)
-      Parallel {
-        mu0Tile load mu0(0 :: C par ip) // Load mu0
-        mu1Tile load mu1(0 :: C par ip) // Load mu1
-      }
+      // Parallel {
+      mu0Tile load mu0(0 :: C par ip) // Load mu0
+      mu1Tile load mu1(0 :: C par ip) // Load mu1
+      // }
 
       val sigmaOut = SRAM[T](MAXC, MAXC)
 
@@ -55,13 +55,13 @@ import spatial.dsl._
         val gdaYtile = SRAM[Int](ts)
         val gdaXtile = SRAM[T](ts, MAXC)
         val blk = Reg[Int]
-        Parallel {
-          gdaYtile load y(r :: r + ts par ip)
-          gdaXtile load x(r :: r + ts, 0 :: C par ip) // Load tile of x
-          Pipe {
-            blk := min(R.value - r, ts)
-          }
+        // Parallel {
+        gdaYtile load y(r :: r + ts par ip)
+        gdaXtile load x(r :: r + ts, 0 :: C par ip) // Load tile of x
+        Pipe {
+          blk := min(R.value - r, ts)
         }
+        // }
 
         val sigmaBlk = SRAM[T](MAXC, MAXC)
 

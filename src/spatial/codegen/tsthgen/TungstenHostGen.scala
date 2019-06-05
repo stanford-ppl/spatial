@@ -7,7 +7,7 @@ case class TungstenHostGenSpatial(IR: State) extends TungstenHostCodegen
 	with TungstenHostGenCommon
 	with CppGenDebug
 	with CppGenMath
-	with CppGenArray
+	with TungstenHostGenArray
 	with CppGenFileIO
 	with TungstenHostGenInterface
 	with TungstenHostGenAccel

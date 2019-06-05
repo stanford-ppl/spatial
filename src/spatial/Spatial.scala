@@ -269,22 +269,6 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableParallelBinding = false
     }.text("Enable codegen to PIR [false]")
 
-    cli.opt[Unit]("pir-module").action { (_,_) =>
-      spatialConfig.enablePIR = true
-      spatialConfig.enableTsth = false
-      spatialConfig.enableInterpret = false
-      spatialConfig.enableSynth = false
-      spatialConfig.enableRetiming = false
-      //spatialConfig.enableBroadcast = false
-      spatialConfig.vecInnerLoop = true
-      //spatialConfig.ignoreParEdgeCases = true
-      spatialConfig.enableBufferCoalescing = false
-      spatialConfig.groupUnrolledAccess = true
-      spatialConfig.targetName = "Plasticine"
-      spatialConfig.enableForceBanking = true
-      spatialConfig.enableParallelBinding = false
-    }.text("Enable codegen to Black Boxed PIR [false]")
-
     cli.opt[Unit]("tsth").action { (_,_) =>
       spatialConfig.enablePIR = false
       spatialConfig.enableTsth = true

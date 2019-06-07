@@ -1,3 +1,5 @@
+package spatial.tests.feature.banking
+
 import spatial.dsl._
 
 @spatial class ManualConflictDephasing extends SpatialTest {

@@ -27,15 +27,18 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
 
-  lazy val bankViews: Seq[BankingView] = if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
+  lazy val bankViews: Seq[BankingView] = if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
+                                         else if (mem.explicitBanking.isDefined && mem.explicitNs.size > 1) Seq(Hierarchical(rank))
+                                         else if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
                                          else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank) Seq(Flat(rank), Hierarchical(rank)) 
                                          else if (mem.isNoHierarchicalBank) Seq(Flat(rank)) 
                                          else if (mem.isNoFlatBank) Seq(Hierarchical(rank)) 
                                          else Seq(Flat(rank))
 
-  lazy val nStricts: Seq[NStrictness] = Seq(NPowersOf2, NBestGuess, NRelaxed)
-  lazy val aStricts: Seq[AlphaStrictness] = Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
-  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isNoDuplicate) RegroupHelper.regroupNone
+  lazy val nStricts: Seq[NStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs)) else Seq(NPowersOf2, NBestGuess, NRelaxed)
+  lazy val aStricts: Seq[AlphaStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas)) else Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
+                                                    else if (mem.isNoDuplicate) RegroupHelper.regroupNone
                                                     else if (mem.isOnlyDuplicate) RegroupHelper.regroupAll(rank)
                                                     else if (mem.duplicateOnAxes.isDefined) mem.duplicateOnAxes.get.map{x: Seq[Int] => RegroupDims(x.toList)}.toList
                                                     else if (mem.isDuplicatable & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) 
@@ -58,6 +61,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbgs(s"NStrictness:   ${nStricts}")
     dbgs(s"AlphaStrictness:   ${aStricts}")
     dbgs(s"DimensionDuplication: ${dimensionDuplication}")
+    dbgs(s"Explicit Banking: ${mem.explicitBanking}")
+    dbgs(s"Force Explicit Banking: ${mem.forceExplicitBanking}")
     dbg(s"---------------------------------------------------------------------")
     val readers = mem.readers
     val writers = mem.writers
@@ -390,18 +395,20 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
+    val controllerLCA = lca.ancestors.collectFirst{case x if (x.isInnerControl && !x.isSwitch) => x} // Outermost controller that is inner controller
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       (lca.isOuterPipeLoop && !isWrittenIn(lca)) ||
-      (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
+      (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) || 
+      ((a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay != b.access.fullDelay) && (controllerLCA.isDefined && controllerLCA.get.isLoopControl)) ||
       (lca.isParallel || (a.access.parent == b.access.parent && (Seq(lca) ++ lca.ancestors).exists(_.willUnroll))) || lca.isOuterStreamLoop
   }
 
 
   protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix]): Seq[Instance] = {
-    val rdGroups = groupAccesses(readers)
-    val wrGroups = groupAccesses(writers)
+    val rdGroups = if (mem.forceExplicitBanking) Set(readers) else groupAccesses(readers)
+    val wrGroups = if (mem.forceExplicitBanking) Set(writers) else groupAccesses(writers)
     if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups)
     else if (writers.nonEmpty) mergeWriteGroups(wrGroups)
     else Seq(Instance.Unit(rank))

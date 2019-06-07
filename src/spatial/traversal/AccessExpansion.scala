@@ -26,7 +26,7 @@ trait AccessExpansion {
     * a min or max constraint for x based on this bound. Otherwise returns None.
     */
   def constraint(x: Idx, bound: Idx, isMin: Boolean): Option[SparseConstraint[Idx]] = {
-    val vec = bound.getAccessPattern.flatMap(_.head.getSparseVector)
+    val vec = bound.getAccessPatterns.flatMap(_.head.head.getSparseVector)
     if (isMin) vec.map(_.asMinConstraint(x)) else vec.map(_.asMaxConstraint(x))
   }
 

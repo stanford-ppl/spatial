@@ -264,4 +264,4 @@ case class AddressPattern(
   * Setter:  sym.accessPattern = (Set[AddressPattern])
   * Default: undefined
   */
-case class AccessPattern(pattern: Seq[AddressPattern]) extends Data[AccessPattern](Transfer.Remove)
+case class AccessPattern(pattern: NDAddressPattern) extends Data[AccessPattern](Transfer.Remove)

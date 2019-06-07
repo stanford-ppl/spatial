@@ -13,6 +13,8 @@ import emul.ResidualGenerator._
 
 package object access {
 
+  type NDAddressPattern = Seq[AddressPattern]
+
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
     def isParEnq: Boolean = op match {
@@ -69,16 +71,27 @@ package object access {
   }
 
   implicit class AccessPatternOps(s: Sym[_]) {
-    def getAccessPattern: Option[Seq[AddressPattern]] = metadata[AccessPattern](s).map(_.pattern)
-    def accessPattern: Seq[AddressPattern] = getAccessPattern.getOrElse{throw new Exception(s"No access pattern defined for $s")}
-    def accessPattern_=(pattern: Seq[AddressPattern]): Unit = metadata.add(s, AccessPattern(pattern))
+    // def getAccessPattern: Option[Seq[AddressPattern]] = metadata[AccessPattern](s).map(_.pattern)
+    // def accessPattern: Seq[AddressPattern] = getAccessPattern.getOrElse{throw new Exception(s"No access pattern defined for $s")}
+    // def accessPattern_=(pattern: Seq[AddressPattern]): Unit = metadata.add(s, AccessPattern(pattern))
   }
 
 
   implicit class AffineDataOps(s: Sym[_]) {
-    def getAffineMatrices: Option[Seq[AccessMatrix]] = metadata[AffineMatrices](s).map(_.matrices)
-    def affineMatrices: Seq[AccessMatrix] = getAffineMatrices.getOrElse(Nil)
-    def affineMatrices_=(matrices: Seq[AccessMatrix]): Unit = metadata.add(s, AffineMatrices(matrices))
+    // def getAffineMatrices: Option[Seq[AccessMatrix]] = metadata[AffineMatrices](s).map(_.matrices)
+    // def affineMatrices: Seq[AccessMatrix] = getAffineMatrices.getOrElse(Nil)
+    // def affineMatrices_=(matrices: Seq[AccessMatrix]): Unit = metadata.add(s, AffineMatrices(matrices))
+
+    def getAccessPatterns: Option[Seq[NDAddressPattern]] = if (accessPatterns.isEmpty) None else Some(accessPatterns)
+    def accessPatterns: Seq[NDAddressPattern] = patternsToMatrices.map(_._1).toSeq
+    def affineMatrices: Seq[AccessMatrix] = patternsToMatrices.flatMap(_._2).toSeq
+    def patternsToMatrices: Map[NDAddressPattern, Seq[AccessMatrix]] = metadata[AcccessPatternsToAffineMatrices](s).map(_.mapping).getOrElse(Map())
+    def matricesOfPattern(ap: NDAddressPattern): Seq[AccessMatrix] = patternsToMatrices.getOrElse(ap, Nil)
+    def addPatternAndMatrices(ap: NDAddressPattern, matrices: Seq[AccessMatrix]): Unit = {
+      val old = matricesOfPattern(ap)
+      val all = patternsToMatrices ++ Map((ap -> (old ++ matrices)))
+      metadata.add(s, AcccessPatternsToAffineMatrices(all))
+    }
 
     def getDomain: Option[ConstraintMatrix[Idx]] = metadata[Domain](s).map(_.domain)
     def domain: ConstraintMatrix[Idx] = getDomain.getOrElse{ ConstraintMatrix.empty }
@@ -103,6 +116,7 @@ package object access {
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
     def isReader: Boolean = Reader.unapply(a).isDefined || isUnrolledReader
     def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter
+    def isVecAccess: Boolean = VecReader.unapply(a).isDefined || VecWriter.unapply(a).isDefined
 
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined

@@ -30,3 +30,12 @@ case class Users(users: Set[User]) extends Data[Users](SetBy.Analysis.Consumer)
   * Default: empty set
   */
 case class ReadUses(reads: Set[Sym[_]]) extends Data[ReadUses](SetBy.Flow.Consumer)
+
+/** 
+  *
+  * Option:  TBD
+  * Getter:  TBD
+  * Setter:  TBD
+  * Default: Nil (no access matrices)
+  */
+case class AcccessPatternsToAffineMatrices(mapping: Map[NDAddressPattern, Seq[AccessMatrix]]) extends Data[AcccessPatternsToAffineMatrices](Transfer.Remove)

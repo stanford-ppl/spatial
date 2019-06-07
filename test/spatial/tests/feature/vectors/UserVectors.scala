@@ -20,6 +20,13 @@ import spatial.dsl._
 
       val x = vB(0)
 
+      val m1 = SRAM[Int](1,8)
+      val m2 = SRAM[Int](1,8)
+      val addr = Vec.ZeroFirst(Seq.tabulate(8){i => i.to[Int]}:_*)
+      m1(0,addr) = addr
+      m2(0,addr) = m2(0,addr) 
+
+      println(r"m2(0,1) = ${m2(0,1)}")
       println(vL(1::0)) // Should be Vector.ZeroFirst(12,11)
       println(vB(0::1)) // Should be Vector.ZeroFirst(10,11)
 

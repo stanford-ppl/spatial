@@ -4,6 +4,7 @@ import argon._
 import argon.node._
 import argon.passes.Traversal
 import utils.implicits.collections._
+import utils.math.combs
 
 import spatial.lang._
 import spatial.node._
@@ -210,20 +211,19 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * This spoofing is done by treating the streaming access as a linear access and is used so that
     * streaming and addressed accesses can be analyzed using the same affine pattern logic.
     */
-  private def setAccessPattern(mem: Sym[_], access: Sym[_], addr: Seq[Idx]): Unit = {
+  private def setAccessPattern(mem: Sym[_], access: Sym[_], vAddr: Seq[Seq[Idx]]): Unit = {
     dbgs(s"${stm(access)}")
+    combs(vAddr.map(_.toList).toList).map{addr => 
+      val pattern = addr.map{x => getAccessAddressPattern(mem, access, x) }
+      val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
+      access.addPatternAndMatrices(pattern, matrices)
 
-    val pattern = addr.map{x => getAccessAddressPattern(mem, access, x) }
+      dbgs(s"  Access pattern: ")
+      pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"    [$d] $p") }
+      dbgs(s"  Unrolled matrices: ")
+      matrices.foreach{m => dbgss("    ", m) }
 
-    dbgs(s"  Access pattern: ")
-    pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"    [$d] $p") }
-
-    val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
-    access.accessPattern = pattern
-    access.affineMatrices = matrices
-
-    dbgs(s"  Unrolled matrices: ")
-    matrices.foreach{m => dbgss("    ", m) }
+    }
   }
 
   /**
@@ -251,8 +251,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
     val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
-    access.accessPattern = pattern
-    access.affineMatrices = matrices
+    access.addPatternAndMatrices(pattern, matrices)
 
     dbgs(s"  Unrolled matrices: ")
     matrices.foreach{m => dbgss("    ", m) }
@@ -261,12 +260,12 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = lhs match {
     case Op(op@CounterNew(start,end,step,_)) if op.A.isIdx =>
       dbgs(s"$lhs = $rhs [COUNTER]")
-      start.accessPattern = Seq(getValueAddressPattern(start.asInstanceOf[Idx]))
-      end.accessPattern   = Seq(getValueAddressPattern(end.asInstanceOf[Idx]))
-      step.accessPattern  = Seq(getValueAddressPattern(step.asInstanceOf[Idx]))
-      dbgs(s"  start: ${start.accessPattern}")
-      dbgs(s"  end: ${end.accessPattern}")
-      dbgs(s"  step: ${step.accessPattern}")
+      start.addPatternAndMatrices(Seq(getValueAddressPattern(start.asInstanceOf[Idx])), Seq())
+      end.addPatternAndMatrices(Seq(getValueAddressPattern(end.asInstanceOf[Idx])), Seq())
+      step.addPatternAndMatrices(Seq(getValueAddressPattern(step.asInstanceOf[Idx])), Seq())
+      dbgs(s"  start: ${start.accessPatterns.head}")
+      dbgs(s"  end: ${end.accessPatterns.head}")
+      dbgs(s"  step: ${step.accessPatterns.head}")
 
     case Op(loop: Loop[_]) if loop.cchains.forall(!_._1.isForever) =>
       loop.bodies.foreach{scope =>
@@ -308,9 +307,13 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
           }
         case _ =>
       }
-      setAccessPattern(mem, lhs, adr)
+      setAccessPattern(mem, lhs, adr.map(Seq(_)))
+    case VecReader(mem,adr,_)   => 
+      setAccessPattern(mem, lhs, adr.map(_.elems.toSeq).toSeq)
     case Writer(mem,_,adr,_) => 
-      setAccessPattern(mem, lhs, adr)
+      setAccessPattern(mem, lhs, adr.map(Seq(_)))
+    case VecWriter(mem,_,adr,_) => 
+      setAccessPattern(mem, lhs, adr.map(_.elems.toSeq).toSeq)
     case _ => super.visit(lhs, rhs)
   }
 }

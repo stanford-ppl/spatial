@@ -78,7 +78,6 @@ trait Mem1[A,M1[T]] extends Mem[A,M1] {
 
   /** Returns a view of this memory at the addresses in the given `range`. */
   @api def apply(range: Rng): M1[A] = stage(MemDenseAlias[A,M1,M1](me,Seq(range)))
-
 }
 
 trait Mem2[A,M1[T],M2[T]] extends Mem[A,M2] {

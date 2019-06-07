@@ -45,6 +45,9 @@ case class AccessMatrix(
   /** True if this space of addresses MAY have at least one element in common with b. */
   def intersects(b: AccessMatrix)(implicit isl: ISL): Boolean = isl.intersects(this.matrix, b.matrix)
 
+  /** Determine pseudo lane of this matrix when the access is a VecAccess */
+  def pseudoLane: Int = access.affineMatrices.indexOf(this)
+
   override def toString: String = {
     stm(access) + " {" + unroll.mkString(",") + "}\n" + matrix.toString
   }

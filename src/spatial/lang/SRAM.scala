@@ -135,9 +135,17 @@ object SRAM {
 
   /** Returns the value at `pos`. */
   @api def apply(pos: I32): A = stage(SRAMRead(this,Seq(pos),Set.empty))
+  @api def apply(pos: Vec[I32]): Vec[A] = {
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](pos.elems.size)
+    stage(SRAMVecRead(this,Seq(pos.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
   /** Updates the value at `pos` to `data`. */
   @api def update(pos: I32, data: A): Void = stage(SRAMWrite(this,data,Seq(pos),Set.empty))
+  @api def update(pos: Vec[I32], data: Vec[A]): Void = {
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](data.elems.size)
+    stage(SRAMVecWrite(this,data.asInstanceOf[Vec[Sym[_]]],Seq(pos.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
 }
 
@@ -153,9 +161,24 @@ object SRAM {
 
   /** Returns the value at (`row`, `col`). */
   @api def apply(row: I32, col: I32): A = stage(SRAMRead(this,Seq(row,col),Set.empty))
+  /** Returns a vector of values at (`row`, `col`). */
+  @api def apply(row: I32, col: Vec[I32]): Vec[A] = apply(Vec.ZeroFirst(row), col)
+  @api def apply(row: Vec[I32], col: I32): Vec[A] = apply(row, Vec.ZeroFirst(col))
+  @rig def apply(row: Vec[I32], col: Vec[I32]): Vec[A] = {
+    assert(col.elems.size * row.elems.size == List(col.elems.size, row.elems.size).max, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](col.elems.size * row.elems.size)
+    stage(SRAMVecRead(this,Seq(row.asInstanceOf[Vec[Idx]],col.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
   /** Updates the value at (`row`,`col`) to `data`. */
   @api def update(row: I32, col: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
+  @api def update(row: I32, col: Vec[I32], data: Vec[A]): Void = update(Vec.ZeroFirst(row), col, data)
+  @api def update(row: Vec[I32], col: I32, data: Vec[A]): Void = update(row, Vec.ZeroFirst(col), data)
+  @rig def update(row: Vec[I32], col: Vec[I32], data: Vec[A]): Void = {
+    assert(col.elems.size * row.elems.size == data.elems.size, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](col.elems.size * row.elems.size)
+    stage(SRAMVecWrite(this,data.asInstanceOf[Vec[Sym[_]]],Seq(row.asInstanceOf[Vec[Idx]],col.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
 }
 
@@ -170,9 +193,26 @@ object SRAM {
 
   /** Returns the value at (`d0`,`d1`,`d2`). */
   @api def apply(d0: I32, d1: I32, d2: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2),Set.empty))
+  /** Returns a vector of values at (`d0`, `d1`, `d3`). */
+  @api def apply(d0: I32, d1: I32, d2: Vec[I32]): Vec[A] = apply(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), d2)
+  @api def apply(d0: I32, d1: Vec[I32], d2: I32): Vec[A] = apply(Vec.ZeroFirst(d0), d1, Vec.ZeroFirst(d2))
+  @api def apply(d0: Vec[I32], d1: I32, d2: I32): Vec[A] = apply(d0, Vec.ZeroFirst(d1), Vec.ZeroFirst(d2))
+  @rig def apply(d0: Vec[I32], d1: Vec[I32], d2: Vec[I32]): Vec[A] = {
+    assert(d2.elems.size * d1.elems.size * d0.elems.size == List(d2.elems.size, d1.elems.size, d0.elems.size).max, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](d2.elems.size * d1.elems.size * d0.elems.size)
+    stage(SRAMVecRead(this,Seq(d0.asInstanceOf[Vec[Idx]],d1.asInstanceOf[Vec[Idx]],d2.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
   /** Updates the value at (`d0`,`d1`,`d2`) to `data`. */
   @api def update(d0: I32, d1: I32, d2: I32, data: A): Void = stage(SRAMWrite(this,data,Seq(d0,d1,d2), Set.empty))
+  @api def update(d0: I32, d1: I32, d2: Vec[I32], data: Vec[A]): Void = update(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), d2, data)
+  @api def update(d0: I32, d1: Vec[I32], d2: I32, data: Vec[A]): Void = update(Vec.ZeroFirst(d0), d1, Vec.ZeroFirst(d2), data)
+  @api def update(d0: Vec[I32], d1: I32, d2: I32, data: Vec[A]): Void = update(d0, Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), data)
+  @rig def update(d0: Vec[I32], d1: Vec[I32], d2: Vec[I32], data: Vec[A]): Void = {
+    assert(d2.elems.size * d1.elems.size * d0.elems.size == data.elems.size, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](d2.elems.size * d1.elems.size * d0.elems.size)
+    stage(SRAMVecWrite(this,data.asInstanceOf[Vec[Sym[_]]],Seq(d0.asInstanceOf[Vec[Idx]],d1.asInstanceOf[Vec[Idx]],d2.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
 
 }
@@ -188,9 +228,28 @@ object SRAM {
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`). */
   @api def apply(d0: I32, d1: I32, d2: I32, d3: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3),Set.empty))
+  /** Returns a vector of values at (`d0`, `d1`, `d3`, `d4`). */
+  @api def apply(d0: I32, d1: I32, d2: I32, d3: Vec[I32]): Vec[A] = apply(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), d3)
+  @api def apply(d0: I32, d1: I32, d2: Vec[I32], d3: I32): Vec[A] = apply(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), d2, Vec.ZeroFirst(d3))
+  @api def apply(d0: I32, d1: Vec[I32], d2: I32, d3: I32): Vec[A] = apply(Vec.ZeroFirst(d0), d1, Vec.ZeroFirst(d2), Vec.ZeroFirst(d3))
+  @api def apply(d0: Vec[I32], d1: I32, d2: I32, d3: I32): Vec[A] = apply(d0, Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), Vec.ZeroFirst(d3))
+  @rig def apply(d0: Vec[I32], d1: Vec[I32], d2: Vec[I32], d3: Vec[I32]): Vec[A] = {
+    assert(d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size == List(d3.elems.size, d2.elems.size, d1.elems.size, d0.elems.size).max, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size)
+    stage(SRAMVecRead(this,Seq(d0.asInstanceOf[Vec[Idx]],d1.asInstanceOf[Vec[Idx]],d2.asInstanceOf[Vec[Idx]],d3.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
   /** Updates the value at (`d0`,`d1`,`d2`,`d3`) to `data`. */
   @api def update(d0: I32, d1: I32, d2: I32, d3: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3), Set.empty))
+  @api def update(d0: I32, d1: I32, d2: I32, d3: Vec[I32], data: Vec[A]): Void = update(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), d3, data)
+  @api def update(d0: I32, d1: I32, d2: Vec[I32], d3: I32, data: Vec[A]): Void = update(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), d2, Vec.ZeroFirst(d3), data)
+  @api def update(d0: I32, d1: Vec[I32], d2: I32, d3: I32, data: Vec[A]): Void = update(Vec.ZeroFirst(d0), d1, Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), data)
+  @api def update(d0: Vec[I32], d1: I32, d2: I32, d3: I32, data: Vec[A]): Void = update(d0, Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), data)
+  @rig def update(d0: Vec[I32], d1: Vec[I32], d2: Vec[I32], d3: Vec[I32], data: Vec[A]): Void = {
+    assert(d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size == data.elems.size, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size)
+    stage(SRAMVecWrite(this,data.asInstanceOf[Vec[Sym[_]]],Seq(d0.asInstanceOf[Vec[Idx]],d1.asInstanceOf[Vec[Idx]],d2.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
 }
 
@@ -205,9 +264,30 @@ object SRAM {
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`,`d4`). */
   @api def apply(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
+  /** Returns a vector of values at (`d0`, `d1`, `d3`, `d4`). */
+  @api def apply(d0: I32, d1: I32, d2: I32, d3: I32, d4: Vec[I32]): Vec[A] = apply(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), d4)
+  @api def apply(d0: I32, d1: I32, d2: I32, d3: Vec[I32], d4: I32): Vec[A] = apply(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), d3, Vec.ZeroFirst(d4))
+  @api def apply(d0: I32, d1: I32, d2: Vec[I32], d3: I32, d4: I32): Vec[A] = apply(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), d2, Vec.ZeroFirst(d3), Vec.ZeroFirst(d4))
+  @api def apply(d0: I32, d1: Vec[I32], d2: I32, d3: I32, d4: I32): Vec[A] = apply(Vec.ZeroFirst(d0), d1, Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), Vec.ZeroFirst(d4))
+  @api def apply(d0: Vec[I32], d1: I32, d2: I32, d3: I32, d4: I32): Vec[A] = apply(d0, Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), Vec.ZeroFirst(d4))
+  @rig def apply(d0: Vec[I32], d1: Vec[I32], d2: Vec[I32], d3: Vec[I32], d4: Vec[I32]): Vec[A] = {
+    assert(d4.elems.size * d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size == List(d4.elems.size, d3.elems.size, d2.elems.size, d1.elems.size, d0.elems.size).max, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](d4.elems.size * d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size)
+    stage(SRAMVecRead(this,Seq(d0.asInstanceOf[Vec[Idx]],d1.asInstanceOf[Vec[Idx]],d2.asInstanceOf[Vec[Idx]],d3.asInstanceOf[Vec[Idx]],d4.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
   /** Updates the value at (`d0`,`d1`,`d2`,`d3`,`d4`) to `data`. */
   @api def update(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3,d4), Set.empty))
+  @api def update(d0: I32, d1: I32, d2: I32, d3: I32, d4: Vec[I32], data: Vec[A]): Void = update(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), d4, data)
+  @api def update(d0: I32, d1: I32, d2: I32, d3: Vec[I32], d4: I32, data: Vec[A]): Void = update(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), d3, Vec.ZeroFirst(d4), data)
+  @api def update(d0: I32, d1: I32, d2: Vec[I32], d3: I32, d4: I32, data: Vec[A]): Void = update(Vec.ZeroFirst(d0), Vec.ZeroFirst(d1), d2, Vec.ZeroFirst(d3), Vec.ZeroFirst(d4), data)
+  @api def update(d0: I32, d1: Vec[I32], d2: I32, d3: I32, d4: I32, data: Vec[A]): Void = update(Vec.ZeroFirst(d0), d1, Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), Vec.ZeroFirst(d4), data)
+  @api def update(d0: Vec[I32], d1: I32, d2: I32, d3: I32, d4: I32, data: Vec[A]): Void = update(d0, Vec.ZeroFirst(d1), Vec.ZeroFirst(d2), Vec.ZeroFirst(d3), Vec.ZeroFirst(d4), data)
+  @rig def update(d0: Vec[I32], d1: Vec[I32], d2: Vec[I32], d3: Vec[I32], d4: Vec[I32], data: Vec[A]): Void = {
+    assert(d4.elems.size * d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size == data.elems.size, "Multivector access not supported")
+    implicit val vT: Type[Vec[A]] = Vec.bits[A](d4.elems.size * d3.elems.size * d2.elems.size * d1.elems.size * d0.elems.size)
+    stage(SRAMVecWrite(this,data.asInstanceOf[Vec[Sym[_]]],Seq(d0.asInstanceOf[Vec[Idx]],d1.asInstanceOf[Vec[Idx]],d2.asInstanceOf[Vec[Idx]],d3.asInstanceOf[Vec[Idx]]),Set.empty))
+  }
 
 }
 

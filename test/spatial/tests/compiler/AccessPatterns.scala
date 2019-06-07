@@ -87,9 +87,9 @@ class AccessPatterns extends SpatialTestbench {
     System.out.println(c0)
     System.out.println(s"Overlaps: ${a00.overlapsAddress(a01)}")
 
-    val a1 = A1.accessPattern.head
+    val a1 = A1.accessPatterns.head.head
     //val a2 = A2.accessPattern.head
-    val a3 = A3.accessPattern.head
+    val a3 = A3.accessPatterns.head.head
     // TODO: Equality check is failing here for some reason, even when equal. Using string equality for now
     a1.comps.head.toString shouldBe AffineProduct(1, K).toString
     //a2.comps shouldBe Nil

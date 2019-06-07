@@ -23,6 +23,17 @@ import spatial.lang._
     ens:  Set[Bit])
   extends Reader[A,A]
 
+/** Read a vector of elements from an SRAM.
+  * @param mem The memory instance being read
+  * @param addr The N-dimensional addresses
+  * @param ens Associated read enable(s)
+  */
+@op case class SRAMVecRead[A:Bits,C[T]](
+    mem:  SRAM[A,C],
+    addr: Seq[Vec[Idx]],
+    ens:  Set[Bit])(implicit val vT: Type[Vec[A]])
+  extends VecReader[A]
+
 /** Write of a single element to an SRAM.
   * @param mem The memory instance being written
   * @param data The element being written
@@ -35,6 +46,19 @@ import spatial.lang._
     addr: Seq[Idx],
     ens: Set[Bit])
   extends Writer[A]
+
+/** Write of a vector of elements to an SRAM.
+  * @param mem The memory instance being written
+  * @param data The element being written
+  * @param addr The N-dimensional address
+  * @param ens Associated write enable(s)
+  */
+@op case class SRAMVecWrite[A:Bits,C[T]](
+    mem:  SRAM[A,C],
+    data: Vec[Sym[_]],
+    addr: Seq[Vec[Idx]],
+    ens: Set[Bit])
+  extends VecWriter[A]
 
 
 

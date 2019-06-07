@@ -19,6 +19,8 @@ trait PlasticineTest extends DSLTest { test =>
     //"--debug=true" ::
     Nil
 
+  val timer = s"""/usr/bin/time -f Runtime:%E"""
+
   abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
@@ -174,8 +176,8 @@ trait PlasticineTest extends DSLTest { test =>
       gentstcmd ++= cmdlnArgs
       val timeout = 3000
       scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply) >>
-      scommand(s"maketst", "make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runtst", "./tungsten".split(" "), timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"maketst", "time make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runtst", "time ./tungsten".split(" "), timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
     }
 
     def parseProute(vcLimit:Int)(line:String) = {
@@ -375,9 +377,9 @@ trait PlasticineTest extends DSLTest { test =>
     def runPasses():Result = {
       val result = genpir() >>
       pirpass("gentst", s"--mapping=true --codegen=true --net=inf --row=$row --col=$col --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", "make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
       runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
       }
     }
   }
@@ -390,9 +392,9 @@ trait PlasticineTest extends DSLTest { test =>
     def runPasses():Result = {
       val result = genpir() >>
       pirpass("gentst", s"--module --mapping=true --codegen=true --net=inf --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", "make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
       runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
       }
     }
   }
@@ -405,7 +407,7 @@ trait PlasticineTest extends DSLTest { test =>
     def runPasses():Result = {
       genpir() >>
       pirpass("gentst", s"--module --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=14 --col=14".split(" ").toList) >>
-      scommand(s"maketst", "make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
     }
   }
 

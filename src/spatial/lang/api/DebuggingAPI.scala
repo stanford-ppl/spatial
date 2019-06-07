@@ -148,4 +148,32 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
       stage(TextConcat(str))
     }
   }
+
+  private val defaultMargin = 0.1
+  @api def approxEql[T:Bits](a:T, b:T, margin:scala.Double=0.1):Bit = {
+    implicitly[Type[T]] match {
+      case tobits:Num[_] =>
+        implicit val n = tobits.asInstanceOf[Num[T]]
+        abs(a - b) <= (margin.to[T] * abs(a))
+      case _ => a === b
+    }
+  }
+
+  @api def approxEql[T:Bits](a:Tensor1[T], b:Tensor1[T]):Bit = approxEql(a,b,0.1)
+  @api def approxEql[T:Bits](a:Tensor1[T], b:Tensor1[T], margin:scala.Double):Bit = {
+    (a.length === b.length) &
+    a.zip(b) { (a,b) => approxEql[T](a,b,margin) }.reduce { _ & _ }
+  }
+
+  @api def approxEql[T:Bits](a:Tensor2[T], b:Tensor2[T]):Bit = approxEql(a,b,0.1)
+  @api def approxEql[T:Bits](a:Tensor2[T], b:Tensor2[T], margin:scala.Double):Bit = {
+    a.length === b.length &
+    a.zip(b) { (a,b) => approxEql[T](a,b,margin) }.reduce { _ & _ }
+  }
+
+  @api def approxEql[T:Bits](a:Tensor3[T], b:Tensor3[T]):Bit = approxEql(a,b,0.1)
+  @api def approxEql[T:Bits](a:Tensor3[T], b:Tensor3[T], margin:scala.Double):Bit = {
+    (a.length === b.length) &
+    a.zip(b) { (a,b) => approxEql(a,b,margin) }.reduce { _ & _ }
+  }
 }

@@ -103,7 +103,7 @@ import spatial.dsl._
     printArray(gold, "gold: ")
     printArray(result, "result: ")
 
-    val cksum = gold.zip(result){ case (a,b) => a < b + margin && a > b - margin }.reduce{_&&_}
+    val cksum = approxEql(gold, result)
     println("PASS: " + cksum  + " (GDA)")
     assert(cksum)
   }

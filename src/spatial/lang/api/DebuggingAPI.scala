@@ -12,7 +12,8 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   with argon.lang.api.DebuggingAPI_Shadowing {
   this: StaticAPI_Shadowing =>
 
-  @api def sleep(cycles: I32): Void = Pipe.NoBind.Foreach(cycles by 1){i => if (i == {cycles - 1}) print(r"$i") }
+  @virtualize
+  @api def sleep(cycles: I32): Void = Pipe.NoBind.Foreach(cycles by 1){i => if (i == 0) print(i) }
 
   /** Prints the given Array to the console, preceded by an optional heading. **/
   @virtualize

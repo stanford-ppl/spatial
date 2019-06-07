@@ -484,11 +484,15 @@ case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends Banki
 
 /** Enumeration of how to search for possible number of banks */
 sealed trait NStrictness extends SearchPriority {
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int]
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
+}
+case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
+  val P = 9
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
   val P = 1
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
 }
 case object NBestGuess extends NStrictness {
   val P = 0
@@ -502,13 +506,13 @@ case object NBestGuess extends NStrictness {
     list
   }
 
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = { 
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = { 
     numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}.sorted
   }
 }
 case object NRelaxed extends NStrictness {
   val P = 2
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int]): List[Int] = (min to max).filter(!isPow2(_)).toList
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(!isPow2(_)).toList
 }
 
 /** Enumeration of how to search for possible alpha vectors
@@ -529,11 +533,15 @@ sealed trait AlphaStrictness extends SearchPriority {
     }
     else valids.iterator.map{aR => prev :+ aR }
   }
-  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]]
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]]
+}
+case class UserDefinedAlpha(alphas: Seq[Int]) extends AlphaStrictness {
+  val P = 9
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = Iterator(axes.map(alphas))
 }
 case object AlphaPowersOf2 extends AlphaStrictness {
   val P = 1
-  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank)
   }
@@ -549,7 +557,7 @@ case object AlphaBestGuess extends AlphaStrictness {
     }
     list
   }
-  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = { 
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = { 
     val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product).uniqueModN(N)
     val dimBased = Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N).uniqueModN(N)
     val possibleAs = (List(0,1) ++ accessBased ++ dimBased).filter{x => x >= 0 && x <= N}
@@ -558,9 +566,24 @@ case object AlphaBestGuess extends AlphaStrictness {
 }
 case object AlphaRelaxed extends AlphaStrictness {
   val P = 2
-  def expand(rank: Int, N: Int, stagedDims: Seq[Int]): Iterator[Seq[Int]] = {
+  def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank).filterNot(_.forall(x => isPow2(x) || x == 1))
   }
 }
 
+/** Info set by the user to specify a specific banking scheme to be used
+  *
+  * Getter:  sym.explicitBanking: Option
+  * Setter:  sym.explicitBanking = (Seq[Int], Seq[Int], Seq[Int])
+  * Default: None
+  */
+case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int])) extends Data[ExplicitBanking](SetBy.User)
+
+/** Flag set by the user to specify that a banking scheme must be used even if it is unsafe
+  *
+  * Getter:  sym.forceExplicitBanking
+  * Setter:  sym.forceExplicitBanking = flag
+  * Default: false
+  */
+case class ForceExplicitBanking(flag: Boolean) extends Data[ForceExplicitBanking](SetBy.User)

@@ -66,6 +66,14 @@ package object memory {
     @stateful def bankingEffort: Int = metadata[BankingEffort](s).map(_.effort).getOrElse(spatialConfig.bankingEffort)
     def bankingEffort_=(effort: Int): Unit = metadata.add(s, BankingEffort(effort))
 
+    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int])] = metadata[ExplicitBanking](s).map(_.scheme)
+    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def explicitNs: Seq[Int] = explicitBanking.get._1
+    def explicitBs: Seq[Int] = explicitBanking.get._2
+    def explicitAlphas: Seq[Int] = explicitBanking.get._3
+    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).map(_.flag).getOrElse(false)
+    def forceExplicitBanking_=(flag: Boolean): Unit = metadata.add(s, ForceExplicitBanking(flag))
+
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 

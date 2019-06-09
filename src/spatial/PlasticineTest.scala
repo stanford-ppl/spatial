@@ -399,6 +399,18 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
+  case object HTst extends PIRBackend(args="--pir --dot") {
+    private val genName = name + "_" + property("project").getOrElse("")
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
+    def runPasses():Result = {
+      genpir() >>
+      pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=14 --col=14 --run-proute".split(" ").toList) >>
+      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+    }
+  }
+
   case object MDHTst extends PIRBackend(args="--pir --dot") {
     private val genName = name + "_" + property("project").getOrElse("")
     override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
@@ -420,6 +432,7 @@ trait PlasticineTest extends DSLTest { test =>
     Dot +:
     Tst +:
     MDTst +:
+    HTst +:
     MDHTst +:
     super.backends
 

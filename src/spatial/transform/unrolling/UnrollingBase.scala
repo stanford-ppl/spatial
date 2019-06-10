@@ -229,7 +229,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     // The lane id of each unrolled lane. Norally it will be a list of Seqs with single element. If
     // the loop is vectorized it will be a List of single Seq() with vectorized lane ids
     lazy val ulanes:List[Lane] = {
-      if (vectorize) List(List.tabulate(P)(i => i))
+      if (vectorize) List(List.tabulate(V)(i => i))
       else List.tabulate(P) { p => List(p) }
     }
     /*

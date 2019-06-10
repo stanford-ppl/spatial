@@ -330,7 +330,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     }
 
     logs(s"[Accum-fold $lhs] Unrolling reduction trees and cycles")
-    val results = redLanes.map{ case List(p) =>
+    val results = redLanes.map{ lane =>
+      val p = redLanes.ulanes.indexOf(lane)
       val laneValid = if (redLanes.valids(p).isEmpty) Bit(true) else redLanes.valids(p).andTree
 
       logs(s"Lane #$p:")

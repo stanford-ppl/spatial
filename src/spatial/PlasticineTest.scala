@@ -19,7 +19,10 @@ trait PlasticineTest extends DSLTest { test =>
     //"--debug=true" ::
     Nil
 
-  val timer = s"""/usr/bin/time -f Runtime:%E"""
+  def timer = System.getProperty("os.name") match {
+    case "Mac OS X" => s"""gtime -f Runtime:%E"""
+    case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
+  }
 
   abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
     override val name = this.getClass.getSimpleName.replace("$","")

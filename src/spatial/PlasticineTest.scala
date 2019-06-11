@@ -408,9 +408,12 @@ trait PlasticineTest extends DSLTest { test =>
     override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
     override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
     def runPasses():Result = {
-      genpir() >>
+      val result = genpir() >>
       pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=14 --col=14 --run-proute".split(" ").toList) >>
       scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
+        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      }
     }
   }
 

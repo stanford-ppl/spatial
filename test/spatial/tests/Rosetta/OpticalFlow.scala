@@ -3,7 +3,8 @@ import spatial.targets._
 
 @spatial class OpticalFlow extends SpatialTest {
 
-  type Pixel = Float // FixPt[TRUE, _9, _23]
+  type Pixel     = FixPt[TRUE, _9, _23]
+  type PixelLong = FixPt[TRUE, _9, _23] //55]
 
   type Frame = UInt8
 
@@ -258,7 +259,7 @@ import spatial.targets._
     val tensor_filter   = LUT[Pixel](3)(0.3243.to[Pixel], 0.3513.to[Pixel], 0.3243.to[Pixel])
 
     //val tensor_buffer  = SRAM[Tensor](max_width) 
-    val outer_lb   = LineBuffer[Outer](tensor_filter.length, max_width)
+    val outer_lb   = SRAM[Outer](tensor_filter.length, max_width)
     val buf_num    = tensor_filter.length
 
     Foreach(max_height + 1 by 1) { r =>
@@ -353,21 +354,28 @@ import spatial.targets._
       Foreach(outputs_x.cols by 1) { c => tensor_buffer(c) = tensors.deq() }
 
       Foreach(outputs_x.cols by 1) { c =>
-
+        /* Needs very low-precision FP ops. This is best handled with actual floating-point hardware support */
         val curr_tensor = tensor_buffer(c)
-        val denom = curr_tensor.t1 * curr_tensor.t2 - curr_tensor.t4 * curr_tensor.t4
 
-        val vec_x = (curr_tensor.t6 * curr_tensor.t4 - curr_tensor.t5 * curr_tensor.t2) / denom
-        val vec_y = (curr_tensor.t5 * curr_tensor.t4 - curr_tensor.t6 * curr_tensor.t1) / denom
+        val curr_tensor_t1 = curr_tensor.t1.to[PixelLong]
+        val curr_tensor_t2 = curr_tensor.t2.to[PixelLong]
+        val curr_tensor_t3 = curr_tensor.t3.to[PixelLong]
+        val curr_tensor_t4 = curr_tensor.t4.to[PixelLong]
+        val curr_tensor_t5 = curr_tensor.t5.to[PixelLong]
+        val curr_tensor_t6 = curr_tensor.t6.to[PixelLong]
+
+        val denom = curr_tensor_t1 * curr_tensor_t2 - curr_tensor_t4 * curr_tensor_t4 
+
+        val vec_x = (curr_tensor_t6 * curr_tensor_t4 - curr_tensor_t5 * curr_tensor_t2).to[Float] / denom.to[Float]
+        val vec_y = (curr_tensor_t5 * curr_tensor_t4 - curr_tensor_t6 * curr_tensor_t1).to[Float] / denom.to[Float]
         //print(curr_tensor)
-        //print(" ")
-        //println(curr_tensor.t1 * curr_tensor.t2)
+
         if (r >= 2 && r < outputs_x.rows - 2 &&  c  >= 2 && c < outputs_x.cols - 2) 
-                {outputs_x_buf(c) = vec_x; outputs_y_buf(c) = vec_y } 
+                {outputs_x_buf(c) = vec_x.to[Pixel]; outputs_y_buf(c) = vec_y.to[Pixel] } 
                else 
                 {outputs_x_buf(c) = 0.to[Pixel]; outputs_y_buf(c) = 0.to[Pixel]} 
       }
-     // println()
+
       Parallel { 
         outputs_x(r, 0::outputs_x.cols) store outputs_x_buf
         outputs_y(r, 0::outputs_y.cols) store outputs_y_buf
@@ -435,20 +443,13 @@ import spatial.targets._
     val velocity_outputs_dram_y   =  DRAM[Pixel](max_height, max_width)
 
     /* Intermmediate values */
-   // val debug_grad_x = DRAM[Pixel](max_height, max_width)
-
-   // val y_filtered          = DRAM[Gradient](max_height, max_width)
-  //  val grad_filtered       = DRAM[Gradient](max_height, max_width)
-   // val curr_out_product    = DRAM[Outer](max_height, max_width)
-  //  val tensor_y            = DRAM[Tensor](max_height, max_width)
-  //  val tensor_final        = DRAM[Tensor](max_height, max_width)
 
     val velocity_outputs_x = DRAM[Pixel](max_height, max_width)
     val velocity_outputs_y = DRAM[Pixel](max_height, max_width)
 
 
     Accel {
-      val fifo_depth = max_width*2
+      val fifo_depth = max_width
 
       val gradient_x      = FIFO[Pixel](fifo_depth)
       val gradient_y      = FIFO[Pixel](fifo_depth)

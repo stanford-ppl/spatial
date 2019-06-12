@@ -12,6 +12,7 @@ import utils.implicits._
 	type Pixel2 = FixPt[FALSE, _24, _0]
 	type Pixel3 = UInt32
 
+	type Float = FixPt[FALSE, _12, _20]
 
 	@struct case class Size(width : Int, height : Int)
 
@@ -27,6 +28,7 @@ import utils.implicits._
 	val image_maxgrey   = 255 
 
 	val window_size 	= 25
+
 	val total_stages 	= 25 
 	val total_nodes 	= 2913
 
@@ -52,8 +54,8 @@ import utils.implicits._
 		//val b = Reg[UInt](0)
 		val c = Reg[UInt](0)
 		val value_int = Reg[UInt](0)
+
 		a := 0.to[UInt]
-		//b := 0.to[UInt] 
 		c := 0.to[UInt] 
 		
 		value_int := num_u 
@@ -64,7 +66,6 @@ import utils.implicits._
 			val b_temp 		= a_temp << 1 | 1
 			c 			:= mux(c_temp >= b_temp, c_temp - b_temp, c_temp) 
 			a 			:= mux(c_temp >= b_temp, a_temp + 1, a_temp) 
-		//	b 			:= b_temp
 		    value_int 	:= val_temp 
 		}
 		a.value.to[UInt]
@@ -192,8 +193,8 @@ import utils.implicits._
 		val y_ratio = (((h1 << 16) / h2) + 1).to[Int]
 
 		val parFactor = 2 //scatter/gather support for 2D structures
-		Foreach (max_height by 1) { i => 
-			Foreach (max_width by 1 par parFactor) { j =>
+		Foreach (max_height by 1) { i =>
+			Foreach(max_width by 1 par parFactor) { j =>
 				if (i < h2 && j < w2) {
 					img1_sram(j)  = data( (i*y_ratio) >> 16, (j*x_ratio) >> 16 )
 				}
@@ -213,18 +214,19 @@ import utils.implicits._
 							 img1_data_sram  		: SRAM1[Pixel], 
 							 c 						: I32) : Unit = {
 
+		//List.tabulate(window_size, window_size) { (u,v) =>
 		Foreach(window_size by 1, window_size by 1) { (u,v) =>
-			//println(imageWindowBuffer(u, v + 1) - imageWindowBuffer(u, 0)))
-			integralWindowBuffer(u,v) = (integralWindowBuffer(u,v).to[Int] + (imageWindowBuffer(u, v + 1).to[Int] - imageWindowBuffer(u, 0).to[Int])).to[Pixel3]
-			//println()
+			integralWindowBuffer(u,v) = (integralWindowBuffer(u,v).to[Int] + 
+				(imageWindowBuffer(u, v + 1).to[Int] - imageWindowBuffer(u, 0).to[Int])).to[Pixel3]
 		}
+
 		squareIntegralBuffer(0,0) = (squareIntegralBuffer(0,0).to[Int]  + (squareImageBuffer(0,1).to[Int]							- squareImageBuffer(0,0).to[Int] )).to[Pixel3] 
 		squareIntegralBuffer(0,1) = (squareIntegralBuffer(0,1).to[Int]  + (squareImageBuffer(0,window_size).to[Int]  				- squareImageBuffer(0,0).to[Int] )).to[Pixel3] 
 		squareIntegralBuffer(1,0) = (squareIntegralBuffer(1,0).to[Int]  + (squareImageBuffer(window_size - 1,1).to[Int] 			- squareImageBuffer(window_size - 1,0).to[Int])).to[Pixel3] 
 		squareIntegralBuffer(1,1) = (squareIntegralBuffer(1,1).to[Int]  + (squareImageBuffer(window_size - 1,window_size).to[Int]  	- squareImageBuffer(window_size - 1,0).to[Int])).to[Pixel3] 
 
 		/* ideal to parallelize all operations */
-		Foreach(window_size_double - 1 by 1, window_size by 1 par 1) { (u,v) =>
+		Foreach(window_size_double - 1 by 1, window_size by 1 par 4) { (u,v) =>
 			imageWindowBuffer(v, u) = if (u + v != window_size_double - 1) 
 										imageWindowBuffer(v, u + 1)
 									  else 
@@ -236,18 +238,18 @@ import utils.implicits._
 										squareImageBuffer(v, u + 1) + squareImageBuffer(v - 1, u + 1)
 		}
 
-		//List.tabulate(window_size - 1) { v  =>imageWindowBuffer(v, window_size_double - 1) = imageLineBuffer(window_size - 2 - v, c).to[Pixel2] }
-		// Might not work in old spatial, but should work in new Spatial 
-
-		Foreach(window_size - 1 by 1 par window_size - 1) { v =>
-			imageWindowBuffer(v, window_size_double - 1) = imageLineBuffer(window_size - 2 - v, c).to[Pixel2]
-			squareImageBuffer(v, window_size_double - 1) = imageLineBuffer(window_size - 2 - v, c).to[Pixel2] * imageLineBuffer(window_size - 2 - v, c).to[Pixel2]
+		//List.tabulate(window_size - 1) { v =>
+		Foreach(window_size - 1 by 1){ v => 
+			imageWindowBuffer(v, window_size_double - 1) = imageLineBuffer(window_size - 1 - v, c).to[Pixel2]
+			squareImageBuffer(v, window_size_double - 1) = imageLineBuffer(window_size - 1 - v, c).to[Pixel2] * imageLineBuffer(window_size - 1 - v, c).to[Pixel2]
 		}
 		
 		imageWindowBuffer(window_size - 1, window_size_double - 1) = img1_data_sram(c).to[Pixel2]
 	    squareImageBuffer(window_size - 1, window_size_double - 1) = img1_data_sram(c).to[Pixel2] * img1_data_sram(c).to[Pixel2]
 	    
-	    imageLineBuffer(*, c) <<= img1_data_sram(c) /* shift up line buffer */
+
+	    imageLineBuffer(*, c) <<= img1_data_sram(c) /* shifts down line buffer */ 
+
 	}
 
 
@@ -365,8 +367,9 @@ import utils.implicits._
 						processImage(factor.value, sz.height, sz.width, result_x, result_y, result_w, result_h, result_reg, img1_dram, winSize.value) 
 
 						factor := factor.value * scaleFactor 
+
 					} else {}
-				} { factor_state => mux(image_width/factor.value.to[Int] > window_size && image_height/factor.value.to[Int] > window_size, not_done, done)} 
+				} { factor_state => mux(image_width/factor.value.to[Int] > window_size && image_height/factor.value.to[Int] > window_size, done, done)} 
 			}
 
 			
@@ -374,9 +377,9 @@ import utils.implicits._
 							   coord 		: RegFile1[Int], 
 							   haar_counter : I32) : Int = {
 
-				val weights_haar0 = -4096.to[Int]
+				val weights_haar0 = -4096 // compiler error if I use -4096.to[Int]
 
-				val return_value = Reg[Int]
+				//val return_value = Reg[Int]
 
 				val t = tree_thresh_array(haar_counter) * stddev.to[Int]
 				val sum0 = (coord(0) - coord(1) - coord(2) + coord(3))   * weights_haar0
@@ -384,8 +387,8 @@ import utils.implicits._
 				val sum2 = (coord(8) - coord(9) - coord(10) + coord(11)) * weights_haar2(haar_counter)
 				val final_sum = sum0 + sum1 + sum2 
 
-				return_value := mux(final_sum >= t, alpha2_array(haar_counter), alpha1_array(haar_counter))
-				return_value.value
+				mux(final_sum >= t, alpha2_array(haar_counter), alpha1_array(haar_counter))
+				//return_value.value
 			}
 
 			
@@ -409,7 +412,6 @@ import utils.implicits._
 
 				val stddev_t2	=	stddev_t * (window_size - 1) * (window_size - 1) - mean * mean
 				val stddev 		=   mux(stddev_t2 > 0.to[Int], intSqrt(stddev_t2), 1.to[UInt])
-
 
 				//val w_inx	= Reg[Index](0)
 				//val r_inx 	= Reg[I32](0)
@@ -477,18 +479,21 @@ import utils.implicits._
 							coord(10) = mux(coords_not_zero, sum(tr2.y + tr2.h, tr2.x).to[Int]			, 0.to[Int]) 
 							coord(11) = mux(coords_not_zero, sum(tr2.y + tr2.h, tr2.x + tr2.w).to[Int]	, 0.to[Int]) 
 
-							//println("coords: ")
-							//println(coord(0))
-							//println()
+							/*println("coords: ")
+							println(coord(0))
+							println(coord(1))
+							println(coord(2))
+							println() */
 
 							s := weakClassifier(stddev, coord, haar_counter.value.to[Int]) 
 
-							stage_sum := stage_sum + s 
+							stage_sum 	 := stage_sum + weakClassifier(stddev, coord, haar_counter.value.to[Int]) //s  
 							haar_counter := haar_counter + 1 
-
+							//println(haar_counter.value)
 						}
 								
 						bad_triangle := stage_sum.value.to[Float] < 0.4.to[Float] * stages_thresh_lut(i.value).to[Float] 
+
 						i := i + 1 
 					} else {}
 				} {
@@ -512,17 +517,17 @@ import utils.implicits._
 				//val sum1_data 		= SRAM.buffer[Int](max_height, max_width)
 				//val sqsum1_data 	 	= SRAM.buffer[Int](max_height, max_width)
 
-				val imageLineBuffer 	  = RegFile[Pixel](window_size - 1, max_width) /* 24 x 320 */
-				val imageWindowBuffer     = RegFile[Pixel2](window_size, window_size_double)
-				val integralWindowBuffer  = RegFile[Pixel3](window_size, window_size)
+				val imageLineBuffer 	  = RegFile[Pixel](window_size - 1, max_width).buffer /* 24 x 320 */
+				val imageWindowBuffer     = RegFile[Pixel2](window_size, window_size_double).buffer
+				val integralWindowBuffer  = RegFile[Pixel3](window_size, window_size).buffer
 
-				val squareImageBuffer 	  = RegFile[Pixel2](window_size, window_size_double)
-				val squareIntegralBuffer  = RegFile[Pixel3](2, 2)
+				val squareImageBuffer 	  = RegFile[Pixel2](window_size, window_size_double).buffer
+				val squareIntegralBuffer  = RegFile[Pixel3](2, 2).buffer
 
 				val img1_data_sram 		  = SRAM[Pixel](max_width)
 
 				/* initialize integral buffers */
-				Foreach(window_size by 1, window_size by 1 par 1) { (u,v) =>
+				Foreach(window_size by 1, window_size by 1 par 2) { (u,v) =>
 					integralWindowBuffer(u,v) = 0.to[Pixel3]
 				}
 				squareIntegralBuffer(0,0) = 0.to[Pixel3]
@@ -530,19 +535,19 @@ import utils.implicits._
 				squareIntegralBuffer(1,0) = 0.to[Pixel3]
 				squareIntegralBuffer(1,1) = 0.to[Pixel3]
 
-				Foreach(window_size by 1, window_size_double by 1 par 1) { (u,v) =>
+				Foreach(window_size by 1, window_size_double by 1 par 2) { (u,v) =>
 					imageWindowBuffer(u,v) = 0.to[Pixel2]
 					squareImageBuffer(u,v) = 0.to[Pixel2]
 				}
-				Foreach(window_size - 1 by 1, max_width by 1 par 1) { (u,v) =>
+				Foreach(window_size - 1 by 1, max_width by 1 par 2) { (u,v) =>
 					imageLineBuffer(u,v) = 0.to[Pixel]
 				}
 
 				/* finished initiailizing all buffers */
 
-				val r_index = Reg[Int](0)
-				val c_index = Reg[Int](0)
-				val element_counter = Reg[Int](0)
+				val r_index = Reg[Int](0).buffer
+				val c_index = Reg[Int](0).buffer
+				val element_counter = Reg[Int](0).buffer
 
 				r_index := 0.to[Int]
 				c_index := 0.to[Int]
@@ -550,7 +555,7 @@ import utils.implicits._
 
 				Foreach(sum_row by 1) { r =>
 					//imageLineBuffer load img1_data(r, 0::max_width)
-					img1_data_sram  load img1_data(r, 0::max_width)
+					img1_data_sram  load img1_data(r, 0::max_width par 4)
 					Foreach(sum_col by 1) { c =>
 
 						
@@ -569,8 +574,8 @@ import utils.implicits._
 							val p = Reg[Point](Point(0,0))
 							p := Point(x,y)
 
-							val result = Reg[Int](0)
-							result := cascadeClassifier(integralWindowBuffer, squareIntegralBuffer, p.value)
+							//val result = Reg[Int](0)
+							val result = cascadeClassifier(integralWindowBuffer, squareIntegralBuffer, p.value)
 							if (result > 0.to[Int]) {
 				      			val r = Rect( doRound(p.x.to[Float] * factor), doRound(p.y.to[Float] * factor), win_size.width, win_size.height )
 				      			val size_i = all_candidates_size.value
@@ -598,7 +603,6 @@ import utils.implicits._
 
 			}	
 
-			
 
 			/* Main Accel starts here */
 			Parallel {

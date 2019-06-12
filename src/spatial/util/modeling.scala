@@ -244,13 +244,13 @@ object modeling {
             val delay = critical + latencyOf(cur, inReduce)
 
             debugs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
-            delay
+            scrubNoise(delay)
           }
           else {
             val inReduce = knownCycles.contains(cur)
             val delay = latencyOf(cur, inReduce)
             debugs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
-            delay
+            scrubNoise(delay)
           }
 
         case s => paths.getOrElse(s, 0) // Get preset out of scope delay, or assume 0 offset

@@ -56,9 +56,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     // Return Set of iterator combined with its unroll address with which it dephases
     def allDephasingIters(accs: Set[Set[AccessMatrix]]): Set[(Idx,Seq[Int])] = {
-      accs.map{grp => grp.map{a => 
-        grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
-      }.flatten}.flatten
+      if (mem.forceExplicitBanking) Set()
+      else {
+        accs.map{grp => grp.map{a => 
+          grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
+        }.flatten}.flatten
+      }
     }
     def generateSubstRules(toRewrite: Set[(Idx,Seq[Int])]): scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = {
       toRewrite.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
@@ -156,7 +159,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         dbgs(s"incrementing ${scheme.view}, ${scheme.regroup} to ${count + 1} ")
       }
       def wantScheme(scheme: BankingOptions): Boolean = {
-        if (effort == 0 && (schemesFoundCount.map(_._2).sum > 1)) false
+        if (effort == 0 && (schemesFoundCount.map(_._2).sum > 0)) false
         else if (effort == 1 && (
           schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0 ||
           !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
@@ -169,11 +172,17 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
-      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) {
+      if (mem.isArgOut || mem.isArgIn || mem.isHostIO) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && !mem.explicitBanking.isDefined) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && !mem.explicitBanking.isDefined) {
         val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1, 0)))))
       }
+      // else if (mem.explicitBanking.isDefined) {
+      //   if (mem.forceExplicitBanking) {
+      //     Seq()
+      //   }
+      // }
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(view, nStricts, aStricts, regroup) => 
           if (wantScheme(scheme)) {
@@ -373,7 +382,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
-    val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList).iterator
+    dbgs(s"for $nStricts, $aStricts, $axes, $stagedDims on $mem, bounds are $Nmin $Ncap (${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)})")
+    val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes).iterator
 
     val rank = axes.length
     var banking: Option[ModBanking] = None
@@ -381,12 +391,20 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     var attempts = 0
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
-      val As = aStricts.expand(rank, N, stagedDims)
+      val As = aStricts.expand(rank, N, stagedDims, axes)
+      if (mem.forceExplicitBanking) {
+        val alpha = As.next()
+        val t = computeP(N,1,alpha,stagedDims,mem)
+        val P = t._1
+        val darkVolume = t._2
+        // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
+        banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P,darkVolume))
+      }
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1
-        if (!mem.onlyBlockCyclic && checkCyclic(N,alpha,grps)) {
+        if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val t = computeP(N,1,alpha,stagedDims,mem)
           val P = t._1
@@ -394,7 +412,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           banking = Some(ModBanking(N,1,alpha,axes,P,darkVolume))
         }
         else if (!mem.noBlockCyclic) {
-          val B = mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val t = computeP(N, b, alpha, stagedDims,mem)

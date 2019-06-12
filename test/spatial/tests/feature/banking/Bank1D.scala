@@ -33,6 +33,8 @@ import spatial.dsl._
       val directW5 = SRAM[Int](C)
       val xBarW1   = SRAM[Int](tile)
       val xBarW2   = SRAM[Int](C)
+      val explicit1 = SRAM[Int](tile).forcebank(N=Seq(8),B=Seq(1),alpha=Seq(1)) // Compiler does not verify that this is valid
+      val explicit2 = SRAM[Int](tile).bank(N=Seq(8),B=Seq(1),alpha=Seq(1)) // Compiler verifies if this is valid
       directW1             load dram(0::tile par 8)
       directW2             load dram(16::16 + tile par 8)
       directW3             load dram(0::LEN par 8)     // Unaligned but local addr should start at const 0
@@ -40,11 +42,13 @@ import spatial.dsl._
       directW5(21::21+LEN) load dram(21::21+LEN par 8) // Unaligned but local addr should start at const 21
       xBarW1               load dram(START::START + 16 par 8) // Cannot be direct bank
       xBarW2(START::START+LEN)   load dram(START::START + 16 par 8) // Cannot be direct bank
+      explicit1            load dram(0::tile par 8)
+      explicit2            load dram(0::tile par 8)
 
-      RESULT := directW1(PROBE.value) + directW2(PROBE.value) + directW3(PROBE.value) + directW4(PROBE.value) + directW5(21 + PROBE.value) + xBarW1(PROBE.value) + xBarW2(START.value + PROBE.value)
+      RESULT := directW1(PROBE.value) + directW2(PROBE.value) + directW3(PROBE.value) + directW4(PROBE.value) + directW5(21 + PROBE.value) + xBarW1(PROBE.value) + xBarW2(START.value + PROBE.value) + explicit1(PROBE.value) + explicit2(PROBE.value)
     }
 
-    val gold = data(probe) + data(probe + 16) + data(probe) + data(probe + 21) + data(probe + 21) + data(probe + start) + data(probe + start)
+    val gold = data(probe) + data(probe + 16) + data(probe) + data(probe + 21) + data(probe + 21) + data(probe + start) + data(probe + start) + data(probe) + data(probe)
     val result = getArg(RESULT)
     println(r"got $result, wanted $gold")
     assert(result == gold)
@@ -146,5 +150,35 @@ import spatial.dsl._
     val gold2 = 7
     println(r"Answers: $got1 =?= $gold1, $got2 =?= $gold2")
     assert(got1 == gold1 && got2 == gold2)
+  }
+}
+
+
+@spatial class MetaprogrammedConflict extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+    val dram1 = DRAM[Int](64)
+    val dram2 = DRAM[Int](64)
+    setMem(dram1, Array.tabulate(64){i => i.to[Int]})
+    val in = ArgIn[Int]
+    setArg(in, 1)
+
+    Accel {
+      val mem1 = SRAM[Int](64).noduplicate
+      val mem2 = SRAM[Int](64).noduplicate
+      mem1 load dram1
+      Foreach(64 by 8){i => 
+        if (in.value == 1) { // Make LCA an inner SwitchCase to confuse banking analyzer
+          List.tabulate(8){j => 
+            mem2(i+j) = mem1(i+j) // Used to bank this N=7 since first lane does not have addition in the address path, which is wrong if II = 1
+          }
+        }
+      }
+      dram2 store mem2
+    }
+
+    printArray(getMem(dram2), "got")
+    println(r"Pass: ${getMem(dram2) == getMem(dram1)}")
+    assert(getMem(dram2) == getMem(dram1))
   }
 }

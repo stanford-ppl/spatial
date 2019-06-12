@@ -1,7 +1,7 @@
 
 `timescale 1 ns / 1 ps
 
-	module AXI4LiteToRFBridgeZCUVerilog #
+	module AXI4LiteToRFBridgeKCU1500Verilog #
 	(
 		// Users to add parameters here
 

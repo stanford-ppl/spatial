@@ -38,11 +38,11 @@ case class FileBus[A:Bits](fileName:String) extends Bus { @rig def nbits: Int = 
  * Same as FileBus. Except A must be struct type with last field in Bit type. The last field
  * will be interpreted as last bit of the stream to terminate simulation.
  * */
-case class FileBusLastBit[A:Bits](fileName:String)(implicit state:State) extends Bus { 
+case class FileEOFBus[A:Bits](fileName:String)(implicit state:State) extends Bus { 
   Type[A] match {
     case a:Struct[_] if a.fields.last._2 == Type[Bit] => 
     case a => 
-      error(s"LastBitBus must have struct type with last field in Bit. Got type ${a}")
+      error(s"EFOBus must have struct type with last field in Bit. Got type ${a}")
       state.logError()
   }
   @rig def nbits: Int = Bits[A].nbits

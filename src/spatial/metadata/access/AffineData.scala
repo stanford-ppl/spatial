@@ -7,6 +7,7 @@ import utils.math._
 import spatial.lang._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.access._
 import poly.{ConstraintMatrix, ISL, SparseMatrix, SparseVector}
 import emul.ResidualGenerator._
 
@@ -121,8 +122,11 @@ case class AccessMatrix(
     }
   }
 
+  /** Convert unroll addr to lane index */
+  def laneIndex: Int = access.affineMatrices.map(_.unroll).indexOf(unroll)
+
   /** Get segments that each unroll belongs to */
-  def segmentAssignments: Seq[Int] = access.segmentMapping.map(_._2).toSeq
+  def segmentAssignment: Int = access.segmentMapping.getOrElse(laneIndex,0)
 }
 
 /** The unrolled access patterns of an optionally parallelized memory access represented as affine matrices.

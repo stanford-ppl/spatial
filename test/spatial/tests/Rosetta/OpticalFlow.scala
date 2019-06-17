@@ -259,7 +259,7 @@ import spatial.targets._
     val tensor_filter   = LUT[Pixel](3)(0.3243.to[Pixel], 0.3513.to[Pixel], 0.3243.to[Pixel])
 
     //val tensor_buffer  = SRAM[Tensor](max_width) 
-    val outer_lb   = SRAM[Outer](tensor_filter.length, max_width)
+    val outer_lb   = LineBuffer[Outer](tensor_filter.length, max_width)
     val buf_num    = tensor_filter.length
 
     Foreach(max_height + 1 by 1) { r =>
@@ -271,7 +271,7 @@ import spatial.targets._
           Foreach(max_width by 1 par 4) { c => 
             outer_lb(0, c) = outer.deq()
           } */ 
-          Foreach(max_width by 1) { _ =>
+          Foreach(max_width by 1) { c =>
             outer_lb.enqAt(0.to[I32], outer.deq() )
           }
         }

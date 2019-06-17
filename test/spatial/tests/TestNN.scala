@@ -208,7 +208,7 @@ import utils.implicits._
              // Pipe{               
               Foreach(nr by 1, nc by 1) { (r,c) =>
       
-                val conv_xnor_win =  List.tabulate(nw,nw,2) { (i, j, inD_i) =>
+                val conv_xnor_win =  List.tabulate(nw,nw,8) { (i, j, inD_i) =>
                                         val r_inx = r+i-1
                                         val c_inx = c+j-1
                                         val out_of_img_bounds = r_inx < 0.to[I32] || c_inx < 0.to[I32] || r_inx > (nr-1) || c_inx > (nc-1)
@@ -216,7 +216,7 @@ import utils.implicits._
                                         val bin_inx = i*nw*conv_max_in_channels + j*nw + inD_i
 
                                         val conv_xnor_win = ~(bin_weight_SRAM(bin_inx) ^ fc_layer_conv(L%2, r_inx, c_inx, inD_i)) 
-                                        val pcnt_conv = popcount(Seq.tabulate(64){ p => conv_xnor_win.bit(p).to[Bit] } ).to[T]
+                                        val pcnt_conv = conv_xnor_win.to[T] //popcount(Seq.tabulate(64){ p => conv_xnor_win.bit(p).to[Bit] } ).to[T]
 
                                         val not_in_channel_range = inD_i >= r_max
 
@@ -246,7 +246,7 @@ import utils.implicits._
             }
 
             Foreach(or by 1, oc by 1, r_max by 1) { (i,j, outD_p) =>
-              fc_layer_conv(1-L%2, i, j, outD_p) = catSeq(Seq.tabulate(64) { p => fc_layer_conv_bit(i,j, outD_p*64 + p) }).as[TB]
+              fc_layer_conv(1-L%2, i, j, outD_p) = fc_layer_conv_bit(i,j,outD_p).to[TB] //catSeq(Seq.tabulate(64) { p => fc_layer_conv_bit(i,j, outD_p*64 + p) }).as[TB]
             } 
         }
 
@@ -293,14 +293,14 @@ import utils.implicits._
               // XNOR + Popcount op in lieu of dot product
               val prod = Reduce(Reg[T](0.to[T]))(fc_in_channels_c par 8){ in_i =>
                               val xnor_tmp = ~(tmp_SRAM_fc(L_inx, in_i) ^ weight_SRAM_long(out_i * fc_in_channels_c + in_i))
-                              popcount(Seq.tabulate(64){ p => xnor_tmp.bit(p)}).to[T] //popcount here 
+                              popcount(Seq.tabulate(64){ p => xnor_tmp.bit(p)}).to[T] 
                          }{_+_}
 
               tmp_SRAM_fc_bit(out_i) = batch_norm(prod.value)
             }
 
             Foreach(0 until fc_bit_channels(L) by 1) { wi =>
-              tmp_SRAM_fc(1-L_inx, wi) = catSeq(Seq.tabulate(64) { p => tmp_SRAM_fc_bit(wi*64 + p) }).as[TB] 
+              tmp_SRAM_fc(1-L_inx, wi) = tmp_SRAM_fc_bit(wi).to[TB] //catSeq(Seq.tabulate(64) { p => tmp_SRAM_fc_bit(wi*64 + p) }).as[TB] 
             }
 
           }

@@ -5,7 +5,7 @@ import spatial.targets._
 import utils.implicits._
 
 
-@spatial class DigitRecognition extends SpatialTest {
+@spatial class DigitRecognitionT1 extends SpatialTest {
 	override def runtimeArgs: Args = "18000 2000"
 
     type LabelType	 		= UInt8
@@ -32,7 +32,7 @@ import utils.implicits._
 
 	/* Parameters to tune */
 	val k_const 				= 3 /* Number of nearest neighbors to handle */
-	val par_factor  			= 40 //40
+	val par_factor  			= 32 //40
 	val par_factor_double		= par_factor * 2
 	val parLoad 				= 2
  
@@ -363,7 +363,7 @@ import utils.implicits._
 					Pipe.II(1).Foreach(num_training by 1 par par_factor) { train_inx  =>
 
 						val curr_train_inx = train_inx // * par_factor + p
-						val p = train_inx % par_factor
+						val p = train_inx// % par_factor
 						update_knn(test_local1, test_local2,
 								   train_set_local1(curr_train_inx), train_set_local2(curr_train_inx),
 								   knn_tmp_large_set, label_list_tmp, p, label_set_local(curr_train_inx))	

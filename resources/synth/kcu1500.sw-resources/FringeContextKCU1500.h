@@ -1,9 +1,9 @@
-#ifndef __FRINGE_CONTEXT_ZCU_H__
-#define __FRINGE_CONTEXT_ZCU_H__
+#ifndef __FRINGE_CONTEXT_KCU1500_H__
+#define __FRINGE_CONTEXT_KCU1500_H__
 
 #include "FringeContextBase.h"
-#include "ZCUAddressMap.h"
-#include "ZCUUtils.h"
+#include "KCU1500AddressMap.h"
+#include "KCU1500Utils.h"
 #include <cstring>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -30,7 +30,7 @@
 using namespace std;
 
 /**
- * ZCU Fringe Context
+ * KCU1500 Fringe Context
  */
 
 // extern "C" {
@@ -39,7 +39,7 @@ using namespace std;
 
 // }
 
-class FringeContextZCU : public FringeContextBase<void> {
+class FringeContextKCU1500 : public FringeContextBase<void> {
 
   uint32_t burstSizeBytes;
   int fd;
@@ -101,7 +101,7 @@ public:
   uint32_t numArgEarlyExits;
   string bitfile;
 
-  FringeContextZCU(string path = "") : FringeContextBase(path) {
+  FringeContextKCU1500(string path = "") : FringeContextBase(path) {
     bitfile = path;
 
     numArgIns = 0;
@@ -296,7 +296,7 @@ public:
 
   void flushCache(uint32_t kb) {
     // Iterate through an array the size of the L2$, to "flush" the cache aka fill it with garbage
-    int cacheSizeWords = kb * (1 << 10) / sizeof(int); // 512kB on ZCU, 1MB on ZCU
+    int cacheSizeWords = kb * (1 << 10) / sizeof(int); // 512kB on KCU1500, 1MB on KCU1500
     int arraySize = cacheSizeWords * 10;
     int *dummyBuf = (int*) malloc(arraySize * sizeof(int));
     EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", dummyBuf, getFPGAPhys((uint64_t) dummyBuf), arraySize);
@@ -496,7 +496,7 @@ public:
     EPRINTF(" **************************\n");
   }
 
-  ~FringeContextZCU() {
+  ~FringeContextKCU1500() {
     dumpDebugRegs();
   }
 };

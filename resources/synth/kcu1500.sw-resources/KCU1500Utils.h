@@ -1,5 +1,5 @@
-#ifndef __ZCU_UTILS_H__
-#define __ZCU_UTILS_H__
+#ifndef __KCU1500_UTILS_H__
+#define __KCU1500_UTILS_H__
 
 #include <arpa/inet.h>
 #include <time.h>
@@ -54,4 +54,4 @@ u64 Xil_In64(u64 Addr);
 void Xil_Out64(u64 OutAddress, u64 Value);
 double getTime();
 
-#endif  // ifndef __ZCU_UTILS_H__
+#endif  // ifndef __KCU1500_UTILS_H__

@@ -293,6 +293,8 @@ package object memory {
         case Op(_: RegAccumFMA[_]) => Some(AccumFMA)
         case Op(_: RegAccumLambda[_]) => Some(AccumUnk)
       }
+
+    def isSingleton: Boolean = isReg || isArgIn || isArgOut || isHostIO || isFIFOReg
     def isReg: Boolean = mem.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgInNew[_]] }
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }

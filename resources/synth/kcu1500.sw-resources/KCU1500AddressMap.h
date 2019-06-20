@@ -1,5 +1,5 @@
-#ifndef __ZCU_ADDRESS_MAP_H__
-#define __ZCU_ADDRESS_MAP_H__
+#ifndef __KCU1500_ADDRESS_MAP_H__
+#define __KCU1500_ADDRESS_MAP_H__
 
 #include <stdio.h>
 #include <assert.h>
@@ -40,4 +40,4 @@
     assert(0);  \
   }
 
-#endif  // ifndef __ZCU_ADDRESS_MAP_H__
+#endif  // ifndef __KCU1500_ADDRESS_MAP_H__

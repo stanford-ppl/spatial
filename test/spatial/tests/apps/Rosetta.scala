@@ -22,34 +22,32 @@ import spatial.targets._
 	@struct case class Pixel(x : UInt8, y : UInt8, color : UInt8)
 
 	def coloringFB(size_pixels 		: Int,
-				   pixels 			: FIFO[Pixel],
+				   pixels 			: SRAM1[Pixel],
 				   frame_buffer		: SRAM2[UInt8]) : Unit = {
 
-		//println(" " + size_pixels)
 		Foreach(size_pixels by 1){ i =>
-			val curr_pixel = pixels.deq()
+			val curr_pixel = pixels(i)
 			frame_buffer(curr_pixel.y.to[I32], curr_pixel.x.to[I32]) = curr_pixel.color
 		}
 	}
 
-	def zculling(fragments 	: FIFO[CandidatePixel],
+	def zculling(fragments 	: SRAM1[CandidatePixel],
 				 size_fragment : Int,
-				 pixels 	: FIFO[Pixel],
+				 pixels 	: SRAM1[Pixel],
 				 z_buffer 	: SRAM2[UInt8]) : Int = {
 
 		val pixel_reg = Reg[Int](0)
-		Pipe { pixel_reg := 0.to[Int] }
+	    pixel_reg := 0.to[Int] 
 
 		Foreach(size_fragment by 1) { p =>
-			val curr_fragment = fragments.deq() //(p)
+			val curr_fragment = fragments(p) //.deq()
 			if (curr_fragment.z < z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32])) {
-				pixels.enq(Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color))
+				pixels(p) = Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color)
 				z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32]) = curr_fragment.z
 				pixel_reg := pixel_reg + 1.to[Int]
 			}
 		}
 
-		//pixels.numel.to[Int]
 		pixel_reg.value 
 	}
 
@@ -58,7 +56,7 @@ import spatial.targets._
 					   xmax_index	: Reg[Int], 
 					   ymax_index	: Reg[Int], 
 					   sample_triangle2D : triangle2D, 
-					   fragments 	: FIFO[CandidatePixel]) : Int = {
+					   fragments 	: SRAM1[CandidatePixel]) : Int = {
 
 		def pixel_in_triangle(x : Int16, y : Int16, tri2D : triangle2D) : Boolean = {
 
@@ -78,7 +76,7 @@ import spatial.targets._
 		val y_max = ymax_index.value //(max_min(3).to[I32] - max_min(2).to[I32]).to[I32]
 
 		val frag_reg = Reg[Int](0)
-		Pipe { frag_reg := 0.to[Int] }
+		frag_reg := 0.to[Int] 
 		if ( (!flag) ) { 
 		   	Foreach(x_max by 1, y_max by 1 par 1){ (x_t, y_t) =>
 				val x = max_min(0).to[Int16] + x_t.to[Int16]
@@ -92,27 +90,13 @@ import spatial.targets._
 				val frag_color = color 
 
 				if (in_triangle == true) {
-					fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color) ) 
+					fragments(frag_reg.value) = CandidatePixel(frag_x, frag_y, frag_z, frag_color) 
 					frag_reg := frag_reg +  1.to[Int]  
 				}
-			} /*
-			Foreach(max_index.value.to[I32] by 1 par 4) { k =>
-			 	val x = max_min(0).to[Int] + k.to[Int] % max_min(4).to[Int]
-			  	val y = max_min(2).to[Int] + k.to[Int] / max_min(4).to[Int]
-
-			  	val in_triangle = pixel_in_triangle(x, y, sample_triangle2D) 
-
-				val frag_x = x.to[UInt8]
-				val frag_y = y.to[UInt8]
-			   	val frag_z = sample_triangle2D.z
-				val frag_color = color 
-	     	//	if  (in_triangle == true) {
-    			Pipe { fragments.enq( CandidatePixel(frag_x, frag_y, frag_z, frag_color), in_triangle == true)	}									
-		    //    }
-		    } */
+			} 
 		}
 		frag_reg.value 
-		//mux(flag, 0.to[Int], fragments.numel.to[Int]) /* if (flag) 0 else i */
+
 	}
 
 	/* calculate bounding box for 2D triangle */
@@ -261,7 +245,7 @@ import spatial.targets._
 
 			/* instantiate buffer */
 			Foreach(img_y_size by 1, img_x_size by 1 par 16) { (i,j) =>
-				z_buffer(i,j) = 255.to[UInt8]
+				z_buffer(i,j)	  = 255.to[UInt8]
 				frame_buffer(i,j) = 0.to[UInt8]
 			}
 			
@@ -282,13 +266,13 @@ import spatial.targets._
 					val xmax_index = Reg[Int](0)
 					val ymax_index = Reg[Int](0)
 
-					val pixels = FIFO[Pixel](500)
+					val pixels = SRAM[Pixel](500)
 	
 					val flag = Reg[Boolean](false)
 					val size_fragment = Reg[Int](0.to[Int])
 					val size_pixels = Reg[Int](0.to[Int])
 
-					val fragment = FIFO[CandidatePixel](500)
+					val fragment = SRAM[CandidatePixel](500)
 
 					'proj.Pipe { projection(curr_triangle3D, tri2D, angle) }
 					'rast1.Pipe { flag := rasterization1(tri2D, max_min, xmax_index, ymax_index) } 
@@ -299,11 +283,9 @@ import spatial.targets._
 				}
 
 			}
-
-			Parallel { 
-				//host_z_buffer store z_buffer 
-				host_frame_buffer store frame_buffer
-			}
+ 
+			//host_z_buffer store z_buffer 
+			host_frame_buffer store frame_buffer
 		}
 
 		//val z_buffer_screen = getMatrix(host_z_buffer)

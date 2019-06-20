@@ -68,6 +68,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
     open(src"def staging(top:Top) = {")
     emit("""import pirgenStaging._""")
     emit("""import top._""")
+    emit(s"""top.name("${spatialConfig.name}")""")
   }
 
   def emitAccelFooter = {

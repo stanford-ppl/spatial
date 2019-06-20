@@ -45,6 +45,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                 val accumIters = iters.dropWhile(!writer.affineMatrices.head.matrix.keys.contains(_))
                 val selfRelativeData = iters.map{i => 
                   val p = i.ctrParOr1
+                  // TODO: I think this will be incorrect if writer leads reader, but iteration count of cchain cannot be determined
                   (i.ctrStart, i.ctrEnd, i.ctrStep) match {
                     case (Expect(start), Expect(end), Expect(step)) => 
                       ((scala.math.ceil((end-start) / step) / p).toInt, step*p)

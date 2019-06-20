@@ -172,7 +172,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-      if (mem.parent == Ctrl.Host) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      if (mem.isSingleton) {
+        if (myWrites.exists(_.size > 1) && !mem.shouldIgnoreConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
+        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      }
       else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && !mem.explicitBanking.isDefined) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
       else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && !mem.explicitBanking.isDefined) {
         val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
@@ -269,19 +272,25 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val writeIterSubsts = generateSubstRules(allDephasingIters(writes))
     if (writeIterSubsts.nonEmpty) dbgs(s"General write dephasing rules for $mem: ${writeIterSubsts.mkString("\n  - ")}")
     val hostReads = scala.collection.mutable.Set[AccessMatrix]()
-    val newReads = rewriteAccesses(reads, readIterSubsts).map(_.toSeq.flatMap{x => 
-      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
-      if (x.parent != Ctrl.Host) Some(x.matrix)
-      else {
-        hostReads += x
-        None
-      }
-    }.distinct)
-    val newWrites = rewriteAccesses(writes, writeIterSubsts).map(_.toSeq.flatMap{x => 
-      // sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
-      if (x.parent != Ctrl.Host) Some(x.matrix)
-      else None
-    }.distinct)
+    val newReads = rewriteAccesses(reads, readIterSubsts).map{accs => 
+      val mats = accs.toSeq.flatMap{x => 
+                                      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+                                      if (x.parent != Ctrl.Host) Some(x.matrix)
+                                      else {
+                                        hostReads += x
+                                        None
+                                      }
+                                    }
+      if (mem.isSingleton) mats else mats.distinct
+    }
+    val newWrites = rewriteAccesses(writes, writeIterSubsts).map{accs => 
+      val mats = accs.toSeq.flatMap{x => 
+                                      // sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+                                      if (x.parent != Ctrl.Host) Some(x.matrix)
+                                      else None
+                                    }
+      if (mem.isSingleton) mats else mats.distinct
+    }
 
     // Step 2: Find schemes for these grps
     findSchemes(newReads, newWrites, hostReads.toSet)

@@ -201,6 +201,10 @@ object Vec {
     stage(VecConcat(vecs))
   }
 
+  @rig def popcount(bits : Seq[Bit]) : U8 = {
+    stage(BitsPopcount(bits)) 
+  }
+  
   @rig def fromBits[A](bits: Vec[Bit], width: Int, A: Bits[A]): Vec[A] = A match {
     case _:Bit => bits.asInstanceOf[Vec[A]]
     case _ =>

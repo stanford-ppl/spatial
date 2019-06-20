@@ -23,7 +23,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
         x := mux(i === 0, mux(b > 0, a << 1, a >> 1),
           mux(b > 0, x << 1, x >> 1))
       }
-      x.value
+      mux(b === 0.to[Fix[TRUE,_16,_0]], a, x.value)
   }
 
   def lowerSRA[S,I,F](op: FixSRA[S,I,F]): Fix[S,I,F] = {
@@ -41,7 +41,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
           mux(b > 0, x >> 1, a << 1))
 
       }
-      x.value
+      mux(b === 0.to[Fix[TRUE,_16,_0]], a, x.value)
   }
 
   def lowerSRU[S,I,F](op: FixSRU[S,I,F]): Fix[S,I,F] = {
@@ -58,7 +58,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
         x := mux(i === 0, mux(b > 0, a >>> 1, a << 1),
           mux(b > 0, x >>> 1, x << 1))
       }
-      x.value
+      mux(b === 0.to[Fix[TRUE,_16,_0]], a, x.value)
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {

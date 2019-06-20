@@ -46,3 +46,7 @@ import utils.implicits.collections._
     case _ => super.rewrite
   }
 }
+
+@op case class BitsPopcount(data: Seq[Bit]) extends Primitive[U8] {
+  override val isTransient: Boolean  = true 
+}

@@ -31,6 +31,11 @@ trait ChiselGenVec extends ChiselGenCommon {
       emit(src"val (${lhs}_data, ${lhs}_mask) = Shuffle.compress(Vec($data), Vec($mask))")
       emit(src"${lhs}.zipWithIndex.foreach { case (a, i) => a.r := Cat(${lhs}_mask(i).r, ${lhs}_data(i).r) }")
 
+    case BitsPopcount(data) =>
+      emit(createWire(quote(lhs),remap(lhs.tp)))    
+      emit(src"$lhs.r := PopCount(Seq($data))") 
+
+
     case _ => super.gen(lhs, rhs)
   }
 

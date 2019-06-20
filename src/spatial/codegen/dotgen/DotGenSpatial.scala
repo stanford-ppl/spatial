@@ -36,9 +36,8 @@ trait DotGenSpatial extends DotCodegen {
     case lhs:RegFile[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:LUT[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs if lhs.isReg => "color" -> "chartreuse2" :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs:FIFO[_]      => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs:StreamIn[_]  => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs:StreamOut[_] => "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case lhs if lhs.isFIFO | lhs.isFIFOReg | lhs.isStreamIn | lhs.isStreamOut => 
+                              "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case lhs:DRAM[_,_]    => "color" -> "blueviolet"  :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case _ => Nil
   })

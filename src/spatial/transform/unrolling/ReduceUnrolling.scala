@@ -6,6 +6,7 @@ import spatial.node._
 import argon.node._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.util.spatialConfig
 import utils.tags.instrument
 
@@ -16,11 +17,11 @@ trait ReduceUnrolling extends UnrollingBase {
       val OpReduce(ens,cchain,accum,map,load,reduce,store,ident,fold,iters,stopWhen) = op
       implicit val A: Bits[a] = op.A
       val accum2 = accumHack(accum, load)
+      dbg(s"accum2:$accum2")
+      accum2.isInnerAccum = lhs.isInnerControl
 
       val stopWhen2 = if (stopWhen.isDefined) Some(memories((stopWhen.get,0)).asInstanceOf[Reg[Bit]]) else stopWhen
-      var fullyUnroll = cchain.willFullyUnroll
-      if (spatialConfig.enablePIR) fullyUnroll &= !lhs.isInnerControl
-      if (fullyUnroll) {
+      if (cchain.willFullyUnroll) {
         fullyUnrollReduce(lhs, f(ens), f(cchain), accum2, ident, fold, load, store, map, reduce, iters, stopWhen2, mop)
       }
       else {
@@ -68,10 +69,15 @@ trait ReduceUnrolling extends UnrollingBase {
         else {
           dbgs("Fully unrolling inner reduce")
           val result = unrollReduceTree[A](inputs, valids(), ident, rfunc)
-          store.reapply(accum, result)
+          if (spatialConfig.enablePIR) {
+            pirUnrollInnerReduce(None, reduce, result, load, store, accum)
+          } else {
+            store.reapply(accum, result)
+          }
         }
       }
     })){lhs2 => transferData(lhs,lhs2) }
+    pipe.unrollBy = mapLanes.Ps.product
     dbgs(s"Created unit pipe ${stm(pipe)}")
     pipe
   }
@@ -189,45 +195,71 @@ trait ReduceUnrolling extends UnrollingBase {
         unrollReduceTree[A](inputs, valids, ident, reduce.toFunction2)
       }
 
-      val result: A = inReduce(redType, isInner) {
-        dbgs(s"Inlining load function in reduce")
-        val accValue = load.reapply(accum)
-        val isFirst = iters.zip(start).map { case (i, st) => i === st }.andTree
+      if (spatialConfig.enablePIR && isInner) {
+        pirUnrollInnerReduce(fold, reduce, treeResult, load, store, accum)
+      } else {
+        val result: A = inReduce(redType, isInner) {
+          dbgs(s"Inlining load function in reduce")
+          val accValue = load.reapply(accum)
+          val isFirst = iters.zip(start).map { case (i, st) => i === st }.andTree
+          fold match {
+            // FOLD: On first iteration, use init value rather than zero
+            case Some(init) =>
+              val accumOrFirst: A = mux(isFirst, init, accValue)
+              box(accumOrFirst).reduceType = redType
+              reduce.reapply(treeResult, accumOrFirst)
 
-        if (spatialConfig.ignoreParEdgeCases) {
-          reduce.reapply(treeResult, accValue)
+            // REDUCE: On first iteration, store result of tree, do not include value from accum
+            // TODO: Could also have third case where we use ident instead of loaded value. Is one better?
+            case None =>
+              val res2 = reduce.reapply(treeResult, accValue)
+              val select = mux(isFirst, treeResult, res2)
+              box(select).reduceType = redType
+
+              dbgs(s"isFirst: ${stm(isFirst)}")
+              dbgs(s"res2:    ${stm(res2)}")
+              dbgs(s"select:  ${stm(select)}")
+
+              select
+          }
         }
-        else fold match {
-          // FOLD: On first iteration, use init value rather than zero
-          case Some(init) =>
-            val accumOrFirst: A = mux(isFirst, init, accValue)
-            box(accumOrFirst).reduceType = redType
-            reduce.reapply(treeResult, accumOrFirst)
 
-          // REDUCE: On first iteration, store result of tree, do not include value from accum
-          // TODO: Could also have third case where we use ident instead of loaded value. Is one better?
-          case None =>
-            val res2 = reduce.reapply(treeResult, accValue)
-            val select = mux(isFirst, treeResult, res2)
-            box(select).reduceType = redType
+        inReduce(redType, isInner) {
+          dbgs(s"Store: $result to $accum")
 
-            dbgs(s"isFirst: ${stm(isFirst)}")
-            dbgs(s"res2:    ${stm(res2)}")
-            dbgs(s"select:  ${stm(select)}")
+          val res = store.reapply(accum, result)
 
-            select
+          dbgs(s"Completed store (symbol $res)")
+          res
         }
-      }
-
-      inReduce(redType, isInner) {
-        dbgs(s"Store: $result to $accum")
-
-        val res = store.reapply(accum, result)
-
-        dbgs(s"Completed store (symbol $res)")
-        res
       }
     }
+  }
+
+  // HACK: create pattern that pir will match on.
+  // accum.write (reduce(mux(dummy, input, initOrInput), accum.read))
+  def pirUnrollInnerReduce[A:Bits,C[T]](
+    fold:   Option[A],            // Optional fold value
+    reduce: Lambda2[A,A,A],       // Reduction function
+    treeResult:A,
+    load:   Lambda1[C[A],A],      // Load function from accumulator
+    store:  Lambda2[C[A],A,Void], // Store function to accumulator
+    accum:  C[A],                 // Accumulator
+  ) = withFlow("inInnerReduce", { e =>
+    e.isInnerReduceOp = true
+  }) { 
+
+    dbgs(s"inInnerReduce(accum=$accum)")
+    val accValue = load.reapply(accum)
+    val initOrInput: A = fold match {
+      case Some(init) => init
+      case None => treeResult
+    }
+    val dummy = boundVar[Bit]
+    val m = mux(dummy, treeResult, initOrInput)
+    dbg(s"mux = $m treeResult=$treeResult, initOrInput=$initOrInput")
+    val rop = reduce.reapply(m, accValue)
+    store.reapply(accum, rop)
   }
 
 }

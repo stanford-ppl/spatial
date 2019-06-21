@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.metadata.bounds.Expect
 import spatial.metadata.access._
 import spatial.metadata.control._
+import spatial.util.spatialConfig
 import forge.tags.stateful
 
 package object memory {
@@ -30,6 +31,12 @@ package object memory {
     def segmentMapping: Map[Int,Int] = metadata[SegmentMapping](s).map(_.mapping).getOrElse(Map[Int,Int]())
     def segmentMapping_=(mapping: Map[Int,Int]): Unit = metadata.add(s, SegmentMapping(mapping))
     def removeSegmentMapping: Unit = metadata.add(s,SegmentMapping(Map[Int,Int]()))
+
+    def isInnerAccum: Boolean = metadata[InnerAccum](s).map(_.isInnerAccum).getOrElse(false)
+    def isInnerAccum_=(v: Boolean): Unit = metadata.add(s, InnerAccum(v))
+
+    def isInnerReduceOp: Boolean = metadata[InnerReduceOp](s).map(_.flag).getOrElse(false)
+    def isInnerReduceOp_=(v: Boolean): Unit = metadata.add(s, InnerReduceOp(v))
   }
 
   implicit class BankedMemoryOps(s: Sym[_]) {
@@ -45,14 +52,36 @@ package object memory {
     def noBlockCyclic: Boolean = metadata[NoBlockCyclic](s).exists(_.flag)
     def noBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, NoBlockCyclic(flag))
 
+    def onlyBlockCyclic: Boolean = metadata[OnlyBlockCyclic](s).exists(_.flag)
+    def onlyBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, OnlyBlockCyclic(flag))
+
+    def blockCyclicBs: Seq[Int] = metadata[BlockCyclicBs](s).map(_.bs).getOrElse {
+      Seq(2, 4, 8, 16, 32, 64, 128, 256)
+    }
+    def blockCyclicBs_=(bs: Seq[Int]): Unit = metadata.add(s, BlockCyclicBs(bs))
+
     def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
     def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
+
+    @stateful def bankingEffort: Int = metadata[BankingEffort](s).map(_.effort).getOrElse(spatialConfig.bankingEffort)
+    def bankingEffort_=(effort: Int): Unit = metadata.add(s, BankingEffort(effort))
+
+    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int])] = metadata[ExplicitBanking](s).map(_.scheme)
+    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def explicitNs: Seq[Int] = explicitBanking.get._1
+    def explicitBs: Seq[Int] = explicitBanking.get._2
+    def explicitAlphas: Seq[Int] = explicitBanking.get._3
+    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).map(_.flag).getOrElse(false)
+    def forceExplicitBanking_=(flag: Boolean): Unit = metadata.add(s, ForceExplicitBanking(flag))
 
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
-    def isNoBank: Boolean = metadata[NoBank](s).exists(_.flag)
-    def isNoBank_=(flag: Boolean): Unit = metadata.add(s, NoBank(flag))
+    def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
+    def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
+
+    def duplicateOnAxes: Option[Seq[Seq[Int]]] = metadata[DuplicateOnAxes](s).map(_.opts)
+    def duplicateOnAxes_=(opts: Seq[Seq[Int]]): Unit = metadata.add(s, DuplicateOnAxes(opts))
 
     def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
     def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
@@ -122,6 +151,15 @@ package object memory {
       case Some(set) => s.dispatches += (uid -> (set + d))
       case None      => s.dispatches += (uid -> Set(d))
     }
+    def getGroupIds: Option[Map[Seq[Int], Set[Int]]] = metadata[GroupId](s).map(_.m)
+    def getGroupId(uid: Seq[Int]): Option[Set[Int]] = getGroupIds.flatMap(_.get(uid))
+    def gid(uid: Seq[Int]): Set[Int] = getGroupId(uid).getOrElse{throw new Exception(s"No group id defined for $s {${uid.mkString(",")}}")}
+    def gids: Map[Seq[Int], Set[Int]] = getGroupIds.getOrElse{ Map.empty }
+    def gids_=(gs: Map[Seq[Int],Set[Int]]): Unit = metadata.add(s, GroupId(gs))
+    def addGroupId(uid: Seq[Int], g: Set[Int]): Unit = getGroupId(uid) match {
+      case Some(set) => s.gids += (uid -> (set ++ g))
+      case None      => s.gids += (uid -> g)
+    }
 
     def getPorts: Option[Map[Int, Map[Seq[Int],Port]]] = metadata[Ports](s).map(_.m)
     def getPorts(dispatch: Int): Option[Map[Seq[Int],Port]] = getPorts.flatMap(_.get(dispatch))
@@ -139,6 +177,16 @@ package object memory {
 
     /** Returns the final port after unrolling. For use after unrolling only. */
     def port: Port = getPorts(0).flatMap(_.values.headOption).getOrElse{ throw new Exception(s"No final port defined for $s") }
+    def setBufPort(p: Int): Unit = {
+      val originalPortMetadata = getPorts
+      if (originalPortMetadata.isDefined) {
+        val originalPort = port
+        val newPort = Port(Some(p), originalPort.muxPort, originalPort.muxOfs, originalPort.castgroup, originalPort.broadcast)
+        metadata.remove(s, classOf[Ports])
+        originalPortMetadata.get.foreach{case (k,v) => metadata.add(s, Ports(Map((k -> Map((v.toList.head._1 -> newPort))))))}
+      }
+    }
+
   }
 
 
@@ -168,6 +216,24 @@ package object memory {
       case _ => throw new Exception(s"Could not get static size of $mem")
     }
 
+    def hotSwapPairings: Map[Sym[_], Set[Sym[_]]] = {
+      metadata[HotSwapPairings](mem).map(_.pairings).getOrElse(Map.empty)
+    }
+    def substHotSwap(src: Sym[_], dst: Sym[_]): Unit = {
+      if (hotSwapPairings.map(_._1).toList.contains(src)) {
+        hotSwapPairings = hotSwapPairings.filter(_._1 != src) ++ Map((dst -> hotSwapPairings(src)))
+      } else if (hotSwapPairings.map(_._2).flatten.toList.contains(src)) {
+        val newMap = hotSwapPairings.map{case (k,v) => 
+          if (v.contains(src)) (k -> (v.filter(_ != src) ++ Set(dst)))
+          else (k -> v)
+        }
+        hotSwapPairings = newMap
+      }
+    }
+    def hotSwapPairings_=(pairings: Map[Sym[_], Set[Sym[_]]]): Unit = {
+      metadata.add(mem, HotSwapPairings(pairings)) 
+    }
+
     /** Returns constant values of the dimensions of the given memory. */
     @stateful def constDims: Seq[Int] = {
       if (stagedDims.forall{case Expect(c) => true; case _ => false}) {
@@ -193,6 +259,8 @@ package object memory {
       case Op(write: UnrolledAccessor[_,_]) => write.width
       case _ => 1
     }
+
+    def isDuplicatable: Boolean = (mem.isSRAM || mem.isReg || mem.isRegFile || mem.isLUT)
 
     def isLocalMem: Boolean = mem match {
       case _: LocalMem[_,_] => true
@@ -225,6 +293,8 @@ package object memory {
         case Op(_: RegAccumFMA[_]) => Some(AccumFMA)
         case Op(_: RegAccumLambda[_]) => Some(AccumUnk)
       }
+
+    def isSingleton: Boolean = isReg || isArgIn || isArgOut || isHostIO || isFIFOReg
     def isReg: Boolean = mem.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgInNew[_]] }
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }
@@ -242,6 +312,7 @@ package object memory {
 
     def isMemPrimitive: Boolean = (isSRAM || isLineBuffer || isRegFile || isFIFO || isLIFO || isFIFOReg || isReg || isLUT) && !isNBuffered && (!isRemoteMem && !isOptimizedReg)
 
+
     def isSRAM: Boolean = mem match {
       case _: SRAM[_,_] => true
       case _ => false
@@ -255,6 +326,7 @@ package object memory {
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
     def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
     def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
+    def hasDestructiveReads: Boolean = isFIFO || isLIFO || isFIFOReg
 
     def isLUT: Boolean = mem match {
       case _: LUT[_,_] => true
@@ -294,6 +366,9 @@ package object memory {
 
     def resetters: Set[Sym[_]] = metadata[Resetters](s).map(_.resetters).getOrElse(Set.empty)
     def resetters_=(rst: Set[Sym[_]]): Unit = metadata.add(s, Resetters(rst))
+
+    def originalSym: Option[Sym[_]] = metadata[OriginalSym](s).map(_.forbiddenFruit).headOption
+    def originalSym_=(forbiddenFruit: Sym[_]): Unit = metadata.add(s, OriginalSym(forbiddenFruit))
 
     def dephasedAccesses: Set[Sym[_]] = metadata[DephasedAccess](s).map(_.accesses).getOrElse(Set.empty)
     def addDephasedAccess(access: Sym[_]): Unit = metadata.add(s, DephasedAccess(Set(access) ++ s.dephasedAccesses))

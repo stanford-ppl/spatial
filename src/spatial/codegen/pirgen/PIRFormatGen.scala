@@ -15,15 +15,19 @@ trait PIRFormatGen extends Codegen {
 
   val typeMap = mutable.Map[Lhs, String]()
 
-  def quoteRhs(lhs:Sym[_], rhs:Any) = src"""$rhs"""
-
   implicit def sym_to_lhs(sym:Sym[_]) = Lhs(sym,None)
 
   def state(lhs:Lhs, tp:Option[String]=None)(rhs: Any) = {
-    val rhsStr = quoteRhs(lhs.sym, rhs)
+    var rhsStr = src"""$rhs.sctx("${lhs.sym.ctx}")"""
     val tpStr = tp match {
       case Some(tp) => tp
       case None => rhsStr.split("\\(")(0)
+    }
+    (lhs.sym.name, lhs.postFix) match {
+      case (Some(name), Some(postFix)) => rhsStr += src""".name("${name}_${postFix}")"""
+      case (Some(name), None) => rhsStr += src""".name("${name}")"""
+      case (None, Some(postFix)) => rhsStr += src""".name("${postFix}")"""
+      case (None, None) => 
     }
     emitStm(lhs, tpStr, rhsStr)
   }
@@ -43,9 +47,9 @@ trait PIRFormatGen extends Codegen {
 
   def comment(lhs:Lhs, tp:String) = {
     lhs.sym match {
-      case Def(LUTNew(dims, elems)) => src"[$tp] $lhs = LUTNew($dims, elems)"
-      case Def(op) => src"[$tp] $lhs = $op"
-      case lhs => src"[$tp] $lhs"
+      case Def(LUTNew(dims, elems)) => s"[$tp] ${quoteOrRemap(lhs)} = LUTNew($dims, elems)"
+      case Def(op) => s"[$tp] ${quoteOrRemap(lhs)} = $op"
+      case lhs => s"[$tp] ${quoteOrRemap(lhs)}"
     }
   }
 

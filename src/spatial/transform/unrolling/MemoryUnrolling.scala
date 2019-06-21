@@ -73,6 +73,7 @@ trait MemoryUnrolling extends UnrollingBase {
       val mem2 = mirror(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])
       mem2.instance = inst
       mem2.name = mem2.name.map{x => s"${x}_$d"}
+      mem2.originalSym = mem
       mem2.padding = inst.padding
       mem2.darkVolume = inst.darkVolume
       dbgs(s"  ${stm(mem2)}")
@@ -85,7 +86,11 @@ trait MemoryUnrolling extends UnrollingBase {
     * Duplicates are registered internally for each lane (orig, dispatch#) -> dup.
     */
   def unrollMemory(mem: Sym[_])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    lanes.duplicateMem(mem){_ => duplicateMemory(mem)}
+    val dups = lanes.duplicateMem(mem){_ => duplicateMemory(mem)}
+    if (lanes.vectorize && dups.distinct.size != 1) { //TODO: Can we check this earlier in MemoryConfiguration?
+      error(s"Invalid duplication for $mem for plasticine. Inconsistent duplications across lanes ${dups}")
+      IR.logError()
+    }
     Nil // No correct default substitution for mem - have to know dispatch number of the access
   }
 
@@ -93,7 +98,7 @@ trait MemoryUnrolling extends UnrollingBase {
     * Assumption: Global memories are never duplicated, since they correspond to external pins / memory spaces
     */
   def unrollGlobalMemory[A](mem: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
-    val mem2 = lanes.inLane(0){ mirror(mem, rhs) }
+    val mem2 = lanes.mapFirst { mirror(mem, rhs) }
     memories += (mem,0) -> mem2
     lanes.unify(mem, mem2)
   }
@@ -104,7 +109,7 @@ trait MemoryUnrolling extends UnrollingBase {
     val duplicates = memories.keys.filter(_._1 == mem)
     val lhs2 = duplicates.map{dup =>
       isolateSubstWith(escape=Nil, mem -> memories(dup)){
-        val lhs2 = lanes.inLane(0){ mirror(lhs, rhs) }
+        val lhs2 = lanes.mapFirst { mirror(lhs, rhs) }
         lhs2
       }
     }
@@ -117,7 +122,9 @@ trait MemoryUnrolling extends UnrollingBase {
     implicit val vT: Type[Vec[Tup2[A,Bit]]] = Vec.bits[Tup2[A,Bit]](in.length)
     val shuffle = stage(ShuffleCompressVec(in))
     lanes.unify(lhs, shuffle)
-    val vec = lanes.map { i =>
+    val vec = lanes.map { is =>
+      assert(is.size == 1, s"Unhandled vectorized shuffle for lanes $is")
+      val i = is.head
       val elem: Sym[Tup2[A,Bit]] = shuffle(i)
       register(lhs -> elem)
       elem
@@ -130,6 +137,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dispIds:  Seq[Int],
     laneIds:  Seq[Int],
     port:     Port,
+    grpids:   Set[Int],
     vecOfs:   Seq[Int]
   )
 
@@ -166,7 +174,7 @@ trait MemoryUnrolling extends UnrollingBase {
 
       dbgs(s"Unrolling ${stm(lhs)}");// strMeta(lhs)
 
-      mems.zipWithIndex.flatMap{case (UnrollInstance(mem2,dispIds,laneIds,port,_),i) =>
+      mems.zipWithIndex.flatMap{case (UnrollInstance(mem2,dispIds,laneIds,port,gids,_),i) =>
         dbgs(s"  Dispatch: $dispIds")
         dbgs(s"  Lane IDs: $laneIds")
         dbgs(s"  Port:     $port")
@@ -176,10 +184,10 @@ trait MemoryUnrolling extends UnrollingBase {
 
         val inst  = mem2.instance
         val addrOpt = addr.map{a =>
-          val a2 = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
+          val a2:Seq[NDAddressInLane] = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
           dbgs(s"a2 = ")
           a2.foreach{aa => dbgs(s"  lane ${aa.lane} (castgrp/broadcast ${port.castgroup(laneIds.indexOf(aa.lane))}/${port.broadcast(laneIds.indexOf(aa.lane))}) = ${aa.addr}")}
-          val distinct = a2.groupBy{_.addr}
+          val distinct:Seq[NDAddressAcrossLanes] = a2.groupBy{_.addr}
                            .mapValues{pairs => pairs.map(_.lane)}
                            .toSeq.map{case (adr, ls) => NDAddressAcrossLanes(adr, ls) }
                            .sortBy(_.lanes.last)                        // (ND address, lane IDs) pairs
@@ -209,9 +217,12 @@ trait MemoryUnrolling extends UnrollingBase {
           masters.map{t => d2(laneIdToChunkId(t)) }                          // Vector of data
         }
         val ens2   = masters.map{t => lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.valids(p) }(laneIdToChunkId(t)) }
+        //val ens2   = masters.map{t => 
+          //lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.flatValids(p) }(laneIdToChunkId(t))
+        //}
 
 
-        val broadcast = port.broadcast.map(_ > 0)
+        //val broadcast = port.broadcast.map(_ > 0)
 
         val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
         val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
@@ -236,13 +247,24 @@ trait MemoryUnrolling extends UnrollingBase {
         }
 
         // hack for issue #90
-        val newOfs = mems.map{case UnrollInstance(m,_,_,p,_) => (m,p)}.take(i).count(_ == (mem2,port))
+        val newOfs = mems.map{case UnrollInstance(m,_,_,p,_,_) => (m,p)}.take(i).count(_ == (mem2,port))
         
         banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, i) =>
           val segmentBase = banked.flatMap(_._2).take(i).length
           val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
-          val reorderedCastgroup = portReordering.map(port.castgroup(_))
-          val reorderedBroadcast = portReordering.map(port.broadcast(_))
+          // If broadcast exists within a vectorized unrolled access, then just broadcast that lane.
+          // For PIR only
+          val reordered = portReordering.map { ln =>
+            val castgroup = lanes.ulanes(ln).map(port.castgroup(_)) // For FPGA will be Seq of one element
+            val broadcast = lanes.ulanes(ln).map(port.broadcast(_)) // For FPGA will be Seq of one element
+            val map:Map[Int,Int] = castgroup.zip(broadcast).groupBy { _._1 }.map { case (grp, bcs) =>
+              val bc = if (bcs.exists { _._2 == 0}) 0 else bcs.head._2
+              (grp, bc)
+            }
+            castgroup.distinct.map { g => (g, map(g)) }
+          }.flatten
+          val reorderedCastgroup = reordered.map { _._1 }
+          val reorderedBroadcast = reordered.map { _._2 }
           val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(reorderedCastgroup) else reorderedCastgroup
           val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(reorderedBroadcast) else reorderedBroadcast
           if (s.getPorts(0).isDefined) {
@@ -254,7 +276,9 @@ trait MemoryUnrolling extends UnrollingBase {
             s.addPort(dispatch=0, Nil, port2)
           }
           s.addDispatch(Nil, 0)
+          s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
+          mem2.substHotSwap(lhs, s)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); //strMeta(s)
         }
@@ -265,6 +289,7 @@ trait MemoryUnrolling extends UnrollingBase {
             val elems: Seq[A] = if (lhs.segmentMapping.values.toList.sorted.reverse.headOption.getOrElse(0) >= 1) vecsInSegment.indices.map{i => vec(i) }
                                 else vecsInSegment.map{i => vec(i)}
             val thisLaneIds = laneIds.filter(vecsInSegment.map(vecToLaneAddr).contains)
+            dbgs(s"$vec thisLaneIds:$thisLaneIds ${lanes.ulanes} ${lanes.name}")
             lanes.inLanes(thisLaneIds){p =>
               // Convert lane to vecId
               val vecId = laneIdToVecId(p)
@@ -327,6 +352,12 @@ trait MemoryUnrolling extends UnrollingBase {
   }
 
 
+  def assertUnify[A](list:Iterable[A],info:String):A = {
+    val res = list
+    assert(res.toSet.size<=1, s"$list doesnt have the same $info = $res")
+    res.head
+  }
+
 
   /** Returns the instances required to unroll the given access
     * len: width of vector access for vectorized accesses, e.g. linebuffer(0, c::c+3)
@@ -340,25 +371,48 @@ trait MemoryUnrolling extends UnrollingBase {
 
     val words = len.map{l => Range(0,l)}.getOrElse(Range(0,1)) // For vectors
 
-    val mems = lanes.map{laneId =>
+    val mems = lanes.map { lane =>
+      val laneId = lanes.ulanes.indexOf(lane)
       words.flatMap{w =>
-        val uid = is.map{i => unrollNum(i) }
+        var uids = is.map{i => unrollNum(i) }.foldLeft[List[Seq[Int]]](Nil){ 
+          case (Nil, ids) => ids.toList.map { id => Seq(id) }
+          case (prev, ids) => prev.flatMap { uid => ids.map { id => uid :+ id } }
+        }
+        if (uids.isEmpty) uids = List(Seq())
         val wid = if (len.isDefined) Seq(w) else Nil
-        val vid = uid ++ wid
-        val dispatches = access.dispatch(vid)
+        dbgs(s"uids:$uids")
+        val vids = uids.map { _  ++ wid }
+        val dispatches = vids.flatMap { vid =>
+          access.dispatch(vid)
+        }.distinct
+        val grpids = vids.flatMap { vid => access.gid(vid) }.toSet
         if (isLoad && dispatches.size > 1) {
           bug(s"Readers should have exactly one dispatch, $access had ${dispatches.size}.")
           bug(access.ctx)
         }
         dispatches.map{dispatchId =>
+          val ports:Seq[Port] = vids.map { vid => access.port(dispatchId, vid) }.distinct
+          dbgs(s"ports:")
+          ports.foreach { p =>
+            dbgs(s"$p")
+          }
+          //assert(ports.size == 1, s"More than one ports across lanes for ${access} ${access.ctx} vids=$vids")
+          val port = Port(
+            bufferPort=assertUnify(ports.map{_.bufferPort}, s"access=$access (${access.ctx}) vids=$vids bufferPort"),
+            muxPort=assertUnify(ports.map{_.muxPort}, s"access=$access (${access.ctx}) vids=$vids muxPort"),
+            muxOfs=if(ports.size==1) ports.head.muxOfs else -1,
+            castgroup=ports.flatMap { _.castgroup },
+            broadcast=ports.flatMap { _.broadcast }
+          )
           if (!memories.contains((mem, dispatchId))) {
             bug(mem.ctx, s"Duplicate #$dispatchId for memory $mem was not available!")
           }
           UnrollInstance(
             memory  = memories((mem, dispatchId)),
             dispIds = Seq(dispatchId),
-            laneIds = Seq(laneId),
-            port    = access.port(dispatchId, vid),
+            laneIds = Seq(laneId), // Unrolled lane id
+            port    = port,
+            grpids = grpids,
             vecOfs  = wid
           )
         }
@@ -391,6 +445,7 @@ trait MemoryUnrolling extends UnrollingBase {
             dispIds = vec.flatMap(_.dispIds),
             laneIds = vec.flatMap(_.laneIds),
             port    = Port(bufferPort,muxPort,muxOfs,castgroups,broadcasts),
+            grpids = vec.flatMap { _.grpids }.toSet,
             vecOfs  = vec.flatMap(_.vecOfs)
           )
         }

@@ -40,7 +40,13 @@ object modeling {
     def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
-        else inputsDfs(x.inputs.toSet, nodes + x)
+        else if (x.isMem) {
+          val w = (x.writers.toSet intersect scope).filterNot(nodes.contains)
+          inputsDfs(w, nodes + x)
+        }
+        else {
+          inputsDfs(x.inputs.toSet, nodes + x)
+        }
       }
       else Set.empty[Sym[_]]
     }
@@ -127,6 +133,7 @@ object modeling {
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val memories = readersByMem.keySet intersect writersByMem.keySet
+    dbgs(s"Memories with both reads and writes in this scope: $memories")
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
@@ -237,13 +244,13 @@ object modeling {
             val delay = critical + latencyOf(cur, inReduce)
 
             debugs(s"[$delay = max(" + dlys.mkString(", ") + s") + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
-            delay
+            scrubNoise(delay)
           }
           else {
             val inReduce = knownCycles.contains(cur)
             val delay = latencyOf(cur, inReduce)
             debugs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
-            delay
+            scrubNoise(delay)
           }
 
         case s => paths.getOrElse(s, 0) // Get preset out of scope delay, or assume 0 offset
@@ -278,8 +285,8 @@ object modeling {
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){
-        debugs(s"Multiplexed accesses for memory $mem: ")
-        accesses.foreach{access => debugs(s"  ${stm(access)}") }
+        dbgs(s"Multiplexed accesses for memory $mem: ")
+        accesses.foreach{access => dbgs(s"  ${stm(access)}") }
       }
 
       // NOTE: After unrolling there should be only one mux index per access
@@ -302,18 +309,18 @@ object modeling {
         var writeStage = 0.0
         orderedMuxPairs.foreach{pairs =>
           val dlys = pairs.map(_._2) :+ writeStage
-          val writeDelay = dlys.max
+          val writeDelay = dlys.max 
           writeStage = writeDelay + 1
           pairs.foreach{case (access, dly, _) =>
             val oldPath = paths(access)
-            paths(access) = writeDelay
-            debugs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
+            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
             if (writeDelay-oldPath > 0) {
-              debugs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              paths(access) = writeDelay
+              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
               val affectedNodes = consumersDfs(access.consumers, Set(), scope) intersect scope
               affectedNodes.foreach{case x if (paths.contains(x)) => 
-                  debugs(s"  $x")
+                  dbgs(s"  $x")
                   paths(x) = paths(x) + (writeDelay-oldPath)
                 case _ =>
               }
@@ -366,6 +373,24 @@ object modeling {
 
     }
 
+    def protectRAWCycle(regWrite: Sym[_]): Unit = {
+      val reg = regWrite.writtenMem.get
+      val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
+      val writePosition = parentScope.indexOf(regWrite)
+      val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && paths.contains(x) && paths.contains(regWrite) && paths(x).toInt <= paths(regWrite).toInt && x.readMem.isDefined && x.readMem.get == reg && !reg.hotSwapPairings.getOrElse(x,Set()).contains(regWrite)) => x}
+      readsAfter.foreach{r => 
+        val dist = paths(regWrite).toInt - paths(r).toInt
+        warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
+        val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)
+        affectedNodes.foreach{
+          case x if (paths.contains(x)) => 
+            dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")
+            paths(x) = paths(x) + dist
+          case _ => 
+        }
+      }
+    }
+
     debugs(s"----------------------------------")
     debugs(s"Computing pipeLatencies for scope:")
     schedule.foreach{ e => debugs(s"  ${stm(e)}") }
@@ -379,7 +404,7 @@ object modeling {
       // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
-        debugs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
+        dbgs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
         reverseDFS(writer, cycle)
       }
     }
@@ -412,7 +437,12 @@ object modeling {
       }
     }
 
-    scope.foreach{case x if x.isWriter && x.writtenMem.isDefined && x.writtenMem.get.isBreaker => pushBreakNodes(x); case _ => }
+    schedule.foreach{
+      case x if x.isWriter && x.writtenMem.isDefined => 
+        if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
+        if (x.writtenMem.get.isReg) protectRAWCycle(x)
+      case _ => 
+    }
 
     pushSegmentationAccesses()
 

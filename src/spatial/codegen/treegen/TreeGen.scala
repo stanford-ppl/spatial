@@ -8,6 +8,7 @@ import spatial.node._
 import spatial.util.spatialConfig
 import spatial.codegen.naming.NamedCodegen
 import spatial.metadata.access._
+import spatial.metadata.types._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.traversal.AccelTraversal
@@ -35,8 +36,13 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func)     => inAccel{ printControl(lhs,rhs) }
     case _:Control[_] if inHw => printControl(lhs, rhs)
-    case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer | lhs.isFIFOReg) => logMem(lhs, rhs)
+    case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer | lhs.isFIFOReg | lhs.isFIFO | lhs.isLIFO) => logMem(lhs, rhs)
     case _ => rhs.blocks.foreach{blk => gen(blk) }
+  }
+
+  protected def bitWidth(tp: Type[_]): Int = tp match {
+    case Bits(bT) => bT.nbits
+    case _ => -1
   }
 
   def inCell(cellName: String, hasCollapsible: Boolean)(header: => Unit)(collapsible: => Unit): Unit = {
@@ -182,7 +188,9 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
         val volume = singleVolume(mem)
         val bufVolume = totalVolume(mem)
+        val bitwidth = bitWidth(mem.tp.typeArgs.head)
         val banks = mem.instance.nBanks
+        val B = mem.instance.Bs
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val lca = mem.swappers.head.parent.s.get
@@ -193,7 +201,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
           else ""
-        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
+        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth, dv = ${mem.getDarkVolume.getOrElse(0)})", s"nBufs*volume = $bufVolume", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     inCell("Single-Buffered Mems", true) {
@@ -203,7 +211,9 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val dims = mem.constDims
         val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
         val volume = singleVolume(mem)
+        val bitwidth = bitWidth(mem.tp.typeArgs.head)
         val banks = mem.instance.nBanks
+        val B = mem.instance.Bs
         val alphas = mem.instance.alphas
         val Ps = mem.instance.Ps
         val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
@@ -213,7 +223,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
           else ""
-        printMem(mem, s"volume = $volume (dims $dims + pads $pads)", s"nBanks = $banks, a = $alphas, p = $Ps", hist)
+        printMem(mem, s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth, dv = ${mem.getDarkVolume.getOrElse(0)})", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     emit("</body>")

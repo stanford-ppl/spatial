@@ -175,10 +175,10 @@ import spatial.dsl._
       val B_flat = SRAM[T](full_N * full_K)
       val L_flat = SRAM[T](full_N * full_N)
       val X = SRAM[T](full_N * full_K)
-      Parallel {
-        B_flat load OCB_flat(0 :: full_N*full_K)
-        L_flat load OCL_flat(0 :: full_N*full_N)
-      }
+      // Parallel {
+      B_flat load OCB_flat(0 :: full_N*full_K)
+      L_flat load OCL_flat(0 :: full_N*full_N)
+      // }
       // fixme: do normal DRAM matrices when https://github.com/stanford-ppl/spatial-lang/issues/68 is resolved
       Foreach(full_N by 1, full_K by 1) { (i,j) =>
         B(i,j) = B_flat(i.to[I32]*full_K + j.to[I32])

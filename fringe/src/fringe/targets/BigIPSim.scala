@@ -10,35 +10,35 @@ import fringe.templates.math.{OverflowMode, RoundingMode, FloatingPoint}
 import fringe.utils.getRetimed
 
 class BigIPSim extends BigIP with SimBlackBoxes {
-  def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
+  def divide(dividend: UInt, divisor: UInt, latency: Int, flow: Bool, myName: String): UInt = {
     getConst(divisor) match { 
       case Some(bigNum) => getRetimed(dividend / bigNum.U, latency, flow)
       case None => getRetimed(dividend/divisor, latency, flow)
     }
   }
 
-  def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
+  def divide(dividend: SInt, divisor: SInt, latency: Int, flow: Bool, myName: String): SInt = {
     getConst(divisor) match { 
       case Some(bigNum) => getRetimed(dividend / bigNum.S, latency, flow)
       case None => getRetimed(dividend/divisor, latency, flow)
     }
   }
 
-  def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool): UInt = {
+  def mod(dividend: UInt, divisor: UInt, latency: Int, flow: Bool, myName: String): UInt = {
     getConst(divisor) match { 
       case Some(bigNum) => getRetimed(dividend % bigNum.U, latency, flow)
       case None => getRetimed(dividend % divisor, latency, flow)
     }
   }
 
-  def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool): SInt = {
+  def mod(dividend: SInt, divisor: SInt, latency: Int, flow: Bool, myName: String): SInt = {
     getConst(divisor) match { 
       case Some(bigNum) => getRetimed(dividend % bigNum.S, latency, flow)
       case None => getRetimed(dividend % divisor, latency, flow)
     }
   }
 
-  def multiply(a: UInt, b: UInt, latency: Int, flow: Bool): UInt = {
+  def multiply(a: UInt, b: UInt, latency: Int, flow: Bool, myName: String): UInt = {
     val aconst = getConst(a)
     val bconst = getConst(b)
     if (aconst.isDefined | bconst.isDefined) { // Constant optimization
@@ -53,7 +53,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
       getRetimed(a * b, latency, flow)
     }
   }
-  def multiply(a: SInt, b: SInt, latency: Int, flow: Bool): SInt = {
+  def multiply(a: SInt, b: SInt, latency: Int, flow: Bool, myName: String): SInt = {
     val aconst = getConst(a)
     val bconst = getConst(b)
     if (aconst.isDefined | bconst.isDefined) { // Constant optimization
@@ -68,30 +68,30 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     }
   }
 
-  override def log2(a: UInt, latency: Int, flow: Bool): UInt = {
+  override def log2(a: UInt, latency: Int, flow: Bool, myName: String): UInt = {
     val m = Module(new Log2Sim(a.getWidth, false, latency))
     m.io.x := a
     m.io.y
   }
   
-  override def sqrt(num: UInt, latency: Int, flow: Bool): UInt = {
+  override def sqrt(num: UInt, latency: Int, flow: Bool, myName: String): UInt = {
     val m = Module(new SqrtSim(num.getWidth, false, latency))
     m.io.x := num
     m.io.y
   }
-  override def sin(num: UInt, latency: Int): UInt = {
+  override def sin(num: UInt, latency: Int, myName: String): UInt = {
     num // TODO    
   }
-  override def cos(num: UInt, latency: Int): UInt = {
+  override def cos(num: UInt, latency: Int, myName: String): UInt = {
     num // TODO    
   }
-  override def atan(num: UInt, latency: Int): UInt = {
+  override def atan(num: UInt, latency: Int, myName: String): UInt = {
     num // TODO    
   }
-  override def sinh(num: UInt, latency: Int): UInt = {
+  override def sinh(num: UInt, latency: Int, myName: String): UInt = {
     num // TODO    
   }
-  override def cosh(num: UInt, latency: Int): UInt = {
+  override def cosh(num: UInt, latency: Int, myName: String): UInt = {
     num // TODO    
   }
 
@@ -122,7 +122,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
 
 
-  override def fsqrt(a: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
+  override def fsqrt(a: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): UInt = {
     val fma = Module(new DivSqrtRecFN_small(e, m, 0))
     fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
@@ -133,7 +133,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
 
-  def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
+  def fadd(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
     fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
@@ -143,7 +143,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
 
-  def fsub(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
+  def fsub(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
     fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
@@ -152,7 +152,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     fma.io.op := 1.U(2.W)
     getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
-  def fmul(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
+  def fmul(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): UInt = {
     val fma = Module(new MulAddRecFN(e, m))
     fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
@@ -161,7 +161,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     fma.io.op := 0.U(2.W)
     getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
-  def fdiv(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): UInt = {
+  def fdiv(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): UInt = {
     val fma = Module(new DivSqrtRecFN_small(e, m, 0))
     fma.io <> DontCare
     fma.io.a := recFNFromFN(e, m, a)
@@ -173,7 +173,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     getRetimed(fNFromRecFN(e, m, fma.io.out), latency, flow)
   }
 
-  def flt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
+  def flt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io <> DontCare
@@ -183,7 +183,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     result := comp.io.lt
     getRetimed(result, latency, flow)
   }
-  def feq(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
+  def feq(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io <> DontCare
@@ -193,7 +193,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     result := comp.io.eq
     getRetimed(result, latency, flow)
   }
-  def fgt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
+  def fgt(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io <> DontCare
@@ -203,7 +203,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     result := comp.io.gt
     getRetimed(result, latency, flow)
   }
-  def fge(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
+  def fge(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io <> DontCare
@@ -213,7 +213,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     result := comp.io.gt | comp.io.eq
     getRetimed(result, latency, flow)
   }
-  def fle(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
+  def fle(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io <> DontCare
@@ -223,7 +223,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     result := comp.io.lt | comp.io.eq
     getRetimed(result, latency, flow)
   }
-  def fne(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool): Bool = {
+  def fne(a: UInt, b: UInt, m: Int, e: Int, latency: Int, flow: Bool, myName: String): Bool = {
     val result = Wire(Bool())
     val comp = Module(new CompareRecFN(e, m))
     comp.io <> DontCare
@@ -235,13 +235,14 @@ class BigIPSim extends BigIP with SimBlackBoxes {
   }
 
   override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
-    if (src.litOption.isEmpty) {
+    if (src.litArg.isEmpty) {
       val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
       fix2fixBox.io <> DontCare
       fix2fixBox.io.a := src
       fix2fixBox.io.expect_neg := false.B
       fix2fixBox.io.expect_pos := false.B
-      getRetimed(fix2fixBox.io.b, latency, flow)
+      fix2fixBox.io.flow := flow
+      fix2fixBox.io.b
     }
     // Likely that there are mistakes here
     else {
@@ -271,7 +272,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
 
   }
 
-  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int, latency: Int, flow: Bool): UInt = {
+  override def fix2flt(a: UInt, sign: Boolean, dec: Int, frac: Int, man: Int, exp: Int, latency: Int, flow: Bool, myName: String): UInt = {
     val conv = Module(new INToRecFN(a.getWidth,exp,man))
     conv.io <> DontCare
     conv.io.signedIn := sign.B
@@ -281,7 +282,7 @@ class BigIPSim extends BigIP with SimBlackBoxes {
     getRetimed(fNFromRecFN(exp, man, conv.io.out), latency, flow)
   }
 
-  override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+  override def flt2fix(a: UInt, man: Int, exp: Int, sign: Boolean, dec: Int, frac: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode, myName: String): UInt = {
     val conv = Module(new RecFNToIN(exp,man,a.getWidth))
     conv.io <> DontCare
     conv.io.signedOut := sign.B

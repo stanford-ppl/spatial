@@ -3,6 +3,7 @@ package spatial.dse
 import argon._
 import spatial.metadata._
 import poly.ISL
+import models.AreaEstimator
 import spatial.targets._
 import spatial.metadata.params._
 import spatial.metadata.bounds._
@@ -20,7 +21,7 @@ case class HyperMapperThread(
   localMems: Seq[Sym[_]],
   workQueue: BlockingQueue[Seq[Any]],
   outQueue:  BlockingQueue[String]
-)(implicit val state: State, val isl: ISL) extends Runnable { thread =>
+)(implicit val state: State, val isl: ISL, val areamodel: models.AreaEstimator) extends Runnable { thread =>
   // --- Thread stuff
   private var isAlive: Boolean = true
   private var hasTerminated: Boolean = false

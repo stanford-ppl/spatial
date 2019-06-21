@@ -3,10 +3,10 @@ package emul.ResidualGenerator
 /** ResidualGenerator elaborates the possible banks that a lane of an access may access. */
 
 case class ResidualGenerator(A: Int, B: Seq[Int], M: Int) {
+  val bs = if (B.size == 1) s"${B.head}" else s"[${B.mkString(",")}]"
   // Used in chisel gen
   override def toString: String = {
-    assert(B.size == 1)
-    if (A == M) s"RG(${B.head})" else s"RG($A,${B.head},$M)"
+    if (A == M) s"RG($bs)" else s"RG($A,$bs,$M)"
   }
 
   def static: Boolean = (A == M)
@@ -14,7 +14,7 @@ case class ResidualGenerator(A: Int, B: Seq[Int], M: Int) {
   def resolvesTo: Option[Seq[Int]] = if (static) Some(B) else None
   def expand(max: Int): Seq[Int] = 
     if (M == 0) (0 until scala.math.ceil(max.toDouble/A.toDouble).toInt).flatMap{i => B.map { b => (i*A + b) % max } } 
-  	else if (A == 0) B // This RG should never exist, but technically it expands to Seq(B)!
+  	else if (A == 0) B // This RG should never exist, but technically it expands to Seq(B) (NOTE: Not true after area modeling changes)
     else (0 until scala.math.ceil(M.toDouble/A.toDouble).toInt).flatMap{i => B.map { b => (i*A + b) % M } }
 }
 object ResidualGenerator{

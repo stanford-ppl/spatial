@@ -396,6 +396,29 @@ package object control {
       }
     }
 
+    @stateful def nestedWrittenDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.writtenDRAMs).toSet) }.getOrElse(Set.empty)
+    }
+    def writtenDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[WrittenDRAMs](sym).map(_.drams) }.getOrElse(Set.empty)
+    }
+    def writtenDRAMs_=(drams: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, WrittenDRAMs(drams)) }
+    }
+
+    @stateful def nestedReadDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.readDRAMs).toSet) }.getOrElse(Set.empty)
+    }
+    def readDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[ReadDRAMs](sym).map(_.drams) }.getOrElse(Set.empty)
+    }
+    def readDRAMs_=(drams: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, ReadDRAMs(drams)) }
+    }
+
+    @stateful def nestedWrittenMems: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.writtenMems).toSet) }.getOrElse(Set.empty)
+    }
     def writtenMems: Set[Sym[_]] = {
       s.flatMap{sym => metadata[WrittenMems](sym).map(_.mems) }.getOrElse(Set.empty)
     }
@@ -403,12 +426,28 @@ package object control {
       s.foreach{sym => metadata.add(sym, WrittenMems(mems)) }
     }
 
+    @stateful def nestedReadMems: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.readMems).toSet) }.getOrElse(Set.empty)
+    }
     def readMems: Set[Sym[_]] = {
       s.flatMap{sym => metadata[ReadMems](sym).map(_.mems) }.getOrElse(Set.empty)
     }
     def readMems_=(mems: Set[Sym[_]]): Unit = {
       s.foreach{sym => metadata.add(sym, ReadMems(mems)) }
     }
+
+    @stateful def nestedTransientReadMems: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.transientReadMems).toSet) }.getOrElse(Set.empty)
+    }
+    def transientReadMems: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[TransientReadMems](sym).map(_.mems) }.getOrElse(Set.empty)
+    }
+    def transientReadMems_=(mems: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, TransientReadMems(mems)) }
+    }
+
+    def shouldNotBind: Boolean = s.flatMap{sym => metadata[ShouldNotBind](sym).map(_.f) }.getOrElse(false)
+    def shouldNotBind_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, ShouldNotBind(f))}
 
     def getLoweredTransfer: Option[TransferType] = {
       s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ).headOption }.headOption
@@ -553,9 +592,14 @@ package object control {
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
+    @stateful def nestedChildren: Seq[Ctrl.Node] = {
+      if (s.isControl) toCtrl.nestedChildren
+      else throw new Exception(s"Cannot get nestedChildren of non-controller ${stm(s)}")
+    }
+
     @stateful def siblings: Seq[Ctrl.Node] = {
       if (s.isControl) parent.children
-      else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
+      else throw new Exception(s"Cannot get siblings of non-controller ${stm(s)}")
     }
 
     def parent: Ctrl = s.rawParent
@@ -623,6 +667,8 @@ package object control {
     def userII: Option[Double] = metadata[UserII](s).map(_.interval)
     def userII_=(interval: Option[Double]): Unit = interval.foreach{ii => metadata.add(s, UserII(ii)) }
 
+    def unrollBy: Option[Int] = metadata[UnrollBy](s).map(_.par)
+    def unrollBy_=(par: Int): Unit = metadata.add(s, UnrollBy(par))
   }
 
 
@@ -635,6 +681,7 @@ package object control {
     def isControl: Boolean = true
 
     @stateful def children: Seq[Ctrl.Node] = toCtrl.children
+    @stateful def nestedChildren: Seq[Ctrl.Node] = toCtrl.nestedChildren
     @stateful def siblings: Seq[Ctrl.Node] = toCtrl.siblings
     def parent: Ctrl = toCtrl.parent
     def scope: Scope = scp
@@ -678,6 +725,28 @@ package object control {
       }
       // Subcontroller case - return all children which have this subcontroller as an owner
       case Ctrl.Node(sym,_) => sym.rawChildren.filter(_.scope.toCtrl == ctrl)
+
+      // The children of the host controller is all Accel scopes in the program
+      case Ctrl.Host => AccelScopes.all
+    }
+
+    @stateful def nestedChildren: Seq[Ctrl.Node] = ctrl match {
+      // "Master" controller case
+      case Ctrl.Node(sym, -1) => sym match {
+        case Op(ctrl: Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body,id) =>
+          val stage = Ctrl.Node(sym,id)
+          // If this is a pseudostage, transparently return all controllers under this pseudostage
+          if (body.isPseudoStage) sym.rawChildren.filter(_.scope.toCtrl == stage) ++ sym.rawChildren.filter(_.scope.toCtrl == stage).flatMap(_.nestedChildren)
+          // Otherwise return the subcontroller for this "future" stage
+          else Seq(Ctrl.Node(sym, id))
+        }
+
+        case Op(ctrl: IfThenElse[_]) => sym.rawChildren ++ sym.rawChildren.flatMap(_.nestedChildren) // Fixme?
+
+        case _ => throw new Exception(s"Cannot get children of non-controller.")
+      }
+      // Subcontroller case - return all children which have this subcontroller as an owner
+      case Ctrl.Node(sym,_) => sym.rawChildren.filter(_.scope.toCtrl == ctrl) ++ sym.rawChildren.filter(_.scope.toCtrl == ctrl).flatMap(_.nestedChildren)
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all

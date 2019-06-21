@@ -98,11 +98,11 @@ x_par=4  |       --->       X                XX    |
     Accel{
       val exp_sram = SRAM[T](lut_size)
       // val grid_sram = SRAM[Int](ROWS,COLS).flat
-      val grid_sram = SRAM[Int](ROWS,COLS).noflat.noduplicate
+      val grid_sram = SRAM[Int](ROWS,COLS).hierarchical.noduplicate.effort(0)
       exp_sram load exp_lut
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
       // Issue #187
-      val bias_sram = SRAM[Int](ROWS,COLS)
+      val bias_sram = SRAM[Int](ROWS,COLS).effort(1)
       bias_sram load bias_dram(0::ROWS, 0::COLS par par_load)
 
 

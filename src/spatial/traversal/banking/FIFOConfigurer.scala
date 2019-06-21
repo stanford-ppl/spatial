@@ -3,7 +3,9 @@ package banking
 
 import argon._
 import poly.ISL
+import models.AreaEstimator
 import utils.implicits.collections._
+import utils.math._
 
 import spatial.issues.UnbankableGroup
 import spatial.lang._
@@ -11,7 +13,7 @@ import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 
-class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL)
+class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL, areamodel: AreaEstimator)
   extends MemoryConfigurer[C](mem,strategy)
 {
 
@@ -52,10 +54,16 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       Left(UnbankableGroup(mem,rdGroups.flatten,wrGroups.flatten))
     }
     else {
-      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, Seq(FLAT_BANKS)).head._2
+      val nStricts: Seq[NStrictness] = Seq(NPowersOf2, NBestGuess, NRelaxed)
+      val aStricts: Seq[AlphaStrictness] = Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+      val dimensionDuplication: Seq[RegroupDims] = RegroupHelper.regroupNone
+      val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
+      val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds.map{ addr => BankingOptions(Flat(rank), nStricts(addr(0)), aStricts(addr(1)), dimensionDuplication(addr(2))) }
+    
+      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
       if (bankings.nonEmpty) {
-        val banking = bankings.head
-        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)
+        val banking = bankings.head._2
+        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)._4.head
         val ports = computePorts(rdGroups) ++ computePorts(wrGroups)
 
         Right(Seq(Instance(

@@ -13,9 +13,9 @@ typedef FringeContextSim FringeContext;
 #include "FringeContextZynq.h"
 typedef FringeContextZynq FringeContext;
 
-#elif defined ZCU
-#include "FringeContextZCU.h"
-typedef FringeContextZCU FringeContext;
+#elif defined KCU1500
+#include "FringeContextKCU1500.h"
+typedef FringeContextKCU1500 FringeContext;
 #endif
 
 #endif

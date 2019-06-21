@@ -7,6 +7,7 @@ import poly._
 import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 
 import scala.collection.mutable
 
@@ -81,7 +82,7 @@ trait AccessExpansion {
             dbgs(s"  Iterator: $x")
             val i = Seq(is(idx))
             val a = vec(x)*ps(idx)
-            val b = vec(x)*uid(idx)
+            val b = if (mem.isSingleton) 0 else vec(x)*uid(idx)
             (a,x,b,i)
           }
           else {

@@ -3,6 +3,7 @@ package spatial.lang
 import argon.Mirrorable
 import argon.tags.struct
 import forge.tags._
+import argon._
 
 case class Pin(name: String) {
   override def toString: String = name
@@ -27,6 +28,28 @@ case class PinBus(valid: Pin, data: Seq[Pin]) extends Bus {
 @struct case class IssuedCmd(size: I32, start: I32, end: I32)
 
 abstract class DRAMBus[A:Bits] extends Bus { @rig def nbits: Int = Bits[A].nbits }
+
+/*
+ * Bus type on StreamIn and StreamOut. Each element in Stream In Out will be a new line in csv.
+ * If A is struct, different fields will be in columns of the CSV.
+ * */
+case class FileBus[A:Bits](fileName:String) extends Bus { @rig def nbits: Int = Bits[A].nbits }
+/*
+ * Same as FileBus. Except A must be struct type with last field in Bit type. The last field
+ * will be interpreted as last bit of the stream to terminate simulation.
+ * */
+case class FileEOFBus[A:Bits](fileName:String)(implicit state:State) extends Bus { 
+  Type[A] match {
+    case a:Struct[_] if a.fields.last._2 == Type[Bit] => 
+    case a => 
+      error(s"EFOBus must have struct type with last field in Bit. Got type ${a}")
+      state.logError()
+  }
+  @rig def nbits: Int = Bits[A].nbits
+}
+case class BlackBoxBus[A:Bits](name:String) extends Bus {
+  @rig def nbits: Int = Bits[A].nbits
+}
 
 case object BurstCmdBus extends DRAMBus[BurstCmd]
 case object BurstAckBus extends DRAMBus[Bit]

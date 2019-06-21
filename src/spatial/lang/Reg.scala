@@ -24,6 +24,11 @@ import spatial.metadata.memory._
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
   /** Do not buffer memory */
   def nonbuffer: Reg[A] = { this.isNonBuffer = true; me }
+  /** Allow "unsafe" banking, where two writes can technically happen simultaneously and one will be dropped.
+    * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
+    * due to data-dependent control flow or that you don't care if one write gets dropped
+    */
+  def conflictable: Reg[A] = { this.shouldIgnoreConflicts = true; me }
 
   // --- Typeclass Methods
   @rig def __sread(): A = Reg.read(this)

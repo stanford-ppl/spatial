@@ -29,6 +29,7 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
     case "zcu"  | "ZCU"       => new targets.zcu.ZCU
     case "arria10" | "Arria10"   => new targets.arria10.Arria10
     case "asic" | "ASIC"     => new targets.asic.ASIC
+    case "kcu1500" | "KCU1500"     => new targets.kcu1500.KCU1500
     case _           => throw new Exception(s"Unknown target '$targetName'")
   }
 

@@ -198,7 +198,7 @@ trait PlasticineTest extends DSLTest { test =>
       "-l" :: s"${IR.config.genDir}/plastisim/link.csv" ::
       "-v" :: s"${IR.config.genDir}/plastisim/summary.csv" ::
       "-g" :: s"${IR.config.genDir}/plastisim/proute.dot" ::
-      "-o" :: s"${IR.config.genDir}/plastisim/final.place" ::
+      "-G" :: s"${IR.config.genDir}/plastisim/final.place" ::
       "-T" :: "checkerboard" ::
       "-a" :: "route_min_directed_valient" ::
       "-r" :: s"$row" ::
@@ -423,9 +423,13 @@ trait PlasticineTest extends DSLTest { test =>
     override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
     override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
     def runPasses():Result = {
-      genpir() >>
+      val result = genpir() >>
       pirpass("gentst", s"--module --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=14 --col=14".split(" ").toList) >>
+      runproute(row=14, col=14, vlink=2, slink=4, iter=100, vcLimit=4) >>
       scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
+        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      }
     }
   }
 

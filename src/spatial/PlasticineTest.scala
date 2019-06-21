@@ -382,7 +382,7 @@ trait PlasticineTest extends DSLTest { test =>
       pirpass("gentst", s"--mapping=true --codegen=true --net=inf --tungsten --psim=false".split(" ").toList) >>
       scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
       runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
       }
     }
   }

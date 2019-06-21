@@ -114,7 +114,7 @@ import spatial.dsl._
     setArg(in,1)
     val out1 = ArgOut[Int]
     val out2 = ArgOut[Int]
-    val dummy = ArgOut[Int]
+    val dummy = ArgOut[Int].conflictable
 
     Accel {
       val f1 = FIFO[Int](64)

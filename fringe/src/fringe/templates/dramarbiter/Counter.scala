@@ -26,3 +26,24 @@ class Counter(val w: Int) extends Module {
   io.next := newCount
 }
 
+
+class ElementCounter(val w: Int) extends Module {
+  val io = IO(new Bundle {
+    val reset = Input(Bool())
+    val enable = Input(Bool())
+    val out = Output(UInt(w.W))
+  })
+
+  val count = RegInit(0.U(w.W))
+
+  val newCount = count + 1.U
+
+  when(io.reset) {
+    count := 0.U
+  } .elsewhen(io.enable) {
+    count := newCount
+  }
+
+  io.out := count
+}
+

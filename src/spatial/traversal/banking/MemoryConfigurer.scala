@@ -25,7 +25,7 @@ import spatial.metadata.types._
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL, areamodel: AreaEstimator) {
   protected lazy val rank: Int = mem.sparseRank.length
-  protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
+  protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut || mem.isHostIO
 
   lazy val bankViews: Seq[BankingView] = if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
                                          else if (mem.explicitBanking.isDefined && mem.explicitNs.size > 1) Seq(Hierarchical(rank))

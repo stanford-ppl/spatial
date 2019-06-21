@@ -32,10 +32,14 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
     cmd.setTag(tag)
   }
 
+  val wdataMux = Module(new MuxPipe(dramStream.wdata.bits, streamCount))
+  val elementCtr = Module(new ElementCounter(32))
+  elementCtr.io.enable := (wdataMux.io.in.ready & wdataMux.io.in.valid)
+  elementCtr.io.reset := cmdMux.io.out.ready
+
   val cmdStreamID = cmdMux.io.out.bits.getTag.streamID
   val cmdOutDecoder = UIntToOH(cmdStreamID)
-  val wdataMux = Module(new MuxPipe(dramStream.wdata.bits, streamCount))
-  wdataMux.io.in.valid := VecInit(io.app.map { _.wdata.valid })(cmdStreamID) & cmdMux.io.out.valid
+  wdataMux.io.in.valid := VecInit(io.app.map { _.wdata.valid })(cmdStreamID) & cmdMux.io.out.valid & (elementCtr.io.out < cmdMux.io.out.bits.size)
   wdataMux.io.sel := cmdStreamID
   wdataMux.io.in.bits := io.app.map { _.wdata.bits }
 
@@ -55,7 +59,7 @@ class StreamArbiter(dramStream: DRAMStream, streamCount: Int) extends Module {
 
   io.app.zipWithIndex.foreach { case (app, i) =>
     app.cmd.ready := cmdMux.io.in.ready & cmdInDecoder(i)
-    app.wdata.ready := (wdataMux.io.in.ready & wdataMux.io.in.valid) & cmdOutDecoder(i)
+    app.wdata.ready := (wdataMux.io.in.ready & wdataMux.io.in.valid) & cmdOutDecoder(i) & (elementCtr.io.out < cmdMux.io.out.bits.size)
 
     app.rresp.valid := io.dram.rresp.valid & rrespDecoder(i)
     app.rresp.bits := io.dram.rresp.bits

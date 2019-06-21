@@ -48,7 +48,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
     lhs.children.drop(1).zipWithIndex.foreach{case (cc,i) => 
       val c = cc.s.get
       val activeMems = c.nestedWrittenMems.toSet ++ c.nestedWrittenDRAMs.toSet ++ c.nestedReadMems.toSet ++ c.nestedReadDRAMs.toSet ++ c.nestedTransientReadMems
-      val addressableMems = (activeMems ++ prevMems).filter(!_.isSingleton)
+      val addressableMems = (activeMems ++ prevMems).filter(!_.isSingleton).filter(!_.isDRAM)
       val activeWrMems = c.nestedWrittenMems.toSet ++ c.nestedWrittenDRAMs.toSet
       val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind) | (c.isSwitch && c.op.exists(_.R.isBits))
       val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind) | (lhs.children.apply(i).s.get.isSwitch && lhs.children.apply(i).s.get.op.exists(_.R.isBits))

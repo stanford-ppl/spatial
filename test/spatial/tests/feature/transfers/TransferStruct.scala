@@ -63,9 +63,9 @@ import spatial.dsl._
       tensorsram load tensordram
   
       veldram store velsram
-      framdram store framsram
+      Pipe.NoBind{framdram store framsram}
       tridram store trisram
-      tensordram store tensorsram
+      Pipe.NoBind{tensordram store tensorsram}
     }
     val x = getArg(out)
 

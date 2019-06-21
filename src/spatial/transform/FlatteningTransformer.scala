@@ -43,13 +43,13 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
     val bundling: HashMap[Int,Seq[Sym[_]]] = HashMap((0 -> Seq(lhs.children.head.s.get)))
     val prevMems: Set[Sym[_]] = Set()
     val prevWrMems: Set[Sym[_]] = Set()
-    (lhs.children.head.s.get.nestedWrittenMems ++ lhs.children.head.s.get.nestedReadMems ++ lhs.children.head.s.get.nestedTransientReadMems).foreach(prevMems += _)
-    (lhs.children.head.s.get.nestedWrittenMems).foreach{x => prevWrMems += x}
+    (lhs.children.head.s.get.nestedWrittenMems ++ lhs.children.head.s.get.nestedWrittenDRAMs ++ lhs.children.head.s.get.nestedReadMems ++ lhs.children.head.s.get.nestedReadDRAMs ++ lhs.children.head.s.get.nestedTransientReadMems).foreach(prevMems += _)
+    (lhs.children.head.s.get.nestedWrittenMems ++ lhs.children.head.s.get.nestedWrittenDRAMs).foreach{x => prevWrMems += x}
     lhs.children.drop(1).zipWithIndex.foreach{case (cc,i) => 
       val c = cc.s.get
-      val activeMems = c.nestedWrittenMems.toSet ++ c.nestedReadMems.toSet ++ c.nestedTransientReadMems
+      val activeMems = c.nestedWrittenMems.toSet ++ c.nestedWrittenDRAMs.toSet ++ c.nestedReadMems.toSet ++ c.nestedReadDRAMs.toSet ++ c.nestedTransientReadMems
       val addressableMems = (activeMems ++ prevMems).filter(!_.isSingleton)
-      val activeWrMems = c.nestedWrittenMems.toSet
+      val activeWrMems = c.nestedWrittenMems.toSet ++ c.nestedWrittenDRAMs.toSet
       val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind) | (c.isSwitch && c.op.exists(_.R.isBits))
       val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind) | (lhs.children.apply(i).s.get.isSwitch && lhs.children.apply(i).s.get.op.exists(_.R.isBits))
       if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems ++ addressableMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
@@ -63,7 +63,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
         prevWrMems.clear()
         bundling += (bundling.toList.size -> Seq(c))
       } else {
-        dbgs(s"No dependencies detected between next child deps prev bundle deps.  Grouping $c in group ${bundling.toList.size-1}")
+        dbgs(s"No dependencies detected between next child deps ($activeMems) prev bundle ($prevMems) deps.  Grouping $c in group ${bundling.toList.size-1}")
         bundling += ((bundling.toList.size - 1) -> (bundling(bundling.toList.size - 1) ++ Seq(c)))
       }
       activeMems.foreach{x => prevMems += x}

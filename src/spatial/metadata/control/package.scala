@@ -396,6 +396,26 @@ package object control {
       }
     }
 
+    @stateful def nestedWrittenDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.writtenDRAMs).toSet) }.getOrElse(Set.empty)
+    }
+    def writtenDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[WrittenDRAMs](sym).map(_.drams) }.getOrElse(Set.empty)
+    }
+    def writtenDRAMs_=(drams: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, WrittenDRAMs(drams)) }
+    }
+
+    @stateful def nestedReadDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.readDRAMs).toSet) }.getOrElse(Set.empty)
+    }
+    def readDRAMs: Set[Sym[_]] = {
+      s.flatMap{sym => metadata[ReadDRAMs](sym).map(_.drams) }.getOrElse(Set.empty)
+    }
+    def readDRAMs_=(drams: Set[Sym[_]]): Unit = {
+      s.foreach{sym => metadata.add(sym, ReadDRAMs(drams)) }
+    }
+
     @stateful def nestedWrittenMems: Set[Sym[_]] = {
       s.flatMap{sym => Some((Seq(sym.toCtrl) ++ sym.nestedChildren).flatMap(_.writtenMems).toSet) }.getOrElse(Set.empty)
     }

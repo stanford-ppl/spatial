@@ -238,7 +238,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     sortedAccesses.foreach{a =>
       dbg(s"    Access: ${a.short} [${a.parent}]")
       val grpId = {
-        if (mem.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
+        if (mem.parent == Ctrl.Host) groups.zipWithIndex.indexWhere{case (grp,i) => 
+          val samePort = grp.filter{b => requireConcurrentPortAccess(a,b)}
+          if (samePort.nonEmpty && !mem.shouldIgnoreConflicts) dbgs(s"      WARNING: $mem has conflictable writers.  Do you want to add .conflictable flag to it?")
+          samePort.nonEmpty && !mem.shouldIgnoreConflicts
+        }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
           // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
           // Should drop in data broadcasting node in this case

@@ -159,6 +159,20 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
             case StatusReader(mem, _) => 
               s.readMems += mem
 
+            case Op(_@FringeDenseStore(d,_,_,_)) =>
+              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+            case Op(_@FringeSparseStore(d,_,_)) =>
+              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+            case Op(_@DRAMAlloc(d,_)) => 
+              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+
+            case Op(_@FringeDenseLoad(d,_,_)) =>
+              s.readDRAMs += d.asInstanceOf[Sym[_]]
+            case Op(_@FringeSparseLoad(d,_,_)) =>
+              s.readDRAMs += d.asInstanceOf[Sym[_]]
+            case Op(_@DRAMDealloc(d)) => 
+              s.readDRAMs += d.asInstanceOf[Sym[_]]
+
             case Op(_@(BreakpointIf(_) | ExitIf(_))) =>
               lhs.parent.s.get.shouldNotBind = true
 

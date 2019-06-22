@@ -13,7 +13,7 @@ import scala.collection.mutable
 trait ScalaCodegen extends Codegen with FileDependencies with NamedCodegen {
   override val lang: String = "scala"
   override val ext: String = "scala"
-  final val CODE_WINDOW: Int = 75
+  final val CODE_WINDOW: Int = spatialConfig.codeWindow
 
   def and(ens: Set[Bit]): String = if (ens.isEmpty) "TRUE" else ens.map(quote).mkString(" & ")
 

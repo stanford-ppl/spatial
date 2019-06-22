@@ -38,6 +38,7 @@ class SpatialConfig extends Config {
   var unrollMetapipeOfParallels: Boolean = true
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false
+  var codeWindow: Int = 50
 
   var enableArchDSE: Boolean = false
 

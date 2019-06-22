@@ -19,7 +19,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override val lang: String = "chisel"
   override val ext: String = "scala"
   backend = "accel"
-  final val CODE_WINDOW: Int = 50
+  final val CODE_WINDOW: Int = spatialConfig.codeWindow
 
   protected var globalBlockID: Int = 0
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]

@@ -285,6 +285,10 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.enableParallelBinding = false
     }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
 
+    cli.opt[Int]("codeWindow").action{ (t,_) => 
+      spatialConfig.codeWindow = t
+    }.text("""Size of code window for Java-style chunking, which breaks down large IR blocks into multiple levels of Java objects.  Increasing can sometimes solve the GC issue during Chisel compilation (default: 50)""")
+
     cli.opt[Int]("bankingEffort").action{ (t,_) => 
       spatialConfig.bankingEffort = t
     }.text("""Specify the level of effort to put into banking local memories.  i.e:

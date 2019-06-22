@@ -214,9 +214,9 @@ class BigIPZynq extends BigIP with ZynqBlackBoxes {
     m.io.a := a
     m.io.out
   }
-  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode): UInt = {
+  override def fix2fix(src: UInt, s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, latency: Int, flow: Bool, rounding: RoundingMode, saturating: OverflowMode, myName: String): UInt = {
     if (src.litArg.isEmpty) {
-      val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating))
+      val fix2fixBox = Module(new fix2fixBox(s1, d1, f1, s2, d2, f2, rounding, saturating, latency, myName))
       fix2fixBox.io.a := src
       fix2fixBox.io.expect_neg := false.B
       fix2fixBox.io.expect_pos := false.B

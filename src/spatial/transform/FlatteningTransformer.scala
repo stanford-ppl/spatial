@@ -128,6 +128,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
           body.blocks.foreach{case (_,block) => 
             val saveMerge = deleteChild
             deleteChild = true
+
             val block2 = f(block)
             register(block -> block2)
             deleteChild = saveMerge
@@ -159,6 +160,16 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       if (bundling.toList.size < lhs.children.size) {
         stageWithFlow(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
+    case ctrl@SwitchCase(blk) if (spatialConfig.enableParallelBinding && lhs.isOuterControl && lhs.children.length > 1) => 
+      Type[A] match {
+        case _:Void => 
+          val bundling = precomputeBundling(lhs)
+          if (bundling.toList.size < lhs.children.size) {
+            stageWithFlow(SwitchCase(applyBundling(bundling,blk.asInstanceOf[Block[Void]]))){lhs2 => transferData(lhs, lhs2)}  
+          } else super.transform(lhs,rhs)
+        case _      => 
+          super.transform(lhs,rhs)
+      }
 
     case ctrl@AccelScope(func) => 
       val bundling = precomputeBundling(lhs)
@@ -166,13 +177,13 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
         stageWithFlow(AccelScope(applyBundling(bundling, func))){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
 
-    case _ => super.transform(lhs,rhs)
+    case _ => 
+      super.transform(lhs,rhs)
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case op@Switch(F(sels),_) if flattenSwitch =>
       val vals = op.cases.map{cas => inlineBlock(cas.body).unbox }
-
       Type[A] match {
         case Bits(b) =>
           implicit val bA: Bits[A] = b
@@ -188,7 +199,11 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.children.head.isStreamControl && !lhs.isStreamControl)) deleteChild = false
       ctrl.bodies.foreach{body => 
         body.blocks.foreach{case (_,block) => 
-          inlineBlock(block)
+          val block2 = if (spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1) {
+            val bundling = precomputeBundling(lhs)
+            if (bundling.toList.size < lhs.children.size) applyBundling(bundling,block.asInstanceOf[Block[Void]]) else block
+          } else block
+          inlineBlock(block2)
         }
       }
       if (!(lhs.children.length == 1 && lhs.children.head.isUnitPipe && !lhs.children.head.isStreamControl && !lhs.isStreamControl)) deleteChild = true

@@ -67,7 +67,7 @@ class FixFMAAccum(
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
   drainState.io.input.reset := activeLast.D(drain_latency + fmaLatency)
-  val isDrainState = drainState.io.output
+  val isDrainState = drainState.io.output || activeEn
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
@@ -123,7 +123,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
   drainState.io.input.reset := activeLast.D(drain_latency + opLatency)
-  val isDrainState = drainState.io.output
+  val isDrainState = drainState.io.output || activeEn
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}

@@ -102,6 +102,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
+    lazy val bindingTransformer    = BindingTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
     lazy val accumTransformer      = AccumTransformer(state)
     lazy val regReadCSE            = RegReadCSE(state)
@@ -168,7 +169,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
-        flatteningTransformer ==> 
+        flatteningTransformer ==> bindingTransformer ==>
         /** Update buffer depths */
         bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Accumulation Specialization **/
@@ -284,6 +285,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false
     }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
+
+    cli.opt[Int]("codeWindow").action{ (t,_) => 
+      spatialConfig.codeWindow = t
+    }.text("""Size of code window for Java-style chunking, which breaks down large IR blocks into multiple levels of Java objects.  Increasing can sometimes solve the GC issue during Chisel compilation (default: 50)""")
 
     cli.opt[Int]("bankingEffort").action{ (t,_) => 
       spatialConfig.bankingEffort = t

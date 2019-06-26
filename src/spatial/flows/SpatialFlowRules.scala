@@ -165,6 +165,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
             case Op(_@DRAMAlloc(d,_)) => 
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+              s.readDRAMs += d.asInstanceOf[Sym[_]]
 
             case Op(_@FringeDenseLoad(d,_,_)) =>
               s.readDRAMs += d.asInstanceOf[Sym[_]]
@@ -172,6 +173,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
               s.readDRAMs += d.asInstanceOf[Sym[_]]
             case Op(_@DRAMDealloc(d)) => 
               s.readDRAMs += d.asInstanceOf[Sym[_]]
+              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
 
             case Op(_@(BreakpointIf(_) | ExitIf(_))) =>
               lhs.parent.s.get.shouldNotBind = true

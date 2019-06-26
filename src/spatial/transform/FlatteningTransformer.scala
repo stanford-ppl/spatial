@@ -73,7 +73,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
         ctrl.bodies.foreach{body => 
           body.blocks.foreach{case (_,block) => 
             val block2 = f(block)
-            block.stms.foreach(update)
+            block.stms.foreach(visit)
             register(block -> block2)
           }
         }

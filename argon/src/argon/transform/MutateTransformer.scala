@@ -51,11 +51,5 @@ abstract class MutateTransformer extends ForwardTransformer {
     }
   }
 
-  final def update(lhs: Sym[Any]): Unit = lhs.op match {
-    case Some(rhs) =>
-      update(lhs, rhs)
-    case _ => // Do nothing
-  }
-
   def updateNode[A](node: Op[A]): Unit = node.update(f)
 }

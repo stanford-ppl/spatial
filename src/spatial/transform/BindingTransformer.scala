@@ -75,14 +75,14 @@ case class BindingTransformer(IR: State) extends MutateTransformer with AccelTra
         // Add stm to roster if it is a ctrl to be bundled
         if (bundling(curGrp).contains(stm)) bundledStms += stm
         else {
-          update(stm)
+          visit(stm)
         }
-        // If we are at final controller in bundle, update each sym in roster (need to transfer metadata, so use update instead of visit)
+        // If we are at final controller in bundle, visit each sym in roster (need to transfer metadata, so use visit instead of visit)
         if (stm == bundling(curGrp).last) {
-          // Wrap in Parallel if bundled, otherwise just plain update
+          // Wrap in Parallel if bundled, otherwise just plain visit
           if (bundling(curGrp).size > 1) {
-            stage(ParallelPipe(scala.collection.immutable.Set[Bit](), stageBlock(bundledStms.foreach(update))))
-          } else bundledStms.foreach(update)
+            stage(ParallelPipe(scala.collection.immutable.Set[Bit](), stageBlock(bundledStms.foreach(visit))))
+          } else bundledStms.foreach(visit)
           // Increment to next group and clear bundleStms
           bundledStms.clear()
           curGrp += 1
@@ -94,42 +94,47 @@ case class BindingTransformer(IR: State) extends MutateTransformer with AccelTra
 
   private def transformCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case ctrl@UnrolledForeach(ens, cchain, blk, is, vs, stopWhen) if (spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1) => 
+      dbgs(s"attempting to transform $lhs, condition 1")
       val bundling = precomputeBundling(lhs)
       if (bundling.toList.size < lhs.children.size) {
-        stageWithFlow(UnrolledForeach(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferDataIfNew(lhs, lhs2)}  
+        stageWithFlow(UnrolledForeach(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
     case ctrl@UnrolledReduce(ens, cchain, blk, is, vs, stopWhen) if (spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1) => 
+      dbgs(s"attempting to transform $lhs, condition 2")
       val bundling = precomputeBundling(lhs)
       if (bundling.toList.size < lhs.children.size) {
-        stageWithFlow(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferDataIfNew(lhs, lhs2)}  
+        stageWithFlow(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
     case ctrl@SwitchCase(blk) if (spatialConfig.enableParallelBinding && lhs.isOuterControl && lhs.children.length > 1) => 
+      dbgs(s"attempting to transform $lhs, condition 3")
       Type[A] match {
         case _:Void => 
           val bundling = precomputeBundling(lhs)
           if (bundling.toList.size < lhs.children.size) {
-            stageWithFlow(SwitchCase(applyBundling(bundling,blk.asInstanceOf[Block[Void]]))){lhs2 => transferDataIfNew(lhs, lhs2)}  
+            stageWithFlow(SwitchCase(applyBundling(bundling,blk.asInstanceOf[Block[Void]]))){lhs2 => transferData(lhs, lhs2)}  
           } else super.transform(lhs,rhs)
         case _      => 
           super.transform(lhs,rhs)
       }
 
     case ctrl@AccelScope(func) => 
+      dbgs(s"attempting to transform $lhs, condition 4")
       val bundling = precomputeBundling(lhs)
       if (bundling.toList.size < lhs.children.size) {
-        stageWithFlow(AccelScope(applyBundling(bundling, func))){lhs2 => transferDataIfNew(lhs, lhs2)}  
+        stageWithFlow(AccelScope(applyBundling(bundling, func))){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
 
     case _ => 
+      dbgs(s"attempting to transform $lhs, condition 5")
       super.transform(lhs,rhs)
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case _:Switch[_]  => super.transform(lhs,rhs)
-    case _:AccelScope => inAccel{ transformCtrl(lhs,rhs) }
-    case _:Control[_] => transformCtrl(lhs,rhs)
+    case _:Switch[_]  => dbgs(s"enter $lhs cond 1"); super.transform(lhs,rhs)
+    case _:AccelScope => dbgs(s"enter $lhs cond 2"); inAccel{ transformCtrl(lhs,rhs) }
+    case _:Control[_] => dbgs(s"enter $lhs cond 3"); transformCtrl(lhs,rhs)
 
-    case _ => super.transform(lhs,rhs)
+    case _ => dbgs(s"enter $lhs cond 4"); super.transform(lhs,rhs)
   }
 
 }

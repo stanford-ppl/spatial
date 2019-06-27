@@ -1,3 +1,5 @@
+package spatial.tests.apps
+
 /* This app is a fancier version of Differentiator and EdgeDetector.  It takes a 1D stream of data that has roughly this shape with lots of noise and shifts:
                                                        
                                                        
@@ -70,6 +72,8 @@ import spatial.dsl._
   val rowTileSize = 16
   val deriv_window = 40
   @struct case class score(idx: Int, v: I32)
+  type P = FixPt[TRUE,_112,_0]
+  @struct case class composite(rising_idx: Int, rising_v: I32, falling_idx: Int, falling_v: I32, volume: U16, p16: U16, p32: U32, p64: U64)
   def main(args: Array[String]): Unit = {
 
     // // Get reference edges
@@ -87,15 +91,13 @@ import spatial.dsl._
     // Set up dram
     val COLS = ArgIn[Int]
     val ROWS = ArgIn[Int]
-    val ROWS_TODO = ArgIn[Int]
+    val LINES_TODO = ArgIn[Int]
     setArg(COLS, input_data.cols)
     setArg(ROWS, input_data.rows)
-    setArg(ROWS_TODO, args(0).to[Int])
+    setArg(LINES_TODO, args(0).to[Int])
     val input_dram = DRAM[I16](ROWS, COLS)
     setMem(input_dram, input_data)
-    val output_rising_dram = DRAM[score](ROWS_TODO)
-    val output_falling_dram = DRAM[score](ROWS_TODO)
-    val output_volume_dram = DRAM[U16](ROWS_TODO)
+    val output_composite_dram = DRAM[composite](LINES_TODO)
 
     // DEBUG
     val deriv = DRAM[T](COLS)
@@ -103,19 +105,19 @@ import spatial.dsl._
     Accel{
       /*
                                                 acc after last rising update
-                                                                  _                    intensity_fifo
-                                           /------------>   |_|  ------------\           ________   
-                                          /      acc after last rising update - > -->   |_|_|_|_|     ----->      DRAM
-                                         /                   _               /
-                                        /--------------->   |_|  -----------/
-                                       /                                                                      
-                       input_fifo     /     sr                                                                  
-                        ________     /     _____                min idx/val            falling fifo
-       DRAM  ----->    |_|_|_|_|    --->  |_|_|_|     deriv       _                      ________                                          
-                                                  \     _     /  |_|            ---->   |_|_|_|_|     ----->      DRAM
-                                          kernel   >   |_|  <   max idx/val            rising fifo
-                                           _____  /           \     _                    ________                        
-                                          |_|_|_|                |_|            ---->   |_|_|_|_|     ----->      DRAM          
+                                                             _                     
+                                           /------------>   |_|  ------------\        
+                                          /      acc after last rising update ---\ 
+                                         /                   _               /    \
+                                        /--------------->   |_|  -----------/      \
+                                       /                                            \                          
+                       input_fifo     /     sr                                       \                           
+                        ________     /     _____                min idx/val           \  result_fifo
+       DRAM  ----->    |_|_|_|_|    --->  |_|_|_|     deriv       _                    \   ________                                          
+                                                  \     _     /  |_|  ------------------> |_|_|_|_|   ----->    DRAM
+                                          kernel   >   |_|  <   max idx/val            /
+                                           _____  /           \   _                   /                         
+                                          |_|_|_|                |_|  ---------------/                  
                                                                                                       
        \__________________/ \________________________________________________________________/ \____________________/                                                                                           
              Stage 1                            Stage 2                                                Stage 3    
@@ -125,12 +127,10 @@ import spatial.dsl._
                                                                                                     
                                                                                                     
       */
-      Stream.Foreach(ROWS_TODO by 1 par 1){r => 
+      Stream.Foreach(LINES_TODO by 1 par 1){r => 
         val input_fifo = FIFO[I16](colTileSize)
-        val rising = FIFO[score](2*rowTileSize)
-        val falling = FIFO[score](2*rowTileSize)
-        val volume = FIFO[U16](2*rowTileSize)
         val issue = FIFO[Int](2*rowTileSize)
+        val result = FIFO[composite](2*rowTileSize)
 
         // // DEBUG
         // val deriv_fifo = FIFO[T](32)
@@ -159,14 +159,12 @@ import spatial.dsl._
             best_falling := score(c,t.to[I32])
           }
           if (c == COLS-1) {
-            rising.enq(best_rising.value)
-            falling.enq(best_falling.value)
-            volume.enq(acc_after_rising - acc_after_falling)
-            issue.enq(mux(best_rising.value == score(-1,-1) || r == ROWS_TODO-1 || r % rowTileSize == rowTileSize-1, mux((r+1) % rowTileSize == 0, rowTileSize, r % rowTileSize + 1), 0)) // Random math to make sure retiming puts it later
+            result.enq(composite(best_rising.value.idx, best_rising.value.v, best_falling.value.idx, best_falling.value.v, acc_after_rising - acc_after_falling, 0, 0, 0))
+            issue.enq(mux(best_rising.value == score(-1,-1) || r == LINES_TODO-1 || r % rowTileSize == rowTileSize-1, mux((r+1) % rowTileSize == 0, rowTileSize, r % rowTileSize + 1), 0)) // Random math to make sure retiming puts it later
           } 
 
           // // DEBUG
-          // if (r == ROWS_TODO-1) deriv_fifo.enq(t)
+          // if (r == LINES_TODO-1) deriv_fifo.enq(t)
         }
 
         // Stage 3: Store
@@ -176,9 +174,7 @@ import spatial.dsl._
             // // DEBUG
             // deriv store deriv_fifo
             // Store results
-            Pipe{output_rising_dram(r-(r%rowTileSize)::r-(r%rowTileSize) + numel) store rising}
-            Pipe{output_falling_dram(r-(r%rowTileSize)::r-(r%rowTileSize) + numel) store falling}
-            Pipe{output_volume_dram(r-(r%rowTileSize)::r-(r%rowTileSize) + numel) store volume}
+            output_composite_dram(r-(r%rowTileSize)::r-(r%rowTileSize) + numel) store result
           }
         }
       }
@@ -189,13 +185,15 @@ import spatial.dsl._
     // printArray(Array.tabulate(input_data.cols){i => input_data(args(0).to[Int]-1, i)}, r"Row ${args(0)}")
     // printArray(getMem(deriv), r"Deriv ${args(0)}")
 
-    val result_rising_dram = getMem(output_rising_dram)
-    val result_falling_dram = getMem(output_falling_dram)
-    val result_volume_dram = getMem(output_volume_dram)
+    val result_composite_dram = getMem(output_composite_dram)
     println("Results:")
     println("|  Rising Idx   |  Falling Idx  |     Volume      |   Rising V   |   Falling V   |")
-    for (i <- 0 until ROWS_TODO) {
-      println(r"|      ${result_rising_dram(i).idx}      |      ${result_falling_dram(i).idx}      |      ${result_volume_dram(i)}      |      ${result_rising_dram(i).v}      |      ${result_falling_dram(i).v}      |")
+    for (i <- 0 until LINES_TODO) {
+      println(r"|      ${result_composite_dram(i).rising_idx}      |" +
+              r"      ${result_composite_dram(i).falling_idx}      |" +
+              r"      ${result_composite_dram(i).volume}      |"      +
+              r"      ${result_composite_dram(i).rising_v}      |"    +
+              r"      ${result_composite_dram(i).falling_v}      |")
     }
 
     val gold_rising_idx = loadCSV1D[Int](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.rising_idx",",")
@@ -204,12 +202,12 @@ import spatial.dsl._
     val gold_falling_v = loadCSV1D[I32](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.falling_v",",")
     val gold_volume = loadCSV1D[U16](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.volume",",")
 
-    if (ROWS_TODO == 50) { // Only have regression for 50 lines...
-      val got_rising_idx = Array.tabulate(ROWS_TODO){i => result_rising_dram(i).idx}
-      val got_rising_v = Array.tabulate(ROWS_TODO){i => result_rising_dram(i).v}
-      val got_falling_idx = Array.tabulate(ROWS_TODO){i => result_falling_dram(i).idx}
-      val got_falling_v = Array.tabulate(ROWS_TODO){i => result_falling_dram(i).v}
-      val got_volume = Array.tabulate(ROWS_TODO){i => result_volume_dram(i)}
+    if (LINES_TODO == 50) { // Only have regression for 50 lines...
+      val got_rising_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_idx}
+      val got_rising_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_v}
+      val got_falling_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_idx}
+      val got_falling_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_v}
+      val got_volume = Array.tabulate(LINES_TODO){i => result_composite_dram(i).volume}
 
       println(r"Correct rising_idx:  ${gold_rising_idx == got_rising_idx}")
       println(r"Correct rising_v:    ${gold_rising_v == got_rising_v}")

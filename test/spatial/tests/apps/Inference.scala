@@ -83,7 +83,7 @@ import spatial.dsl._
     // println("MANUALLY COPY KERNEL_DATA PTR TO ME!")
 
     Accel{
-      val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, KERNEL_COLS, KERNEL_ROWS, INPUT_CHANS_MAX)
+      val kernel_sram = SRAM[T](OUTPUT_CHANS_MAX, KERNEL_COLS, KERNEL_ROWS, INPUT_CHANS_MAX).hierarchical
       val bias_sram = SRAM[T](OUTPUT_CHANS_MAX)
       // Parallel{
       kernel_sram load KERNEL_DATA(0::OUTPUT_CHANS, 0::KERNEL_COLS, 0::KERNEL_ROWS, 0::INPUT_CHANS)
@@ -95,7 +95,7 @@ import spatial.dsl._
         val row = R*STRIDE.value
         Foreach(colspan par P2){ C =>
           val col = C*STRIDE.value
-          val local_data = SRAM[T](3,3,INPUT_CHANS_MAX)
+          val local_data = SRAM[T](3,3,INPUT_CHANS_MAX).hierarchical
           val accum_line_upcast = SRAM[T2](OUTPUT_CHANS_MAX)
           val accum_line = SRAM[T](OUTPUT_CHANS_MAX)
           local_data load INPUT_DATA(col::col+3, row::row+3, 0::INPUT_CHANS par loadPar)

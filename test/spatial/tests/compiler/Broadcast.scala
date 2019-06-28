@@ -79,7 +79,7 @@ import spatial.dsl._
     // App should have 26 SRAMNew for mop (29 for pom because sram5 needs to be fully duplicated)
       // NOTE: Spatial seems to kill off dummy srams
     Accel {
-      val accum = SRAM[Int](8,32,3,3)
+      val accum = SRAM[Int](8,32,3,3).hierarchical
       val sram1 = SRAM[Int](9999) // Should have 3 duplicates, each broadcast to 2 readers (NOT 3*2 duplicates)
       val reg1 = Reg[Int](0)
       val sram2 = SRAM[Int](9999) // Should have 3 duplicates, each broadcast to 2 readers (NOT 3*2 duplicates)

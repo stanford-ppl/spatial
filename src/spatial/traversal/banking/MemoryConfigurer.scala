@@ -46,7 +46,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   // Mapping from BankingOptions to its "duplicates."  Each "duplicate" contains a histogram (Seq[Int]), a Seq of auxilliary nodes (Seq[String]), and a 7-element Seq of its cost components (total, mem luts/ffs/brams, aux luts/ffs/brams) (Seq[Int])
   type DUPLICATE = (Seq[Banking], Seq[Int], Seq[String], Seq[Double])
-  val schemesInfo = scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]()
+  val schemesInfo = scala.collection.mutable.HashMap[Int,scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]]()
+  private val latestSchemesInfo = scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]()
 
   def configure(): Unit = {
     dbg(s"---------------------------------------------------------------------")
@@ -602,6 +603,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
+        latestSchemesInfo.clear()
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
         dbgs(s"**************************************************************************************")
         dbgs(s"Analyzing costs for ${bankings.toList.size} banking schemes found for ${mem.fullname}")
@@ -610,7 +612,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val c = banking.toList.zipWithIndex.map{case ((rds, b),i) => 
             dbgs(s"  - ${rds.map(_.size).sum} readers connect to duplicate #$i (${b})")
             val dup = cost(b,depth,rds,reachingWrGroups)
-            schemesInfo += (scheme -> {schemesInfo.getOrElse(scheme, Seq()) ++ Seq(dup)})
+            latestSchemesInfo += (scheme -> {latestSchemesInfo.getOrElse(scheme, Seq()) ++ Seq(dup)})
             dup._4.head
           }.sum
           scheme -> c
@@ -718,6 +720,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         case Right(insts) =>
           var instIdx = 0
           var merged = false
+          val unmergedSchemesInfo = latestSchemesInfo
           while (instIdx < instances.length && !merged && insts.length == 1) {
             dbgs(s"Attempting to merge group #$grpId with instance #$instIdx: ")
             state.logTab += 1
@@ -736,19 +739,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                     else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
                   }
 
-                case Left(issue) =>
-                  dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
+                case Left(issue) => dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
               }
             }
-            else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+            else {
+              dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+            }
             state.logTab -= 1
             instIdx += 1
           }
           if (!merged) {
+            schemesInfo += (instances.length -> unmergedSchemesInfo)
             insts.foreach{i1 => instances += i1}
             dbgs(s"Result: Created instance #${instances.length-1}")
           }
           else {
+            schemesInfo += ({instIdx-1} -> latestSchemesInfo)
             dbgs(s"Result: Merged $grpId into instance ${instIdx-1}")
           }
 

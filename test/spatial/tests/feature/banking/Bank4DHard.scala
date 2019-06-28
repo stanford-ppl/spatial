@@ -16,11 +16,11 @@ import argon.Block
     setMem(dram,data)
     val out = ArgOut[Int]
     Accel {
-      val x = SRAM[Int](I,R,C,O).noduplicate
-      x load dram
+      val x_hier = SRAM[Int](I,R,C,O).noduplicate.hierarchical // flat is also possible but takes way longer to find
+      x_hier load dram
 
       out := Reduce(Reg[Int])(0 until I par PI, 0 until R par PR, 0 until C par PC, 0 until O par PO){case List(i,r,c,o) =>
-        x(i,r,c,o)
+        x_hier(i,r,c,o)
       }{_+_}
     }
 

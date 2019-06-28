@@ -19,7 +19,7 @@ case class PotentialBufferHazard(mem: Sym[_], bad: List[(Sym[_],scala.Int)]) ext
       error("")
 
       error(s"  access ${a} connects to port ${i}: ")
-      error(s"    ${a.ctx.content.getOrElse("<?:?:?>")}")
+      error(s"    ${a.ctx}: ${a.ctx.content.getOrElse("<?:?:?>")}")
       error("")
     }
     error("")

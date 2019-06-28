@@ -380,7 +380,7 @@ trait PlasticineTest extends DSLTest { test =>
     def runPasses():Result = {
       val result = genpir() >>
       pirpass("gentst", s"--mapping=true --codegen=true --net=inf --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
       runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
         result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
       }
@@ -395,7 +395,9 @@ trait PlasticineTest extends DSLTest { test =>
     def runPasses():Result = {
       val result = genpir() >>
       pirpass("gentst", s"--module --mapping=true --codegen=true --net=inf --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p1 extlink.csv -p2 link.csv -d mlink.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
+      scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l mlink.csv -p ideal.place -i /idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
+      scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
       runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
         result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
       }

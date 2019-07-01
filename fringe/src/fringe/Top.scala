@@ -23,6 +23,7 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
     case "vcs"  | "VCS"       => new targets.vcs.VCS
     case "xsim"      => new targets.xsim.XSim
     case "aws"  | "AWS_F1"     => new targets.aws.AWS_F1
+    case "cxp"  | "CXP"     => new targets.cxp.CXP
     case "aws-sim"   => new targets.aws.AWS_Sim
     case "zynq" | "Zynq"      => new targets.zynq.Zynq
     case "zedboard" | "ZedBoard"      => new targets.zedboard.ZedBoard

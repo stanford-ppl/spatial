@@ -30,6 +30,7 @@ trait CommonMain {
     case "zedboard"       => true
     case "verilator" => true
     case "vcs"       => true
+    case "cxp"       => true
     case "xsim"      => true
     case "de1soc"    => true
     case "arria10"   => true

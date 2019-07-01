@@ -402,10 +402,10 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"ln_p2p", s"ln -sf script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"run_p2p", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"ln_hybrid", s"ln -sf script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"run_hybrid", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"lnp2p", s"ln -sf script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runp2p", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"lnhybrid", s"ln -sf script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runhybrid", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
     }
   }
 

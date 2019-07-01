@@ -77,6 +77,9 @@ package object memory {
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
+    def isMustMerge: Boolean = metadata[MustMerge](s).exists(_.flag)
+    def isMustMerge_=(flag: Boolean): Unit = metadata.add(s, MustMerge(flag))
+
     def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
     def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
 

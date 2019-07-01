@@ -669,23 +669,26 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   3. Either instance is an accumulator and there is at least one pipelined ancestor controller.
     */
   protected def getMergeAttemptError(a: Instance, b: Instance): Option[String] = {
-    lazy val reads = a.reads.flatten ++ b.reads.flatten
-    lazy val writes = a.writes.flatten ++ b.writes.flatten
-    lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
-    val commonCtrl = a.ctrls intersect b.ctrls
-    val conflicts  = getInstanceConflict(a, b)
+    if (mem.isMustMerge) None
+    else {
+      lazy val reads = a.reads.flatten ++ b.reads.flatten
+      lazy val writes = a.writes.flatten ++ b.writes.flatten
+      lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
+      val commonCtrl = a.ctrls intersect b.ctrls
+      val conflicts  = getInstanceConflict(a, b)
 
-    if (spatialConfig.enablePIR) Some("Do not merge accesses for plasticine")
-    else if (commonCtrl.nonEmpty && !isGlobal)
-      Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
-    else if (conflicts.nonEmpty)
-      Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")
-    else if (metapipes.size > 1)
-      Some("Ambiguous metapipes")
-    else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce && !mem.shouldCoalesce)
-      Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
-    else
-      None
+      if (spatialConfig.enablePIR) Some("Do not merge accesses for plasticine")
+      else if (commonCtrl.nonEmpty && !isGlobal)
+        Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
+      else if (conflicts.nonEmpty)
+        Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")
+      else if (metapipes.size > 1)
+        Some("Ambiguous metapipes")
+      else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce && !mem.shouldCoalesce)
+        Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
+      else
+        None
+    }
   }
 
   /** Should not complete merging instances if any of the following hold:

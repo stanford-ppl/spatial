@@ -74,6 +74,10 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def hierarchical: C[A] = { this.isNoFlatBank = true; me }
   /** Only attempt to bank memory in a flattened manner */
   def flat: C[A] = { this.isNoHierarchicalBank = true; me }
+  /** Guarantee that it is safe to merge different duplicates. 
+    * Only use this if you know exactly what you are doing! 
+    */
+  def mustmerge: C[A] = { this.isMustMerge = true; me }
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}

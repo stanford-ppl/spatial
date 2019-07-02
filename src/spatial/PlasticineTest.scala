@@ -146,6 +146,7 @@ trait PlasticineTest extends DSLTest { test =>
 
     def parseMake(line:String) = {
       if (line.contains("error") || line.contains("exception")) Fail
+      else if (line.contains("Runtime")) Pass
       else Unknown
     }
 
@@ -225,6 +226,7 @@ trait PlasticineTest extends DSLTest { test =>
       cmd ++= "-p100 -t1 -d100".split(" ").map(_.trim).toList
       val timeout = 10800 * 2 // 6 hours
       val name = "runproute"
+      cmd = timer.split(" ").toList ++ cmd
       scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply, wd=IR.config.genDir+"/plastisim")
     }
 
@@ -386,7 +388,7 @@ trait PlasticineTest extends DSLTest { test =>
     col:Int=15,
     vlink:Int = 3,
     slink:Int = 4,
-    iter:Int = 100,
+    iter:Int = 1000,
     vcLimit:Int = 4,
     module:Boolean = false,
   ) extends PIRBackend {
@@ -396,16 +398,17 @@ trait PlasticineTest extends DSLTest { test =>
     override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
     override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
     def runPasses():Result = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
       genpir() >>
       pirpass("gentst", s"${if (module) "--module --module-name=Top" else ""} --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=$row --col=$col".split(" ").toList) >>
       (if (module) scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p extlink.csv -d link.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") else Pass) >>
+      scommand(s"maketst", s"$timer make".split(" "), timeout=6001, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
-      runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"lnp2p", s"ln -sf script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runp2p", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runp2p", s"$timer ./tungsten $runArg".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       scommand(s"lnhybrid", s"ln -sf script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runhybrid", s"$timer ./tungsten $args".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"runhybrid", s"$timer ./tungsten $runArg".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
     }
   }
 

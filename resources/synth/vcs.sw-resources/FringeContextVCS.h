@@ -276,7 +276,7 @@ public:
   void connect() {
     int id = sendCmd(READY);
     simCmd *cmd = recvResp();
-    EPRINTF("Sent cmd id %lu payload %lu. Echoed cmd id %lu payload %lu", id, READY, cmd->id, cmd->cmd);
+    EPRINTF("Sent cmd id %d payload %d. Echoed cmd id %d payload %d\n", id, READY, cmd->id, cmd->cmd);
     ASSERT(cmd->id == id, "Error: Received ID does not match sent ID\n");
     ASSERT(cmd->cmd == READY, "Error: Received cmd is not 'READY'\n");
     EPRINTF("Connection successful!\n");
@@ -321,8 +321,8 @@ public:
     close(respChannel->writeFd());
 
     // Connect with simulator
-    connect();
     EPRINTF("FPGA PID is %d\n", sim_pid);
+    connect();
 
     // Configure settings from environment
     debugRegs = envToBool("DEBUG_REGS");

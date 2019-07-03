@@ -204,7 +204,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && outermost.parent.s.get.isLockstepAcross(itersDiffer, Some(a.access), Some(outermost.parent))
+        spatialConfig.enableBroadcast && outermost.parent.s.get.synchronizedStart(itersDiffer, includeOuter = true)
       }
     }
     else true
@@ -252,7 +252,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
           val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)}
-          samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
+          samePort.foreach{b => val conflictable = divergedIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable} that dephase due to non-lockstep controllers")}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")
           if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
@@ -332,7 +332,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val conflict = if (samePort) {
         a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)
       } else false
-      val dephaseIter = if (samePort) dephasingIters(a,b,mem) else Set.empty
+      val dephaseIter = if (samePort) divergedIters(a,b,mem) else Set.empty
       dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict dephaseIter:$dephaseIter")
       samePort && !conflict
     })
@@ -723,7 +723,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         case Right(insts) =>
           var instIdx = 0
           var merged = false
-          val unmergedSchemesInfo = latestSchemesInfo
+          val unmergedSchemesInfo = latestSchemesInfo.clone()
           while (instIdx < instances.length && !merged && insts.length == 1) {
             dbgs(s"Attempting to merge group #$grpId with instance #$instIdx: ")
             state.logTab += 1

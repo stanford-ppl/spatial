@@ -54,24 +54,20 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     depth: Int
   ): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
 
-    // Return Set of iterator combined with its unroll address with which it dephases
-    def allDephasingIters(accs: Set[Set[AccessMatrix]]): Set[(Idx,Seq[Int])] = {
-      if (mem.forceExplicitBanking) Set()
-      else {
-        accs.map{grp => grp.map{a => 
-          grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
-        }.flatten}.flatten
-      }
+    // Generate substitution rules for each iter for each uid.  Given iter and its uid, generate a rule to replace it with a new iter and an offset to include in the access patterns c column
+    def generateSubstRules(accs: Set[Set[AccessMatrix]]): scala.collection.immutable.Map[(Idx,Seq[Int]),(Idx,Int)] = {
+      val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.map{a => dephasingIters(a,mem)}.flatten.toMap
+      toRewrite.map{
+        case((i,addr),ofs) if (ofs.isDefined) => ((i,addr) -> (i,ofs.get))
+        case((i,addr),ofs) if (!ofs.isDefined) => ((i,addr) -> (boundVar[I32],0))
+      }.toMap
     }
-    def generateSubstRules(toRewrite: Set[(Idx,Seq[Int])]): scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = {
-      toRewrite.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
-    }
-    def rewriteAccesses(accs: Set[Set[AccessMatrix]], rules: Map[(Idx,Seq[Int]),Idx]): Set[Set[AccessMatrix]] = {
+    def rewriteAccesses(accs: Set[Set[AccessMatrix]], rules: Map[(Idx,Seq[Int]),(Idx,Int)]): Set[Set[AccessMatrix]] = {
       accs.map{grp => grp.map{a => 
         val aIters = accessIterators(a.access, mem)
-        val keyRules: scala.collection.immutable.Map[Idx,Idx] = aIters.zipWithIndex.collect{case(iter,i) if (rules.contains((iter,getDephasedUID(aIters,a.unroll,i)))) => (iter -> rules((iter,getDephasedUID(aIters,a.unroll,i))))}.toMap
+        val keyRules: scala.collection.immutable.Map[Idx,(Idx,Int)] = aIters.zipWithIndex.collect{case(iter,i) if (rules.contains((iter,getDephasedUID(aIters,a.unroll,i)))) => (iter -> rules((iter,getDephasedUID(aIters,a.unroll,i))))}.toMap
         if (keyRules.nonEmpty) {mem.addDephasedAccess(a.access); dbgs(s"Substituting due to dephasing: $keyRules")}
-        val newa = a.randomizeKeys(keyRules)
+        val newa = a.substituteKeys(keyRules)
         accMatrixMapping += (newa -> a)
         newa
       }.toSet}.toSet
@@ -267,9 +263,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     sparseMatrixMapping.clear()
 
     // Step 1: Modify access matrices due to lockstep dephasing and compute new "actual" grps
-    val readIterSubsts = generateSubstRules(allDephasingIters(reads))
+    val readIterSubsts = generateSubstRules(reads)
     if (readIterSubsts.nonEmpty) dbgs(s"General read dephasing rules for $mem: ${readIterSubsts.mkString("\n  - ")}")
-    val writeIterSubsts = generateSubstRules(allDephasingIters(writes))
+    val writeIterSubsts = generateSubstRules(writes)
     if (writeIterSubsts.nonEmpty) dbgs(s"General write dephasing rules for $mem: ${writeIterSubsts.mkString("\n  - ")}")
     val hostReads = scala.collection.mutable.Set[AccessMatrix]()
     val newReads = rewriteAccesses(reads, readIterSubsts).map{accs => 

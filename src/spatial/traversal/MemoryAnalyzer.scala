@@ -61,6 +61,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
       emit(s"""<br><font size = "2">NStrictness:   ${conf.nStricts}</font>""")
       emit(s"""<br><font size = "2">AlphaStrictness:   ${conf.aStricts}</font>""")
       emit(s"""<br><font size = "2">DimensionDuplication: ${conf.dimensionDuplication}</font>""")
+      dbgs(s"schem info for $mem is ${conf.schemesInfo.toList}")
       conf.schemesInfo.toList.sortBy(_._1).foreach{case (inst, schemes) => 
         val (partialCost: Double, winningScheme) = schemes.map{scheme => 
           val cost = scheme._2.map(_._4.head).sum

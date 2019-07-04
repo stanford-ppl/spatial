@@ -13,10 +13,20 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel{ super.visit(lhs, rhs) }
 
+    case _: MemAlloc[_,_] => lhs.isBroadcastAddr = false
+
     case _:Control[_] if lhs.isInnerControl => 
       lhs.op.get.blocks.foreach{block =>
         block.stms.reverse.foreach{sym => 
+          println(s"visiting $sym")
           sym match {
+            case Op(_: StatusReader[_]) => sym.isBroadcastAddr = false
+            case Op(_: BankedEnqueue[_]) => 
+              sym.isBroadcastAddr = false
+              sym.nestedInputs.foreach{in => in.isBroadcastAddr = false}
+            case Op(_: BankedDequeue[_]) => 
+              sym.isBroadcastAddr = false
+              sym.nestedInputs.foreach{in => in.isBroadcastAddr = false}
 
             case Op(x: BankedReader[_]) if sym.getPorts(0).isDefined => 
               sym.port.broadcast.zipWithIndex.foreach{

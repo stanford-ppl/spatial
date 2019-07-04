@@ -18,7 +18,6 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
     case _:Control[_] if lhs.isInnerControl => 
       lhs.op.get.blocks.foreach{block =>
         block.stms.reverse.foreach{sym => 
-          println(s"visiting $sym")
           sym match {
             case Op(_: StatusReader[_]) => sym.isBroadcastAddr = false
             case Op(_: BankedEnqueue[_]) => 

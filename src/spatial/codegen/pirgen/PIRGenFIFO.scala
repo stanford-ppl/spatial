@@ -32,6 +32,15 @@ trait PIRGenFIFO extends PIRCodegen {
     case FIFOBankedEnq(fifo, data, ens) =>
       stateWrite(lhs, fifo, None, None, data, ens)
 
+    case op@FIFORegNew(Const(init))    =>
+      stateMem(lhs, "FIFO()", Some(init))
+
+    case op@FIFORegDeq(fifo, ens) =>
+      stateRead(lhs, fifo, None, None, Seq(ens))
+
+    case FIFORegEnq(fifo, data, ens) =>
+      stateWrite(lhs, fifo, None, None, Seq(data), Seq(ens))
+
     case _ => super.genAccel(lhs, rhs)
   }
 }

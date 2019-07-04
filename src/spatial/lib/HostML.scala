@@ -79,4 +79,8 @@ trait HostML {
     unstaged_SVMR_infer[T](alphas, b, supportVectors, kernel)(x) > zero
   }
 
+  def unstaged_sigmoid(x:Float) = {
+    1 / (1 + math.exp(-x)) 
+  }
+
 }

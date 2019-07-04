@@ -56,7 +56,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     // Generate substitution rules for each iter for each uid.  Given iter and its uid, generate a rule to replace it with a new iter and an offset to include in the access patterns c column
     def generateSubstRules(accs: Set[Set[AccessMatrix]]): scala.collection.immutable.Map[(Idx,Seq[Int]),(Idx,Int)] = {
-      val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.map{a => dephasingIters(a,mem)}.flatten.toMap
+      val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.map{a => dephasingIters(a,Seq.fill(a.unroll.size)(0),mem)}.flatten.toMap
       toRewrite.map{
         case((i,addr),ofs) if (ofs.isDefined) => ((i,addr) -> (i,ofs.get))
         case((i,addr),ofs) if (!ofs.isDefined) => ((i,addr) -> (boundVar[I32],0))

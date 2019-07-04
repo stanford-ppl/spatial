@@ -229,9 +229,18 @@ package object access {
 
   /** Checks if iterators in a and b are relatively dephased or not */
   @stateful def divergedIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Set[Idx] = {
-    val dephaseA = dephasingIters(a, mem)
-    val dephaseB = dephasingIters(b, mem)
-    accessIterators(a.access, mem).collect{case i if (!dephaseA.map(_._1._1).toSeq.contains(i) || !dephaseB.map(_._1._1).toSeq.contains(i)) => i}.toSet
+    val aLowerThanB = a.unroll.zip(b.unroll).collectFirst{case (i,j) if (i != j) => if (i < j) true else false}.getOrElse(false)
+    if (accessIterators(a.access, mem) != accessIterators(b.access, mem)) {
+      Set()
+    } else if (aLowerThanB) {
+      val dephase = dephasingIters(b, a.unroll, mem)
+      val uid = b.unroll
+      accessIterators(b.access, mem).collect{case i if (!dephase(i, uid).isDefined) => i}.toSet  
+    } else {
+      val dephase = dephasingIters(a, b.unroll, mem)
+      val uid = a.unroll
+      accessIterators(a.access, mem).collect{case i if (!dephase(i, uid).isDefined) => i}.toSet        
+    }
   }
 
   /** Checks the iters in access a for those which can dephase due to controllers not being synchronized with base uid.  
@@ -239,9 +248,9 @@ package object access {
     *
     * We can use this info to create replacement rules for each iter in each access that may conflict due to lockstep dephasing
     */
-  @stateful def dephasingIters(a: AccessMatrix, mem: Sym[_]): Map[(Idx,Seq[Int]),Option[Int]] = {
+  @stateful def dephasingIters(a: AccessMatrix, baseUID: Seq[Int], mem: Sym[_]): Map[(Idx,Seq[Int]),Option[Int]] = {
     val aIters: Seq[Idx] = accessIterators(a.access, mem)
-    val ofsRules = if (aIters.nonEmpty) aIters.head.parent.s.get.iterLockstepInfo(aIters, a.unroll) else Map[Idx,Int]()
+    val ofsRules = if (aIters.nonEmpty) aIters.head.parent.s.get.iterLockstepInfo(aIters, baseUID, a.unroll) else Map[Idx,Int]()
     aIters.map{i => ((i,a.unroll) -> ofsRules.get(i))}.toMap
   }
 

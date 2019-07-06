@@ -227,20 +227,10 @@ package object access {
     pomMask.zipWithIndex.collect{case (take,i) if (i < position || take) => fullUID(i)}
   }
 
-  /** Checks if iterators in a and b are relatively dephased or not */
-  @stateful def divergedIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Set[Idx] = {
-    val aLowerThanB = a.unroll.zip(b.unroll).collectFirst{case (i,j) if (i != j) => if (i < j) true else false}.getOrElse(false)
-    if (accessIterators(a.access, mem) != accessIterators(b.access, mem)) {
-      Set()
-    } else if (aLowerThanB) {
-      val dephase = dephasingIters(b, a.unroll, mem)
-      val uid = b.unroll
-      accessIterators(b.access, mem).collect{case i if (!dephase(i, uid).isDefined) => i}.toSet  
-    } else {
-      val dephase = dephasingIters(a, b.unroll, mem)
-      val uid = a.unroll
-      accessIterators(a.access, mem).collect{case i if (!dephase(i, uid).isDefined) => i}.toSet        
-    }
+  /** Generate replacement rules for access a relative to access b */
+  @stateful def divergedIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Map[Idx,Option[Int]] = {
+    if (accessIterators(a.access, mem) != accessIterators(b.access, mem)) Map()
+    else dephasingIters(a, b.unroll, mem).map{case ((iter,uid),ofs) => (iter -> ofs)}.toMap
   }
 
   /** Checks the iters in access a for those which can dephase due to controllers not being synchronized with base uid.  

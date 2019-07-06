@@ -101,6 +101,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val transientCleanup      = TransientCleanup(state)
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
+    lazy val laneStaticTransformer = LaneStaticTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val bindingTransformer    = BindingTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
@@ -144,6 +145,7 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
+        ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** CSE on regs */

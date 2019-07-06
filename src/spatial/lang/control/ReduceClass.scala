@@ -41,7 +41,7 @@ protected class ReduceAccum[A](accum: Option[Reg[A]], ident: Option[A], init: Op
     val lA = boundVar[A]
     val rA = boundVar[A]
     val iters  = List.fill(domain.length){ boundVar[I32] }
-    domain.zip(iters).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq(0)) }
+    domain.zip(iters).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i}) }
     val mapBlk = stageBlock{ map(iters) }
     val ldBlk  = stageLambda1(acc){ acc.value }
     val redBlk = stageLambda2(lA,rA){ reduce(lA,rA) }

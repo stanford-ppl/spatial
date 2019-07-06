@@ -435,8 +435,14 @@ package object control {
     /** Computes the ofs between iter from uid to baseline if applicable, due to iter's cchain having a start value that depends on uid divergence */
     @stateful def iterOfs(iter: Idx, itersAbove: Seq[Seq[Idx]], uid: Seq[Seq[Int]], base: Seq[Seq[Int]]): Int = {
       val startSym = iter.ctrStart
-      // dbgs(s"want iterOfs of $iter for $itersAbove at $uid relative $base")
-      0
+      startSym match {
+        case Op(LaneStatic(dep, elems)) => 
+          val position = itersAbove.flatten.indexOf(dep)
+          val upper = elems(uid.flatten.apply(position))
+          val lower = elems(base.flatten.apply(position))
+          upper - lower
+        case _ => 0
+      }
     }
 
     /** Returns true if the subtree rooted at ctrl run for the same number of cycles (i.e. iterations) regardless of uid.

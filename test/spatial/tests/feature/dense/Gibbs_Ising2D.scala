@@ -77,9 +77,9 @@ x_par=4  |       --->       X                XX    |
     // // Square
     // val grid_init = (0::ROWS, 0::COLS){(i,j) => if (i > ROWS/4 && i < 3*ROWS/4 && j > COLS/4 && j < 3*COLS/4) -1.to[Int] else 1.to[Int]}
 
-    val par_load = 16
-    val par_store = 16
-    val x_par = 4 (1 -> 1 -> 16)
+    val par_load = 1
+    val par_store = 1
+    val x_par = 4
 
     // Square
     val bias_matrix = (0::ROWS, 0::COLS){(i,j) => if (i > ROWS/4 && i < 3*ROWS/4 && j > COLS/4 && j < 3*COLS/4) -1.to[Int] else 1.to[Int]}
@@ -98,7 +98,7 @@ x_par=4  |       --->       X                XX    |
     Accel{
       val exp_sram = SRAM[T](lut_size)
       // val grid_sram = SRAM[Int](ROWS,COLS).flat
-      val grid_sram = SRAM[Int](ROWS,COLS).hierarchical.noduplicate.effort(0)
+      val grid_sram = SRAM[Int](ROWS,COLS).hierarchical.effort(0)
       exp_sram load exp_lut
       grid_sram load grid_dram(0::ROWS, 0::COLS par par_load)
       // Issue #187
@@ -107,15 +107,21 @@ x_par=4  |       --->       X                XX    |
 
 
       Foreach(iters by 1) { iter =>
+        def rowv(r: I32): Bit = {r >= 0 && r < ROWS}
+        def colv(c: I32): Bit = {c >= 0 && c < COLS}
+        // Foreach(ROWS by 1 by x_par) { i =>
+        //   // Update each point in active row
+        //   Parallel{
+        //     List.tabulate(x_par){this_body => 
         Foreach(ROWS by 1 par x_par) { i =>
           // Update each point in active row
-          val this_body = i % x_par
-          Sequential.Foreach(-this_body until COLS by 1) { j =>
+          val this_body = (i % x_par)*2
+          Foreach(-this_body until COLS by 1) { j =>
             // val col = j - this_body
-            val N = grid_sram((i+1)%ROWS, j)
-            val E = grid_sram(i, (j+1)%COLS)
-            val S = grid_sram((i-1)%ROWS, j)
-            val W = grid_sram(i, (j-1)%COLS)
+            val N = mux(rowv(i+1), grid_sram(i+1, j), -1)
+            val E = mux(colv(j+1), grid_sram(i, j+1), -1)
+            val S = mux(rowv(i-1), grid_sram(i-1, j), -1)
+            val W = mux(colv(j-1), grid_sram(i, j-1), -1)
             val self = grid_sram(i,j)
             val sum = (N+E+S+W)*self
             val p_flip = exp_sram(-sum+lut_size/2)
@@ -127,6 +133,8 @@ x_par=4  |       --->       X                XX    |
               grid_sram(i,j) = mux(flip == 1.to[T], -self, self)
             }
           }
+            // }
+          // }
         }
       }
       grid_dram(0::ROWS, 0::COLS par par_store) store grid_sram

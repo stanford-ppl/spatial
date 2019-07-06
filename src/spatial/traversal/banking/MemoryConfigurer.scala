@@ -204,7 +204,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && divergedIters(a, b, mem).isEmpty
+        spatialConfig.enableBroadcast && divergedIters(a, b, mem).values.forall(_.isDefined)
       }
     }
     else true
@@ -250,14 +250,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // A conflict occurs if there are accesses on the same port with overlapping addresses
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
-          val conflicts = samePort.filter{b => 
-            val conflictable = divergedIters(a,b,mem)
-            if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable} that dephase due to non-lockstep controllers")
-            dbgs(s"are ${a.keys} in conflicatble $conflictable ?")
-            dbgs(s"  (${a.matrix}")
-            dbgs(s"  ${b.matrix}")
-            a.keys.exists(conflictable.contains) || (a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
-          }
+          val conflicts = samePort.filter{b => overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")
           if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
@@ -323,6 +316,20 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     reduced.toList
   }
 
+  private def overlapsAddress(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val substRules = divergedIters(a, b, mem)
+    val keyRules: scala.collection.immutable.Map[Idx,(Idx,Int)]  = accessIterators(a.access, mem).zipWithIndex.collect{
+      case(iter,i) if (substRules.contains(iter) && substRules(iter).isDefined) => 
+        if (substRules(iter).get != 0) dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally lockstepped iterator, $iter, with offset ${substRules(iter).get}") 
+        (iter -> (iter, substRules(iter).get))
+      case(iter,i) if (substRules.contains(iter) && !substRules(iter).isDefined) => 
+        dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally dephased iterator, $iter")
+        (iter -> (boundVar[I32], 0))
+    }.toMap
+    val newa = a.substituteKeys(keyRules)
+    newa.overlapsAddress(b)
+  }
+
   protected def groupAccessUnroll(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val isWrite = accesses.exists(_.access.isWriter)
     val tp = if (isWrite) "Write" else "Read"
@@ -334,12 +341,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     // Two accesses can be grouped if they are in the same port and they don't conflict
     def canGroup(a:AccessMatrix, b:AccessMatrix) = cache.getOrElseUpdate((a,b),{
       val samePort = requireConcurrentPortAccess(a, b)
-      val conflictable = divergedIters(a,b,mem)
-      val conflict = if (samePort) {
-        a.keys.exists(conflictable.contains) || (a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
-      } else false
-      val dephaseIter = if (samePort) divergedIters(a,b,mem) else Set.empty
-      dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict dephaseIter:$dephaseIter")
+      val conflict = if (samePort) {overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)} else false
+      dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict")
       samePort && !conflict
     })
 
@@ -654,8 +657,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
-    val conflictable = divergedIters(a,b,mem)
-    val conflicting = a.keys.exists(conflictable.contains) || (a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
+    val conflicting = (overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
     val trueConflict = concurrent && conflicting && !mem.isReg
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict

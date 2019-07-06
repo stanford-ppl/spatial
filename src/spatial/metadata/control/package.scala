@@ -901,20 +901,23 @@ package object control {
       case (Final(a: scala.Int), Final(b: scala.Int)) => true
       case _ => false
     }
-    @stateful def isFixed(forkedIters: Seq[Idx]): Boolean = nIters match {
-      case Some(Expect(_)) => true
-      case _ => 
-        import spatial.util.modeling._
-        val deps = mutatingBounds(start) ++ mutatingBounds(end) ++ mutatingBounds(step)
-        val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-        val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-        val endFixed = end match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-        val distFixed = (start.asInstanceOf[Sym[_]],end.asInstanceOf[Sym[_]]) match {
-          case (Op(FixAdd(_,x)),Op(FixAdd(_,y))) if x == y => true
-          case (Op(FixSub(_,x)),Op(FixSub(_,y))) if x == y => true
-          case _ => false
-        }
-        startFixed && (distFixed || (stepFixed && endFixed)) && !forkedIters.exists(deps.contains)
+    /** Returns true if this counter runs for the same number of cycles regardless of uid of forkedIters */
+    @stateful def isFixed(forkedIters: Seq[Idx]): Boolean = {
+      import spatial.util.modeling._
+      val deps = mutatingBounds(start) ++ mutatingBounds(end) ++ mutatingBounds(step)
+      nIters match {
+        case Some(Expect(_)) => forkedIters.exists(deps.contains)
+        case _ => 
+          val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+          val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+          val endFixed = end match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+          val distFixed = (start.asInstanceOf[Sym[_]],end.asInstanceOf[Sym[_]]) match {
+            case (Op(FixAdd(_,x)),Op(FixAdd(_,y))) if x == y => true
+            case (Op(FixSub(_,x)),Op(FixSub(_,y))) if x == y => true
+            case _ => false
+          }
+          startFixed && (distFixed || (stepFixed && endFixed)) && !forkedIters.exists(deps.contains)
+      }
     }
 
     @stateful def nIters: Option[Bound] = (start,step,end) match {

@@ -322,9 +322,10 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       case(iter,i) if (substRules.contains(iter) && substRules(iter).isDefined) => 
         if (substRules(iter).get != 0) dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally lockstepped iterator, $iter, with offset ${substRules(iter).get}") 
         (iter -> (iter, substRules(iter).get))
-      case(iter,i) if (substRules.contains(iter) && !substRules(iter).isDefined) => 
+      case(iter,i) if (substRules.contains(iter) && !substRules(iter).isDefined && a.matrix.keys.contains(iter)) => 
         dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally dephased iterator, $iter")
-        (iter -> (boundVar[I32], 0))
+        return true
+        // (iter -> (boundVar[I32], 0))
     }.toMap
     val newa = a.substituteKeys(keyRules)
     newa.overlapsAddress(b)

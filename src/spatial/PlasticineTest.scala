@@ -15,8 +15,6 @@ trait PlasticineTest extends DSLTest { test =>
   protected def pirArgs:List[String] = 
     "bash" ::
     "run.sh" ::
-    //"--dot=true" ::
-    //"--debug=true" ::
     Nil
 
   def timer = System.getProperty("os.name") match {
@@ -384,8 +382,8 @@ trait PlasticineTest extends DSLTest { test =>
   }
 
   case class Tst(
-    row:Int=15,
-    col:Int=15,
+    row:Int=18,
+    col:Int=18,
     vlink:Int = 3,
     slink:Int = 4,
     iter:Int = 300,
@@ -404,10 +402,10 @@ trait PlasticineTest extends DSLTest { test =>
       (if (module) scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p extlink.csv -d link.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") else Pass) >>
       scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
-      scommand(s"lnp2p", s"ln -sf script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"lnp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"runp2p", s"$timer ./tungsten $runArg".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
-      scommand(s"lnhybrid", s"ln -sf script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"lnhybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"runhybrid", s"$timer ./tungsten $runArg".split(" "), timeout=12000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
     }
   }

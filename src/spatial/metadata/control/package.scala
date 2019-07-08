@@ -449,7 +449,9 @@ package object control {
       * includeOuter flag identifies whether the outermost iterator of the cchain should be ignored or not
       */
     @stateful def synchronizedStart(forkedIters: Seq[Idx], includeOuter: Boolean): Boolean = {
-      cchainIsInvariant(forkedIters, includeOuter) && children.filter(_.s.get != s.get).forall(_.synchronizedStart(forkedIters, includeOuter = true))
+      val meSynch = cchainIsInvariant(forkedIters, includeOuter)
+      val childrenSynch = children.filter(_.s.get != s.get).forall(_.synchronizedStart(forkedIters, includeOuter = true))
+      meSynch && childrenSynch
     }
     /** Returns true if this counterchain is invariant with iterators above it that diverge */
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], includeOuter: Boolean): Boolean = {
@@ -906,7 +908,7 @@ package object control {
       import spatial.util.modeling._
       val deps = mutatingBounds(start) ++ mutatingBounds(end) ++ mutatingBounds(step)
       nIters match {
-        case Some(Expect(_)) => forkedIters.exists(deps.contains)
+        case Some(Expect(_)) => !forkedIters.exists(deps.contains)
         case _ => 
           val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
           val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}

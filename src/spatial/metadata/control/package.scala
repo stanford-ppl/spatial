@@ -1175,7 +1175,8 @@ package object control {
             val dist = getCoarseDistance(metapipe, anchor, a)
             dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
 
-            if (group.exists{x => a == x._1 || a == x._2 }) a -> dist else a -> None
+            // As long as a is in the metapipeLCAs map, or is a reader that was unmapped because its LCA with writer is inner control, assign its dist
+            if (group.exists{x => a.isReader || a == x._1 || a == x._2 }) a -> dist else a -> None
           }
           val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
           val minDist = buffers.minOrElse(0)

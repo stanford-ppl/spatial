@@ -406,7 +406,7 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"runp2p", s"$timer ./tungsten $runArg".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       scommand(s"lnhybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runhybrid", s"$timer ./tungsten $runArg".split(" "), timeout=12000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"runhybrid", s"$timer ./tungsten $runArg".split(" "), timeout=1000000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
     }
   }
 

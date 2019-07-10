@@ -8,8 +8,6 @@ import spatial.dsl._
   override def finalModelArgs: Args = "24 24 6 6"
   override def runtimeArgs: Args = "3"
 
-
-
   def main(args: Array[String]): Void = {
     val xIn = args(0).to[Int]
     val tileSize = 16
@@ -42,6 +40,6 @@ import spatial.dsl._
 
     val chkSum = switchprop1.value == 3*xIn && out1.value == 15 && switchprop2.value == 3*xIn && ctrprop1.value == (xIn*15-1) && ctrprop2.value == (xIn*14-1)
     assert(chkSum)
-    println("PASS: " + chkSum + " (SimplePip)")
+    println("PASS: " + chkSum + " (SimplePipelined)")
   }
 }

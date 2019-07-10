@@ -20,6 +20,13 @@ import scala.collection.immutable.SortedSet
 
 object modeling {
 
+  def mutatingBounds(x: Sym[_], visited: Set[Sym[_]] = Set(), bounds: Set[Idx] = Set()): Set[Idx] = {
+    val (newBounds, toCheck) = x.inputs.partition(_.isBound)
+    val toCheckExpanded = toCheck.toSeq.map{y: Sym[_] => if (y.isMem) y.writers.toSeq else Seq(y)}.flatten.toSet diff visited
+    val nextBounds = bounds ++ newBounds.map(_.asInstanceOf[Idx])
+    toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}
+  }
+
   def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
     if (scope.contains(x) && !nodes.contains(x)) {
       consumersDfs(x.consumers, nodes + x, scope)

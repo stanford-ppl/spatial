@@ -44,7 +44,7 @@ case class BindingTransformer(IR: State) extends MutateTransformer with AccelTra
       val activeWrMems = c.nestedWrittenMems.toSet ++ c.nestedWrittenDRAMs.toSet
       val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind) | (c.isSwitch && c.op.exists(_.R.isBits))
       val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind) | (lhs.children.apply(i).s.get.isSwitch && lhs.children.apply(i).s.get.op.exists(_.R.isBits))
-      val streamShouldNotBind = c.hasStreamAncestor && (activeMems.filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isStreamIn}.nonEmpty)
+      val streamShouldNotBind = lhs.hasStreamAncestor && (activeMems.filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isStreamIn}.nonEmpty)
       if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems ++ addressableMems).nonEmpty || nextShouldNotBind || prevShouldNotBind || streamShouldNotBind) {
         dbgs(s"Conflict between:")
         dbgs(s" - Prev rd/wr: $prevMems")

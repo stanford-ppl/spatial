@@ -184,6 +184,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   override def mirrorNode[A](rhs: Op[A]): Op[A] = rhs match {
     case e:Enabled[_] => e.mirrorEn(f, enables).asInstanceOf[Op[A]]
+    case LaneStatic(iter, resolutions) if (unrollNum.getOrElse(iter.asInstanceOf[Idx], Seq()).size == 1) => 
+      val i = iter.asInstanceOf[Idx]
+      LaneStatic[FixPt[TRUE,_32,_0]](iter.asInstanceOf[FixPt[TRUE,_32,_0]], Seq(resolutions(unrollNum(i).head))).asInstanceOf[Op[A]]
+      // resolutions(unrollNum(i).head).asInstanceOf[Op[A]]
     case _ => super.mirrorNode(rhs)
   }
   override def updateNode[A](node: Op[A]): Unit = node match {
@@ -293,6 +297,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def inLane[A](lane:Lane)(block: => A): A = {
       // Note that we don't use isolateSubst (or similar here) because that would also save/restore lanes
       val i = ulanes.indexOf(lane)
+      dbgs(s"in lane $lane, $i from $ulanes")
       val save     = subst
       val saveMems = memories
       val addr     = lane.map { l => parAddr(l) }.transpose
@@ -318,7 +323,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def map[A](block: Lane => A): List[A] = if (__doLanes.nonEmpty) __doLanes.map{p => inLane(List(p)){ block(List(p)) } } else ulanes.map { lane => inLane(lane) { block(lane) } }
 
 
-    def foreach(block: Lane => Unit): Unit = { dbgs(s"dolanes ${__doLanes}"); map(block) }
+    def foreach(block: Lane => Unit): Unit = { map(block) }
 
     def mapFirst[A](block: => A):A = inLane(ulanes.head) { block }
 

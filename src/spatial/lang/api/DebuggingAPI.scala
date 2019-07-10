@@ -196,8 +196,8 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
 
   @api def checkGold[T:Bits](reg:Reg[T], gold:T)(implicit ev:Cast[T,Text]):Bit = {
     val result = getArg(reg)
-    println(s"${reg.name.getOrElse(s"$reg")} Result: " + result)
-    println(s"${reg.name.getOrElse(s"$reg")} Gold: " + gold)
+    println(Text(s"${reg.name.getOrElse(s"$reg")} Result: ") + result.to[Text])
+    println(Text(s"${reg.name.getOrElse(s"$reg")} Gold: ") + gold.to[Text])
     approxEql[T](result, gold)
   }
 

@@ -33,6 +33,12 @@ trait PIRFormatGen extends Codegen {
     lhs.sym.count.foreach { c =>
       rhsStr += src".count($c)"
     }
+    lhs.sym.barrier.foreach { id =>
+      rhsStr += src".barrier($id)"
+    }
+    lhs.sym.waitFors.foreach { ids =>
+      rhsStr += src".waitFors($ids)"
+    }
     emitStm(lhs, tpStr, rhsStr)
   }
 

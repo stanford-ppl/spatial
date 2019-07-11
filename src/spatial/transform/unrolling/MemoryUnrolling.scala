@@ -278,6 +278,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addDispatch(Nil, 0)
           s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
+          transferSyncMeta(lhs, s)
           mem2.substHotSwap(lhs, s)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); //strMeta(s)

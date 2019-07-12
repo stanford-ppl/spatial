@@ -240,7 +240,7 @@ package object access {
     */
   @stateful def dephasingIters(a: AccessMatrix, baseUID: Seq[Int], mem: Sym[_]): Map[(Idx,Seq[Int]),Option[Int]] = {
     val aIters: Seq[Idx] = accessIterators(a.access, mem)
-    val ofsRules = if (aIters.nonEmpty) aIters.head.parent.s.get.iterLockstepInfo(aIters, baseUID, a.unroll) else Map[Idx,Int]()
+    val ofsRules = if (aIters.nonEmpty) aIters.head.parent.s.get.iterSynchronizationInfo(aIters, baseUID, a.unroll) else Map[Idx,Int]()
     aIters.map{i => ((i,a.unroll) -> ofsRules.get(i))}.toMap
   }
 

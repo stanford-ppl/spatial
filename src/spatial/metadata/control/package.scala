@@ -372,14 +372,34 @@ package object control {
       val groups = ArrayBuffer(ArrayBuffer[T]())
 
       iters.zipWithIndex.foreach{case (iter, i) => 
+        // Part of this layer
         if (iter.parent.s.get == ctrl) groups(layer) += elements(i)
-        else {
+        // Next layer
+        else if (iter.parent.s.get.parent.s.get == ctrl) {
           layer = layer + 1
           ctrl = iter.parent.s.get
           groups += ArrayBuffer(elements(i))
         }
+        // Skipped layer(s)
+        else {
+          var current = iter.parent.s.get
+          while (current != ctrl) {
+            layer = layer + 1
+            val next = current.parent.s.get
+            if (next == ctrl) groups += ArrayBuffer(elements(i))
+            else groups += ArrayBuffer()
+            current = next
+          }
+          ctrl = iter.parent.s.get
+        }
       }
       groups
+    }
+
+    /** Find controllers between two iterators */
+    def ctrlsBetween(top: Idx, bottom: Sym[_], chain: Seq[Sym[_]] = Seq()): Seq[Sym[_]] = {
+      if (bottom == top.parent.s.get) Seq(bottom) ++ chain
+      else ctrlsBetween(top,bottom.parent.s.get,Seq(bottom) ++ chain)
     }
 
     /** Returns how iterators derived from UID are related to iterators derived from baseline UID.
@@ -392,13 +412,14 @@ package object control {
       *   If a forkPoint unrolls as MoP, the anchor point for the lockstep check is just above the relevent child of that forkPoint
       *   If a forkPoint unrolls as PoM, the anchor point for the lockstep check is just above the forkPoint itself               
       */
-    @stateful def iterLockstepInfo(iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
+    @stateful def iterSynchronizationInfo(iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
       import scala.collection.mutable.ArrayBuffer
+      import spatial.util.modeling._
       val map = scala.collection.mutable.HashMap[Idx,Int]()
       val bundledIters = bundleLayers(iters, iters)
       val bundledUID = bundleLayers(iters, uid)
       val bundledBase = bundleLayers(iters, baseUID)
-      val controlChain = bundledIters.map(_.head.parent.s.get)
+      val controlChain = ctrlsBetween(iters.head, iters.last.parent.s.get)
       // Check lockstepness at each layer where there is forking
       var foundRandomLayer = false
       var layer = 0
@@ -407,24 +428,31 @@ package object control {
         val liters = bundledIters(layer)
         val luid = bundledUID(layer) 
         val lbase = bundledBase(layer)
+        val forkedIters = (bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)).zipped.collect{case (iters,uid0,uid1) if (uid.zip(uid1).exists{case (a,b) => a != b}) => iters}.flatten.toSeq
         if (ctrl.isOuterControl && luid != lbase && ctrl.willUnrollAsPOM) {
           val children = if (layer + 1 == controlChain.size || (op.isDefined && op.get.isLoop)) ctrl.children.filter(_.s.get != ctrl) else ctrl.childrenPriorTo(Ctrl.Node(controlChain(layer+1),-1))
           // TODO: Is it enough to include liters or should it include liters and all below liters?
           // Only mark iters if we should continue
-          if (children.map(_.s.get).forall(_.synchronizedStart(liters, includeOuter = true))) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))} // Technically don't need to includeOuter for last ctrl of childrenPriorTo case
+          if (children.map(_.s.get).forall(_.synchronizedStart(forkedIters, includeOuter = true))) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))} // Technically don't need to includeOuter for last ctrl of childrenPriorTo case
           else foundRandomLayer = true
         }
         else if (ctrl.isOuterControl && luid != lbase && ctrl.willUnrollAsMOP) {
           liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
           // TODO: Is it enough to include liters or should it include liters and all below liters?
           // Mark liters and decide if we should continue
-          if ((layer + 1 != controlChain.size) && !(controlChain(layer+1).synchronizedStart(liters, includeOuter = false))) foundRandomLayer = true
+          if ((layer + 1 != controlChain.size) && !(controlChain(layer+1).synchronizedStart(forkedIters, includeOuter = false))) foundRandomLayer = true
+        }
+        else if (ctrl.isFork && ctrl.isOuterControl) {
+          // If we hit a fork node whose conditions are mutated by forked iters above layer, quit digging and mark this as random layer
+          val conditions = ctrl match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
+          val condMutators = conditions.map(mutatingBounds(_)).flatten
+          if (!condMutators.intersect(forkedIters).isEmpty) foundRandomLayer = true
         }
         else if (ctrl.isOuterControl) {
           liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
         }
         else if (ctrl.isInnerControl) {
-          if (ctrl.synchronizedStart(liters, includeOuter = false)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+          if (ctrl.synchronizedStart(forkedIters, includeOuter = false)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
           else foundRandomLayer = true
         }
         layer = layer + 1
@@ -455,12 +483,12 @@ package object control {
     }
     /** Returns true if this counterchain is invariant with iterators above it that diverge */
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], includeOuter: Boolean): Boolean = {
+      import spatial.util.modeling._
       if (isFSM || isStreamControl) false
       else if (isSwitch && isOuterControl) {
-        // TODO: Something like this?
-        // allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
-        // isLockstepAcross(iters, reference)
-        false
+        val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
+        val condMutators = conditions.map(mutatingBounds(_)).flatten
+        condMutators.intersect(forkedIters).isEmpty
       } else {
         // TODO: Actually check if cchains vary with forkedIters
         val ctrsToDrop = if (includeOuter) 0 else 1

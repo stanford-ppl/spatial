@@ -52,7 +52,7 @@ module test;
   * Use the "[start|stop][VPD|VCD] functions from sim.cpp to control these variables"
   */
   reg vpdon = 0;
-  reg vcdon = 1;
+  reg vcdon = 0;
   reg [1023:0] vcdfile = 0;
   reg [1023:0] vpdfile = 0;
 
@@ -519,7 +519,7 @@ module test;
   endfunction
 
   function void startVCD();
-    vcdon = 1;
+    vcdon = 0;
   endfunction
 
   function void stopVPD();

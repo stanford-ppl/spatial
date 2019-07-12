@@ -1,6 +1,12 @@
 package spatial.tests.feature.banking
 
+object Helper{
+  def contains(a: Option[String], b: String): Boolean = {a.getOrElse("").indexOf(b) != -1}
+}
+
 import argon.Block
+import argon.Op
+import spatial.node._
 import spatial.dsl._
 
 @spatial class BankLockstep extends SpatialTest {
@@ -49,6 +55,17 @@ import spatial.dsl._
     printTensor3(gold, "gold")
     assert(got == gold)
   }
+
+  override def checkIR(block: Block[_]): Result = {
+    val dataInConfl_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "dataInConfl") => sram }.size
+    val dataInNoConfl_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "dataInNoConfl") => sram }.size
+
+    require(dataInConfl_count == 2, "Should only have 2 duplicates of dataInConfl")
+    require(dataInNoConfl_count == 1, "Should only have 1 duplicate of dataInNoConfl")
+
+    super.checkIR(block)
+  }
+
 }
 
 @spatial class DephasingDuplication extends SpatialTest {
@@ -91,7 +108,7 @@ import spatial.dsl._
     import spatial.node._
 
     // We should have 2 dups of sram and one of sram2
-    val srams = block.nestedStms.collect{case sram:SRAMNew[_,_] => sram }
+    val srams = block.nestedStms.collect{case Op(sram:SRAMNew[_,_]) => sram }
     if (srams.size > 0) assert (srams.size == 3)
 
     super.checkIR(block)
@@ -163,9 +180,53 @@ import spatial.dsl._
         'LAYERC_STAGE1.Foreach(start until 16 by 1 par P2){c0 => println(r"${sram5(a0*16 + c0)}")}
       }
 
+      // No controllers are synchronized, because of unknow Fork injected into the hierarchy
+      val sram6 = SRAM[Int](16*16)
+      fillSRAM(sram6) // Must duplicate for each lane of LAYERA (P1 duplicates), but LAYERC_STAGE1 is synchronized for each unrolled body
+      'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
+        val start = a0 % P1
+        if (a0 + dummy.value == 3) {
+          'LAYERC_STAGE0.Foreach(4 by 1){_ => println(r"$dummy")}
+          'LAYERC_STAGE1.Foreach(16 by 1 par P2){c0 => println(r"${sram6(a0*16 + c0)}")}
+        }
+      }
+
+      // All controllers are synchronized, even though there is a branch, because it is forked-iter invariant
+      val sram7 = SRAM[Int](16*16)
+      fillSRAM(sram7)
+      'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
+        val start = a0 % P1
+        if (dummy.value == 3) {
+          'LAYERC_STAGE0.Foreach(4 by 1){_ => println(r"$dummy")}
+          'LAYERC_STAGE1.Foreach(16 by 1 par P2){c0 => println(r"${sram7(a0*16 + c0)}")}
+        }
+      }
+
 
     }
 
     assert(true)
   }
+
+
+  override def checkIR(block: Block[_]): Result = {
+    val sram1_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram1") => sram }.size
+    val sram2_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram2") => sram }.size
+    val sram3_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram3") => sram }.size
+    val sram4_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram4") => sram }.size
+    val sram5_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram5") => sram }.size
+    val sram6_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram6") => sram }.size
+    val sram7_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram7") => sram }.size
+
+    require(sram1_count == 1, "Should only have 1 duplicate of sram1")
+    require(sram2_count == 2, "Should only have 2 duplicates of sram2")
+    require(sram3_count == 1, "Should only have 1 duplicate of sram3")
+    require(sram4_count == 2, "Should only have 2 duplicates of sram4")
+    require(sram5_count == 1, "Should only have 1 duplicate of sram5")
+    require(sram6_count == 2, "Should only have 2 duplicates of sram6")
+    require(sram7_count == 1, "Should only have 1 duplicate of sram7")
+
+    super.checkIR(block)
+  }
+
 }

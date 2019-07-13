@@ -1,6 +1,13 @@
 package spatial.tests.compiler
 
+object Helper{
+  def contains(a: Option[String], b: String): Boolean = {a.getOrElse("").indexOf(b) != -1}
+}
+
 import spatial.dsl._
+import argon.Block
+import argon.Op
+import spatial.node._
 
 @spatial class Broadcast extends SpatialTest {
 
@@ -76,7 +83,6 @@ import spatial.dsl._
     val P3 = 3
     val P2 = 2
 
-    // App should have 26 SRAMNew for mop (29 for pom because sram5 needs to be fully duplicated)
       // NOTE: Spatial seems to kill off dummy srams
     Accel {
       val accum = SRAM[Int](8,32,3,3).hierarchical
@@ -164,6 +170,25 @@ import spatial.dsl._
     println(r"Got5 $y5, wanted $gold")
     println(r"Got6 $y6, wanted $gold")
     assert(y1 == gold && y2 == gold && y3 == gold && y4 == gold && y5 == gold && y6 == gold)
+  }
+
+  override def checkIR(block: Block[_]): Result = {
+    val sram1_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram1") => sram }.size
+    val sram2_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram2") => sram }.size
+    val sram3_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram3") => sram }.size
+    val sram4_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram4") => sram }.size
+    val sram5_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram5") => sram }.size
+    val sram6_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram6") => sram }.size
+    val sram7_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram7") => sram }.size
+
+    require(sram1_count == 3, "Should only have 3 duplicates of sram1")
+    require(sram2_count == 3, "Should only have 3 duplicates of sram2")
+    require(sram3_count == 3, "Should only have 3 duplicates of sram3")
+    require(sram4_count == 3, "Should only have 3 duplicates of sram4")
+    require(sram5_count == 3, "Should only have 3 duplicates of sram5")
+    require(sram6_count == 6, "Should only have 6 duplicates of sram6")
+
+    super.checkIR(block)
   }
 
 }

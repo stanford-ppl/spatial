@@ -28,8 +28,8 @@ case class AccessMatrix(
 ) {
   def keys: Set[Idx] = matrix.keys
   @stateful def parent: Ctrl = access.parent
-  def randomizeKeys(keySwap: Map[Idx,Idx]): AccessMatrix = {
-    keySwap.foreach{case (old, swp) => swp.domain = old.domain.replaceKeys(keySwap)}
+  def substituteKeys(keySwap: Map[Idx,(Idx,Int)]): AccessMatrix = {
+    keySwap.foreach{case (old, (swp,_)) => swp.domain = old.domain.replaceKeys(keySwap)}
     val matrix2 = matrix.replaceKeys(keySwap) 
     AccessMatrix(access, matrix2, unroll)
   }

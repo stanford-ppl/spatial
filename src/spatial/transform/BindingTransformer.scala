@@ -44,11 +44,13 @@ case class BindingTransformer(IR: State) extends MutateTransformer with AccelTra
       val activeWrMems = c.nestedWrittenMems.toSet ++ c.nestedWrittenDRAMs.toSet
       val nextShouldNotBind = (Seq(c.toCtrl) ++ c.nestedChildren).exists(_.s.get.shouldNotBind) | (c.isSwitch && c.op.exists(_.R.isBits))
       val prevShouldNotBind = (Seq((lhs.children.apply(i))) ++ (lhs.children.apply(i)).nestedChildren).exists(_.s.get.shouldNotBind) | (lhs.children.apply(i).s.get.isSwitch && lhs.children.apply(i).s.get.op.exists(_.R.isBits))
-      if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems ++ addressableMems).nonEmpty || nextShouldNotBind || prevShouldNotBind) {
+      val streamShouldNotBind = lhs.hasStreamAncestor && (activeMems.filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isStreamIn}.nonEmpty)
+      if (prevMems.intersect(activeMems).intersect(activeWrMems ++ prevWrMems ++ addressableMems).nonEmpty || nextShouldNotBind || prevShouldNotBind || streamShouldNotBind) {
         dbgs(s"Conflict between:")
         dbgs(s" - Prev rd/wr: $prevMems")
         dbgs(s" - Next rd/wr: $activeMems")
         dbgs(s" - Next wr + Prev wr + addressable: ${prevWrMems ++ activeWrMems ++ addressableMems}")
+        dbgs(s" - Stream dependency: $streamShouldNotBind")
         dbgs(s" - (or someone should not bind next: $nextShouldNotBind prev: $prevShouldNotBind)!")
         dbgs(s"Placing $c in group ${bundling.toList.size}")
         prevMems.clear()

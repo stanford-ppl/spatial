@@ -78,6 +78,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
   // Collect when all stages are done with all iters
   val allDone = done.map(_.io.output).reduce{_&&_} // TODO: Retime tree
+  val finished = allDone || io.done || {if (p.depth > 1) done.last.io.input.set else false.B}
 
   // Tie down the asyn_resets
   active.foreach(_.io.input.asyn_reset := false.B)
@@ -126,7 +127,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output & !io.ctrDone & io.enable & io.backpressure & ~iterDone(0).io.output & !io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone | io.break
-      iterDone(0).io.input.set := (io.doneIn(0) & !synchronize) | (!io.maskIn(0) & io.enable & io.backpressure) | io.break
+      iterDone(0).io.input.set := ((io.doneIn(0) & !synchronize) | (!io.maskIn(0) & io.enable & io.backpressure) | io.break) && !finished
       done(0).io.input.set := (io.ctrDone & !io.rst) | io.break
 
       // Define logic for the rest of the stages

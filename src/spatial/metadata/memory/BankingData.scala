@@ -414,6 +414,16 @@ case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
   */
 case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
 
+/** Flag set by the user to force banking analysis to merge buffers even if the 
+  * compiler thinks it is unsafe.  Use for cases such as where counter start for different lanes
+  * is lane-dependent but known to be such that there are no bank conflicts between lanes
+  *
+  * Getter:  sym.isMustMerge
+  * Setter:  sym.isMustMerge = (true | false)
+  * Default: false
+  */
+case class MustMerge(flag: Boolean) extends Data[MustMerge](SetBy.User)
+
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
   *

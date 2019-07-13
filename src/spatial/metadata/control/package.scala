@@ -433,14 +433,14 @@ package object control {
           val children = if (layer + 1 == controlChain.size || (op.isDefined && op.get.isLoop)) ctrl.children.filter(_.s.get != ctrl) else ctrl.childrenPriorTo(Ctrl.Node(controlChain(layer+1),-1))
           // TODO: Is it enough to include liters or should it include liters and all below liters?
           // Only mark iters if we should continue
-          if (children.map(_.s.get).forall(_.synchronizedStart(forkedIters, includeOuter = true))) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))} // Technically don't need to includeOuter for last ctrl of childrenPriorTo case
+          if (children.map(_.s.get).forall(_.synchronizedStart(forkedIters ++ liters, includeOuter = true))) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))} // Technically don't need to includeOuter for last ctrl of childrenPriorTo case
           else foundRandomLayer = true
         }
         else if (ctrl.isOuterControl && luid != lbase && ctrl.willUnrollAsMOP) {
           liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
           // TODO: Is it enough to include liters or should it include liters and all below liters?
           // Mark liters and decide if we should continue
-          if ((layer + 1 != controlChain.size) && !(controlChain(layer+1).synchronizedStart(forkedIters, includeOuter = false))) foundRandomLayer = true
+          if ((layer + 1 != controlChain.size) && !(controlChain(layer+1).synchronizedStart(forkedIters ++ liters, includeOuter = false))) foundRandomLayer = true
         }
         else if (ctrl.isFork && ctrl.isOuterControl) {
           // If we hit a fork node whose conditions are mutated by forked iters above layer, quit digging and mark this as random layer
@@ -493,7 +493,8 @@ package object control {
         // TODO: Actually check if cchains vary with forkedIters
         val ctrsToDrop = if (includeOuter) 0 else 1
         cchains.forall{cchain => 
-          cchain.counters.drop(ctrsToDrop).forall{ctr => ctr.isFixed(forkedIters)}}
+          cchain.counters.drop(ctrsToDrop).forall{ctr => ctr.isFixed(forkedIters)}
+        }
       }
     }
 
@@ -934,19 +935,22 @@ package object control {
     /** Returns true if this counter runs for the same number of cycles regardless of uid of forkedIters */
     @stateful def isFixed(forkedIters: Seq[Idx]): Boolean = {
       import spatial.util.modeling._
-      val deps = mutatingBounds(start) ++ mutatingBounds(end) ++ mutatingBounds(step)
+      val startDeps = mutatingBounds(start)
+      val endDeps = mutatingBounds(end)
+      val stepDeps = mutatingBounds(step)
+      val allDeps = startDeps ++ endDeps ++ stepDeps
       nIters match {
-        case Some(Expect(_)) => !forkedIters.exists(deps.contains)
+        case Some(Expect(_)) => !forkedIters.exists(allDeps.contains)
         case _ => 
-          val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-          val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-          val endFixed = end match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false}//case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
+          val startFixed = !forkedIters.exists(startDeps.contains) // start match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false} //!forkedIters.exists(startDeps.contains) 
+          val stepFixed = !forkedIters.exists(stepDeps.contains) // step match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false} //!forkedIters.exists(stepDeps.contains) 
+          val endFixed = !forkedIters.exists(endDeps.contains) // end match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false} //!forkedIters.exists(endDeps.contains) 
           val distFixed = (start.asInstanceOf[Sym[_]],end.asInstanceOf[Sym[_]]) match {
             case (Op(FixAdd(_,x)),Op(FixAdd(_,y))) if x == y => true
             case (Op(FixSub(_,x)),Op(FixSub(_,y))) if x == y => true
             case _ => false
           }
-          startFixed && (distFixed || (stepFixed && endFixed)) && !forkedIters.exists(deps.contains)
+          startFixed && (distFixed || (stepFixed && endFixed))
       }
     }
 

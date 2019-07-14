@@ -1,4 +1,4 @@
-package spatial.tests.compiler
+package spatial.tests.feature.synchronization
 
 object Helper{
   def contains(a: Option[String], b: String): Boolean = {a.getOrElse("").indexOf(b) != -1}

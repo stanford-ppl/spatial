@@ -1,0 +1,63 @@
+/*
+
+Vivado v2017.1 (64-bit)
+SW Build 1846317 on Fri Apr 14 18:54:47 MDT 2017
+IP Build 1846188 on Fri Apr 14 20:52:08 MDT 2017
+
+Process ID: 3705
+License: Customer
+
+Current time: 	6/10/19 10:53:58 AM PDT
+Time zone: 	Pacific Standard Time (America/Los_Angeles)
+
+OS: NAME="Ubuntu"
+OS Version: 4.15.0-39-generic
+OS Architecture: amd64
+Available processors (cores): 144
+
+Display: localhost:11.0
+Screen size: 1920x1080
+Screen resolution (DPI): 96
+Available screens: 1
+Available disk space: 0 GB
+Default font: family=Dialog,name=Dialog,style=plain,size=12
+
+Java version: 	1.8.0_112 64-bit
+Java home: 	/opt/Xilinx/Vivado/2017.1/tps/lnx64/jre
+JVM executable location: 	/opt/Xilinx/Vivado/2017.1/tps/lnx64/jre/bin/java
+Java library paths: /opt/Xilinx/Vivado/2017.1/tps/lnx64/libxslt/lib:/opt/Xilinx/Vivado/2017.1/lib/lnx64.o:/opt/Xilinx/Vivado/2017.1/tps/lnx64/jre/lib/amd64:/opt/Xilinx/Vivado/2017.1/tps/lnx64/jre/lib/amd64/server:/usr/lib/x86_64-linux-gnu:/opt/Xilinx/Vivado/2017.1/lib/lnx64.o:/opt/Xilinx/SDx/2017.1/runtime/lib/x86_64:/opt/Xilinx/SDx/2017.1/lib/lnx64.o:/opt/gurobi752/linux64/lib:/opt/Xilinx/Vivado/2017.1/lnx64/tools/dot/lib:/usr/java/packages/lib/amd64:/usr/lib64:/lib64:/lib:/usr/lib
+
+User name: 	mattfel
+User home directory: /local/ssd/home/mattfel
+User working directory: /local/ssd/home/mattfel/sp_fixes/spatial/resources/synth
+User country: 	US
+User language: 	en
+User locale: 	en_US
+
+RDI_BASEROOT: /opt/Xilinx/Vivado
+HDI_APPROOT: /opt/Xilinx/Vivado/2017.1
+RDI_DATADIR: /opt/Xilinx/Vivado/2017.1/data
+RDI_BINDIR: /opt/Xilinx/Vivado/2017.1/bin
+
+User preferences location: /home/mattfel/.Xilinx/Vivado
+Vivado preferences directory: /home/mattfel/.Xilinx/Vivado/2017.1/vivado.xml
+Vivado layouts directory: /local/ssd/home/mattfel/.Xilinx/Vivado/2017.1/layouts
+PlanAhead jar location: 	/opt/Xilinx/Vivado/2017.1/lib/classes/planAhead.jar
+Vivado Look & Feel: 	[Synthetica - the extended Synth Look and Feel. - ui.g.i.H]
+Engine tmp dir: 	./.Xil/Vivado-3705-lagos
+
+GUI allocated memory:	16,365 MB
+GUI max memory:		32,748 MB
+Engine allocated memory: 18,540 MB
+
+*/
+
+// TclEventType: START_GUI
+// Tcl Message: start_gui 
+// Tcl Message: xterm: cannot load font "-Misc-Fixed-bold-R-*-*-13-120-75-75-C-60-ISO8859-1" xterm: cannot load font "-Misc-Fixed-medium-R-*-*-13-120-75-75-C-120-ISO10646-1" xterm: cannot load font "-Misc-Fixed-bold-R-*-*-13-120-75-75-C-120-ISO10646-1" 
+// [GUI Memory]: 61 MB (+61861kb) [00:00:18]
+// [Engine Memory]: 18,540 MB (+19289086kb) [00:00:18]
+// HMemoryUtils.trashcanNow. Engine heap size: 18,584 MB. GUI used memory: 44 MB. Current time: 6/10/19 10:54:01 AM PDT
+selectButton(PAResourceEtoH.GettingStartedView_OPEN_PROJECT, "Open Project"); // x:h (JPanel:JComponent, cg:JFrame)
+selectMenu(PAResourceItoN.MainMenuMgr_FILE, "File"); // U:JideMenu (CommandMenuBar:CommandBar, cg:JFrame)
+// [GUI Memory]: 67 MB (+2916kb) [00:03:04]

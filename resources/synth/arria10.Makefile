@@ -37,7 +37,7 @@ hw:
 	echo "$$(date +%s)" > end.log
 
 sw:
-	cp scripts/arria10.mk cpp/Makefile
+	cp arria10.sw-resources/Makefile cpp/Makefile
 	# cp cpp/cpptypes.hpp cpp/datastructures
 	# cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	# cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :

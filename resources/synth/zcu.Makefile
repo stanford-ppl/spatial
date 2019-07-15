@@ -23,7 +23,7 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/zcu.mk cpp/Makefile
+	cp zcu.sw-resources/Makefile cpp/Makefile
 	make -C cpp -j8
 	tar -czf $(APPNAME).tar.gz -C ${ZCU_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C ../zcu.sw-resources/utils set_perms setClocks.sh run.sh
 

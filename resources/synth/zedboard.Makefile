@@ -23,7 +23,7 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/zedboard.mk cpp/Makefile
+	cp zedboard.sw-resources/Makefile cpp/Makefile
 	make -C cpp -j8
 	tar -czf $(APPNAME).tar.gz -C ${ZYNQ_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C ../zedboard.sw-resources/utils set_perms setClocks.sh run.sh
 

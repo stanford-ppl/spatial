@@ -19,7 +19,7 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/de1soc.mk cpp/Makefile
+	cp de1.sw-resources/Makefile cpp/Makefile
 	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/DE1SoC.h cpp/fringeDE1SoC/
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :

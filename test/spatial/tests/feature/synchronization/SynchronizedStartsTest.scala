@@ -147,16 +147,16 @@ import spatial.node._
 
 
   override def checkIR(block: Block[_]): Result = {
-    val sram1_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram1")  => sram }.size
-    val sram2_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram2")  => sram }.size
-    val sram3_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram3")  => sram }.size
-    val sram4_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram4")  => sram }.size
-    val sram5_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram5")  => sram }.size
-    val sram6_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram6")  => sram }.size
-    val sram7_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram7")  => sram }.size
-    val sram8_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram8")  => sram }.size
-    val sram9_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram9")  => sram }.size
-    val sram10_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram10") => sram }.size
+    val sram1_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram1_")  => sram }.size
+    val sram2_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram2_")  => sram }.size
+    val sram3_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram3_")  => sram }.size
+    val sram4_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram4_")  => sram }.size
+    val sram5_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram5_")  => sram }.size
+    val sram6_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram6_")  => sram }.size
+    val sram7_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram7_")  => sram }.size
+    val sram8_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram8_")  => sram }.size
+    val sram9_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram9_")  => sram }.size
+    val sram10_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram10_") => sram }.size
 
     require(sram1_count ==  1, "Should only have 1 duplicate of sram1")
     require(sram2_count ==  2, "Should only have 2 duplicates of sram2")

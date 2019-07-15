@@ -37,9 +37,10 @@ import spatial.dsl._
 
       Foreach(16 by 1 par 2){b1 => 
         val todo = cols_todo(b1)
+        val t = dataInNoConfl(b1, 0)
         Sequential.Foreach(4 by 1 par 2){ p => 
           val x = Reduce(Reg[Int])(todo by 1 par 2){q => 
-            dataInConfl(b1,q) + dataInNoConfl(b1,0)
+            dataInConfl(b1,q) + t
           }{_+_}
           Foreach(todo by 1 par 2){j => dataOut(p,b1,j) = x}
           Foreach(todo until 16 by 1 par 2){j => dataOut(p,b1,j) = 0}

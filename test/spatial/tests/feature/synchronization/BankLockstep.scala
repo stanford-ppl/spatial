@@ -1,6 +1,6 @@
 package spatial.tests.feature.synchronization
 
-object Helper{
+object BLHelper{
   def contains(a: Option[String], b: String): Boolean = {a.getOrElse("").indexOf(b) != -1}
 }
 
@@ -57,8 +57,8 @@ import spatial.dsl._
   }
 
   override def checkIR(block: Block[_]): Result = {
-    val dataInConfl_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "dataInConfl") => sram }.size
-    val dataInNoConfl_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "dataInNoConfl") => sram }.size
+    val dataInConfl_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BLHelper.contains(x.name, "dataInConfl") => sram }.size
+    val dataInNoConfl_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BLHelper.contains(x.name, "dataInNoConfl") => sram }.size
 
     require(dataInConfl_count == 2, "Should only have 2 duplicates of dataInConfl")
     require(dataInNoConfl_count == 1, "Should only have 1 duplicate of dataInNoConfl")

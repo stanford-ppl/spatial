@@ -365,24 +365,24 @@ package object control {
     }
 
     /** Use a flat Seq[Idx] to group a corresponding Seq[_] based on whether they appear in the same multilevel counter chain */ 
-    def bundleLayers[T](iters: Seq[Idx], elements: Seq[T]): Seq[Seq[T]] = {
+    def bundleLayers[T](leaf: Sym[_], iters: Seq[Idx], elements: Seq[T]): Seq[Seq[T]] = {
       import scala.collection.mutable.ArrayBuffer
       var layer: scala.Int = 0
       var ctrl = iters.head.parent.s.get
       val groups = ArrayBuffer(ArrayBuffer[T]())
 
-      iters.zipWithIndex.foreach{case (iter, i) => 
+      iters.map(_.parent.s.get).zipWithIndex.foreach{case (cur, i) => 
         // Part of this layer
-        if (iter.parent.s.get == ctrl) groups(layer) += elements(i)
+        if (cur == ctrl) groups(layer) += elements(i)
         // Next layer
-        else if (iter.parent.s.get.parent.s.get == ctrl) {
+        else if (cur.parent.s.get == ctrl) {
           layer = layer + 1
-          ctrl = iter.parent.s.get
+          ctrl = cur
           groups += ArrayBuffer(elements(i))
         }
         // Skipped layer(s)
         else {
-          var current = iter.parent.s.get
+          var current = cur
           while (current != ctrl) {
             layer = layer + 1
             val next = current.parent.s.get
@@ -390,9 +390,18 @@ package object control {
             else groups += ArrayBuffer()
             current = next
           }
-          ctrl = iter.parent.s.get
+          ctrl = cur
         }
       }
+
+      // NOTE: Make sure we extend to leaf
+      var current = leaf
+      while (current != ctrl) {
+        layer = layer + 1
+        groups += ArrayBuffer()
+        current = current.parent.s.get
+      }
+
       groups
     }
 
@@ -412,15 +421,15 @@ package object control {
       *   If a forkPoint unrolls as MoP, the anchor point for the lockstep check is just above the relevent child of that forkPoint
       *   If a forkPoint unrolls as PoM, the anchor point for the lockstep check is just above the forkPoint itself               
       */
-    @stateful def iterSynchronizationInfo(iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
+    @stateful def iterSynchronizationInfo(leaf: Sym[_], iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
       import scala.collection.mutable.ArrayBuffer
       import spatial.util.modeling._
       val map = scala.collection.mutable.HashMap[Idx,Int]()
       // 1) Bundle iters/uids based on the depth of the counter chain they are part of
-      val bundledIters = bundleLayers(iters, iters)
-      val bundledUID = bundleLayers(iters, uid)
-      val bundledBase = bundleLayers(iters, baseUID)
-      val controlChain = ctrlsBetween(iters.head, iters.last.parent.s.get)
+      val bundledIters = bundleLayers(leaf, iters, iters)
+      val bundledUID = bundleLayers(leaf, iters, uid)
+      val bundledBase = bundleLayers(leaf, iters, baseUID)
+      val controlChain = ctrlsBetween(iters.head, leaf)
       var forked = false
       var firstFork = false
       var foundRandomLayer = false
@@ -443,31 +452,21 @@ package object control {
           // 3.1) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
           if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
             val stopAtChild = if (layer + 1 < controlChain.size && (op.isDefined && !op.get.isLoop)) Some(controlChain(layer+1)) else None 
-            // Only mark iters if we should continue
-            if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))} // Technically don't need to entry for last ctrl of childrenPriorTo case
+            if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
             else foundRandomLayer = true
           }
           // 3.2) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
           else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
-            liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
-            // Mark liters and decide if we should continue
-            if ((layer + 1 != controlChain.size) && !(controlChain(layer+1).synchronizedStart(forkedIters ++ liters, entry = true))) foundRandomLayer = true
+            if ((layer + 1 < controlChain.size) && (controlChain(layer+1).synchronizedStart(forkedIters ++ liters, entry = true))) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+            else foundRandomLayer = true
           }
           // 3.3) If first fork occurs at inner controller, then iterators are always synchronized
           else if (ctrl.isInnerControl) {
             liters.foreach{iter => map += (iter -> 0)}
           }
         } else if (forked) {
-          // 3.4) If level is outtie fork, abort if conditions depend on iterators above this level that have forked
-          if (ctrl.isFork && ctrl.isOuterControl) {
-            val conditions = ctrl match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
-            val condMutators = conditions.map(mutatingBounds(_)).flatten
-            if (!condMutators.intersect(forkedIters).isEmpty) foundRandomLayer = true
-          }
           // 3.5) Otherwise assume we can mark synchronization because firstFork determined we are still synchronized
-          else {
-            liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
-          }
+          liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
         } else {
           liters.foreach{iter => map += (iter -> 0)}
         }
@@ -503,7 +502,7 @@ package object control {
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], entry: Boolean): Boolean = {
       import spatial.util.modeling._
       if (isFSM || isStreamControl) false
-      else if (isSwitch && isOuterControl) {
+      else if (isSwitch) {
         val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
         val condMutators = conditions.map(mutatingBounds(_)).flatten
         condMutators.intersect(forkedIters).isEmpty

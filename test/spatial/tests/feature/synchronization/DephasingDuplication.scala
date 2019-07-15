@@ -1,8 +1,10 @@
 package spatial.tests.feature.synchronization
 
-object Helper{
-  def contains(a: Option[String], b: String): Boolean = {a.getOrElse("").indexOf(b) != -1}
-}
+
+import spatial.dsl._
+import argon.Block
+import argon.Op
+import spatial.node._
 
 @spatial class DephasingDuplication extends SpatialTest {
   override def dseModelArgs: Args = "16"

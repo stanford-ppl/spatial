@@ -1,6 +1,6 @@
 package spatial.tests.feature.synchronization
 
-object Helper{
+object BHelper{
   def contains(a: Option[String], b: String): Boolean = {a.getOrElse("").indexOf(b) != -1}
 }
 
@@ -173,13 +173,13 @@ import spatial.node._
   }
 
   override def checkIR(block: Block[_]): Result = {
-    val sram1_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram1") => sram }.size
-    val sram2_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram2") => sram }.size
-    val sram3_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram3") => sram }.size
-    val sram4_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram4") => sram }.size
-    val sram5_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram5") => sram }.size
-    val sram6_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram6") => sram }.size
-    val sram7_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if Helper.contains(x.name, "sram7") => sram }.size
+    val sram1_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram1") => sram }.size
+    val sram2_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram2") => sram }.size
+    val sram3_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram3") => sram }.size
+    val sram4_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram4") => sram }.size
+    val sram5_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram5") => sram }.size
+    val sram6_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram6") => sram }.size
+    val sram7_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) if BHelper.contains(x.name, "sram7") => sram }.size
 
     require(sram1_count == 3, "Should only have 3 duplicates of sram1")
     require(sram2_count == 3, "Should only have 3 duplicates of sram2")

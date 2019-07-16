@@ -80,7 +80,7 @@ trait HostML {
   }
 
   def unstaged_sigmoid(x:Float) = {
-    1 / (1 + math.exp(-x)) 
+    1 / (1 + math.exp(-x).toFloat) 
   }
 
 }

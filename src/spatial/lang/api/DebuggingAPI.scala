@@ -209,4 +209,12 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     }
   }
 
+  // Unstaged if else statement
+  def IfElse[T](cond:scala.Boolean)(trueBlock: => T)(falseBlock: => T) = {
+    cond match {
+      case true => trueBlock
+      case false => falseBlock
+    }
+  }
+
 }

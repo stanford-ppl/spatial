@@ -259,7 +259,7 @@ object DenseTransfer {
             length := aligned.size
           }
           Foreach(length.value par p){i =>
-            val en = staticStart(dramAddr) match {
+            val en: spatial.lang.Bit = staticStart(dramAddr) match {
                     case Left(x)  => i >= x && i < endBound
                     case Right(_) => i >= startBound && i < endBound
                   }

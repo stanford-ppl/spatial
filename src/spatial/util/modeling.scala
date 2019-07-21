@@ -20,17 +20,17 @@ import scala.collection.immutable.SortedSet
 
 object modeling {
 
-  @stateful def mutatingBounds(x: Sym[_], visited: Set[Sym[_]] = Set(), bounds: Set[Sym[_]] = Set()): Set[Sym[_]] = {
+  @stateful def mutatingBounds(x: Sym[_], visited: SortedSet[Sym[_]] = SortedSet[Sym[_]](), bounds: SortedSet[Sym[_]] = SortedSet[Sym[_]]()): SortedSet[Sym[_]] = {
     val (newBounds, toCheck) = x.inputs.partition(_.isBound)
     val toCheckExpanded = toCheck.toSeq.map{y: Sym[_] => if (y.isSingleton) y.writers.toSeq else Seq(y)}.flatten.toSet diff visited // TODO: Also trace nonSingleton but conflictable mems?
     val nextBounds = bounds ++ newBounds.map(_.asInstanceOf[Sym[_]])
-    if (!toCheckExpanded.isEmpty) toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}
+    if (!toCheckExpanded.isEmpty) SortedSet(toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}.toSeq:_*)
     else nextBounds
   }
 
-  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+  def consumersDfs(frontier: SortedSet[Sym[_]], nodes: SortedSet[Sym[_]], scope: SortedSet[Sym[_]]): SortedSet[Sym[_]] = frontier.flatMap{x: Sym[_] =>
     if (scope.contains(x) && !nodes.contains(x)) {
-      consumersDfs(x.consumers, nodes + x, scope)
+      consumersDfs(SortedSet(x.consumers.toSeq:_*), nodes + x, scope)
     }
     else nodes
   }
@@ -44,21 +44,21 @@ object modeling {
   /** Returns all nodes on all paths from start --> end, including start and end
     * If there are no such paths, returns an empty set.
     */
-  def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
-    def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+  def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: SortedSet[Sym[_]]): SortedSet[Sym[_]] = {
+    def inputsDfs(frontier: SortedSet[Sym[_]], nodes: SortedSet[Sym[_]]): SortedSet[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
         else if (x.isMem) {
-          val w = (x.writers.toSet intersect scope).filterNot(nodes.contains)
+          val w = SortedSet((x.writers.toSet intersect scope).filterNot(nodes.contains).toSeq:_*)
           inputsDfs(w, nodes + x)
         }
         else {
-          inputsDfs(x.inputs.toSet, nodes + x)
+          inputsDfs(SortedSet(x.inputs:_*), nodes + x)
         }
       }
-      else Set.empty[Sym[_]]
+      else SortedSet[Sym[_]]()
     }
-    inputsDfs(Set(end),Set(end))
+    inputsDfs(SortedSet(end),SortedSet(end))
   }
 
   @stateful def target: HardwareTarget = spatialConfig.target
@@ -87,7 +87,7 @@ object modeling {
     verbose: Boolean = false
   ): (Double, Double) = {
     val (latencies, cycles) = latenciesAndCycles(block, verbose = verbose)
-    val scope = latencies.keySet
+    val scope = SortedSet(latencies.keySet.toSeq:_*)
     val latency = latencies.values.fold(0.0){(a,b) => Math.max(a,b) }
     // TODO: Safer way of determining if THIS cycle is the reduceType
     val interval = (cycles.map{c => c.length} + 0).max
@@ -102,7 +102,7 @@ object modeling {
   }
 
 
-  @stateful def latenciesAndCycles(block: Block[_], verbose: Boolean = false): (Map[Sym[_],Double], Set[Cycle]) = {
+  @stateful def latenciesAndCycles(block: Block[_], verbose: Boolean = false): (Map[Sym[_],Double], SortedSet[Cycle]) = {
     val (schedule, result) = blockNestedScheduleAndResult(block)
     pipeLatencies(result, schedule, verbose = verbose)
   }
@@ -113,12 +113,12 @@ object modeling {
   case class ScopeAccumInfo(
     readers: Map[Sym[_],Set[Sym[_]]], // Memory -> readers
     writers: Map[Sym[_],Set[Sym[_]]], // Memory -> writers
-    accums:  Set[AccumTriple],
+    accums:  SortedSet[AccumTriple],
     cycles:  mutable.Map[Sym[_], mutable.Set[AccumTriple]]
   )
 
   @stateful def findAccumCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
-    val scope = schedule.toSet
+    val scope = SortedSet(schedule:_*)
     val cycles = mutable.HashMap[Sym[_],mutable.Set[AccumTriple]]()
     def addCycle(sym: Sym[_], triple: AccumTriple): Unit = {
       val set = cycles.getOrElseAdd(sym, () => mutable.HashSet.empty)
@@ -169,12 +169,12 @@ object modeling {
     schedule: Seq[Sym[_]],
     oos:      Map[Sym[_],Double] = Map.empty,
     verbose:  Boolean = false
-  ): (Map[Sym[_],Double], Set[Cycle]) = {
+  ): (Map[Sym[_],Double], SortedSet[Cycle]) = {
 
-    val scope = schedule.toSet
+    val scope = SortedSet(schedule:_*)
 
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
-    val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
+    val cycles = mutable.HashMap[Sym[_],SortedSet[Sym[_]]]()
 
     val accumInfo = findAccumCycles(schedule,verbose)
     val accums      = accumInfo.accums
@@ -184,8 +184,8 @@ object modeling {
 
     def debugs(x: => Any): Unit = if (verbose) dbgs(x)
 
-    def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): Set[WARCycle] = {
-      val scope = schedule.toSet
+    def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): SortedSet[WARCycle] = {
+      val scope = SortedSet(schedule:_*)
 
       val readers = scope.collect{
         case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
@@ -213,19 +213,19 @@ object modeling {
 
           // TODO[2]: FIFO/Stack operations need extra cycle for status update?
           val cycleLength = if (rd.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
-          WARCycle(rd, wr, mem, Set(rd,wr,mem), cycleLength)
+          WARCycle(rd, wr, mem, SortedSet(rd,wr,mem), cycleLength)
         }
       }
 
     }
 
     def fullDFS(cur: Sym[_]): Double = {
-      def precedingWrites: Set[Sym[_]] = {
+      def precedingWrites: SortedSet[Sym[_]] = {
         cur.readMem.map{mem => 
           val parentScope = cur.parent.innerBlocks.flatMap(_._2.stms)
-          val writers = parentScope.filter(_.writtenMem == Some(mem)).toSet
-          parentScope.zipWithIndex.collect{case (x,i) if i < parentScope.indexOf(cur) => x}.toSet intersect writers
-        }.getOrElse(Set.empty)
+          val writers = parentScope.filter(_.writtenMem == Some(mem))
+          SortedSet(parentScope.zipWithIndex.collect{case (x,i) if i < parentScope.indexOf(cur) => x}:_*) intersect SortedSet(writers:_*)
+        }.getOrElse(SortedSet[Sym[_]]())
       }
       cur match {
         case Op(d) if scope.contains(cur) =>
@@ -267,7 +267,7 @@ object modeling {
 
     // Perform backwards pass to push unnecessary delays out of reduction cycles
     // This can create extra registers, but decreases the initiation interval of the cycle
-    def reverseDFS(cur: Sym[_], cycle: Set[Sym[_]]): Unit = cur match {
+    def reverseDFS(cur: Sym[_], cycle: SortedSet[Sym[_]]): Unit = cur match {
       case s: Sym[_] if cycle contains cur =>
         val forward = s.consumers intersect scope
         if (forward.nonEmpty) {
@@ -291,7 +291,7 @@ object modeling {
     }
 
 
-    def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
+    def pushMultiplexedAccesses(accessors: Map[Sym[_],SortedSet[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose){
         dbgs(s"Multiplexed accesses for memory $mem: ")
         accesses.foreach{access => dbgs(s"  ${stm(access)}") }
@@ -326,7 +326,7 @@ object modeling {
               paths(access) = writeDelay
               dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
-              val affectedNodes = consumersDfs(access.consumers, Set(), scope) intersect scope
+              val affectedNodes = consumersDfs(SortedSet(access.consumers.toSeq:_*), SortedSet(), scope) intersect scope
               affectedNodes.foreach{case x if (paths.contains(x)) => 
                   dbgs(s"  $x")
                   paths(x) = paths(x) + (writeDelay-oldPath)
@@ -353,7 +353,7 @@ object modeling {
           // Place reader at this latency
           val originalReadLatency = paths(reader)
           paths(reader) = baseLatency + 2 /*sram load latency*/
-          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope) intersect scope) diff Set(reader)
+          val affectedNodes = (consumersDfs(SortedSet(reader.consumers.toSeq:_*), SortedSet(), scope) intersect scope) diff SortedSet(reader)
           dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
           // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
           affectedNodes.foreach{case x if (paths.contains(x)) => 
@@ -369,7 +369,7 @@ object modeling {
       val reg = regWrite match {case Op(_@RegWrite(x,_,_)) => x; case _ => throw new Exception(s"Cannot break loop with non-reg ($regWrite)")}
       if (regWrite.ancestors.exists(_.stopWhen == Some(reg))) {
         val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
-        val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
+        val toPush = SortedSet(parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSeq:_*)
         toPush.foreach{
           case x if (paths.contains(x)) => 
             dbgs(s"  $x - Originally at ${paths(x)}, but must push by ${paths(regWrite)}")
@@ -389,7 +389,7 @@ object modeling {
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
         warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
-        val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)
+        val affectedNodes = (consumersDfs(SortedSet(r.consumers.toSeq:_*), SortedSet(), scope) intersect scope) ++ SortedSet(r)
         affectedNodes.foreach{
           case x if (paths.contains(x)) => 
             dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")
@@ -403,7 +403,7 @@ object modeling {
     debugs(s"Computing pipeLatencies for scope:")
     schedule.foreach{ e => debugs(s"  ${stm(e)}") }
 
-    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+    accumReads.foreach{reader => cycles(reader) = SortedSet(reader) }
 
     if (scope.nonEmpty) {
       // Perform forwards pass for normal data dependencies
@@ -411,7 +411,7 @@ object modeling {
 
       // TODO[4]: What to do in case where a node is contained in multiple cycles?
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
-        val cycle = cycles.getOrElse(writer, Set.empty)
+        val cycle = cycles.getOrElse(writer, SortedSet[Sym[_]]())
         dbgs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
         reverseDFS(writer, cycle)
       }
@@ -428,9 +428,9 @@ object modeling {
     val pseudoWarCycles = findPseudoWARCycles(schedule)
     val warCycles = trueWarCycles ++ pseudoWarCycles
 
-    val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
-    val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet      
+    val wawCycles = pushMultiplexedAccesses(accumInfo.writers.map{case (k,v) => k -> SortedSet(v.toSeq:_*)}.toMap)
+    val rarCycles = pushMultiplexedAccesses(accumInfo.readers.map{case (k,v) => k -> SortedSet(v.toSeq:_*)}.toMap)
+    val allCycles: SortedSet[Cycle] = SortedSet((wawCycles ++ rarCycles ++ warCycles).toSeq:_*)
 
     if (verbose) {
       if (allCycles.nonEmpty) {
@@ -470,7 +470,7 @@ object modeling {
     latencies:  Map[Sym[_], Double],
     hierarchy:  Int,
     delayLines: Map[Sym[_], SortedSet[ValueDelay]],
-    cycles:     Set[Sym[_]],
+    cycles:     SortedSet[Sym[_]],
     createLine: Option[(Int, Sym[_], SrcCtx) => Sym[_]]
   ): Seq[(Sym[_], ValueDelay)] = {
     dbgs(s"computing delay lines for $scope $latencies $delayLines $cycles")

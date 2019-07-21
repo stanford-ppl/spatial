@@ -114,8 +114,9 @@ object ML extends HostML {
     inPar:scala.Int,
     outPar:scala.Int, 
     activation: T => T,
-  )(in:I32 => T)(out:(Idx, T) => Unit):Option[T] = 
+  )(in:I32 => T)(out:(Idx, T) => Unit):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Left(in),Left(out))
+  }
 
   @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
@@ -125,8 +126,9 @@ object ML extends HostML {
     outPar:scala.Int, 
     activation: T => T,
     in:SRAM1[T],
-  )(out:(Idx, T) => Unit):Option[T] = 
+  )(out:(Idx, T) => Unit):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Right(in),Left(out))
+  }
 
   @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
@@ -136,8 +138,9 @@ object ML extends HostML {
     outPar:scala.Int, 
     activation: T => T,
     out:SRAM1[T],
-  )(in:I32 => T):Option[T] = 
+  )(in:I32 => T):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Left(in),Right(out))
+  }
 
   @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
@@ -148,8 +151,9 @@ object ML extends HostML {
     activation: T => T,
     in:SRAM1[T],
     out:SRAM1[T],
-  ):Option[T] = 
+  ):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Right(in),Right(out))
+  }
 
   // Activation Functions
   @api def activation[T:Num](x:T => T) = x

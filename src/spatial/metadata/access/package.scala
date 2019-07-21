@@ -227,32 +227,25 @@ package object access {
     pomMask.zipWithIndex.collect{case (take,i) if (i < position || take) => fullUID(i)}
   }
 
-  /** Checks the iters in accesses a and b for those which can dephase due to controllers not running in lockstep.  Returns a Set of 
-    * iter - Seq[Int] pair that identify the unroll ID addressing that identifies where it dephases from. 
+  /** Generate replacement rules for access a relative to access b */
+  @stateful def divergedIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Map[Idx,Option[Int]] = {
+    if (accessIterators(a.access, mem) != accessIterators(b.access, mem)) Map()
+    else dephasingIters(a, b.unroll, mem).map{case ((iter,uid),ofs) => (iter -> ofs)}.toMap
+  }
+
+  /** Checks the iters in access a for those which can dephase due to controllers not being synchronized with base uid.  
+    * Returns a mapping between iter, uid to the ofs to include for that iter.  If the offset is None, assume total dephasing 
     *
     * We can use this info to create replacement rules for each iter in each access that may conflict due to lockstep dephasing
     */
-  @stateful def dephasingIters(a: AccessMatrix, b: AccessMatrix, mem: Sym[_]): Set[(Idx,Seq[Int])] = {
+  @stateful def dephasingIters(a: AccessMatrix, baseUID: Seq[Int], mem: Sym[_]): Map[(Idx,Seq[Int]),Option[Int]] = {
     val aIters: Seq[Idx] = accessIterators(a.access, mem)
-    val bIters: Seq[Idx] = accessIterators(b.access, mem)
-    // Figure out the uid position where iterators start to diverge (minimum of first iterator whose parent will unroll as POM and first uid in a to differ from uid in b)
-    val pomForkLayer = aIters.zipWithIndex.collectFirst{case (it,i) if it.parent.s.get.willUnrollAsPOM => i} 
-    // TODO: uidForkLayer should actually find first divergence and grab mark fork at LAST iterator that is part of this forked cchain
-    val uidForkLayer = a.unroll.zip(b.unroll).zipWithIndex.collectFirst{case ((u0,u1),i) if (u0 != u1) => i}
-    val forkLayer = if (pomForkLayer.isDefined && uidForkLayer.isDefined) Some(pomForkLayer.get min uidForkLayer.get) 
-                    else if (pomForkLayer.isDefined || uidForkLayer.isDefined) Some(pomForkLayer.getOrElse(0) + uidForkLayer.getOrElse(0))
-                    else None
-    // For any iters a and b have in common, check if the iterator's owner's parent has children running in lockstep. 
-    //   return false if we find at least one who is not in lockstep
-    if (forkLayer.isDefined && aIters(forkLayer.get).parent.s.get.isOuterControl) {
-      val forkNode = aIters(forkLayer.get).parent.s.get
-
-      val dephaseStart = if (pomForkLayer == forkLayer) pomForkLayer.get - 1 else uidForkLayer.get // minus 1 for pom because iterator exactly at fork is dephased
-      val mustClone = !forkNode.isLockstepAcross(aIters, Some(a.access), Some(forkNode.toCtrl))
-      val mapping:Set[(Idx,Seq[Int])] = if (mustClone) aIters.zipWithIndex.collect{case (x,i) if i > dephaseStart => (x, getDephasedUID(aIters, a.unroll, i))}.toSet
-                                        else Set()
-      mapping
-    } else Set()    
+    if (!aIters.isEmpty) {
+      val leaf = a.access.parent.s.get
+      // TODO: iterSynchronizationInfo should be standalone helper, not a func defined on a Sym!
+      val ofsRules = if (aIters.nonEmpty) leaf.iterSynchronizationInfo(leaf, aIters, baseUID, a.unroll) else Map[Idx,Int]()
+      aIters.map{i => ((i,a.unroll) -> ofsRules.get(i))}.toMap
+    } else Map() 
   }
 
 

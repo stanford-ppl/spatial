@@ -364,35 +364,154 @@ package object control {
       children.takeWhile{c => c != child }
     }
 
-    /** Returns true if all copies of the loop body across iterator iter will have the
-      * same execution time.
-      * If reference is defined, only accounts for the stages up to and including the reference.
-      * This is currently trivially true for inner controllers.
-      */
-    // TODO: Update to incorporate pom vs mop unrolling
-    @stateful def isLockstepAcross(iters: Seq[Idx], reference: Option[Sym[_]], forkNode: Option[Ctrl] = None): Boolean = {
-      val child = reference.flatMap{ref => this.getChildContaining(ref) }
-      val wu = s.isDefined && s.get.isOuterControl && s.get.cchains.exists(_.willUnroll)
-      val ctrls = {
-        if      (s.isDefined && s.get.willUnrollAsPOM) return false
-        else if (op.isDefined && op.get.isLoop && !wu) children 
-        else if (op.isDefined && !wu) child.map{c => childrenPriorTo(c) }.getOrElse(children) 
-        else child.map{c => Seq(c) }.getOrElse(children)
+    /** Use a flat Seq[Idx] to group a corresponding Seq[_] based on whether they appear in the same multilevel counter chain */ 
+    def bundleLayers[T](leaf: Sym[_], iters: Seq[Idx], elements: Seq[T]): Seq[Seq[T]] = {
+      import scala.collection.mutable.ArrayBuffer
+      var layer: scala.Int = 0
+      var ctrl = iters.head.parent.s.get
+      val groups = ArrayBuffer(ArrayBuffer[T]())
+
+      iters.map(_.parent.s.get).zipWithIndex.foreach{case (cur, i) => 
+        // Part of this layer
+        if (cur == ctrl) groups(layer) += elements(i)
+        // Next layer
+        else if (cur.parent.s.get == ctrl) {
+          layer = layer + 1
+          ctrl = cur
+          groups += ArrayBuffer(elements(i))
+        }
+        // Skipped layer(s)
+        else {
+          var current = cur
+          while (current != ctrl) {
+            layer = layer + 1
+            val next = current.parent.s.get
+            if (next == ctrl) groups += ArrayBuffer(elements(i))
+            else groups += ArrayBuffer()
+            current = next
+          }
+          ctrl = cur
+        }
       }
-      ctrls.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = false, forkNode = forkNode) } &&
-      child.forall{c => c.runtimeIsInvariantAcross(iters, reference, allowSwitch = true, forkNode = forkNode) }
+
+      // NOTE: Make sure we extend to leaf
+      var current = leaf
+      while (current != ctrl) {
+        layer = layer + 1
+        groups += ArrayBuffer()
+        current = current.parent.s.get
+      }
+
+      groups
     }
 
-    @stateful def runtimeIsInvariantAcross(iters: Seq[Idx], reference: Option[Sym[_]], allowSwitch: Boolean, forkNode: Option[Ctrl]): Boolean = {
-      if (isFSM) false
-      else if (isSwitch && isOuterControl) {
-        allowSwitch && reference.exists{r => r.ancestors.contains(toCtrl) } &&
-        isLockstepAcross(iters, reference)
+    /** Find controllers between two iterators */
+    def ctrlsBetween(top: Idx, bottom: Sym[_], chain: Seq[Sym[_]] = Seq()): Seq[Sym[_]] = {
+      if (bottom == top.parent.s.get) Seq(bottom) ++ chain
+      else ctrlsBetween(top,bottom.parent.s.get,Seq(bottom) ++ chain)
+    }
+
+    /** Returns how iterators derived from UID are related to iterators derived from baseline UID.
+      * We determine a value for each iterator based on lockstep-ness of the relevent sub-tree:
+      *   If iterator i from UID can be treated as the same iterator i from baseline, then i -> 0.
+      *   If iterator i from UID is random relative to iterator i from baseline, then i will not be in the map
+      *   If iterator i from UID is systematically offset from iterator i from baseline, then i -> offset.
+      * Lockstep-ness of an anchor point is true if every child of that anchor point runs for the same number of cycles in UID as baseline
+      * When determining lockstep-ness, we treat PoM and MoP as follows:
+      *   If a forkPoint unrolls as MoP, the anchor point for the lockstep check is just above the relevent child of that forkPoint
+      *   If a forkPoint unrolls as PoM, the anchor point for the lockstep check is just above the forkPoint itself               
+      */
+    @stateful def iterSynchronizationInfo(leaf: Sym[_], iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
+      import scala.collection.mutable.ArrayBuffer
+      import spatial.util.modeling._
+      val map = scala.collection.mutable.HashMap[Idx,Int]()
+      // 1) Bundle iters/uids based on the depth of the counter chain they are part of
+      val bundledIters = bundleLayers(leaf, iters, iters)
+      val bundledUID = bundleLayers(leaf, iters, uid)
+      val bundledBase = bundleLayers(leaf, iters, baseUID)
+      val controlChain = ctrlsBetween(iters.head, leaf)
+      var forked = false
+      var firstFork = false
+      var foundRandomLayer = false
+      var layer = 0
+      // TODO: Mark fork if own uid(iter) doesn't match or if ANY uid(iter) in the layer doesn't match or compute forkedIters only after visiting layer?
+      // val forkedIters = (bundledIters, bundledUID, bundledBase).zipped.collect{case (iters,uid0,uid1) if (uid.zip(uid1).exists{case (a,b) => a != b}) => iters}.flatten.toSeq
+      val forkedIters = (iters, baseUID, uid).zipped.collect{case (iter,uid0,uid1) if (uid0 != uid1) => iter}.toSeq
+      // 2) For each layer, determine iterOfs based on the uids of this layer and forking of parent layers
+      while (layer < bundledIters.size && !foundRandomLayer) {
+        val ctrl = controlChain(layer)
+        val liters = bundledIters(layer)
+        val luid = bundledUID(layer) 
+        val lbase = bundledBase(layer)
+        // Mark forked flags when we reach first fork, meaning every descendent from now on comes from different ancestry
+        if (luid != lbase && forked == false) {forked = true; firstFork = true}
+        // val forkedIters = (bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)).zipped.collect{case (iters,uid0,uid1) if (uid.zip(uid1).exists{case (a,b) => a != b}) => iters}.flatten.toSeq
+
+        // 2.1) If at first fork, mark iterators for layer appropriately and decide if entire subtrees are synchronized or not
+        if (firstFork) {
+          // 3.1) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
+          if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
+            val stopAtChild = if (layer + 1 < controlChain.size && (op.isDefined && !op.get.isLoop)) Some(controlChain(layer+1)) else None 
+            if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+            else foundRandomLayer = true
+          }
+          // 3.2) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
+          else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
+            if ((layer + 1 < controlChain.size) && (controlChain(layer+1).synchronizedStart(forkedIters ++ liters, entry = true))) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+            else foundRandomLayer = true
+          }
+          // 3.3) If first fork occurs at inner controller, then iterators are always synchronized
+          else if (ctrl.isInnerControl) {
+            liters.foreach{iter => map += (iter -> 0)}
+          }
+        } else if (forked) {
+          // 3.5) Otherwise assume we can mark synchronization because firstFork determined we are still synchronized
+          liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+        } else {
+          liters.foreach{iter => map += (iter -> 0)}
+        }
+        firstFork = false
+        layer = layer + 1
       }
-      else {
-        // TODO: More restrictive than it needs to be. Change to ctr bounds being invariant w.r.t iters
-        isLockstepAcross(iters, reference) &&
-        (!isFSM && !isStreamControl && cchains.forall{cchain => cchain.counters.forall{ctr => ctr.isFixed(forkNode)}})
+      map.toMap
+    }
+
+    /** Computes the ofs between iter from uid to baseline if applicable, due to iter's cchain having a start value that depends on uid divergence */
+    @stateful def iterOfs(iter: Idx, itersAbove: Seq[Seq[Idx]], uid: Seq[Seq[Int]], base: Seq[Seq[Int]]): Int = {
+      val startSym = iter.ctrStart
+      startSym match {
+        case Op(LaneStatic(dep, elems)) => 
+          val position = itersAbove.flatten.indexOf(dep)
+          val upper = elems(uid.flatten.apply(position))
+          val lower = elems(base.flatten.apply(position))
+          upper - lower
+        case _ => 0
+      }
+    }
+
+    /** Returns true if the subtree rooted at ctrl run for the same number of cycles (i.e. iterations) regardless of uid.
+      * entry flag identifies whether the outermost iterator of the cchain should be ignored or not
+      */
+    @stateful def synchronizedStart(forkedIters: Seq[Idx], entry: Boolean = false, stopAtChild: Option[Sym[_]] = None): Boolean = {
+      val meSynch = cchainIsInvariant(forkedIters, entry)
+      val childrenTodo = if (stopAtChild.isDefined) childrenPriorTo(Ctrl.Node(stopAtChild.get,-1)) else children
+      val childrenSynch = childrenTodo.filter(_.s.get != s.get).forall(_.synchronizedStart(forkedIters, entry = false))
+      meSynch && childrenSynch
+    }
+    /** Returns true if this counterchain is invariant with iterators above it that diverge */
+    @stateful def cchainIsInvariant(forkedIters: Seq[Idx], entry: Boolean): Boolean = {
+      import spatial.util.modeling._
+      if (isFSM || isStreamControl) false
+      else if (isSwitch) {
+        val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
+        val condMutators = conditions.map(mutatingBounds(_)).flatten
+        condMutators.intersect(forkedIters).isEmpty
+      } else {
+        // TODO: Actually check if cchains vary with forkedIters
+        val ctrsToDrop = if (entry) 1 else 0
+        cchains.forall{cchain => 
+          cchain.counters.drop(ctrsToDrop).forall{ctr => ctr.isFixed(forkedIters)}
+        }
       }
     }
 
@@ -830,13 +949,26 @@ package object control {
       case (Final(a: scala.Int), Final(b: scala.Int)) => true
       case _ => false
     }
-    @stateful def isFixed(relative: Option[Ctrl]): Boolean = nIters match {
-      case Some(Expect(_)) => true
-      case _ => 
-        val startFixed = start match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-        val stepFixed = step match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-        val endFixed = end match {case Expect(_) => true; case x if x.isArgInRead => true; case x if (relative.getOrElse(Ctrl.Host).ancestors.contains(x.parent)) => true; case _ => false}
-        startFixed && stepFixed && endFixed
+    /** Returns true if this counter runs for the same number of cycles regardless of uid of forkedIters */
+    @stateful def isFixed(forkedIters: Seq[Idx]): Boolean = {
+      import spatial.util.modeling._
+      val startDeps = mutatingBounds(start)
+      val endDeps = mutatingBounds(end)
+      val stepDeps = mutatingBounds(step)
+      val allDeps = startDeps ++ endDeps ++ stepDeps
+      nIters match {
+        case Some(Expect(_)) => !forkedIters.exists(allDeps.contains)
+        case _ => 
+          val startFixed = !forkedIters.exists(startDeps.contains) // start match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false} //!forkedIters.exists(startDeps.contains) 
+          val stepFixed = !forkedIters.exists(stepDeps.contains) // step match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false} //!forkedIters.exists(stepDeps.contains) 
+          val endFixed = !forkedIters.exists(endDeps.contains) // end match {case Expect(_) => true; case x if x.isArgInRead => true; case _ => false} //!forkedIters.exists(endDeps.contains) 
+          val distFixed = (start.asInstanceOf[Sym[_]],end.asInstanceOf[Sym[_]]) match {
+            case (Op(FixAdd(_,x)),Op(FixAdd(_,y))) if x == y => true
+            case (Op(FixSub(_,x)),Op(FixSub(_,y))) if x == y => true
+            case _ => false
+          }
+          startFixed && (distFixed || (stepFixed && endFixed))
+      }
     }
 
     @stateful def nIters: Option[Bound] = (start,step,end) match {
@@ -1092,7 +1224,8 @@ package object control {
             val dist = getCoarseDistance(metapipe, anchor, a)
             dbgs(s"$a <-> $anchor # LCA: $metapipe, Dist: $dist")
 
-            if (group.exists{x => a == x._1 || a == x._2 }) a -> dist else a -> None
+            // As long as a is in the metapipeLCAs map, or is a reader that was unmapped because its LCA with writer is inner control, assign its dist
+            if (group.exists{x => a.isReader || a == x._1 || a == x._2 }) a -> dist else a -> None
           }
           val buffers = dists.filter{_._2.isDefined}.map(_._2.get)
           val minDist = buffers.minOrElse(0)

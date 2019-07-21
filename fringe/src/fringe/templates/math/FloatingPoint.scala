@@ -3,8 +3,6 @@ package fringe.templates.math
 import chisel3._
 import chisel3.internal.sourceinfo._
 
-import fringe.templates.hardfloat._
-
 class FloatingPoint(val m: Int, val e: Int) extends Bundle {
 
   def this(fmt: emul.FltFormat) = this(fmt.sbits+1, fmt.ebits)
@@ -13,6 +11,8 @@ class FloatingPoint(val m: Int, val e: Int) extends Bundle {
 
   def apply(msb: Int, lsb: Int): UInt = this.number(msb,lsb)
   def apply(bit: Int): Bool = this.number(bit)
+
+  def toSeq: Seq[FloatingPoint] = Seq(this)
 
   // Properties
   val number = UInt((m + e).W)

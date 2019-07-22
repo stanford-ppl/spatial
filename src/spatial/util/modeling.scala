@@ -173,6 +173,7 @@ object modeling {
 
     val scope = schedule
 
+    dbgs(s"Working on pipeLatencies of result $result, schedule $schedule")
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
     val cycles = mutable.HashMap[Sym[_],Seq[Sym[_]]]()
 

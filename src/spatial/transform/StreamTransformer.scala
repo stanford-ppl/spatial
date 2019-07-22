@@ -19,12 +19,12 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
   private def injectCtrs(block: Block[Void], ctrs: Seq[Sym[_]], is: Seq[I32]): Block[Void] = {
     stageBlock{
       block.stms.foreach{
-        case x@Op(CounterChainNew(ctrs)) => 
+        case x@Op(CounterChainNew(ctrs2)) => 
           val newctrs = ctrs.map{ case Op(CounterNew(start, stop, step, par)) => 
             val newctr = stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
             newctr
           }
-          val newcchain = stageWithFlow(CounterChainNew(newctrs ++ ctrs)){lhs2 => transferData(x, lhs2)}
+          val newcchain = stageWithFlow(CounterChainNew(newctrs ++ ctrs2)){lhs2 => transferData(x, lhs2)}
           subst += (x -> newcchain)
           newcchain
         case x@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if x.isStreamControl && x.isOuterControl => 

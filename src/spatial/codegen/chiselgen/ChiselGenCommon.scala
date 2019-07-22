@@ -7,47 +7,41 @@ import spatial.node._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
 import spatial.metadata.memory._
-import spatial.metadata.retiming._
-import spatial.metadata.types._
 import spatial.util.spatialConfig
 
-trait ChiselGenCommon extends ChiselCodegen { 
+import scala.collection.mutable.HashMap
 
-  /* Set of controllers that we've already emited control signals for.  Sometimes a RegRead
-   * can sit in an outer controller and be used by a controller that is a descendent of the 
-   * other controllers in this outer controller 
-  **/
-  private var initializedControllers = Set.empty[Sym[_]]
+trait ChiselGenCommon extends ChiselCodegen { 
 
   // // List of inputs for current controller, in order to know if quote(mem) is the mem itself or the interface
   // var scopeInputs = List[Sym[_]]()
 
   // Mapping for DRAMs, since DRAMs and their related Transfer nodes don't necessarily appear in consistent order
-  val loadStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  val storeStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  val gatherStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  val scatterStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  val loadStreams: HashMap[Sym[_], (String, Int)] = HashMap()
+  val storeStreams: HashMap[Sym[_], (String, Int)] = HashMap()
+  val gatherStreams: HashMap[Sym[_], (String, Int)] = HashMap()
+  val scatterStreams: HashMap[Sym[_], (String, Int)] = HashMap()
 
   // Statistics counters
-  var ctrls = List[Sym[_]]()
+  var ctrls: List[Sym[_]] = List()
   val widthStats = new scala.collection.mutable.ListBuffer[Int]
   val depthStats = new scala.collection.mutable.ListBuffer[Int]
-  var appPropertyStats = Set[AppProperties]()
+  var appPropertyStats: Set[AppProperties] = Set()
 
   // Interface
-  var argOuts = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argOutLoopbacks = scala.collection.mutable.HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
-  var accelDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var hostDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var argOuts = HashMap[Sym[_], Int]()
+  var argIOs = HashMap[Sym[_], Int]()
+  var argIns = HashMap[Sym[_], Int]()
+  var argOutLoopbacks = HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
+  var accelDrams = HashMap[Sym[_], Int]()
+  var hostDrams = HashMap[Sym[_], Int]()
   /* List of break or exit nodes */
   protected var earlyExits: List[Sym[_]] = List()
   /* List of instrumentation counters and their respective depth in the hierarchy*/
   protected var instrumentCounters: List[(Sym[_], Int)] = List()
 
   /* Mapping between FIFO/LIFO/FIFOReg accesses and the "activity" lane they occupy" */
-  protected var activesMap = scala.collection.mutable.HashMap[Sym[_], Int]()
+  protected var activesMap = HashMap[Sym[_], Int]()
 
   protected def instrumentCounterIndex(s: Sym[_]): Int = {
     if (spatialConfig.enableInstrumentation) {
@@ -77,9 +71,9 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.output"
   protected def cchainCopyOutput(ii: Int): String = if (spatialConfig.enableModular) s"io.sigsIn.cchainOutputs($ii)" else s"cchain($ii).output"
   protected def ifaceType(mem: Sym[_]): String = mem match {
-        case _ if (mem.isNBuffered) => src".asInstanceOf[NBufInterface]"
-        case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined && mem.optimizedRegType.get == AccumFMA) => src".asInstanceOf[FixFMAAccumBundle]"
-        case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined) => src".asInstanceOf[FixOpAccumBundle]"
+        case _ if mem.isNBuffered => src".asInstanceOf[NBufInterface]"
+        case Op(_: RegNew[_]) if mem.optimizedRegType.isDefined && mem.optimizedRegType.get == AccumFMA => src".asInstanceOf[FixFMAAccumBundle]"
+        case Op(_: RegNew[_]) if mem.optimizedRegType.isDefined => src".asInstanceOf[FixOpAccumBundle]"
         case Op(_: RegNew[_]) => src".asInstanceOf[StandardInterface]"
         case Op(_: RegFileNew[_,_]) => src".asInstanceOf[ShiftRegFileInterface]"
         case Op(_: LUTNew[_,_]) => src".asInstanceOf[StandardInterface]"
@@ -270,7 +264,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
 
   protected def createMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"m_${lhs}.scala"){
+    inGen(out, src"m_$lhs.scala"){
       emitHeader()
       open(src"class $lhs {")
         contents
@@ -279,11 +273,11 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       close("}")
     }
-    emit(src"val ${lhs} = (new $lhs).m.io${ifaceType(lhs)}")
+    emit(src"val $lhs = (new $lhs).m.io${ifaceType(lhs)}")
   }
 
   protected def createBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"bus_${lhs}.scala"){
+    inGen(out, src"bus_$lhs.scala"){
       emitHeader()
       open(src"class $lhs {")
         contents
@@ -292,7 +286,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       close("}")
     }
-    emit(src"val ${lhs} = new $lhs")
+    emit(src"val $lhs = new $lhs")
   }
 
   protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean): Unit = {
@@ -320,7 +314,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def createStreamCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
     forEachChild(lhs.owner){case (c,i) => 
-      createCChainObject(lhs, ctrs, src"_copy${c}")
+      createCChainObject(lhs, ctrs, src"_copy$c")
     }
   }
 
@@ -340,7 +334,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", loadStreams.size))
+      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", loadStreams.size))
     }
     dram.storeStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
@@ -350,7 +344,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
       val par = f.dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", storeStreams.size))
+      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", storeStreams.size))
     }
     dram.gatherStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
@@ -359,7 +353,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       // if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", gatherStreams.size))
+      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", gatherStreams.size))
     }
     dram.scatterStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
@@ -367,7 +361,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
       RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
       val par = f.addrStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", scatterStreams.size))
+      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", scatterStreams.size))
     }
 
 

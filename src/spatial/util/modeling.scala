@@ -22,8 +22,8 @@ object modeling {
 
   @stateful def mutatingBounds(x: Sym[_], visited: Set[Sym[_]] = Set(), bounds: Set[Sym[_]] = Set()): Seq[Sym[_]] = {
     val (newBounds, toCheck) = x.inputs.partition(_.isBound)
-    val toCheckExpanded = toCheck.toSeq.map{y: Sym[_] => if (y.isSingleton) y.writers.toSeq else Seq(y)}.flatten.toSet diff visited // TODO: Also trace nonSingleton but conflictable mems?
-    val nextBounds = bounds ++ newBounds.map(_.asInstanceOf[Sym[_]])
+    val toCheckExpanded = toCheck.toSeq.flatMap{y: Sym[_] => if (y.isSingleton) y.writers.toSeq else Seq(y)}.toSet diff visited // TODO: Also trace nonSingleton but conflictable mems?
+    val nextBounds = bounds ++ newBounds
     if (toCheckExpanded.nonEmpty) toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}.toSortedSeq
     else nextBounds.toSortedSeq
   }
@@ -49,7 +49,7 @@ object modeling {
       if (scope.contains(x)) {
         if (x == start) nodes + x
         else if (x.isMem) {
-          val w = (x.writers.toSet intersect scope).filterNot(nodes.contains)
+          val w = (x.writers.toSet intersect scope) diff nodes
           inputsDfs(w, nodes + x)
         }
         else {
@@ -90,7 +90,7 @@ object modeling {
     val scope: Seq[Sym[_]] = latencies.keySet.toSortedSeq
     val latency = latencies.values.fold(0.0){(a,b) => Math.max(a,b) }
     // TODO: Safer way of determining if THIS cycle is the reduceType
-    val interval = (cycles.map{c => c.length}).sorted.reverse.headOption.getOrElse(0.0)
+    val interval = cycles.map{c => c.length}.sorted.reverse.headOption.getOrElse(0.0)
     // Combine segmented cycleSyms
     val segmentedInterval = cycles.filter(_.memory.segmentMapping.size > 1).filter(_.isInstanceOf[WARCycle])
                                   .groupBy(_.memory)
@@ -207,7 +207,7 @@ object modeling {
         dbgs(s"pseudo cycles for $mem:")
         val rds = readersByMem(mem)
         val wrs = writersByMem(mem)
-        rds.cross(wrs).collect{case (rd, wr) if (paths(rd) < paths(wr) && !accums.contains(AccumTriple(mem, rd, wr))) =>
+        rds.cross(wrs).collect{case (rd, wr) if paths(rd) < paths(wr) && !accums.contains(AccumTriple(mem, rd, wr)) =>
           val cycleLengthExact = paths(wr).toInt - paths(rd).toInt + latencyOf(rd, true)
           dbgs(s" - $rd $wr cycle = $cycleLengthExact")
 
@@ -223,7 +223,7 @@ object modeling {
       def precedingWrites: Seq[Sym[_]] = {
         cur.readMem.map{mem => 
           val parentScope = cur.parent.innerBlocks.flatMap(_._2.stms)
-          val writers = parentScope.filter(_.writtenMem == Some(mem)).toSet
+          val writers = parentScope.filter(_.writtenMem contains mem).toSet
           parentScope.zipWithIndex.collect{case (x,i) if i < parentScope.indexOf(cur) => x}.toSet intersect writers
         }.getOrElse(Seq()).toSortedSeq
       }

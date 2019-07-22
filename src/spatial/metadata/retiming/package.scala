@@ -3,7 +3,6 @@ package spatial.metadata
 import argon._
 import spatial.node._
 import emul.FixedPoint
-import forge.tags.rig
 
 package object retiming {
 
@@ -31,10 +30,6 @@ package object retiming {
 
   implicit object ValueDelayOrdering extends Ordering[ValueDelay] {
     override def compare(x: ValueDelay, y: ValueDelay): Int = implicitly[Ordering[Int]].compare(y.delay,x.delay)
-  }
-
-  implicit object CycleOrdering extends Ordering[Cycle] {
-    override def compare(x: Cycle, y: Cycle): Int = x.memory.asInstanceOf[Exp[_,_]] compare y.memory.asInstanceOf[Exp[_,_]]
   }
 
 

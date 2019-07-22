@@ -14,13 +14,11 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 
-import scala.collection.immutable.SortedSet
-
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
   private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective start value
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
-  private var scopes: Map[Idx,SortedSet[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
+  private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
   private var mostRecentWrite: Map[Reg[_], Sym[_]] = Map.empty
 
   private def inLoop(loop: Sym[_], is: Seq[Idx], istarts: Seq[Ind[_]], block: Block[_]): Unit = {
@@ -29,11 +27,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     val saveLoops = loops
     val saveScopes = scopes
 
-    val scope = SortedSet(block.nestedStms.toSeq:_*)
+    val scope = block.nestedStms.toSet
     iters ++= is
     iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
-    scopes ++= is.map{i => (i -> modeling.consumersDfs(SortedSet(i.consumers.toSeq:_*),SortedSet(), scope)) }
+    scopes ++= is.map{i => (i -> modeling.consumersDfs(i.consumers,Set(), scope)) }
     visitBlock(block)
 
     iters = saveIters
@@ -124,7 +122,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
   def combine(a1: Seq[AffineComponent], a2: Seq[AffineComponent]): Seq[AffineComponent] = {
     val combined = a1 ++ a2
-    var remainingIndices = SortedSet(Seq.tabulate(combined.size){i => i}:_*)
+    var remainingIndices = Seq.tabulate(combined.size){i => i}.toSet
     combined.zipWithIndex.foreach{
       case (a,i) if (remainingIndices.contains(i)) => 
         val matches = combined.zipWithIndex.collect{case (x,j) if (-a == x) => j}.filter(remainingIndices.contains)
@@ -299,7 +297,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Reader(mem,adr,_)   => 
       lhs match {
         case Op(RegRead(reg)) if !reg.isRemoteMem => 
-          val reachingWrite = reachingWritesToReg(lhs, SortedSet(reg.writers.toSeq:_*))
+          val reachingWrite = reachingWritesToReg(lhs, reg.writers.toSet)
           if (reachingWrite.size == 1 && reachingWrite.head.accumType == AccumType.Unknown) {
             val data = reachingWrite.head match {
               case Op(x: Enqueuer[_]) => x.data

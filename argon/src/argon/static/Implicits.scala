@@ -37,6 +37,7 @@ trait Implicits extends LowPriorityImplicits { this: Staging =>
   implicit def expTypeOps[C,A](tp: ExpType[C,A]): ExpTypeMiscOps[C,A] = new ExpTypeMiscOps[C,A](tp)
   implicit def expOps[C,A](exp: Exp[C,A]): ExpMiscOps[C,A] = new ExpMiscOps[C,A](exp)
 
+
   class ExpTypeMiscOps[C,A](tp: ExpType[C,A]) extends Serializable {
     lazy val boxed: A <:< Ref[C,A] = tp.evRef
 

@@ -25,13 +25,15 @@ object collections {
         else None
       }
     }
-
   }
 
   implicit class SeqHelpers[A](x: Seq[A]) {
     def get(i: Int): Option[A] = if (i >= 0 && i < x.length) Some(x(i)) else None
     def indexOrElse(i: Int, els: => A): A = if (i >= 0 && i < x.length) x(i) else els
 
+    def intersect(y: Seq[A]): Seq[A] = (x.toSet intersect y.toSet).toSortedSeq
+    def diff(y: Seq[A]): Seq[A] = (x.toSet diff y.toSet).toSortedSeq
+    
     private def inter(left: Boolean, x: Seq[A], y: Seq[A]): Seq[A] = (left,x,y) match {
       case (_, Nil, Nil)   => Nil
       case (true, Nil, _)  => y
@@ -83,6 +85,8 @@ object collections {
   implicit class IterableHelpers[A](x: Iterable[A]) {
     /** Returns a new Map from elements in x to func(x)  */
     def mapping[B](func: A => B): Map[A,B] = x.map{x => x -> func(x) }.toMap
+
+    def toSortedSeq(implicit rule: (A => Int) = {y => y.hashCode()}): Seq[A] = x.toSeq.sortBy(rule)
 
     def maxByOrElse[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.maxBy(f)
     def minByOrElse[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.minBy(f)

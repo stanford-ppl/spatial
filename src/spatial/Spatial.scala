@@ -155,7 +155,7 @@ trait Spatial extends Compiler with ParamLoader {
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Stream controller rewrites */
-        (spatialConfig.distributeStreamCtr ? streamTransformer) ==>
+        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==> 
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
@@ -287,7 +287,7 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
-    cli.opt[Unit]("allowStreamCtrs").action{ (_,_) => 
+    cli.opt[Unit]("leaveStreamCounters").action{ (_,_) => 
       spatialConfig.distributeStreamCtr = false
     }.text("Disable transformer that converts Stream.Foreach controllers into Stream Unit Pipes with the counter tacked on to children counters (default: disallow [i.e. run transformer])")
 

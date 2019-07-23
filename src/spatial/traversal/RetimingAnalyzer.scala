@@ -10,7 +10,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.util.modeling._
 import spatial.util.spatialConfig
-
+import utils.implicits.collections._
 
 case class RetimingAnalyzer(IR: State) extends AccelTraversal {
   override def shouldRun: Boolean = spatialConfig.enableRetiming
@@ -26,8 +26,8 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
   }
 
   private def retimeBlock[T](block: Block[T], saveLatency: Boolean): Unit = {
-    val scope = block.nestedStms
-    val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_))
+    val scope = block.nestedStms.toSortedSeq
+    val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_)).toSortedSeq
 
     import spatial.metadata.access._
     import spatial.metadata.memory._
@@ -120,3 +120,4 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
   }
 
 }
+

@@ -50,13 +50,13 @@ trait ChiselGenController extends ChiselGenCommon {
 
   final private def connectBufs(lhs: Sym[_]): Unit = {
     bufMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
-      emit(src"""$mem.connectStageCtrl(${DL(name = src"$done", latency = 1, isBit = true)}, $baseEn, $port)""")
+      emit(src"""$mem.connectStageCtrl(${DL(src"$done", 1, isBit = true)}, $baseEn, $port)""")
     }
   }
   final private def connectChains(lhs: Sym[_]): Unit = {
     regchainsMapping.getOrElse(lhs, List()).foreach{case BufMapping(mem, port) => 
       val swobj = if (lhs.isBranch) "_obj" else ""
-      emit(src"""${mem}_chain.connectStageCtrl(${DLo(name = src"$lhs$swobj.done", latency = 1, smname = src"$lhs" + swobj, isBit = true)}, $lhs$swobj.baseEn, $port)""")
+      emit(src"""${mem}_chain.connectStageCtrl(${DLo(src"$lhs$swobj.done", 1, src"$lhs" + swobj, isBit = true)}, $lhs$swobj.baseEn, $port)""")
     }
   }
 
@@ -81,7 +81,7 @@ trait ChiselGenController extends ChiselGenCommon {
         }
       }
     }
-    valids.zipWithIndex.foreach{ case (v,id) =>
+    valids.zipWithIndex.foreach{ case (v,id) => 
       emit(src"""val $v = ~$cchainOutput.oobs($id); $v.suggestName("$v")""")
       if (lhs.isOuterPipeLoop && lhs.children.count(_.s.get != lhs) > 1) {
         emit(src"""val ${v}_chain = Module(new RegChainPass(${lhs.children.count(_.s.get != lhs)}, 1, myName = "${v}_chain")); ${v}_chain.io <> DontCare""")
@@ -328,7 +328,7 @@ trait ChiselGenController extends ChiselGenCommon {
         //   emit(src"${lhs}$swobj.stalled.io.enable := ${lhs}$swobj.baseEn & ~(${getBackPressure(lhs.toCtrl)})")
         //   emit(src"${lhs}$swobj.idle.io.enable := ${lhs}$swobj.baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
         // }
-        emit(src"""$lhs$swobj.sm.io.ctrDone := ${DL(name = src"$lhs$swobj.cchain.head.output.done", latency = 1, isBit = true)}""")
+        emit(src"""$lhs$swobj.sm.io.ctrDone := ${DL(src"$lhs$swobj.cchain.head.output.done", 1, isBit = true)}""")
       } else if (lhs.isInnerControl & lhs.children.exists(_.s.get != lhs) & (lhs match {case Op(SwitchCase(_)) => true; case _ => false})) { // non terminal switch case
         val headchild = lhs.children.filter(_.s.get != lhs).head.s.get
         emit(src"""$lhs$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")

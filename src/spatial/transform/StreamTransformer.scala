@@ -52,7 +52,8 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
             n
           }
-          stageWithFlow(OpForeach(ens, newcchain, stageBlock{block.stms.foreach(visit)}, newiters, None)){lhs2 => transferData(x, lhs2)}
+          val lhs3 = stageWithFlow(OpForeach(ens, newcchain, stageBlock{block.stms.foreach(visit)}, newiters, None)){lhs2 => transferData(x, lhs2)}
+          lhs3.userSchedule = Sequenced
         case x: Control[_] => throw new Exception(s"Cannot transform Stream controller with $x (${x.rhs}) child!  Please compile with --leaveStreamCounters flag to skip this transformer.")
 
         case x => visit(x)

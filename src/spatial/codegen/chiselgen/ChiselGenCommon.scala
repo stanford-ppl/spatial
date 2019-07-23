@@ -7,8 +7,6 @@ import spatial.node._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
 import spatial.metadata.memory._
-import spatial.metadata.retiming._
-import spatial.metadata.types._
 import spatial.util.spatialConfig
 
 trait ChiselGenCommon extends ChiselCodegen { 
@@ -270,7 +268,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
 
   protected def createMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"m_${lhs}.scala"){
+    inGen(out, src"m_$lhs.scala"){
       emitHeader()
       open(src"class $lhs {")
         contents
@@ -279,11 +277,11 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       close("}")
     }
-    emit(src"val ${lhs} = (new $lhs).m.io${ifaceType(lhs)}")
+    emit(src"val $lhs = (new $lhs).m.io${ifaceType(lhs)}")
   }
 
   protected def createBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"bus_${lhs}.scala"){
+    inGen(out, src"bus_$lhs.scala"){
       emitHeader()
       open(src"class $lhs {")
         contents
@@ -292,7 +290,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       close("}")
     }
-    emit(src"val ${lhs} = new $lhs")
+    emit(src"val $lhs = new $lhs")
   }
 
   protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean): Unit = {
@@ -320,7 +318,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def createStreamCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
     forEachChild(lhs.owner){case (c,i) => 
-      createCChainObject(lhs, ctrs, src"_copy${c}")
+      createCChainObject(lhs, ctrs, src"_copy$c")
     }
   }
 
@@ -340,7 +338,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", loadStreams.size))
+      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", loadStreams.size))
     }
     dram.storeStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
@@ -350,7 +348,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
       val par = f.dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", storeStreams.size))
+      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", storeStreams.size))
     }
     dram.gatherStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
@@ -359,7 +357,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       // if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", gatherStreams.size))
+      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", gatherStreams.size))
     }
     dram.scatterStreams.foreach{f =>
       forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
@@ -367,7 +365,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
       RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
       val par = f.addrStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", scatterStreams.size))
+      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", scatterStreams.size))
     }
 
 

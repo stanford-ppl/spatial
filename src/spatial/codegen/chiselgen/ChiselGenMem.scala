@@ -55,8 +55,9 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
-    if (mem.isFIFOReg) src"~$break && $done"
-    else               src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+    // if (mem.isFIFOReg) src"~$break && $done"
+    // else               src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+    src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {

@@ -118,10 +118,10 @@ x_par=4  |       --->       X                XX    |
           val this_body = (i % x_par)*2
           Foreach(-this_body until COLS by 1) { j =>
             // val col = j - this_body
-            val N = mux(rowv(i+1), grid_sram(i+1, j), -1)
-            val E = mux(colv(j+1), grid_sram(i, j+1), -1)
-            val S = mux(rowv(i-1), grid_sram(i-1, j), -1)
-            val W = mux(colv(j-1), grid_sram(i, j-1), -1)
+            val N = if (rowv(i+1)) grid_sram(i+1, j) else  -1 // Must use "if" instead of "mux" or else inactive lanes will conflict and interfere banks
+            val E = if (colv(j+1)) grid_sram(i, j+1) else  -1 // Must use "if" instead of "mux" or else inactive lanes will conflict and interfere banks
+            val S = if (rowv(i-1)) grid_sram(i-1, j) else  -1 // Must use "if" instead of "mux" or else inactive lanes will conflict and interfere banks
+            val W = if (colv(j-1)) grid_sram(i, j-1) else  -1 // Must use "if" instead of "mux" or else inactive lanes will conflict and interfere banks
             val self = grid_sram(i,j)
             val sum = (N+E+S+W)*self
             val p_flip = exp_sram(-sum+lut_size/2)
@@ -129,7 +129,7 @@ x_par=4  |       --->       X                XX    |
             val threshold = min(1.to[T], pi_x)
             val rng = random[PROB]
             val flip = mux(pi_x > 1, 1.to[T], mux(rng < threshold.bits(15::8).as[PROB], 1.to[T], 0.to[T]))
-            if (j >= 0 && j < COLS) {
+            if (colv(j)) {
               grid_sram(i,j) = mux(flip == 1.to[T], -self, self)
             }
           }
@@ -144,19 +144,43 @@ x_par=4  |       --->       X                XX    |
     println("Ran for " + I + " iters.")
     // printMatrix(result, "Result matrix")
 
+    println("Result Map:")
     print(" ")
     for( j <- 0 until COLS) { print("-")}
     for( i <- 0 until ROWS) {
       println("")
       print("|")
       for( j <- 0 until COLS) {
-        if (result(i,j) == -1) {print("X")} else {print(" ")}
+        if (result(i,j) == -1) {print("X")} else if (result(i,j) == 1) {print(" ")} else print("?")
       }
       print("|")
     }
     println(""); print(" ")
     for( j <- 0 until COLS) { print("-")}
     println("")
+
+    println("")
+    println("Matchup Map:")
+    print(" ")
+    for( j <- 0 until COLS) { print("-")}
+    for( i <- 0 until ROWS) {
+      println("")
+      print("|")
+      for( j <- 0 until COLS) {
+        if (i > ROWS/4 && i < 3*ROWS/4 && j > COLS/4 && j < 3*COLS/4) {
+          if (result(i,j) != -1) print("x") else print(" ")
+        } else {
+          if (result(i,j) != 1) print(".") else print(" ")
+        }
+      }
+      print("|")
+    }
+    println(""); print(" ")
+    for( j <- 0 until COLS) { print("-")}
+    println("")
+
+
+
 
     val blips_inside = (0::ROWS, 0::COLS){(i,j) =>
       if (i > ROWS/4 && i < 3*ROWS/4 && j > COLS/4 && j < 3*COLS/4) {

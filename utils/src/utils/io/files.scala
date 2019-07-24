@@ -49,6 +49,18 @@ object files {
   }
 
   /** 
+    * Write a 1-D Seq to CSV
+    */
+  def writeCSVNow[A](seq:Seq[Any], filename: String, delim1: String="\n"): Unit = {
+    import java.io._
+    val pw = new PrintWriter(new File(filename))
+    seq.foreach { elem =>
+      pw.write(s"${elem}$delim1")
+    }
+    pw.close
+  }
+
+  /** 
     * Write a 2-D Seq to CSV
     */
   def writeCSVNow2D[A](seq:Seq[Seq[Any]], filename: String, delim1: String=",", delim2:String="\n"): Unit = {

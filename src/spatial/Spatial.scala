@@ -287,13 +287,13 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
-    cli.opt[Unit]("leaveStreamCounters").action{ (_,_) => 
+    cli.opt[Unit]("noModifyStream").action{ (_,_) => 
       spatialConfig.distributeStreamCtr = false
-    }.text("Disable transformer that converts Stream.Foreach controllers into Stream Unit Pipes with the counter tacked on to children counters (default: disallow [i.e. run transformer])")
+    }.text("Disable transformer that converts Stream.Foreach controllers into Stream Unit Pipes with the counter tacked on to children counters (default: do modify stream [i.e. run transformer])")
 
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false
-    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
+    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies (default: bind parallels)""")
 
     cli.opt[Int]("codeWindow").action{ (t,_) => 
       spatialConfig.codeWindow = t

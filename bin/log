@@ -5,7 +5,7 @@ sys.path.insert(0, 'pir/bin')
 import logger
 
 def main():
-    cmd = "--logdir=pir/logs"
+    cmd = "--logdir=pir/logs/"
     cmd += " --spatial_dir=./"
     cmd += " --pir_dir=./pir"
     args = sys.argv[1:] + (cmd.split(" "))

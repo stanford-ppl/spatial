@@ -20,8 +20,7 @@ import spatial.dsl._
       o := 32
     }
 
-    println(getArg(o))
-    val cksum = (o == 32)
+    val cksum = checkGold[Int](o,32)
     println("PASS: " + cksum + " (UnrollingTest)")
     assert(cksum)
   }

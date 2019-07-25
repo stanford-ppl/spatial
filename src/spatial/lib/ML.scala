@@ -162,9 +162,9 @@ object ML extends HostML {
    /*
     * SVM regression inference
     * */
-  @api def SVMR_infer[T:Num](V:scala.Int, vp:scala.Int, b:T)(inputs:I32 => (T,T,T)):T = {
+  @api def SVMR_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):T = {
     val sum = Reg[T]
-    Reduce(sum)(V by 1 par vp) { v =>
+    Reduce(sum)(V by 1 par opv) { v =>
       val ins = inputs(v)
       val a = ins._1
       val y = ins._2
@@ -177,8 +177,8 @@ object ML extends HostML {
    /*
     * SVM classification inference
     * */
-  @api def SVMC_infer[T:Num](V:scala.Int, vp:scala.Int, b:T)(inputs:I32 => (T,T,T)):Bit = {
-    SVMR_infer[T](V,vp,b)(inputs) > 0.to[T]
+  @api def SVMC_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):Bit = {
+    SVMR_infer[T](V,opv,b)(inputs) > 0.to[T]
   }
 
   /*

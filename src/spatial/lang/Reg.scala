@@ -12,12 +12,8 @@ import spatial.metadata.memory._
   override val evMem: Reg[A] <:< LocalMem[A,Reg] = implicitly[Reg[A] <:< LocalMem[A,Reg]]
 
   // --- Infix Methods
-  @api def :=(data: A): Void = {
-    println(A)
-    println(data.toString)
-    println(" ")
-    Reg.write(this, data)
-  }
+  @api def :=(data: A): Void = Reg.write(this, data)
+  @rig def write(data: A, ens: Bit*): Void = Reg.write(this, data, ens.toSet)
   @api def value: A = Reg.read(this)
   @api def reset(): Void = stage(RegReset(this,Set.empty))
   @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))

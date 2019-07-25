@@ -45,6 +45,9 @@ pir-update:
 	bin/update_resources.sh
 	cd pir && make update
 
+pir-clean:
+	make -C pir/ clean
+
 pir-develop:
 	git submodule update --init --recursive
 	bin/update_resources.sh

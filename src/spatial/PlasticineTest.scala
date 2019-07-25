@@ -165,7 +165,7 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runtst(args:String="", fifo:Int=20) = {
+    def genruntst(args:String="", fifo:Int=20) = {
       var gentstcmd = pirArgs :+
       "--load=true" :+
       "--ckpt=2" :+
@@ -179,7 +179,16 @@ trait PlasticineTest extends DSLTest { test =>
       val timeout = 3000
       scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply) >>
       scommand(s"maketst", "time make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runtst", "time ./tungsten".split(" "), timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      runtst(timeout=timeout)
+    }
+
+    def runtst(name:String="runtst", timeout:Int=6000) = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      val res = scommand(name, s"$timer ./tungsten $runArg".split(" "), timeout=timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      res match {
+        case Unknown => Pass
+        case res => res
+      }
     }
 
     def parseProute(vcLimit:Int)(line:String) = {
@@ -268,7 +277,7 @@ trait PlasticineTest extends DSLTest { test =>
       runpir() >>
       mappir("--net=asic")
       val psimres = mapres >> genpsim() >> runpsim()
-      val tstres = mapres >> runtst()
+      val tstres = mapres >> genruntst()
       psimres >> tstres
     }
   }
@@ -296,7 +305,7 @@ trait PlasticineTest extends DSLTest { test =>
       runpir() >>
       mappir(s"--net=p2p --row=$row --col=$col") 
       val psimres = mapres >> genpsim() >> runpsim()
-      //val tstres = mapres >> runtst()
+      //val tstres = mapres >> genruntst()
       psimres //>> tstres
     }
   }
@@ -403,10 +412,10 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
       scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runp2p", s"$timer ./tungsten $runArg".split(" "), timeout=6000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten") //>>
+      runtst("runp2p") //>>
       //runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       //scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      //scommand(s"runhybrid", s"$timer ./tungsten $runArg".split(" "), timeout=1000000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      //runtst("runhybrid", 1000000)
     }
   }
 

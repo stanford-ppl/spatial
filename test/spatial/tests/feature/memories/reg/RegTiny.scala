@@ -35,6 +35,7 @@ import spatial.dsl._
       out := reg + 2
     }
 
-    assert(getArg(out) == 5)
+    //assert(getArg(out) == 5)
+    assert(checkGold[Int](out, 5))
   }
 }

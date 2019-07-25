@@ -92,6 +92,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     // --- Transformer
     lazy val friendlyTransformer   = FriendlyTransformer(state)
+    lazy val streamTransformer     = StreamTransformer(state)
     lazy val switchTransformer     = SwitchTransformer(state)
     lazy val switchOptimizer       = SwitchOptimizer(state)
     lazy val blackboxLowering1     = BlackboxLowering(state, lowerTransfers = false)
@@ -153,6 +154,8 @@ trait Spatial extends Compiler with ParamLoader {
         /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
+        /** Stream controller rewrites */
+        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==> 
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
@@ -284,9 +287,13 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
+    cli.opt[Unit]("noModifyStream").action{ (_,_) => 
+      spatialConfig.distributeStreamCtr = false
+    }.text("Disable transformer that converts Stream.Foreach controllers into Stream Unit Pipes with the counter tacked on to children counters (default: do modify stream [i.e. run transformer])")
+
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false
-    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
+    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies (default: bind parallels)""")
 
     cli.opt[Int]("codeWindow").action{ (t,_) => 
       spatialConfig.codeWindow = t

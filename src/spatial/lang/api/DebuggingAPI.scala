@@ -176,4 +176,45 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     (a.length === b.length) &
     a.zip(b) { (a,b) => approxEql(a,b,margin) }.reduce { _ & _ }
   }
+
+
+  @api def checkGold[T:Bits](dram:DRAM1[T], goldFile:java.lang.String)(implicit ev:Cast[Text,T]):Bit = {
+    val goldData = loadCSV1D[T](goldFile)
+    checkGold(dram, goldData)
+  }
+
+  @api def checkGold[T:Bits](dram:DRAM1[T], gold:Array[T])(implicit ev:Cast[Text,T]):Bit = {
+    val result = getMem(dram)
+    println(s"${dram.name.getOrElse(s"$dram")} Result: ")
+    printArray(result)
+
+    println(s"${dram.name.getOrElse(s"$dram")} Gold: ")
+    printArray(gold)
+
+    approxEql[T](result, gold)
+  }
+
+  @api def checkGold[T:Bits](reg:Reg[T], gold:T)(implicit ev:Cast[T,Text]):Bit = {
+    val result = getArg(reg)
+    println(Text(s"${reg.name.getOrElse(s"$reg")} Result: ") + result.to[Text])
+    println(Text(s"${reg.name.getOrElse(s"$reg")} Gold: ") + gold.to[Text])
+    approxEql[T](result, gold)
+  }
+
+  // Unstaged if statement
+  def If(cond:scala.Boolean)(block: => Unit) = {
+    cond match {
+      case true => block
+      case _ =>
+    }
+  }
+
+  // Unstaged if else statement
+  def IfElse[T](cond:scala.Boolean)(trueBlock: => T)(falseBlock: => T) = {
+    cond match {
+      case true => trueBlock
+      case false => falseBlock
+    }
+  }
+
 }

@@ -114,8 +114,9 @@ object ML extends HostML {
     inPar:scala.Int,
     outPar:scala.Int, 
     activation: T => T,
-  )(in:I32 => T)(out:(Idx, T) => Unit):Option[T] = 
+  )(in:I32 => T)(out:(Idx, T) => Unit):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Left(in),Left(out))
+  }
 
   @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
@@ -125,8 +126,9 @@ object ML extends HostML {
     outPar:scala.Int, 
     activation: T => T,
     in:SRAM1[T],
-  )(out:(Idx, T) => Unit):Option[T] = 
+  )(out:(Idx, T) => Unit):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Right(in),Left(out))
+  }
 
   @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
@@ -136,8 +138,9 @@ object ML extends HostML {
     outPar:scala.Int, 
     activation: T => T,
     out:SRAM1[T],
-  )(in:I32 => T):Option[T] = 
+  )(in:I32 => T):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Left(in),Right(out))
+  }
 
   @api def denselayer_tiled[T:Num](
     w:LUT2[T], 
@@ -148,8 +151,9 @@ object ML extends HostML {
     activation: T => T,
     in:SRAM1[T],
     out:SRAM1[T],
-  ):Option[T] = 
+  ):Option[T] = {
     denselayer_tiled(w,b,ip,inPar,outPar,activation,Right(in),Right(out))
+  }
 
   // Activation Functions
   @api def activation[T:Num](x:T => T) = x
@@ -158,9 +162,9 @@ object ML extends HostML {
    /*
     * SVM regression inference
     * */
-  @api def SVMR_infer[T:Num](V:scala.Int, vp:scala.Int, b:T)(inputs:I32 => (T,T,T)):T = {
+  @api def SVMR_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):T = {
     val sum = Reg[T]
-    Reduce(sum)(V by 1 par vp) { v =>
+    Reduce(sum)(V by 1 par opv) { v =>
       val ins = inputs(v)
       val a = ins._1
       val y = ins._2
@@ -173,8 +177,8 @@ object ML extends HostML {
    /*
     * SVM classification inference
     * */
-  @api def SVMC_infer[T:Num](V:scala.Int, vp:scala.Int, b:T)(inputs:I32 => (T,T,T)):Bit = {
-    SVMR_infer[T](V,vp,b)(inputs) > 0.to[T]
+  @api def SVMC_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):Bit = {
+    SVMR_infer[T](V,opv,b)(inputs) > 0.to[T]
   }
 
   /*

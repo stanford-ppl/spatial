@@ -5,6 +5,7 @@ import argon.lang._
 import argon.codegen.{Codegen, FileDependencies}
 import spatial.metadata._
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
 import spatial.node._
 
 import scala.collection.mutable
@@ -28,6 +29,15 @@ trait PIRFormatGen extends Codegen {
       case (Some(name), None) => rhsStr += src""".name("${name}")"""
       case (None, Some(postFix)) => rhsStr += src""".name("${postFix}")"""
       case (None, None) => 
+    }
+    lhs.sym.count.foreach { c =>
+      rhsStr += src".count($c)"
+    }
+    lhs.sym.barrier.foreach { id =>
+      rhsStr += src".barrier($id)"
+    }
+    lhs.sym.waitFors.foreach { ids =>
+      rhsStr += src".waitFors($ids)"
     }
     emitStm(lhs, tpStr, rhsStr)
   }

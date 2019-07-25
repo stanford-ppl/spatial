@@ -16,9 +16,7 @@ import spatial.dsl._
     }
 
     val gold = List.tabulate(N){i => i}.reduce{_+_}
-    val got = getArg(out)
-    println(r"got $got, wanted $gold")
-    assert(got == gold)
+    assert(checkGold[Int](out, gold))
   }
 
 }

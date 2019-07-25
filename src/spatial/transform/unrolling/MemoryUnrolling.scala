@@ -252,16 +252,21 @@ trait MemoryUnrolling extends UnrollingBase {
         banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, i) =>
           val segmentBase = banked.flatMap(_._2).take(i).length
           val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
-          // If broadcast exists within a vectorized unrolled access, then just broadcast that lane.
+          // If broadcast exists within a vectorized unrolled access, then just broadcast that ulane.
           // For PIR only
+          // portReordering is a list o lane IDs. For FPGA, it's a list of lanes. For Plasticine,
+          // it's List(0) for vectorized lane
           val reordered = portReordering.map { ln =>
-            val castgroup = lanes.ulanes(ln).map(port.castgroup(_)) // For FPGA will be Seq of one element
-            val broadcast = lanes.ulanes(ln).map(port.broadcast(_)) // For FPGA will be Seq of one element
+            // For FPGA will be Seq of one element
+            // For vectorized lane in PIR, it's the broadcast/castgroup per lane
+            val castgroup:List[Int] = lanes.ulanes(ln).map(port.castgroup(_))
+            val broadcast:List[Int] = lanes.ulanes(ln).map(port.broadcast(_))
+            dbgs(s"laneid : $ln lanes:${lanes.ulanes(ln)} castgroup:${castgroup} broadcast:${broadcast}")
             val map:Map[Int,Int] = castgroup.zip(broadcast).groupBy { _._1 }.map { case (grp, bcs) =>
               val bc = if (bcs.exists { _._2 == 0}) 0 else bcs.head._2
               (grp, bc)
             }
-            castgroup.distinct.map { g => (g, map(g)) }
+            castgroup.map { g => (g, map(g)) }
           }.flatten
           val reorderedCastgroup = reordered.map { _._1 }
           val reorderedBroadcast = reordered.map { _._2 }
@@ -278,6 +283,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addDispatch(Nil, 0)
           s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
+          transferSyncMeta(lhs, s)
           mem2.substHotSwap(lhs, s)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); //strMeta(s)
@@ -392,10 +398,10 @@ trait MemoryUnrolling extends UnrollingBase {
         }
         dispatches.map{dispatchId =>
           val ports:Seq[Port] = vids.map { vid => access.port(dispatchId, vid) }.distinct
-          dbgs(s"ports:")
-          ports.foreach { p =>
-            dbgs(s"$p")
-          }
+          //dbgs(s"ports:")
+          //ports.foreach { p =>
+            //dbgs(s"$p")
+          //}
           //assert(ports.size == 1, s"More than one ports across lanes for ${access} ${access.ctx} vids=$vids")
           val port = Port(
             bufferPort=assertUnify(ports.map{_.bufferPort}, s"access=$access (${access.ctx}) vids=$vids bufferPort"),

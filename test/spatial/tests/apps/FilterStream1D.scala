@@ -1,5 +1,5 @@
 package spatial.tests.apps
-import scala.language.postfixOp
+import scala.language.postfixOps
 
 /* This app is a fancier version of Differentiator and EdgeDetector.  It takes a 1D stream of data that has roughly this shape with lots of noise and shifts:
                                                        

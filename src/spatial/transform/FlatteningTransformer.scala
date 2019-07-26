@@ -55,7 +55,9 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       // If child is UnitPipe, inline its contents with parent
       val childInputs = child.s.get.op.get.inputs
       val parentNeeded = lhs.op.get.blocks.exists{block => block.stms.exists(childInputs.contains)}
-      if (child.isUnitPipe & !parentNeeded && !lhs.isStreamControl && !child.isStreamControl){
+      val childFromUnroll = spatialConfig.enablePIR && child.s.get.unrollBy.fold(false) { _ > 1 }
+      val fromUnroll = spatialConfig.enablePIR && lhs.unrollBy.fold(false) { _ > 1 }
+      if (child.isUnitPipe & !parentNeeded && !lhs.isStreamControl && !child.isStreamControl && !childFromUnroll){
         ctrl.bodies.foreach{body => 
           body.blocks.foreach{case (_,block) => 
             val saveMerge = deleteChild
@@ -69,7 +71,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
         super.transform(lhs,rhs)
       } 
       // If parent is UnitPipe, delete it
-      else if (lhs.isUnitPipe & !parentNeeded && !lhs.isStreamControl && !child.isStreamControl) {
+      else if (lhs.isUnitPipe & !parentNeeded && !lhs.isStreamControl && !child.isStreamControl && !fromUnroll) {
         ctrl.bodies.foreach{body => 
           body.blocks.foreach{case (_,block) => 
             val block2 = f(block)

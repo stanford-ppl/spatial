@@ -12,7 +12,7 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
   override def cchains = Nil
   override def iters = Nil
   override def bodies = Nil
-  @rig def lower(): R
+  @rig def lower(old:Sym[R]): R
 }
 
 @op case class GEMMBox[T:Num](

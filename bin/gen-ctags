@@ -9,3 +9,5 @@ ctags --exclude=log --languages=scala,java -f .tags -R \
   forge/src \
   poly/src \
   argon/src
+
+cd pir; bash bin/gen-ctags

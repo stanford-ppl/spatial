@@ -279,29 +279,35 @@ import argon.Op
   }
 
   override def checkIR(block: Block[_]): Result = {
-    val acc1 = block.nestedStms.collect{case x@Op(n@RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc1") => reg }.size
-    val acc2 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc2") => reg }.size
-    val acc3 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc3") => reg }.size
-    val acc4 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc4") => reg }.size
-    val acc5 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc5") => reg }.size
-    val acc6 = block.nestedStms.collect{case x@Op(n@RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc6") => reg }.size
-    val acc7 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc7") => reg }.size
-    val acc8 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc8") => reg }.size
-    val acc9 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc9") => reg }.size
-    val acc10 = block.nestedStms.collect{case x@Op(n@RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc10") => reg }.size
-    val acc11 = block.nestedStms.collect{case x@Op(n@RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc11") => reg }.size
+    val regular_writes = block.nestedStms.collect{case x@Op(_:RegWrite[_]) => x }.size 
+    val special_writes = block.nestedStms.collect{case x@Op(_:RegAccumOp[_]) => x }.size 
 
-    require(acc1 == 1, "Should have 1 RegWrite for acc1")
-    require(acc2 == 1, "Should have 1 RegAccumOp for acc2")
-    require(acc3 == 1, "Should have 1 RegAccumOp for acc3")
-    require(acc4 == 1, "Should have 1 RegAccumOp for acc4")
-    require(acc5 == 1, "Should have 1 RegAccumOp for acc5")
-    require(acc6 == 1, "Should have 1 RegWrite for acc6")
-    require(acc7 == 1, "Should have 1 RegAccumOp for acc7")
-    require(acc8 == 1, "Should have 1 RegAccumOp for acc8")
-    require(acc9 == 1, "Should have 1 RegAccumOp for acc9")
-    require(acc10 == 1, "Should have 1 RegAccumOp for acc10")
-    require(acc11 == 1, "Should have 1 RegWrite for acc11")
+    require(regular_writes == 3, "Should have 3 regular RegWrites")
+    require(special_writes == 8, "Should have 8 specialized RegAccumOp")
+
+    // val acc1 = block.nestedStms.collect{case x@Op(RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc1") => reg }.size
+    // val acc2 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc2") => reg }.size
+    // val acc3 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc3") => reg }.size
+    // val acc4 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc4") => reg }.size
+    // val acc5 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc5") => reg }.size
+    // val acc6 = block.nestedStms.collect{case x@Op(RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc6") => reg }.size
+    // val acc7 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc7") => reg }.size
+    // val acc8 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc8") => reg }.size
+    // val acc9 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc9") => reg }.size
+    // val acc10 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc10") => reg }.size
+    // val acc11 = block.nestedStms.collect{case x@Op(RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc11") => reg }.size
+
+    // require(acc1 == 1, "Should have 1 RegWrite for acc1")
+    // require(acc2 == 1, "Should have 1 RegAccumOp for acc2")
+    // require(acc3 == 1, "Should have 1 RegAccumOp for acc3")
+    // require(acc4 == 1, "Should have 1 RegAccumOp for acc4")
+    // require(acc5 == 1, "Should have 1 RegAccumOp for acc5")
+    // require(acc6 == 1, "Should have 1 RegWrite for acc6")
+    // require(acc7 == 1, "Should have 1 RegAccumOp for acc7")
+    // require(acc8 == 1, "Should have 1 RegAccumOp for acc8")
+    // require(acc9 == 1, "Should have 1 RegAccumOp for acc9")
+    // require(acc10 == 1, "Should have 1 RegAccumOp for acc10")
+    // require(acc11 == 1, "Should have 1 RegWrite for acc11")
 
     super.checkIR(block)
   }

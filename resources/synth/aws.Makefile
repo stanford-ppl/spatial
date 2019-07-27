@@ -131,7 +131,7 @@ aws-F1-afi:   aws-F1-hw
 	ln -s ${AWS_HOME}/hdk/cl/examples/${app_name}/ aws_dir
 	# NOTE: Clock recipes can be found here: https://github.com/aws/aws-fpga/blob/b4b9d74415a70f0470b02635604a34710cc1bb22/hdk/docs/clock_recipes.csv
 ifeq ($(CLOCK_FREQ_MHZ),125)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A0 -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A0 -strategy TIMING -uram_option 4 ${FOREGROUND}
 else ifeq ($(CLOCK_FREQ_MHZ),250)
 	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A1 -uram_option 4 ${FOREGROUND}
 else ifeq ($(CLOCK_FREQ_MHZ),5.625)
@@ -148,16 +148,16 @@ endif
 	echo "#!/bin/bash"												                                                 > create_spatial_AFI_instructions.sh
 	echo "# Instructions to upload bitstream to S3 and create AFI"                                                  >> create_spatial_AFI_instructions.sh
 	echo "cd $(AWS_HOME)/hdk/cl/examples/${app_name}"                                                               >> create_spatial_AFI_instructions.sh
-	echo "aws s3 mb s3://${app_name}_$(timestamp)_bucket  --region us-east-1"                                       >> create_spatial_AFI_instructions.sh
-	echo "aws s3 mb s3://${app_name}_$(timestamp)_bucket/dcp 2>&1 | tee log"                                             >> create_spatial_AFI_instructions.sh
+	echo "aws s3 mb s3://${app_name}-$(timestamp)-bucket  --region us-east-1"                                       >> create_spatial_AFI_instructions.sh
+	echo "aws s3 mb s3://${app_name}-$(timestamp)-bucket/dcp 2>&1 | tee log"                                             >> create_spatial_AFI_instructions.sh
 	echo "too_many_buckets=\`cat log | grep TooManyBuckets | wc -l\`"							                        >> create_spatial_AFI_instructions.sh                 								
 	echo "if [[ \$${too_many_buckets} -ne 0 ]]; then echo \"Too many buckets error.  Delete some in S3\"; exit 1; fi" >> create_spatial_AFI_instructions.sh 
-	echo "aws s3 cp build/checkpoints/to_aws/*.Developer_CL.tar s3://${app_name}_$(timestamp)_bucket/dcp/ | tee log" >> create_spatial_AFI_instructions.sh
+	echo "aws s3 cp build/checkpoints/to_aws/*.Developer_CL.tar s3://${app_name}-$(timestamp)-bucket/dcp/ | tee log" >> create_spatial_AFI_instructions.sh
 	echo "tarname=\`cat log | grep \"Developer_CL.tar\" -m 1 | rev | cut -d/ -f1 | rev\`"                             >> create_spatial_AFI_instructions.sh
 	echo "if [[ -z \$$tarname ]]; then echo \"No tarname found!\"; exit 1; fi"                                          >> create_spatial_AFI_instructions.sh
-	echo "aws s3 mb s3://${app_name}_$(timestamp)_bucket/logs | tee log"                                            >> create_spatial_AFI_instructions.sh
+	echo "aws s3 mb s3://${app_name}-$(timestamp)-bucket/logs | tee log"                                            >> create_spatial_AFI_instructions.sh
 	echo "touch LOGS_FILES_GO_HERE.txt"                                                                             >> create_spatial_AFI_instructions.sh
-	echo "aws s3 cp LOGS_FILES_GO_HERE.txt s3://${app_name}_$(timestamp)_bucket/logs/ 2>&1 | tee log"                    >> create_spatial_AFI_instructions.sh
+	echo "aws s3 cp LOGS_FILES_GO_HERE.txt s3://${app_name}-$(timestamp)-bucket/logs/ 2>&1 | tee log"                    >> create_spatial_AFI_instructions.sh
 	echo ""                                                                                                         >> create_spatial_AFI_instructions.sh
 	echo "# Create the FPGA Image."                                                                                 >> create_spatial_AFI_instructions.sh
 	echo "# If this command fails, you may need a different awscli version. We tested with version 1.11.78."        >> create_spatial_AFI_instructions.sh
@@ -165,8 +165,8 @@ endif
 	echo "#            e.g. replace <tarball-name> with 17_10_06-######.Developer_CL.tar."                          >> create_spatial_AFI_instructions.sh
 	echo "aws ec2 create-fpga-image \\"                                                                             >> create_spatial_AFI_instructions.sh
 	echo "--name ${app_name} \\"                                                                                    >> create_spatial_AFI_instructions.sh
-	echo "--input-storage-location Bucket=${app_name}_$(timestamp)_bucket,Key=dcp/\$$tarname \\"                     >> create_spatial_AFI_instructions.sh
-	echo "--logs-storage-location Bucket=${app_name}_$(timestamp)_bucket,Key=logs/ | tee fpgaIds"                   >> create_spatial_AFI_instructions.sh
+	echo "--input-storage-location Bucket=${app_name}-$(timestamp)-bucket,Key=dcp/\$$tarname \\"                     >> create_spatial_AFI_instructions.sh
+	echo "--logs-storage-location Bucket=${app_name}-$(timestamp)-bucket,Key=logs/ | tee fpgaIds"                   >> create_spatial_AFI_instructions.sh
 	echo ""                                                                                                         >> create_spatial_AFI_instructions.sh
 	echo "# Keep a record of the afi and agfi IDs returned above."                                                  >> create_spatial_AFI_instructions.sh
 	echo "# Now wait for the logs to be created in S3. The State file should indicate that the AFI is available"    >> create_spatial_AFI_instructions.sh

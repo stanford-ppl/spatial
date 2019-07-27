@@ -169,7 +169,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      if (mem.parent == Ctrl.Host) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
       else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) {
         val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1, 0)))))

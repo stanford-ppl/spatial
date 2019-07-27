@@ -22,13 +22,13 @@ Running on EC2 FPGAs requires the following prerequisites:
 
 * An installation of Spatial
 
-* Vivado and a license to run on the desired Amazon FPGA. We tested this tutorial using [Amazon?s FPGA Developer AMI](https://aws.amazon.com/marketplace/pp/B06VVYBLZZ#), version 1.5.0, which contains all the required software tools.
+* Vivado and a license to run on the desired Amazon FPGA. We tested this tutorial using [Amazon's FPGA Developer AMI](https://aws.amazon.com/marketplace/pp/B06VVYBLZZ#), version 1.5.0, which contains all the required software tools.
 If you want to run locally, see [these instructions](https://github.com/aws/aws-fpga/blob/0c8aceaa5a36f34879ab431955c66ad4cae3ff42/hdk/docs/on_premise_licensing_help.md).
 
 
 ## Setting up aws-fpga
 
-Clone [Amazon?s EC2 FPGA Hardware and Software Development Kit](https://github.com/aws/aws-fpga/) to any location:
+Clone [Amazon's EC2 FPGA Hardware and Software Development Kit](https://github.com/aws/aws-fpga/) to any location:
 
 ```
 $ git clone https://github.com/aws/aws-fpga.git
@@ -91,7 +91,7 @@ Compile your application using the following command:
   $ bin/spatial example --synth --fpga=AWS_F1 && cd gen/example && make aws-F1
 ```
 
-This step requires Vivado. We tested using Amazon?s FPGA [Developer AMI](https://aws.amazon.com/marketplace/pp/B06VVYBLZZ#) version 1.5.0, as mentioned above, however this can also be run locally using [these instructions](https://github.com/aws/aws-fpga/blob/0c8aceaa5a36f34879ab431955c66ad4cae3ff42/hdk/docs/on_premise_licensing_help.md).
+This step requires Vivado. We tested using Amazon's FPGA [Developer AMI](https://aws.amazon.com/marketplace/pp/B06VVYBLZZ#) version 1.5.0, as mentioned above, however this can also be run locally using [these instructions](https://github.com/aws/aws-fpga/blob/0c8aceaa5a36f34879ab431955c66ad4cae3ff42/hdk/docs/on_premise_licensing_help.md).
 
 Notice that once this command completes, Vivado synthesis will be running in the background. A script called `create_spatial_AFI_instructions.sh` has also been created. Follow the instructions in this text file (also described below) once Vivado completes to upload the Design Checkpoint (DCP) and finish creating the AFI.
 
@@ -108,18 +108,18 @@ Running this will require the [AWS Command Line Interface](https://docs.aws.amaz
 
 Once `create-fpga-image` has been run by the script above, it will print the agfi ID.
 Modify the file `load.sh` in `software/runtime` to paste in the agfi ID returned above.
-Now wait approximately 1-2 hours for the `logs` directory in S3 to be filled, and ensure that the AFI state in the file called `State` is ?available?.
+Now wait approximately 1-2 hours for the `logs` directory in S3 to be filled, and ensure that the AFI state in the file called `State` is 'available'.
 
 
 ### Step 4: Opening an F1 instance
 
 Start an F1 instance in the AWS console. We tested with 
-[Amazon?s FPGA Developer AMI](https://aws.amazon.com/marketplace/pp/B06VVYBLZZ#), version 1.5.0, 
+[Amazon's FPGA Developer AMI](https://aws.amazon.com/marketplace/pp/B06VVYBLZZ#), version 1.5.0, 
 in order to ensure the right SDK tools are compiled (e.g. `fpga-load-local-image`).
 
 If you already have an existing F1 instance (e.g. for a previous Spatial application), skip to Step 5. If this is your first time starting the F1 instance, follow the one-time setup steps below.
 
-Clone [Amazon?s EC2 FPGA Hardware and Software Development Kit](https://github.com/aws/aws-fpga/) to any location, e.g. `/home/centos/src/project_data`:
+Clone [Amazon's EC2 FPGA Hardware and Software Development Kit](https://github.com/aws/aws-fpga/) to any location, e.g. `/home/centos/src/project_data`:
 
 ```
 git clone https://github.com/aws/aws-fpga.git

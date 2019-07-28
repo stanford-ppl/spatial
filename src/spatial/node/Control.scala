@@ -29,10 +29,17 @@ import spatial.lang._
   override def effects: Effects = super.effects andAlso Effects.Simple
 }
 
-@op case class UnitPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
+@op case class UnitPipe(ens: Set[Bit], block: Block[Void], stopWhen: Option[Reg[Bit]]) extends Pipeline[Void] {
   override def iters = Nil
   override def bodies = Seq(PseudoStage(Nil -> block))
   override def cchains = Nil
+  override def mirrorEn(f: Tx, addEns: Set[Bit]): Op[Void] = {
+    val saveEns = ens
+    ens ++= addEns
+    val op2 = UnitPipe(f(ens), f(block), f(stopWhen))
+    ens = saveEns
+    op2
+  }
 }
 
 @op case class ParallelPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {

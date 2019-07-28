@@ -354,11 +354,8 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"$lhs$swobj.forwardpressure := ${getForwardPressure(lhs.toCtrl)} | $lhs$swobj.sm.io.doneLatch")
     emit(src"$lhs$swobj.sm.io.enableOut.zip($lhs$swobj.smEnableOuts).foreach{case (l,r) => r := l}")
 
-    lhs match {
-      case Op(UnrolledForeach(_,_,_,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"$lhs$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
-      case Op(UnrolledReduce(_,_,_,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"$lhs$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
-      case _ => emit(src"$lhs$swobj.sm.io.break := false.B")
-    }
+    if (lhs.stopWhen.isDefined) emit(src"$lhs$swobj.sm.io.break := ${lhs.stopWhen.get}.rPort(0).output.head; ${lhs.stopWhen.get}.connectReset($done)")
+    else emit(src"$lhs$swobj.sm.io.break := false.B")
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
     val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
     val noop = if (lhs.cchains.nonEmpty) src"~$lhs.cchain.head.output.noop" else "true.B"
@@ -571,7 +568,7 @@ trait ChiselGenController extends ChiselGenCommon {
             isLive, 
             branchswobj, 
             arg, 
-            () => initChunkState
+            () => initChunkState()
           )(emit(_) )
 
           emit (s"val numArgOuts_breakpts = ${earlyExits.length}")

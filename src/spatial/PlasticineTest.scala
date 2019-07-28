@@ -408,6 +408,7 @@ trait PlasticineTest extends DSLTest { test =>
     override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
     override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
     override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
+    val runhybrid = property("hybrid").map { _ == "true" }.getOrElse(false)
     def runPasses():Result = {
       val runArg = runtimeArgs.cmds.headOption.getOrElse("")
       genpir() >>
@@ -416,10 +417,13 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
       scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      runtst("runp2p") 
+      runtst("runp2p") >>
+      (if (runhybrid)
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runhybrid", 1000000)
+      else Pass
+      )
     }
   }
 

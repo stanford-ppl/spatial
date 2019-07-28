@@ -5,6 +5,7 @@ import argon.DSLTest
 import spatial.util.spatialConfig
 import utils.io.files._
 import scala.reflect.runtime.universe._
+import scala.io.Source
 
 trait PlasticineTest extends DSLTest { test =>
 
@@ -211,7 +212,10 @@ trait PlasticineTest extends DSLTest { test =>
       stopScore:Int= -1,
       prefix:String="Top"
     ) = {
-      var cmd = s"${buildPath(IR.config.cwd, "pir", "plastiroute", "plastiroute")}" :: 
+      val prouteHome = Source.fromFile(buildPath(sys.env("HOME"), s".pirconf")).getLines.flatMap { line =>
+        if (line.contains("proute-home")) Some(line.split("proute-home=")(1).trim) else None
+      }.toList.headOption.getOrElse(buildPath(IR.config.cwd, "pir", "plastiroute"))
+      var cmd = s"${buildPath(prouteHome, "plastiroute")}" :: 
       "-n" :: s"node.csv" ::
       "-l" :: s"link.csv" ::
       "-v" :: s"summary.csv" ::
@@ -412,10 +416,10 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
       scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      runtst("runp2p") //>>
-      //runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
-      //scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      //runtst("runhybrid", 1000000)
+      runtst("runp2p") 
+      runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
+      scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runhybrid", 1000000)
     }
   }
 

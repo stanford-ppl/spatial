@@ -41,14 +41,18 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
     }
   }
 
-  def genAlloc(lhs:Sym[_])(block: => Unit):Unit = {
-    val func = s"Alloc${lhs}" 
-    allocated += func
-    emit(src"$func();")
-    genIO {
-      open(src"void $func() {")
+  def genAlloc(lhs:Sym[_], inFunc:Boolean)(block: => Unit):Unit = {
+    if (inFunc) {
+      val func = s"Alloc${lhs}" 
+      allocated += func
+      emit(src"$func();")
+      genIO {
+        open(src"void $func() {")
+        block
+        close(src"}")
+      }
+    } else {
       block
-      close(src"}")
     }
   }
 
@@ -89,7 +93,7 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
         // Make sure allocated address is burst aligned
         emit(src"""void* $lhs;""")
       }
-      genAlloc(lhs) { 
+      genAlloc(lhs, dims.forall { _.isConst }) { 
         emit(src"$lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});")
         emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
         emit(src"""cout << "Allocate mem of size ${dims.map(quote).mkString("*")} at " << ($tp*)${lhs} << endl;""")

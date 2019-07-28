@@ -10,8 +10,8 @@ import utils.implicits.collections._
 trait PIRGenFIFO extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@FIFONew(size)    => 
-      stateMem(lhs, "FIFO()")
+    case op@FIFONew(Const(size))    => 
+      stateMem(lhs, "FIFO()", depth=Some(size.toInt))
     //case FIFOIsEmpty(fifo,_) => 
     //case FIFOIsFull(fifo,_)  => 
 

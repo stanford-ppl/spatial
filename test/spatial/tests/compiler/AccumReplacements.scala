@@ -27,6 +27,7 @@ import argon.Op
     val Y9 = ArgOut[Int]
     val Y10 = ArgOut[Int]
     val Y11 = ArgOut[Int]
+    val Y12 = ArgOut[Int]
 
     Accel {
       /**
@@ -239,6 +240,25 @@ import argon.Op
         acc11 := mux(X.value == 0, acc11.value, 0) + t
       }
       Y11 := acc11
+
+      /**
+               t   __         
+               /\ /  |      
+              |  +   |      
+              |  |   | 
+    i==0 --> \````/  |
+              ``|`   |
+               _|    |       
+              |__|---'
+                          
+      */
+      val acc12 = Reg[Int](0) // Valid accumulation but tricky because compound ctr chain (watch your reset condition)
+      'ACC12.Foreach(2 by 1, 4 by 1) { (i,j) =>
+        val t = List.tabulate(8) { j => X.value * X.value }.sumTree
+        acc12 := mux(i == 0, t, t + acc12.value)
+      }
+      Y12 := acc12
+
     }
 
     val gold1 =  (args(0).to[Int] * args(0).to[Int]) * (4-1) * 8
@@ -252,6 +272,7 @@ import argon.Op
     val gold9 =  (args(0).to[Int] * args(0).to[Int]) * 4 * 8
     val gold10 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8
     val gold11 = (args(0).to[Int] * args(0).to[Int]) * 8
+    val gold12 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8
 
     println(r"acc1: $Y1 =?= $gold1")
     println(r"acc2: $Y2 =?= $gold2")
@@ -264,6 +285,7 @@ import argon.Op
     println(r"acc9: $Y9 =?= $gold9")
     println(r"acc10: $Y10 =?= $gold10")
     println(r"acc11: $Y11 =?= $gold11")
+    println(r"acc12: $Y12 =?= $gold12")
 
     assert(Y1 == gold1)
     assert(Y2 == gold2)
@@ -276,6 +298,7 @@ import argon.Op
     assert(Y9 == gold9)
     assert(Y10 == gold10)
     assert(Y11 == gold11)
+    assert(Y12 == gold12)
   }
 
   override def checkIR(block: Block[_]): Result = {
@@ -283,7 +306,7 @@ import argon.Op
     val special_writes = block.nestedStms.collect{case x@Op(_:RegAccumOp[_]) => x }.size 
 
     require(regular_writes == 3, "Should have 3 regular RegWrites")
-    require(special_writes == 8, "Should have 8 specialized RegAccumOp")
+    require(special_writes == 9, "Should have 9 specialized RegAccumOp")
 
     // val acc1 = block.nestedStms.collect{case x@Op(RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc1") => reg }.size
     // val acc2 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc2") => reg }.size

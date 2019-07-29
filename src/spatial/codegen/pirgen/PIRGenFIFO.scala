@@ -2,6 +2,7 @@ package spatial.codegen.pirgen
 
 import argon._
 import spatial.metadata.memory._
+import spatial.metadata.bounds.Expect
 import spatial.lang._
 import spatial.node._
 
@@ -10,7 +11,7 @@ import utils.implicits.collections._
 trait PIRGenFIFO extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op@FIFONew(Const(size))    => 
+    case op@FIFONew(Expect(size))    => 
       stateMem(lhs, "FIFO()", depth=Some(size.toInt))
     //case FIFOIsEmpty(fifo,_) => 
     //case FIFOIsFull(fifo,_)  => 

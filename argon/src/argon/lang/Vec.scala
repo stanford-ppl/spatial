@@ -15,6 +15,7 @@ import argon.node._
   private implicit val evv: A <:< Bits[A] = A.box
 
   // TODO[4]: These are all quite expensive for large vectors
+  @api def size: Int = elems.size
   @api def elems: List[A] = List.tabulate(width){i => this.apply(i) }
   @api def map[B:Bits](func: A => B): Vec[B] = Vec.ZeroFirst(elems.map(func):_*)
   @api def zip[B:Bits,R:Bits](that: Vec[B])(func: (A,B) => R): Vec[R] = {

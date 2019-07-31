@@ -42,6 +42,8 @@ hw:
 	cp ${CXP_EXAMPLE}/03_scripts/*.tcl ${CXP_V_DIR}
 	sed -i "s/\.\.\///g" ${CXP_V_DIR}/create_vivado_project.tcl
 	cp -r ${CXP_EXAMPLE}/04_ref_design ${CXP_V_DIR}
+	# Replace custom logic with spatial rtl
+	mv ${CXP_V_DIR}/CustomLogic.vhd ${CXP_V_DIR}/04_ref_design/CustomLogic.vhd
 	make -C ${CXP_V_DIR}
 	echo "$$(date +%s)" > end.log
 

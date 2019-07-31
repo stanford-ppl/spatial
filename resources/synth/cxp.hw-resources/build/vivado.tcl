@@ -1,3 +1,11 @@
+open_project 07_vivado_project/CustomLogic.xpr
+
+# Add Spatial Top verilog module
+set origin_dir [file dirname [file normalize [info script]]]
+add_files -norecurse "$origin_dir/Top.v"
+add_files -norecurse "$origin_dir/RetimeShiftRegister.sv"
+add_files -norecurse "$origin_dir/AXI4LiteToRFBridgeVerilog.v"
+
 launch_runs synth_1 -jobs 48
 wait_on_run synth_1
 

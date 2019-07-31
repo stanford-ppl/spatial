@@ -14,26 +14,20 @@ trait ChiselGenStream extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
-      val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
-      // createBusObject(lhs){
-      //   forceEmit(src"val ready_options = Wire(Vec(${ens*lhs.readers.toList.length}, Bool()))")
-      //   forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
-      //   forceEmit(src"ready := ready_options.reduce{_|_}")
-      //   forceEmit(src"""val now_valid = Wire(Bool()).suggestName("${lhs}_now_valid")""")
-      //   forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
-      //   forceEmit(src"val m = Wire(${lhs.readers.toList.head.tp})")
-      // }
+      // val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
+      // Emit code for streams that are unrelated to DRAM nodes
+      if (bus.isInstanceOf[TargetBus[_]]) bus match {
+        case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_IN")
+        case _ => 
+      }
 
     case StreamOutNew(bus) =>
-      val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
-      // createBusObject(lhs){
-      //   forceEmit(src"val valid_options = Wire(Vec(${ens*lhs.writers.size}, Bool()))")
-      //   forceEmit(src"""val valid = Wire(Bool()).suggestName("${lhs}_valid")""")
-      //   forceEmit(src"valid := valid_options.reduce{_|_}")
-      //   forceEmit(src"val data_options = Wire(Vec(${ens*lhs.writers.size}, ${lhs.tp.typeArgs.head}))")
-      //   forceEmit(src"val m = VecInit((0 until ${ens}).map{i => val slice_options = (0 until ${lhs.writers.size}).map{j => data_options(i*${lhs.writers.size}+j)}; Mux1H(valid_options, slice_options)}.toList)")
-      //   forceEmit(src"""val ready = Wire(Bool()).suggestName("${lhs}_ready")""")
-      // }	    
+      // val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
+      // Emit code for streams that are unrelated to DRAM nodes
+      if (bus.isInstanceOf[TargetBus[_]]) bus match {
+        case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_OUT")
+        case _ => 
+      }
 
     case StreamOutBankedWrite(stream, data, ens) =>
       val muxPort = lhs.port.muxPort
@@ -84,6 +78,12 @@ trait ChiselGenStream extends ChiselGenCommon {
           }
 
 
+        case CXPPixelBus =>
+          data.zipWithIndex.foreach{case(d,i) =>
+            emit(src"""${stream}.bits.TDATA.r := $d.r""")
+            emit(src"""${stream}.bits.TUSER.r := 0.U //FIXME""")
+          }
+
         case _ =>
           data.zipWithIndex.foreach{case(d,i) =>
             emit(src"""${stream}.bits := $d""")
@@ -101,9 +101,11 @@ trait ChiselGenStream extends ChiselGenCommon {
       val Op(StreamInNew(bus)) = strm
       bus match {
         case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")
-        case BurstAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
         case _: GatherDataBus[_] => emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits(i).r }")
-        case ScatterAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
+        // case ScatterAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
+        // case BurstAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
+        case CXPPixelBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.TDATA.r }""")
+        case _ => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
 
       }
       

@@ -35,7 +35,6 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
-    dbgs(s"BANKSELECT $addr zip $alpha (_*_).sum / $B mod $N = ${(alpha.zip(addr).map{case (a,i) => a*i })}")
     (alpha.zip(addr).map{case (a,i) => a*i }.sumTree / B) % N
   }
   override def toString: String = {

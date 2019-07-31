@@ -8,9 +8,10 @@ endif
 all: accel.bit
 
 accel.bit: setup
-	time vivado -mode batch -source vivado.tcl -tclargs ${CLOCK_FREQ_MHZ} 2>&1 | tee vivado_synthesis.log
+	time vivado -mode batch -source vivado.tcl 2>&1 | tee vivado_synthesis.log
 
 setup: 
+	cp SpatialCustomLogic.vhd 04_ref_design/CustomLogic.vhd
 	time vivado -mode batch -source create_vivado_project.tcl 2>&1 | tee vivado_setup.log 
 
 clean:

@@ -62,6 +62,55 @@ object Helpers {
 }
 
 import spatial.dsl._
+import forge.tags._
+
+@struct case class score(idx: Int, v: I32)
+@struct case class composite(rising_idx: Int, rising_v: I32, falling_idx: Int, falling_v: I32, volume: U16, p16: U16, p32: U32, p64: U64)
+
+object SpatialHelper {
+
+  @virtualize
+  @api def ComputeUnit[T:Num](
+    COLS: I32,
+    sharp_kernel: Seq[scala.Double],
+    input_fifo: FIFO[I16],
+    issue: FIFO[Int],
+    result: FIFO[composite],
+    r: I32,
+    rowTileSize: scala.Int,
+    LINES_TODO: I32
+  ): Unit = {
+    val deriv_window = sharp_kernel.size
+    Console.println(s"kernel is ${sharp_kernel.mkString(",")}")
+    Pipe.II(1).Foreach(COLS by 1){c => 
+      val best_rising = Reg[score](score(0, -999.to[I32]))
+      val best_falling = Reg[score](score(0, -999.to[I32]))
+      val acc_after_rising = Reg[U16](0)
+      val acc_after_falling = Reg[U16](0)
+      val sr = RegFile[I16](deriv_window)
+      val next = input_fifo.deq()
+      sr <<= next
+      acc_after_rising :+= next.as[U16]
+      acc_after_falling :+= next.as[U16]
+      val t = List.tabulate(deriv_window){i => sharp_kernel(i).to[T] * sr(i).to[T]}.reduceTree{_+_}
+      if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] > best_rising.value.v)) {
+        acc_after_rising.reset()
+        best_rising := score(c,t.to[I32])
+      }
+      if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] < best_falling.value.v)) {
+        acc_after_falling.reset()
+        best_falling := score(c,t.to[I32])
+      }
+      if (c == COLS-1) {
+        result.enq(composite(best_rising.value.idx, best_rising.value.v, best_falling.value.idx, best_falling.value.v, acc_after_rising - acc_after_falling, 0, 0, 0))
+        issue.enq(mux(best_rising.value == score(-1,-1) || r == LINES_TODO-1 || r % rowTileSize == rowTileSize-1, mux((r+1) % rowTileSize == 0, rowTileSize, r % rowTileSize + 1), 0)) // Random math to make sure retiming puts it later
+      } 
+
+      // // DEBUG
+      // if (r == LINES_TODO-1) deriv_fifo.enq(t)
+    }
+  }
+}
 
 @spatial class FilterStream1D extends SpatialTest {
 
@@ -71,9 +120,7 @@ import spatial.dsl._
   val colTileSize = 64
   val rowTileSize = 16
   val deriv_window = 40
-  @struct case class score(idx: Int, v: I32)
   type P = FixPt[TRUE,_112,_0]
-  @struct case class composite(rising_idx: Int, rising_v: I32, falling_idx: Int, falling_v: I32, volume: U16, p16: U16, p32: U32, p64: U64)
   def main(args: Array[String]): Unit = {
 
     // // Get reference edges
@@ -121,7 +168,7 @@ import spatial.dsl._
                                                                                                       
        \__________________/ \________________________________________________________________/ \____________________/                                                                                           
              Stage 1                            Stage 2                                                Stage 3    
-                                                                                                     
+                                              (SpatialHelper.ComputeUnit)                                                       
                                                                                                     
                                                                                                     
                                                                                                     
@@ -139,33 +186,7 @@ import spatial.dsl._
         input_fifo load input_dram(r, 0::COLS)
 
         // Stage 2: Process (Force II = 1 to squeeze sr write and sr read into one cycle)
-        Pipe.II(1).Foreach(COLS by 1){c => 
-          val best_rising = Reg[score](score(0, -999.to[I32]))
-          val best_falling = Reg[score](score(0, -999.to[I32]))
-          val acc_after_rising = Reg[U16](0)
-          val acc_after_falling = Reg[U16](0)
-          val sr = RegFile[I16](deriv_window)
-          val next = input_fifo.deq()
-          sr <<= next
-          acc_after_rising :+= next.as[U16]
-          acc_after_falling :+= next.as[U16]
-          val t = List.tabulate(deriv_window){i => sharp_kernel(i).to[T] * sr(i).to[T]}.reduceTree{_+_}
-          if (c == deriv_window || (c > deriv_window && t.to[I32] > best_rising.value.v)) {
-            acc_after_rising.reset()
-            best_rising := score(c,t.to[I32])
-          }
-          if (c == deriv_window || (c > deriv_window && t.to[I32] < best_falling.value.v)) {
-            acc_after_falling.reset()
-            best_falling := score(c,t.to[I32])
-          }
-          if (c == COLS-1) {
-            result.enq(composite(best_rising.value.idx, best_rising.value.v, best_falling.value.idx, best_falling.value.v, acc_after_rising - acc_after_falling, 0, 0, 0))
-            issue.enq(mux(best_rising.value == score(-1,-1) || r == LINES_TODO-1 || r % rowTileSize == rowTileSize-1, mux((r+1) % rowTileSize == 0, rowTileSize, r % rowTileSize + 1), 0)) // Random math to make sure retiming puts it later
-          } 
-
-          // // DEBUG
-          // if (r == LINES_TODO-1) deriv_fifo.enq(t)
-        }
+        SpatialHelper.ComputeUnit[T](COLS, sharp_kernel, input_fifo, issue, result, r, rowTileSize, LINES_TODO)
 
         // Stage 3: Store
         Pipe{

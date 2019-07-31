@@ -181,21 +181,29 @@ trait MemoryUnrolling extends UnrollingBase {
         case class NDAddressAcrossLanes(addr: Seq[Idx], lanes: Seq[Int])
 
         val inst  = mem2.instance
-        val addrOpt = addr.map{a =>
-          val a2:Seq[NDAddressInLane] = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
-          dbgs(s"a2 = ")
-          a2.foreach{aa => dbgs(s"  lane ${aa.lane} (castgrp/broadcast ${port.castgroup(laneIds.indexOf(aa.lane))}/${port.broadcast(laneIds.indexOf(aa.lane))}) = ${aa.addr}")}
-          val distinct:Seq[NDAddressAcrossLanes] = a2.groupBy{_.addr}
-                           .mapValues{pairs => pairs.map(_.lane)}
-                           .toSeq.map{case (adr, ls) => NDAddressAcrossLanes(adr, ls) }
-                           .sortBy(_.lanes.last)                        // (ND address, lane IDs) pairs
-          val portReordering = distinct.flatMap{d => d.lanes}.map(laneIds.indexOf)
-          val addr: Seq[Seq[Idx]] = distinct.map(_.addr)                // Vector of ND addresses
-          val masters: Seq[Int] = distinct.map(_.lanes.last)            // Lane ID for each distinct address
-          val lane2Vec: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => laneId -> aId }}.toMap
-          val vec2Lane: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => aId -> laneId }}.toMap
-          (addr, masters, lane2Vec, vec2Lane, portReordering)
-        }
+        val addrOpt = 
+          if (rhs.isInstanceOf[VectorDequeuer[_]] || rhs.isInstanceOf[VectorEnqueuer[_]]) {
+            addr.map{a =>
+              (a.map(Seq(_)), Seq(0), Seq.tabulate(a.size){i => (i -> i)}.toMap, Seq.tabulate(a.size){i => (i -> i)}.toMap, Seq(0))
+            }
+          }
+          else {
+            addr.map{a =>
+              val a2:Seq[NDAddressInLane] = lanes.inLanes(laneIds){p => NDAddressInLane(f(a),p) }  // lanes of ND addresses
+              dbgs(s"a2 = ")
+              a2.foreach{aa => dbgs(s"  lane ${aa.lane} (castgrp/broadcast ${port.castgroup(laneIds.indexOf(aa.lane))}/${port.broadcast(laneIds.indexOf(aa.lane))}) = ${aa.addr}")}
+              val distinct:Seq[NDAddressAcrossLanes] = a2.groupBy{_.addr}
+                               .mapValues{pairs => pairs.map(_.lane)}
+                               .toSeq.map{case (adr, ls) => NDAddressAcrossLanes(adr, ls) }
+                               .sortBy(_.lanes.last)                        // (ND address, lane IDs) pairs
+              val portReordering = distinct.flatMap{d => d.lanes}.map(laneIds.indexOf)
+              val addr: Seq[Seq[Idx]] = distinct.map(_.addr)                // Vector of ND addresses
+              val masters: Seq[Int] = distinct.map(_.lanes.last)            // Lane ID for each distinct address
+              val lane2Vec: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => laneId -> aId }}.toMap
+              val vec2Lane: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => aId -> laneId }}.toMap
+              (addr, masters, lane2Vec, vec2Lane, portReordering)
+            }
+          }
         val addr2      = addrOpt.map(_._1)                          // Vector of ND addresses
         val masters    = addrOpt.map(_._2).getOrElse(laneIds)       // List of lane IDs of non-repeat addresses
         val lane2Vec   = addrOpt.map(_._3)                          // Lane -> Vector ID
@@ -278,6 +286,9 @@ trait MemoryUnrolling extends UnrollingBase {
             val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,s.port.broadcast.zip(broadcast2).map{case (a,b) => scala.math.min(a,b)})
             s.addPort(dispatch=0, Nil, port2)
           }
+          else if (lhs.isVectorAccess) { // Don't touch ports if this is a vector access
+            s.addPort(dispatch=0, Nil, port)
+          }
           else {
             val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,broadcast2)
             s.addPort(dispatch=0, Nil, port2)
@@ -292,12 +303,11 @@ trait MemoryUnrolling extends UnrollingBase {
         }
 
         banked.flatMap{
-          case (UVecRead(vec), vecsInSegment, _) =>
+          case (UVecReadSym(vec), vecsInSegment, _) =>
             // val vecsInSegment = lanesInSegment.map(laneIdToVecId)
             val elems: Seq[A] = if (lhs.segmentMapping.values.toList.sorted.reverse.headOption.getOrElse(0) >= 1) vecsInSegment.indices.map{i => vec(i) }
                                 else vecsInSegment.map{i => vec(i)}
             val thisLaneIds = laneIds.filter(vecsInSegment.map(vecToLaneAddr).contains)
-            dbgs(s"$vec thisLaneIds:$thisLaneIds ${lanes.ulanes} ${lanes.name}")
             lanes.inLanes(thisLaneIds){p =>
               // Convert lane to vecId
               val vecId = laneIdToVecId(p)
@@ -308,8 +318,11 @@ trait MemoryUnrolling extends UnrollingBase {
               register(lhs -> elem)
               elem
             }
+          case (UVecReadVec(vec), vecsInSegment, _) =>
+            if (laneIds.size > 1) throw new Exception(s"Vector (pre-unroll) nodes in parallelized (post-unroll) loops currently unsupported!")
+            lanes.unifyLanes(laneIds)(lhs, vec)
 
-          case (URead(v), _, _)        => lanes.unifyLanes(laneIds)(lhs, v)
+          case (USymReadSym(v), _, _)        => lanes.unifyLanes(laneIds)(lhs, v)
           case (UWrite(write), _, _)   => lanes.unifyLanes(laneIds)(lhs, write)
           case (UMultiWrite(vs), _, _) => lanes.unifyLanes(laneIds)(lhs, vs.head.s.head)
         }
@@ -461,12 +474,13 @@ trait MemoryUnrolling extends UnrollingBase {
     }
   }
 
-  /** Helper classes for unrolling */
+  /** Helper classes for unrolling, indicating what the unrolled node is and what the original node was (i.e. UVecReadSym is a Sym that unrolls to a Vec) */
   sealed abstract class UnrolledAccess[T] { def s: Seq[Sym[_]] }
-  case class URead[T](v: Sym[T]) extends UnrolledAccess[T] { def s: Seq[Sym[T]] = Seq(v) }
-  case class UVecRead[T](v: Vec[T])  extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Vec[T]] = Seq(v) }
-  case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Void] = Seq(v) }
-  case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Void] = vs.flatMap(_.s) }
+  case class USymReadSym[T](v: Sym[T]) extends UnrolledAccess[T] { def s = Seq(v) }
+  case class UVecReadSym[T](v: Vec[T])  extends UnrolledAccess[T] { def s = Seq(v) }
+  case class UVecReadVec[T](v: Vec[T])  extends UnrolledAccess[T] { def s = Seq(v) }
+  case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s = Seq(v) }
+  case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s = vs.flatMap(_.s) }
 
   sealed abstract class DataOption { def s: Option[Sym[_]] }
   case object NoData extends DataOption { def s: Option[Sym[_]] = None }
@@ -488,13 +502,14 @@ trait MemoryUnrolling extends UnrollingBase {
     ofs:    Seq[Idx],
     enss:   Seq[Set[Bit]]
   )(implicit vT: Type[Vec[A]], ctx: SrcCtx): UnrolledAccess[A] = node match {
-    case _:MergeBufferDeq[_] => UVecRead(stage(MergeBufferBankedDeq(mem.asInstanceOf[MergeBuffer[A]], enss)))
-    case _:FIFODeq[_]       => UVecRead(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
-    case _:LIFOPop[_]       => UVecRead(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))
-    case _:LUTRead[_,_]     => UVecRead(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
-    case _:RegFileRead[_,_] => UVecRead(stage(RegFileVectorRead(mem.asInstanceOf[RegFilex[A]], bank, enss)))
-    case _:SRAMRead[_,_]    => UVecRead(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
-    case _:StreamInRead[_]  => UVecRead(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
+    case _:MergeBufferDeq[_] => UVecReadSym(stage(MergeBufferBankedDeq(mem.asInstanceOf[MergeBuffer[A]], enss)))
+    case _:FIFODeq[_]       => UVecReadSym(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
+    case _:FIFOVecDeq[_]       => UVecReadVec(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], ArrayBuffer.fill(ofs.size)(enss.head))))
+    case _:LIFOPop[_]       => UVecReadSym(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))
+    case _:LUTRead[_,_]     => UVecReadSym(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
+    case _:RegFileRead[_,_] => UVecReadSym(stage(RegFileVectorRead(mem.asInstanceOf[RegFilex[A]], bank, enss)))
+    case _:SRAMRead[_,_]    => UVecReadSym(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
+    case _:StreamInRead[_]  => UVecReadSym(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
     case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))
     case op:MergeBufferBound[_] => UWrite[A](stage(MergeBufferBound(mem.asInstanceOf[MergeBuffer[A]],
@@ -502,20 +517,23 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:MergeBufferInit[_] => UWrite[A](stage(MergeBufferInit(mem.asInstanceOf[MergeBuffer[A]],
                                               data.head.asInstanceOf[Bits[Bit]], enss.head)))
     case _:FIFOEnq[_]        => UWrite[A](stage(FIFOBankedEnq(mem.asInstanceOf[FIFO[A]], data, enss)))
+    case _:FIFOVecEnq[_]        => 
+      val elems = data(0).asInstanceOf[Vec[Bits[A]]].elems
+      UWrite[A](stage(FIFOBankedEnq(mem.asInstanceOf[FIFO[A]], ArrayBuffer(elems:_*), ArrayBuffer.fill(elems.size)(enss.head))))
     case _:LIFOPush[_]       => UWrite[A](stage(LIFOBankedPush(mem.asInstanceOf[LIFO[A]], data, enss)))
     case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileVectorWrite(mem.asInstanceOf[RegFilex[A]], data, bank, enss)))
     case _:SRAMWrite[_,_]    => UWrite[A](stage(SRAMBankedWrite(mem.asInstanceOf[SRAMx[A]], data, bank, ofs, enss)))
     case _:StreamOutWrite[_] => UWrite[A](stage(StreamOutBankedWrite(mem.asInstanceOf[StreamOut[A]], data, enss)))
 
-    case _:FIFOPeek[_]       => URead(stage(FIFOPeek(mem.asInstanceOf[FIFO[A]], enss.flatten.toSet)))
-    case _:LIFOPeek[_]       => URead(stage(LIFOPeek(mem.asInstanceOf[LIFO[A]], enss.flatten.toSet)))
+    case _:FIFOPeek[_]       => USymReadSym(stage(FIFOPeek(mem.asInstanceOf[FIFO[A]], enss.flatten.toSet)))
+    case _:LIFOPeek[_]       => USymReadSym(stage(LIFOPeek(mem.asInstanceOf[LIFO[A]], enss.flatten.toSet)))
 
-    case _:RegRead[_]        => URead(stage(RegRead(mem.asInstanceOf[Reg[A]])))
-    case _:FIFORegDeq[_]    => URead(stage(FIFORegDeq(mem.asInstanceOf[FIFOReg[A]], enss.head)))
+    case _:RegRead[_]        => USymReadSym(stage(RegRead(mem.asInstanceOf[Reg[A]])))
+    case _:FIFORegDeq[_]    => USymReadSym(stage(FIFORegDeq(mem.asInstanceOf[FIFOReg[A]], enss.head)))
     case _:RegWrite[_]       => UWrite[A](stage(RegWrite(mem.asInstanceOf[Reg[A]],data.head, enss.head)))
     case _:FIFORegEnq[_]   => UWrite[A](stage(FIFORegEnq(mem.asInstanceOf[FIFOReg[A]],data.head, enss.head)))
     case _:SetReg[_]         => UWrite[A](stage(SetReg(mem.asInstanceOf[Reg[A]], data.head)))
-    case _:GetReg[_]         => URead(stage(GetReg(mem.asInstanceOf[Reg[A]])))
+    case _:GetReg[_]         => USymReadSym(stage(GetReg(mem.asInstanceOf[Reg[A]])))
 
     case op:RegFileShiftIn[_,_] =>
       // Group by the axis being shifted across
@@ -535,7 +553,7 @@ trait MemoryUnrolling extends UnrollingBase {
       })
 
     case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, bank.head, enss)))
-    case _:LineBufferRead[_]     => UVecRead(stage(LineBufferBankedRead(mem.asInstanceOf[LineBuffer[A]], bank, ofs, enss)))
+    case _:LineBufferRead[_]     => UVecReadSym(stage(LineBufferBankedRead(mem.asInstanceOf[LineBuffer[A]], bank, ofs, enss)))
 
     case _ => throw new Exception(s"bankedAccess called on unknown access node ${node.productPrefix}")
   }

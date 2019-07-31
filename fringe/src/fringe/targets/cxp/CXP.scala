@@ -1,31 +1,40 @@
 package fringe.targets.cxp
 
 import chisel3._
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelTop, BigIP, TopInterface,CXPAccelInterface}
 import fringe.targets.DeviceTarget
 
 class CXP extends DeviceTarget {
 
   override val magPipelineDepth: Int = 0
+  override val external_w: Int = 256
+  override val external_v: Int = 1
+  override val dataWidth = 256
+  override val wordsPerStream = 1
+
   override def regFileAddrWidth(n: Int): Int = 32
 
   override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
     val io = IO(new CXPInterface)
+    io <> DontCare
 
     // CXP Fringe
     val blockingDRAMIssue = false // Allow only one in-flight request, block until response comes back
-    val fringe = Module(new FringeCXP(blockingDRAMIssue, io.axiLiteParams, io.axiParams))
-
-    // Fringe <-> Host connections
-    fringe.io.S_AXI <> io.S_AXI
+    val fringe = Module(new FringeCXP(blockingDRAMIssue, io.axiParams))
+    fringe.io <> DontCare
 
     // Fringe <-> DRAM connections
     io.M_AXI <> fringe.io.M_AXI
 
-    // io.TOP_AXI <> fringe.io.TOP_AXI
-    // io.DWIDTH_AXI <> fringe.io.DWIDTH_AXI
-    // io.PROTOCOL_AXI <> fringe.io.PROTOCOL_AXI
-    // io.CLOCKCONVERT_AXI <> fringe.io.CLOCKCONVERT_AXI
+    // Fringe <-> CXP Bus connections
+    io.AXIS_IN <> accel.io.asInstanceOf[CXPAccelInterface].AXIS_IN
+    io.AXIS_OUT <> accel.io.asInstanceOf[CXPAccelInterface].AXIS_OUT
+
+    // Fringe <-> Host connections
+    fringe.io.ctrl_addr := io.CUSTOMLOGIC_CTRL_ADDR
+    fringe.io.ctrl_data_in_ce := io.CUSTOMLOGIC_CTRL_DATA_IN_CE
+    fringe.io.ctrl_data_in := io.CUSTOMLOGIC_CTRL_DATA_IN
+    io.CUSTOMLOGIC_CTRL_DATA_OUT := fringe.io.ctrl_data_out
 
     // io.rdata handled by bridge inside FringeCXP
     io.rdata := DontCare
@@ -39,20 +48,13 @@ class CXP extends DeviceTarget {
       accelArgOut.echo := fringeArgOut
     }
 
-    // accel.io.argIOIns := fringe.io.argIOIns
-    // fringe.io.argIOOuts.zip(accel.io.argIOOuts) foreach { case (fringeArgOut, accelArgOut) =>
-    //     fringeArgOut.bits := accelArgOut.bits
-    //     fringeArgOut.valid := 1.U
-    // }
-    fringe.io.externalEnable := false.B
     fringe.io.memStreams <> accel.io.memStreams
     fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
     fringe.reset := !reset.toBool
     accel.reset := fringe.io.reset
-    // accel.reset := ~reset.toBool
-    // io.is_enabled := ~accel.io.enable
+
 
     io
   }

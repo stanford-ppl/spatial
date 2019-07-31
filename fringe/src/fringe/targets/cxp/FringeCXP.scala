@@ -1,9 +1,10 @@
 package fringe.targets.cxp
 
 import chisel3._
-import chisel3.util.Decoupled
+import chisel3.util._
 import fringe._
 import fringe.globals._
+import fringe.templates.euresys._
 import fringe.templates.axi4._
 
 /** Top module for CXP FPGA shell
@@ -13,7 +14,6 @@ import fringe.templates.axi4._
   */
 class FringeCXP(
   val blockingDRAMIssue: Boolean,
-  val axiLiteParams:     AXI4BundleParameters,
   val axiParams:         AXI4BundleParameters
 ) extends Module {
 
@@ -29,17 +29,8 @@ class FringeCXP(
   // val d = 16 // FIFO depth: Controls FIFO sizes for address, size, and wdata. Rdata is not buffered
 
   val io = IO(new Bundle {
-    // Host scalar interface
-    val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
-
     // DRAM interface
     val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
-
-    // // AXI Debuggers
-    // val TOP_AXI = new AXI4Probe(axiLiteParams)
-    // val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
-    // val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
-    // val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
 
     // Accel Control IO
     val enable = Output(Bool())
@@ -51,16 +42,17 @@ class FringeCXP(
     val argOuts         = Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(TARGET_W.W))))
     val argEchos         = Output(Vec(NUM_ARG_OUTS, UInt(TARGET_W.W)))
 
+    // Control signals from outside world
+    val ctrl_addr = Input(UInt(16.W))
+    val ctrl_data_in_ce = Input(Bool())
+    val ctrl_data_in = Input(UInt(32.W))
+    val ctrl_data_out = Output(UInt(32.W))
 
     // Accel memory IO
     val memStreams = new AppStreams(LOAD_STREAMS, STORE_STREAMS, GATHER_STREAMS, SCATTER_STREAMS)
+
     val heap = Vec(numAllocators, new HeapIO())
 
-    // External enable
-    val externalEnable = Input(Bool()) // For AWS, enable comes in as input to top module
-
-    // Accel stream IO
-//    val genericStreams = new GenericStreams(streamInsInfo, streamOutsInfo)
   })
 
   io <> DontCare
@@ -68,48 +60,22 @@ class FringeCXP(
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
   fringeCommon.io <> DontCare
 
-  // fringeCommon.io.TOP_AXI <> io.TOP_AXI
-  // fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI
-  // fringeCommon.io.PROTOCOL_AXI <> io.PROTOCOL_AXI
-  // fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
-
   // AXI-lite bridge
-  if (target.isInstanceOf[targets.cxp.CXP]) {
-    val axiLiteBridge = Module(new AXI4LiteToRFBridge(ADDR_WIDTH, DATA_WIDTH))
-    axiLiteBridge.io.S_AXI <> io.S_AXI
 
-    // fringeCommon.reset := ~reset.toBool
-    fringeCommon.io.raddr := axiLiteBridge.io.raddr
-    fringeCommon.io.wen   := axiLiteBridge.io.wen
-    fringeCommon.io.waddr := axiLiteBridge.io.waddr
-    fringeCommon.io.wdata := axiLiteBridge.io.wdata
-    axiLiteBridge.io.rdata := fringeCommon.io.rdata
-  }
-  else if (target.isInstanceOf[targets.zcu.ZCU]) {
-    val axiLiteBridge = Module(new AXI4LiteToRFBridgeZCU(ADDR_WIDTH, DATA_WIDTH))
-    axiLiteBridge.io.S_AXI <> io.S_AXI
-
-    // fringeCommon.reset := ~reset.toBool
-    fringeCommon.io.raddr := axiLiteBridge.io.raddr
-    fringeCommon.io.wen   := axiLiteBridge.io.wen
-    fringeCommon.io.waddr := axiLiteBridge.io.waddr
-    fringeCommon.io.wdata := axiLiteBridge.io.wdata
-    axiLiteBridge.io.rdata := fringeCommon.io.rdata
-  
-  }
-
-  fringeCommon.io.aws_top_enable := io.externalEnable
+  // fringeCommon.reset := ~reset.toBool
+  fringeCommon.io.raddr := io.ctrl_addr
+  fringeCommon.io.wen   := io.ctrl_data_in_ce
+  fringeCommon.io.waddr := io.ctrl_addr
+  fringeCommon.io.wdata := io.ctrl_data_in
+  io.ctrl_data_out := fringeCommon.io.rdata
 
   io.enable := fringeCommon.io.enable
   fringeCommon.io.done := io.done
   fringeCommon.reset := reset.toBool
-  // fringeCommon.reset := reset.toBool
   io.reset := fringeCommon.io.reset
 
   io.argIns := fringeCommon.io.argIns
   fringeCommon.io.argOuts <> io.argOuts
-  // io.argIOIns := fringeCommon.io.argIOIns
-  // fringeCommon.io.argIOOuts <> io.argIOOuts
 
   io.memStreams <> fringeCommon.io.memStreams
   io.heap <> fringeCommon.io.heap

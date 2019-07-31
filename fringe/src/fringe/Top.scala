@@ -12,7 +12,7 @@ abstract class TopInterface extends Bundle {
   // val is_enabled = Output(Bool())
 }
 
-/** Top module including Fringe and Accel
+/** Top module including Fringe and Accel (see target specific for fringe <-> accel connections)
   * @param targetName The name of the target architecture
   * @param accelGen Delayed creation of AccelTop
   */
@@ -38,16 +38,5 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
   val accel = accelGen()
   accel.io <> DontCare
   val io = globals.target.topInterface(reset, accel)
-  // Accel
-
-  // TBD: Accel <-> Fringe Memory connections
-//  for (i <- 0 until numMemoryStreams) {
-//    fringe.io.memStreams(i).cmd.bits := accel.io.memStreams(i).cmd.bits
-//    fringe.io.memStreams(i).cmd.valid := accel.io.memStreams(i).cmd.valid
-//    fringe.io.memStreams(i).wdata.bits := accel.io.memStreams(i).wdata.bits
-//    fringe.io.memStreams(i).wdata.valid := accel.io.memStreams(i).wdata.valid
-//    accel.io.memStreams(i).rdata.bits := fringe.io.memStreams(i).rdata.bits
-//    accel.io.memStreams(i).rdata.valid := fringe.io.memStreams(i).rdata.valid
-//  }
 
 }

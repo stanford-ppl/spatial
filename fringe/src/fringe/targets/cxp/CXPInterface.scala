@@ -7,18 +7,24 @@ import fringe._
 import fringe.TopInterface
 import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Lite, AXI4Probe}
 import fringe.templates.axi4._
+import fringe.templates.euresys.{CXPStream}
 
 class CXPInterface extends TopInterface {
-  val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
-  val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 32)
+  val axiParams = new AXI4BundleParameters(32, 256, 32)
 
-  val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 
-  // AXI debugging loopbacks
-  val TOP_AXI = new AXI4Probe(axiLiteParams)
-  val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
-  val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
-  val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
+  // val METADATA_IN = Input(new Metadata_rec())
+  // val METADATA_OUT = Output(new Metadata_rec())
+  // val CUSTOMLOGIC_EVENT = Output(Bool())
+  // val CUSTOMLOGIC_EVENT_ARG0 = Output(UInt(32.W))
+  // val CUSTOMLOGIC_EVENT_ARG1 = Output(UInt(32.W))
+  val CUSTOMLOGIC_CTRL_ADDR = Input(UInt(16.W))
+  val CUSTOMLOGIC_CTRL_DATA_IN_CE = Input(Bool())
+  val CUSTOMLOGIC_CTRL_DATA_IN = Input(UInt(32.W))
+  val CUSTOMLOGIC_CTRL_DATA_OUT = Output(UInt(32.W))
 
+  val PIPELINECLEAR = Input(Bool())
+  val AXIS_IN = Flipped(Decoupled(new CXPStream()))
+  val AXIS_OUT = Decoupled(new CXPStream())
 }

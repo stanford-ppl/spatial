@@ -411,6 +411,17 @@ package object control {
       groups
     }
 
+    /** Return breakWhen node for controller if it has one */
+    def breaker: Option[Sym[_]] = s match {
+      case Some(Op(_@OpForeach(_,_,_,_,breakWhen))) => breakWhen
+      case Some(Op(_@UnrolledForeach(_,_,_,_,_,breakWhen))) => breakWhen
+      case Some(Op(_@UnitPipe(_,_,breakWhen))) => breakWhen
+      case Some(Op(_@OpReduce(_,_,_,_,_,_,_,_,_,_,breakWhen))) => breakWhen
+      case Some(Op(_@OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,breakWhen))) => breakWhen
+      case Some(Op(_@UnrolledReduce(_,_,_,_,_,breakWhen))) => breakWhen
+      case _ => None
+    }
+
     /** Find controllers between two iterators */
     def ctrlsBetween(top: Idx, bottom: Sym[_], chain: Seq[Sym[_]] = Seq()): Seq[Sym[_]] = {
       if (bottom == top.parent.s.get) Seq(bottom) ++ chain

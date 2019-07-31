@@ -5,6 +5,7 @@ import spatial.dsl._
 @spatial class LineBufs extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
+    println(s"REMEMBER: This app relies on the pipe binding transformer!")
     val init_dram = DRAM[I32](10,24)
     val init = (0::10,0::24){(i,j) => i*24 + j}
     val last_dram = DRAM[I32](3,24)

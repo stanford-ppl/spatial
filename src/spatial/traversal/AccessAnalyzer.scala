@@ -18,7 +18,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
   private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective start value
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
-  private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
+  private var scopes: Map[Idx,Seq[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
   private var mostRecentWrite: Map[Reg[_], Sym[_]] = Map.empty
 
   private def inLoop(loop: Sym[_], is: Seq[Idx], istarts: Seq[Ind[_]], block: Block[_]): Unit = {

@@ -62,7 +62,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
 
   /** Lanes tracking duplications in this scope */
-  var lanes: Unroller = UnitUnroller("Accel", false)
+  var lanes: Unroller = UnitUnroller("Accel", isInnerLoop = false)
   
   /** Mapping between each lane of an Unroller to sequence of Syms to be grouped in that lane (PoM only) */
   var laneMapping: Map[(Unroller, Int), Seq[Block[_]]] = Map.empty
@@ -89,7 +89,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   def crossSection(cchain: CounterChain, addr: List[Int]): CounterChain = {
     import argon.lang._
 
-    val ctrs2 = cchain.counters.zip(addr).map{case (ctr, i) => 
+    val ctrs2 = cchain.counters.zip(addr).map{case (ctr, i) =>
       // TODO: x.getIntValue.getOrElse(c.toInt) is only necessary if we allow dse to retune parameters (currently not the case)
       val start = ctr.start.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr start a constant or mark controller with Pipe.MOP!")}
       val step = ctr.step.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr step a constant or mark controller with Pipe.MOP!")}
@@ -144,7 +144,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
           }
         }
         val lhs2 = stage(ParallelPipe(enables,block))
-        lanes.unify(lhs, lhs2)        
+        lanes.unify(lhs, lhs2)
     }
     else if (!inHw) {
       dbgs(s"$lhs = $rhs [duplicate 1/1] in lane 0")
@@ -183,7 +183,12 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   override def mirrorNode[A](rhs: Op[A]): Op[A] = rhs match {
+    case u@UnitPipe(ens, block, stopWhen) if stopWhen.isDefined => UnitPipe(f(enables ++ ens), f(block), Some(memories(stopWhen.get,0).asInstanceOf[Reg[Bit]])).asInstanceOf[Op[A]]
     case e:Enabled[_] => e.mirrorEn(f, enables).asInstanceOf[Op[A]]
+    case LaneStatic(iter, resolutions) if unrollNum.getOrElse(iter.asInstanceOf[Idx], Seq()).size == 1 =>
+      val i = iter.asInstanceOf[Idx]
+      LaneStatic[FixPt[TRUE,_32,_0]](iter.asInstanceOf[FixPt[TRUE,_32,_0]], Seq(resolutions(unrollNum(i).head))).asInstanceOf[Op[A]]
+      // resolutions(unrollNum(i).head).asInstanceOf[Op[A]]
     case _ => super.mirrorNode(rhs)
   }
   override def updateNode[A](node: Op[A]): Unit = node match {
@@ -223,7 +228,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def P: Int = if (vectorize) 1 else Ps.product
     def V: Int = if (vectorize) Ps.product else 1
     def N: Int = Ps.length
-    def size: Int = if (__doLanes.size != 0) __doLanes.size else P
+    def size: Int = if (__doLanes.nonEmpty) __doLanes.size else P
     def prods: List[Int] = List.tabulate(N){i => Ps.slice(i+1,N).product }
 
     // The lane id of each unrolled lane. Norally it will be a list of Seqs with single element. If
@@ -293,6 +298,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def inLane[A](lane:Lane)(block: => A): A = {
       // Note that we don't use isolateSubst (or similar here) because that would also save/restore lanes
       val i = ulanes.indexOf(lane)
+      dbgs(s"in lane $lane, $i from $ulanes")
       val save     = subst
       val saveMems = memories
       val addr     = lane.map { l => parAddr(l) }.transpose
@@ -318,7 +324,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def map[A](block: Lane => A): List[A] = if (__doLanes.nonEmpty) __doLanes.map{p => inLane(List(p)){ block(List(p)) } } else ulanes.map { lane => inLane(lane) { block(lane) } }
 
 
-    def foreach(block: Lane => Unit): Unit = { dbgs(s"dolanes ${__doLanes}"); map(block) }
+    def foreach(block: Lane => Unit): Unit = { map(block) }
 
     def mapFirst[A](block: => A):A = inLane(ulanes.head) { block }
 

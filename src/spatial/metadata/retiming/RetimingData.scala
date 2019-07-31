@@ -12,7 +12,7 @@ import spatial.node.AccumMarker
   */
 abstract class Cycle extends Data[Cycle](Transfer.Remove) {
   def length: Double
-  def symbols: Set[Sym[_]]
+  def symbols: Seq[Sym[_]]
   def marker: AccumMarker
   def memory: Sym[_]
   def cycleID: Int
@@ -23,7 +23,7 @@ case class WARCycle(
     reader: Sym[_],
     writer: Sym[_],
     memory: Sym[_],
-    symbols: Set[Sym[_]],
+    symbols: Seq[Sym[_]],
     length: Double,
     marker: AccumMarker = AccumMarker.Unknown,
     cycleID: Int = -1)
@@ -32,8 +32,8 @@ case class WARCycle(
 }
 
 /** Access-after-access (AAA) cycle: Time-multiplexed reads/writes. */
-case class AAACycle(accesses: Set[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
-  def symbols: Set[Sym[_]] = accesses
+case class AAACycle(accesses: Seq[Sym[_]], memory: Sym[_], length: Double) extends Cycle {
+  def symbols: Seq[Sym[_]] = accesses
   def marker: AccumMarker = AccumMarker.Unknown
   def cycleID: Int = -1
   override def key: Class[_] = classOf[Cycle]

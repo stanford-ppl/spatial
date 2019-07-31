@@ -410,7 +410,7 @@ import spatial.metadata.control._
     val out = DRAM[Int](1,N)
 
     Accel {
-      val sram = SRAM[Int](M,N).noduplicate.buffer
+      val sram = SRAM[Int](M,N).noduplicate.buffer.hierarchical
       Foreach(iters.value by 1) { _ => 
         Foreach(N by 1){j => sram(0,j) = j}
         Foreach(1 until M by 1, N by 1 par N/2){(i,j) =>  // II = 1 for par = 1 and then increases for higher pars

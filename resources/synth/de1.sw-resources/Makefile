@@ -1,20 +1,47 @@
-# Set compiler args
 CC=g++
-CFLAGS=-DDE1SoC -std=c++11 -Wall -c -g -O0 -ftree-vectorize
-LDFLAGS=
-LDLIBS=-L /usr/lib
-SOURCES=Top.cpp 
+LINK=g++
+CROSS_COMPILE=arm-linux-gnueabihf-
+# arm-xilinx-linux-gnueabi- 
+FRINGE_SRC=./SW
+HOST_SRC=./
+
+SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
+
+INCLUDES +=													\
+			-I${HOST_SRC}/datastructures 	\
+			-I$(JAVA_HOME)/include 				\
+			-I$(JAVA_HOME)/include/linux 	\
+			-I../sw-resources 					  	\
+			-I${FRINGE_SRC} 					  	\
+
+
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=Top
 
-all: $(SOURCES) $(EXECUTABLE)
+DEFINES=$(OBJECTS:.o=.d)
 
-$(EXECUTABLE):$(OBJECTS)
-	$(CC) -o $@ $(LDFLAGS) $(OBJECTS) $(LDLIBS)
-	utils/set_perms $(EXECUTABLE)
+CXXFLAGS=-DDE1SoC  -D__USE_STD_STRING__ -std=c++11
+LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm -static
 
-.cpp.o:
-	$(CC) $(CFLAGS) $< -o $@
+all: pre-build-checks Top
 
+pre-build-checks:
+ifndef JAVA_HOME
+GUESS=$(shell readlink -f $(shell dirname $(shell readlink -f `which java`))/../../)
+$(warning JAVA_HOME is not set, guessing to be ${GUESS}!)
+JAVA_HOME=$(GUESS)
+endif
+
+
+Top: $(OBJECTS)
+	$(CROSS_COMPILE)$(LINK) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@ $(LIBS) $(SC_LIBS) 2>&1 | c++filt
+
+%.o: %.cpp
+	  $(CROSS_COMPILE)$(CC) $(INCLUDES) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@  $<
+
+## Clean up
 clean:
-	\rm -f *.o $(EXECUTABLE) $(TAR)
+	rm -f $(OBJECTS) $(DEFINES) *.a *.vcd *.dat ${TOP} Top
+
+# Set the default Makefile goal to be 'all', else it will default to executing
+# the first target in ${TOP}.mk
+.DEFAULT_GOAL := all

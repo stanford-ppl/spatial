@@ -77,6 +77,9 @@ package object memory {
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
 
+    def isMustMerge: Boolean = metadata[MustMerge](s).exists(_.flag)
+    def isMustMerge_=(flag: Boolean): Unit = metadata.add(s, MustMerge(flag))
+
     def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
     def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
 
@@ -392,6 +395,19 @@ package object memory {
     /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
     def scatterStreams: List[Sym[_]] = s.consumers.filter(_.isScatter).toList
 
+    def barrier: Option[Int] = metadata[Barrier](s).map(_.id)
+    def setBarrier(id: Int): Unit = metadata.add(s, Barrier(id))
+
+    def waitFors: Option[List[Int]] = metadata[Wait](s).map(_.ids.toList)
+    def waitFor(id: Int*): Unit = {
+      val wait = metadata[Wait](s).getOrElse {
+        val w = Wait()
+        metadata.add(s, w)
+        w
+      }
+      wait.ids ++= id
+    }
+
     /** Get BurstCmd bus */
     def addrStream: Sym[_] = s match {
       case Op(FringeDenseStore(_,cmd,_,_)) => cmd
@@ -413,6 +429,16 @@ package object memory {
       case Op(FringeSparseStore(_,_,ack)) => ack
       case _ => throw new Exception("No dataStream for $s")
     }
+  }
+
+  def transferSyncMeta(from:Sym[_], to:Sym[_]) = {
+    from.waitFors.foreach { ids =>
+      to.waitFor(ids:_*)
+    }
+    from.barrier.foreach { id =>
+      to.setBarrier(id)
+    }
+    to
   }
 
 

@@ -5,8 +5,6 @@ import spatial.metadata.access._
 import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
-import utils.tags.instrument
-import utils.implicits.collections._
 
 import scala.collection.mutable.ArrayBuffer
 import spatial.util.IntLike._
@@ -18,7 +16,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _: MemAlloc[_,_] if lhs.isLocalMem  => unrollMemory(lhs)
 
     case op: StatusReader[_] => unrollStatus(lhs, op)
-    case op: Resetter[_]   => unrollResetter(lhs, op)
+    case op: Resetter[_]   => unrollResetter(lhs.asInstanceOf[Sym[Void]], op)
     case op: Accessor[_,_] => unrollAccess(lhs, op)
     case op: ShuffleOp[_] => unrollShuffle(lhs, op)
 
@@ -88,7 +86,7 @@ trait MemoryUnrolling extends UnrollingBase {
   def unrollMemory(mem: Sym[_])(implicit ctx: SrcCtx): List[Sym[_]] = {
     val dups = lanes.duplicateMem(mem){_ => duplicateMemory(mem)}
     if (lanes.vectorize && dups.distinct.size != 1) { //TODO: Can we check this earlier in MemoryConfiguration?
-      error(s"Invalid duplication for $mem for plasticine. Inconsistent duplications across lanes ${dups}")
+      error(s"Invalid duplication for $mem for plasticine. Inconsistent duplications across lanes $dups")
       IR.logError()
     }
     Nil // No correct default substitution for mem - have to know dispatch number of the access
@@ -118,7 +116,7 @@ trait MemoryUnrolling extends UnrollingBase {
 
   def unrollShuffle[A](lhs: Sym[_], rhs: ShuffleOp[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
     implicit val A: Bits[A] = rhs.A
-    val in = lanes.map { i => f(rhs.in).asInstanceOf[Tup2[A,Bit]] }
+    val in = lanes.map { _ => f(rhs.in) }
     implicit val vT: Type[Vec[Tup2[A,Bit]]] = Vec.bits[Tup2[A,Bit]](in.length)
     val shuffle = stage(ShuffleCompressVec(in))
     lanes.unify(lhs, shuffle)
@@ -129,7 +127,7 @@ trait MemoryUnrolling extends UnrollingBase {
       register(lhs -> elem)
       elem
     }
-    vec.toList
+    vec
   }
 
   case class UnrollInstance(
@@ -231,7 +229,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty && {lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}}.size > 1) {
           val segmentMapping = lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}
           dbgs(s"Fracturing access $lhs into more than 1 segment:")
-          segmentMapping.collect{case (segment, lanesInSegment) if (lanesInSegment.forall(laneIds.contains)) => 
+          segmentMapping.collect{case (segment, lanesInSegment) if lanesInSegment.forall(laneIds.contains) =>
             val vecsInSegment = lanesInSegment.map(laneIdToVecId)
             dbgs(s"Segment $segment contains lanes $lanesInSegment (vecs $vecsInSegment)")
             val data3 = if (data2.isDefined) vecsInSegment.map(data2.getOrElse(Nil)(_)) else Nil
@@ -249,24 +247,33 @@ trait MemoryUnrolling extends UnrollingBase {
         // hack for issue #90
         val newOfs = mems.map{case UnrollInstance(m,_,_,p,_,_) => (m,p)}.take(i).count(_ == (mem2,port))
         
-        banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, i) =>
-          val segmentBase = banked.flatMap(_._2).take(i).length
-          val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(i) else 0
-          // If broadcast exists within a vectorized unrolled access, then just broadcast that lane.
+        banked.flatMap(_._1.s).zipWithIndex.foreach{case (s, ii) =>
+          val segmentBase = banked.flatMap(_._2).take(ii).length
+          val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(ii) else 0
+          // If broadcast exists within a vectorized unrolled access, then just broadcast that ulane.
           // For PIR only
-          val reordered = portReordering.map { ln =>
-            val castgroup = lanes.ulanes(ln).map(port.castgroup(_)) // For FPGA will be Seq of one element
-            val broadcast = lanes.ulanes(ln).map(port.broadcast(_)) // For FPGA will be Seq of one element
-            val map:Map[Int,Int] = castgroup.zip(broadcast).groupBy { _._1 }.map { case (grp, bcs) =>
-              val bc = if (bcs.exists { _._2 == 0}) 0 else bcs.head._2
+          // portReordering is a list o lane IDs. For FPGA, it's a list of lanes. For Plasticine,
+          // it's List(0) for vectorized lane
+          val reordered = portReordering.flatMap { ln =>
+            // For FPGA will be Seq of one element
+            // For vectorized lane in PIR, it's the broadcast/castgroup per lane
+            val castgroup: List[Int] = lanes.ulanes(ln).map(port.castgroup(_))
+            val broadcast: List[Int] = lanes.ulanes(ln).map(port.broadcast(_))
+            dbgs(s"""laneid : $ln lanes:${lanes.ulanes(ln)} castgroup:$castgroup broadcast:$broadcast""")
+            val map: Map[Int, Int] = castgroup.zip(broadcast).groupBy {
+              _._1
+            }.map { case (grp, bcs) =>
+              val bc = if (bcs.exists {
+                _._2 == 0
+              }) 0 else bcs.head._2
               (grp, bc)
             }
-            castgroup.distinct.map { g => (g, map(g)) }
-          }.flatten
+            castgroup.map { g => (g, map(g)) }
+          }
           val reorderedCastgroup = reordered.map { _._1 }
           val reorderedBroadcast = reordered.map { _._2 }
-          val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(reorderedCastgroup) else reorderedCastgroup
-          val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(i).map(reorderedBroadcast) else reorderedBroadcast
+          val castgroup2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(ii).map(reorderedCastgroup) else reorderedCastgroup
+          val broadcast2 = if (lhs.segmentMapping.nonEmpty) banked.map(_._2).apply(ii).map(reorderedBroadcast) else reorderedBroadcast
           if (s.getPorts(0).isDefined) {
             val port2 = Port(port.bufferPort,port.muxPort, port.muxOfs + newOfs + segmentBase,castgroup2,s.port.broadcast.zip(broadcast2).map{case (a,b) => scala.math.min(a,b)})
             s.addPort(dispatch=0, Nil, port2)
@@ -278,6 +285,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addDispatch(Nil, 0)
           s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
+          transferSyncMeta(lhs, s)
           mem2.substHotSwap(lhs, s)
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); //strMeta(s)
@@ -324,11 +332,11 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileShiftIn[_,_]  => addr
     case _:RegFileRead[_,_]     => addr
     case _:RegFileWrite[_,_]    => addr
-    case _:LineBufferEnq[_]     => addr.map{case laneAddr => Seq(laneAddr(0))}
-    case _:LineBufferRead[_]    => addr.map{case laneAddr => 
-      Seq(laneAddr(0)) ++ inst.bankSelects(mem, laneAddr).drop(1)
+    case _:LineBufferEnq[_]     => addr.map{laneAddr => Seq(laneAddr.head)}
+    case _:LineBufferRead[_]    => addr.map{laneAddr =>
+      Seq(laneAddr.head) ++ inst.bankSelects(mem, laneAddr).drop(1)
     }
-    case _ => addr.map{case laneAddr =>
+    case _ => addr.map{laneAddr =>
       inst.bankSelects(mem, laneAddr)
     }
   }
@@ -342,11 +350,11 @@ trait MemoryUnrolling extends UnrollingBase {
     case Op(_:RegFileShiftIn[_,_])  => Nil
     case Op(_:RegFileRead[_,_])     => Nil
     case Op(_:RegFileWrite[_,_])    => Nil
-    case Op(_:LineBufferEnq[_])     => addr.map{case laneAddr => laneAddr(0)}
-    case Op(_:LineBufferRead[_])  => addr.map{case laneAddr => 
+    case Op(_:LineBufferEnq[_])     => addr.map{laneAddr => laneAddr.head}
+    case Op(_:LineBufferRead[_])  => addr.map{laneAddr =>
       inst.bankOffset(mem, Seq(0.to[I32]) ++ laneAddr.drop(1))
     }
-    case _ => addr.map{case laneAddr =>
+    case _ => addr.map{laneAddr =>
       inst.bankOffset(mem, laneAddr)
     }
   }
@@ -392,10 +400,10 @@ trait MemoryUnrolling extends UnrollingBase {
         }
         dispatches.map{dispatchId =>
           val ports:Seq[Port] = vids.map { vid => access.port(dispatchId, vid) }.distinct
-          dbgs(s"ports:")
-          ports.foreach { p =>
-            dbgs(s"$p")
-          }
+          //dbgs(s"ports:")
+          //ports.foreach { p =>
+            //dbgs(s"$p")
+          //}
           //assert(ports.size == 1, s"More than one ports across lanes for ${access} ${access.ctx} vids=$vids")
           val port = Port(
             bufferPort=assertUnify(ports.map{_.bufferPort}, s"access=$access (${access.ctx}) vids=$vids bufferPort"),
@@ -455,15 +463,15 @@ trait MemoryUnrolling extends UnrollingBase {
 
   /** Helper classes for unrolling */
   sealed abstract class UnrolledAccess[T] { def s: Seq[Sym[_]] }
-  case class URead[T](v: Sym[T]) extends UnrolledAccess[T] { def s = Seq(v) }
-  case class UVecRead[T](v: Vec[T])  extends UnrolledAccess[T] { def s = Seq(v) }
-  case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s = Seq(v) }
-  case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s = vs.flatMap(_.s) }
+  case class URead[T](v: Sym[T]) extends UnrolledAccess[T] { def s: Seq[Sym[T]] = Seq(v) }
+  case class UVecRead[T](v: Vec[T])  extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Vec[T]] = Seq(v) }
+  case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Void] = Seq(v) }
+  case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Void] = vs.flatMap(_.s) }
 
   sealed abstract class DataOption { def s: Option[Sym[_]] }
-  case object NoData extends DataOption { def s = None }
-  case class VecData(v: Vec[_]) extends DataOption { def s = Some(v) }
-  case class Data(v: Sym[_]) extends DataOption { def s = Some(v) }
+  case object NoData extends DataOption { def s: Option[Sym[_]] = None }
+  case class VecData(v: Vec[_]) extends DataOption { def s: Option[Sym[_]] = Some(v) }
+  case class Data(v: Sym[_]) extends DataOption { def s: Option[Sym[_]] = Some(v) }
   object DataOption {
     def apply(data: Option[Sym[_]]): DataOption = data match {
       case Some(d: Vec[_]) => VecData(d)
@@ -491,7 +499,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))
     case op:MergeBufferBound[_] => UWrite[A](stage(MergeBufferBound(mem.asInstanceOf[MergeBuffer[A]],
                                              op.way, data.head.asInstanceOf[Bits[I32]], enss.head)))
-    case op:MergeBufferInit[_] => UWrite[A](stage(MergeBufferInit(mem.asInstanceOf[MergeBuffer[A]],
+    case _:MergeBufferInit[_] => UWrite[A](stage(MergeBufferInit(mem.asInstanceOf[MergeBuffer[A]],
                                               data.head.asInstanceOf[Bits[Bit]], enss.head)))
     case _:FIFOEnq[_]        => UWrite[A](stage(FIFOBankedEnq(mem.asInstanceOf[FIFO[A]], data, enss)))
     case _:LIFOPush[_]       => UWrite[A](stage(LIFOBankedPush(mem.asInstanceOf[LIFO[A]], data, enss)))
@@ -526,7 +534,7 @@ trait MemoryUnrolling extends UnrollingBase {
         UWrite[A](stage(RegFileShiftIn(mem.asInstanceOf[RegFilex[A]], dat, addr, ens, op.axis)))
       })
 
-    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, bank(0), enss)))
+    case _:LineBufferEnq[_]      => UWrite[A](stage(LineBufferBankedEnq(mem.asInstanceOf[LineBuffer[A]], data, bank.head, enss)))
     case _:LineBufferRead[_]     => UVecRead(stage(LineBufferBankedRead(mem.asInstanceOf[LineBuffer[A]], bank, ofs, enss)))
 
     case _ => throw new Exception(s"bankedAccess called on unknown access node ${node.productPrefix}")

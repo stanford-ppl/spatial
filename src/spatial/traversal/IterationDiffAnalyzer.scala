@@ -114,9 +114,14 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                   ticksBeforeRepeatAddr
                 }
 
-                // Figure out worst-case-scenario number of ticks (i.e. smallest positive value) for the very first reader to catch up to a writer
+                def corners(writers: Seq[SparseMatrix[Idx]], readers: Seq[SparseMatrix[Idx]])(func: (SparseMatrix[Idx],SparseMatrix[Idx]) => Int): List[Int] = {
+                  List(func(writers.head, readers.head), func(writers.last, readers.head), func(writers.head, readers.last), func(writers.last, readers.last))
+                }
+
+                // Figure out worst-case-scenario number of ticks (i.e. smallest positive value) for the very first reader to catch up to a writer.
+                //   To get worst case, check every combination of the four corners of iteration space (write lane 0, write lane N, read lane 0, read lane N)
                 //   If all values are 0, then take 0
-                val minTicksPairings = thisIterWrites.map{w => ticksToCoverDist(w, thisIterReads.head)}.toList
+                val minTicksPairings = corners(thisIterWrites, thisIterReads){(w,r) => ticksToCoverDist(w, r)}
                 val minTicksToOverlap = if (minTicksPairings.forall(_ == 0)) 0 else minTicksPairings.filter(_ != 0).sorted.head
                 dbgs(s"minTickslist is ${minTicksPairings}")
                 dbgs(s"This accumulation needs result written ${minTicksToOverlap} (or more) ticks prior")

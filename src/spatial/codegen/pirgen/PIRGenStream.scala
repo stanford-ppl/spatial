@@ -20,14 +20,6 @@ trait PIRGenStream extends PIRCodegen {
 
     case op@StreamInBankedRead(strm, ens) =>
       stateRead(lhs, strm, None, None, ens)
-      val Def(StreamInNew(bus)) = strm
-      bus match {
-        case BurstAckBus | ScatterAckBus =>
-          val count = s"countAck_$lhs"
-          emit(src"""val $count = CountAck().input($lhs).tp(Bool)""")
-          emit(src"""MemWrite().setMem(argOut().name("$count").tp(Bool)).data($count)""")
-        case bus =>
-      }
 
     case StreamOutBankedWrite(strm, data, ens) =>
       stateWrite(lhs, strm, None, None, data, ens)

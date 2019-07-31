@@ -6,3 +6,4 @@ feature.memories.*
 feature.control.*
 feature.buffering.*
 feature.banking.*
+feature.synchronization.*

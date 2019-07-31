@@ -42,13 +42,13 @@ trait CppGenAccel extends CppGenCommon {
            val msg = b match {
              case Def(AssertIf(_,_,m)) => 
                val mm = m match {
-                 case Some(Const(message)) => s"${message}".replace("\"","'")
+                 case Some(Const(message)) => s"$message".replace("\"","'")
                  case _ => "No Assert Message :("
                }
-               s"""${b.ctx} - """ + s"""${mm}"""
+               s"""${b.ctx} - """ + s"""$mm"""
              case _ => s"${b.ctx}"
            }
-           emit(s"""if (${b}_act) {std::cout << "===================\\n  Breakpoint $i triggered!\\n    ${msg} \\n===================" << std::endl; early_exit = true;}  """)
+           emit(s"""if (${b}_act) {std::cout << "===================\\n  Breakpoint $i triggered!\\n    $msg \\n===================" << std::endl; early_exit = true;}  """)
          }
          emit("""if (!early_exit) {std::cout << "No breakpoints triggered :)" << std::endl;} """)
        }
@@ -56,29 +56,29 @@ trait CppGenAccel extends CppGenCommon {
        if (spatialConfig.enableInstrumentation) {
          emit(src"""std::ofstream instrumentation ("./instrumentation.txt");""")
  
-         emit(s"// Need to instrument ${instrumentCounters}")
+         emit(s"// Need to instrument $instrumentCounters")
          // In order to get niter / parent execution, we need to know the immediate parent of each controller and divide out that guy's niter
          val immediate_parent_niter_hashmap = scala.collection.mutable.HashMap[Int, Sym[_]]()
          val ranWithArgIns = if (argIns.nonEmpty) argIns.mkString(" << \" \" << ") else " \" \" "
          val ranWithArgIOs = if (argIOs.nonEmpty) argIOs.mkString(" << \" \" << ") else " \" \" "
-         emit(s"""std::cout << "ArgIns:" << ${ranWithArgIns} << ", ArgIOs:" << ${ranWithArgIOs} << std::endl;""")
+         emit(s"""std::cout << "ArgIns:" << $ranWithArgIns << ", ArgIOs:" << $ranWithArgIOs << std::endl;""")
          open(s"if (instrumentation.is_open()) {")
-           emit(s"""instrumentation << "ArgIns:" << ${ranWithArgIns} << ", ArgIOs:" << ${ranWithArgIOs} << std::endl;""")
+           emit(s"""instrumentation << "ArgIns:" << $ranWithArgIns << ", ArgIOs:" << $ranWithArgIOs << std::endl;""")
          close("}")
 
          instrumentCounters.foreach{c => 
            immediate_parent_niter_hashmap.update(c._2, c._1)
-           emit(s""" // immediate parent hashmap now ${immediate_parent_niter_hashmap}, current node ${c._1} is at depth ${c._2}""")
+           emit(s""" // immediate parent hashmap now $immediate_parent_niter_hashmap, current node ${c._1} is at depth ${c._2}""")
            val indent = "  "*c._2
            emit(s"""long ${c._1}_cycles = c1->getArg(${quote(c._1).toUpperCase}_cycles_arg, false);""")
            emit(s"""long ${c._1}_iters = c1->getArg(${quote(c._1).toUpperCase}_iters_arg, false);""")
-           val immediate_parent = if (immediate_parent_niter_hashmap.get(c._2-1).isDefined) immediate_parent_niter_hashmap.get(c._2-1).get else c._1
+           val immediate_parent = if (immediate_parent_niter_hashmap.get(c._2-1).isDefined) immediate_parent_niter_hashmap(c._2 - 1) else c._1
            emit(s"""long ${c._1}_iters_per_parent = ${c._1}_iters / std::max((long)1,${immediate_parent}_iters);""")
            emit(s"""long ${c._1}_avg = ${c._1}_cycles / std::max((long)1,${c._1}_iters);""")
-           emit(s"""std::cout << "${indent}${c._1} - " << ${c._1}_avg << " (" << ${c._1}_cycles << " / " << ${c._1}_iters << ") ";""") 
+           emit(s"""std::cout << "$indent${c._1} - " << ${c._1}_avg << " (" << ${c._1}_cycles << " / " << ${c._1}_iters << ") ";""")
            emit(s"""std::cout << "[" << ${c._1}_iters_per_parent << " iters/parent execution]";""")
            open(s"if (instrumentation.is_open()) {")
-             emit(s"""instrumentation << "${indent}${c._1} - " << ${c._1}_avg << " (" << ${c._1}_cycles << " / " << ${c._1}_iters << ") ";""") 
+             emit(s"""instrumentation << "$indent${c._1} - " << ${c._1}_avg << " (" << ${c._1}_cycles << " / " << ${c._1}_iters << ") ";""")
              emit(s"""instrumentation << "[" << ${c._1}_iters_per_parent << " iters/parent execution]";""")
            close("}")
            if (hasBackPressure(c._1.toCtrl) || hasForwardPressure(c._1.toCtrl)) {
@@ -99,43 +99,43 @@ trait CppGenAccel extends CppGenCommon {
        }
        // emit(src"// $lhs $reg $v $en reg write")
 
-    case UnitPipe(_,func) => 
+    case UnitPipe(_,func,_) =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)
       controllerStack.pop()
 
-    case UnrolledForeach(ens,cchain,func,iters,valids,_) if (inHw) =>
+    case UnrolledForeach(_, _,func, _, _,_) if inHw =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)
       controllerStack.pop()
 
-    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
+    case UnrolledReduce(_, _,func, _, _,_) =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)
       controllerStack.pop()
 
-    case ParallelPipe(ens,func) =>
+    case ParallelPipe(_,func) =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)
       controllerStack.pop()      
 
-    case op@Switch(selects, body) if inHw => 
+    case Switch(_, body) if inHw =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(body)
       controllerStack.pop()      
 
-    case op@SwitchCase(body) if inHw =>
+    case SwitchCase(body) if inHw =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(body)
       controllerStack.pop()      
 
-    case StateMachine(ens,start,notDone,action,nextState) =>
+    case StateMachine(_, _,notDone,action,nextState) =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)    
       visitBlock(notDone)
@@ -143,7 +143,7 @@ trait CppGenAccel extends CppGenCommon {
       visitBlock(nextState)
       controllerStack.pop()
 
-    case ExitIf(en) => 
+    case ExitIf(_) =>
       // Emits will only happen if outside the accel
       emit(src"exit(1);")
       if (inHw) earlyExits = earlyExits :+ lhs
@@ -153,10 +153,10 @@ trait CppGenAccel extends CppGenCommon {
       val str = src"""${m.getOrElse("\"API assert failed with no message provided\"")}"""
       emit(src"""string $lhs = ("\n=================\n" + ($str + "\n=================\n"));""")
       val enable = if (en.toList.isEmpty) "true" else en.map(quote).mkString("&")
-      emit(src"""if ($enable) { ASSERT($cond, ${lhs}.c_str()); }""")
+      emit(src"""if ($enable) { ASSERT($cond, "%s", $lhs.c_str()); }""")
       if (inHw) earlyExits = earlyExits :+ lhs
 
-    case BreakpointIf(en) => 
+    case BreakpointIf(_) =>
       // Emits will only happen if outside the accel
       emit(src"exit(1);")
       if (inHw) earlyExits = earlyExits :+ lhs

@@ -78,6 +78,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
   // Collect when all stages are done with all iters
   val allDone = done.map(_.io.output).reduce{_&&_} // TODO: Retime tree
+  val finished = allDone || io.done || {if (p.depth > 1) done.last.io.input.set else false.B}
 
   // Tie down the asyn_resets
   active.foreach(_.io.input.asyn_reset := false.B)
@@ -126,7 +127,7 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
       // Define logic for first stage
       active(0).io.input.set := !done(0).io.output & !io.ctrDone & io.enable & io.backpressure & ~iterDone(0).io.output & !io.doneIn(0)
       active(0).io.input.reset := io.doneIn(0) | io.rst | io.parentAck | allDone | io.break
-      iterDone(0).io.input.set := (io.doneIn(0) & !synchronize) | (!io.maskIn(0) & io.enable & io.backpressure) | io.break
+      iterDone(0).io.input.set := ((io.doneIn(0) & !synchronize) | (!io.maskIn(0) & io.enable & io.backpressure) | io.break) && !finished
       done(0).io.input.set := (io.ctrDone & !io.rst) | io.break
 
       // Define logic for the rest of the stages
@@ -208,10 +209,10 @@ class OuterControl(p: ControlParams) extends GeneralControl(p) {
 
   }
 
-  iterDone.zip(io.childAck).foreach{ case (id, ca) => ca := id.io.output }
+  iterDone.zip(io.childAck).foreach{ case (id, ca) => ca := id.io.output || io.break }
   io.enableOut.zipWithIndex.foreach{case (eo,i) => eo := io.enable & active(i).io.output & ~iterDone(i).io.output & io.maskIn(i) & ~allDone & {if (i == 0) ~io.ctrDone else true.B}}
   io.enableOut.foreach(chisel3.core.dontTouch(_))
-  io.ctrRst := getRetimed(risingEdge(allDone), 1)
+  io.ctrRst := getRetimed(risingEdge(allDone) || io.parentAck, 1)
 
   // Done latch
   val doneLatchReg = RegInit(false.B)
@@ -270,7 +271,7 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
   io.selectsIn.zip(io.selectsOut).foreach{case(a,b)=>b:=a & io.enable}
   io.enableOut <> DontCare
   val doneLag = if (p.cases > 1) 0 else p.latency
-  io.ctrRst := risingEdge(getRetimed(done.io.output, doneLag, io.backpressure)) | io.rst 
+  io.ctrRst := risingEdge(getRetimed(done.io.output, doneLag, io.backpressure)) | io.rst | io.parentAck
 
   if (!p.isFSM) {
     // Set outputs
@@ -313,7 +314,7 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
     io.state := stateFSM.io.rPort(0).output.head.asSInt
 
     // Screwiness with "switch" signals until we have better fsm test cases
-    io.childAck.last := io.doneIn.last
+    io.childAck.last := io.doneIn.last || io.parentAck
 
     doneReg.io.input.set := io.doneCondition & io.enable
     doneReg.io.input.reset := ~io.enable

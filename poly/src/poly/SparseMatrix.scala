@@ -4,10 +4,11 @@ import utils.implicits.collections._
 
 case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
   def keys: Set[K] = rows.map(_.cols.keySet).fold(Set.empty)(_++_)
-  def replaceKeys(keySwap: Map[K,K]): SparseMatrix[K] = {
+  def replaceKeys(keySwap: Map[K,(K,Int)]): SparseMatrix[K] = {
     val rows2 = rows.map{r => 
-      val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,k) -> v)}
-      SparseVector[K](cols2, r.c, r.allIters)
+      val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,(k,0))._1 -> v)}
+      val offset = r.cols.collect{case (k,_) if (keySwap.contains(k)) => keySwap(k)._2}.sum
+      SparseVector[K](cols2, r.c + offset, r.allIters)
     }
     SparseMatrix[K](rows2)
   }

@@ -32,7 +32,7 @@ trait ForeachUnrolling extends UnrollingBase {
     val newEns = enables ++ ens
     if (mop || unrLanes.size == 1 || lhs.isInnerControl) {
       val blk   = inLanes(unrLanes){ substituteBlock(func) }
-      val lhs2  = stageWithFlow(UnitPipe(newEns, blk)){lhs2 => transferData(lhs,lhs2) }
+      val lhs2  = stageWithFlow(UnitPipe(newEns, blk, stopWhen)){lhs2 => transferData(lhs,lhs2) }
       lhs2.unrollBy = unrLanes.Ps.product
       dbgs(s"Created unit pipe ${stm(lhs2)}")
       lhs2    
@@ -42,7 +42,7 @@ trait ForeachUnrolling extends UnrollingBase {
           dbgs(s"Staging lane $p (addr ${unrLanes.parAddr(p)}) of $unrLanes")
           val cchainPart = crossSection(cchain, unrLanes.parAddr(p))
           val blk   = inLanes(unrLanes,p){ substituteBlock(func) }
-          val lhs2  = stageWithFlow(UnitPipe(newEns, blk)){lhs2 => transferData(lhs,lhs2) }
+          val lhs2  = stageWithFlow(UnitPipe(newEns, blk, stopWhen)){lhs2 => transferData(lhs,lhs2) }
         }
       }
       val lhs3 = stage(ParallelPipe(newEns, blocks))

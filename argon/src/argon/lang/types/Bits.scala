@@ -85,6 +85,15 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
       stage(DataAsBits(this))
   }
 
+    /**
+    * Converts a number of A bits to a vector of numbers with B bits each, which is useful for saving precious JVM bytecode
+    */
+    @api def asVec[B:Bits]: Vec[B] = {
+      implicit val tV: Vec[B] = Vec.bits[B](Bits[A].nbits/Bits[B].nbits)
+      stage(DataAsVec[A,B](this))
+    }
+
+
   // --- Typeclass Methods
   @rig def nbits: Int
   @rig def zero: A

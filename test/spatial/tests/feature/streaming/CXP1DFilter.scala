@@ -53,8 +53,8 @@ import spatial.tests.apps._
         // Receive
         Pipe{
           val raw: U256 = in.value
-          val pxls = List.tabulate(256/pxlBits){i => raw.bits((i+1)*pxlBits-1::i*pxlBits).as[I16]}
-          input_fifo.enqVec(Vec.ZeroFirst(pxls:_*))
+//          val pxls = List.tabulate(256/pxlBits){i => raw.bits((i+1)*pxlBits-1::i*pxlBits).as[I16]}
+          input_fifo.enqVec(raw.asVec[I16])//Vec.ZeroFirst(pxls:_*))
         }
         // Modify
         Pipe{
@@ -69,7 +69,7 @@ import spatial.tests.apps._
             // // DEBUG
             // deriv store deriv_fifo
             // Store results
-            out := cat(result.deqVec(256/16).asBits).as[U256]
+            out := result.deqVec(256/16).asPacked[U256]
           }
         }
       }

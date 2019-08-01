@@ -4,6 +4,7 @@ import spatial.dsl._
 
 @spatial class UserVectors extends SpatialTest {
   type Q4 = FixPt[FALSE,_4,_0]
+  type Q64 = FixPt[FALSE,_64,_0]
 
   def main(args: Array[String]): Unit = {
     Accel {
@@ -20,6 +21,9 @@ import spatial.dsl._
 
       val x = vB(0)
 
+      val fat = 9999.to[Q64]
+      val asVec = fat.asVec[Q4]
+
       println(vL(1::0)) // Should be Vector.ZeroFirst(12,11)
       println(vB(0::1)) // Should be Vector.ZeroFirst(10,11)
 
@@ -28,6 +32,8 @@ import spatial.dsl._
 
       println(sliceL.asBits) // Should be 0b1011,1100
       println(sliceB.asBits) // Should be 0b1011,1010
+
+      println(asVec) // Should be 9999 sliced into 16 elements
 
       assert(vL(0) == C, "0th element of little vector should be C")
       assert(vL(1) == B, "1st element of little vector should be B")

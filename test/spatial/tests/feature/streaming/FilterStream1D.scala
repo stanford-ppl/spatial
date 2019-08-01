@@ -1,4 +1,4 @@
-package spatial.tests.apps
+package spatial.tests.feature.streaming
 
 /* This app is a fancier version of Differentiator and EdgeDetector.  It takes a 1D stream of data that has roughly this shape with lots of noise and shifts:
                                                        
@@ -120,7 +120,6 @@ object SpatialHelper {
   val colTileSize = 64
   val rowTileSize = 16
   val deriv_window = 40
-  type P = FixPt[TRUE,_112,_0]
   def main(args: Array[String]): Unit = {
 
     // // Get reference edges
@@ -186,7 +185,7 @@ object SpatialHelper {
         input_fifo load input_dram(r, 0::COLS)
 
         // Stage 2: Process (Force II = 1 to squeeze sr write and sr read into one cycle)
-        SpatialHelper.ComputeUnit[T](COLS, sharp_kernel, input_fifo, issue, result, r, rowTileSize, LINES_TODO)
+          SpatialHelper.ComputeUnit[T](COLS, sharp_kernel, input_fifo, issue, result, r, rowTileSize, LINES_TODO)
 
         // Stage 3: Store
         Pipe{

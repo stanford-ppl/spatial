@@ -28,6 +28,8 @@ import argon.Op
     val Y10 = ArgOut[Int]
     val Y11 = ArgOut[Int]
     val Y12 = ArgOut[Int]
+    val Y13 = ArgOut[Int]
+    val Y14 = ArgOut[Int]
 
     Accel {
       /**
@@ -194,7 +196,7 @@ import argon.Op
               |__|----'
                           
       */
-      val acc9 = Reg[Int](0) // Valid accumulation
+      val acc9 = Reg[Int](0) // Valid accumulation, but only monsters would write it this way
       'ACC9.Foreach(4 by 1) { i =>
         val t = List.tabulate(8) { j => X.value * X.value }.sumTree
         acc9 := mux(i != 0, acc9.value, 0) + t
@@ -246,18 +248,60 @@ import argon.Op
                /\ /  |      
               |  +   |      
               |  |   | 
-    i==0 --> \````/  |
+    j==0 --> \````/  |
               ``|`   |
                _|    |       
               |__|---'
                           
       */
-      val acc12 = Reg[Int](0) // Valid accumulation but tricky because compound ctr chain (watch your reset condition)
-      'ACC12.Foreach(2 by 1, 4 by 1) { (i,j) =>
+      val acc12 = Reg[Int](0) // Not a valid accumulation because mux condition is not based on innermost iterators
+      'ACC12.Foreach(2 by 1, 4 by 1, 4 by 1) { (i,j,k) =>
         val t = List.tabulate(8) { j => X.value * X.value }.sumTree
-        acc12 := mux(i == 0, t, t + acc12.value)
+        acc12 := mux(j == 0, t, t + acc12.value)
       }
       Y12 := acc12
+
+      /**
+               t   __
+               /\ /  |
+              |  +   |
+              |  |   |
+    j==0 --> \````/  |
+   & k==0     ``|`   |
+               _|    |
+              |__|---'
+
+      */
+      val acc13 = Reg[Int](0) // Valid accumulation but tricky because compound ctr chain (watch your reset condition)
+      'ACC13.Foreach(2 by 1, 4 by 1, 4 by 1) { (i,j,k) =>
+        val t = List.tabulate(8) { j => X.value * X.value }.sumTree
+        acc13 := mux(j == 0 && k == 0, t, t + acc13.value)
+      }
+      Y13 := acc13
+
+            /**
+                   .--.
+                0  |  |
+                |  |  |
+      i==0 --> \````/ |
+                ``|`  |
+              t1  |   |
+               \ /    |
+                +     |
+           t2   |     |
+             \ /      |
+              +       |
+             _|       |
+            |__|------'
+
+      */
+      val acc14 = Reg[Int](0) // Valid accumulation but need to be careful about capturing the add chain
+      'ACC14.Foreach(4 by 1) { i =>
+        val t1 = List.tabulate(8) { j => X.value * X.value }.sumTree
+        val t2 = List.tabulate(8) { i => X.value }.sumTree
+        acc14 := t1 + mux(i == 0, 0, acc14.value) + t2
+      }
+      Y14 := acc14
 
     }
 
@@ -272,7 +316,9 @@ import argon.Op
     val gold9 =  (args(0).to[Int] * args(0).to[Int]) * 4 * 8
     val gold10 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8
     val gold11 = (args(0).to[Int] * args(0).to[Int]) * 8
-    val gold12 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8
+    val gold12 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8 // is this right?
+    val gold13 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8 // is this right?
+    val gold14 = (args(0).to[Int] * args(0).to[Int]) * 4 * 8 + (args(0).to[Int]) * 4 * 8 // is this right?
 
     println(r"acc1: $Y1 =?= $gold1")
     println(r"acc2: $Y2 =?= $gold2")
@@ -286,6 +332,8 @@ import argon.Op
     println(r"acc10: $Y10 =?= $gold10")
     println(r"acc11: $Y11 =?= $gold11")
     println(r"acc12: $Y12 =?= $gold12")
+    println(r"acc13: $Y13 =?= $gold13")
+    println(r"acc14: $Y14 =?= $gold14")
 
     assert(Y1 == gold1)
     assert(Y2 == gold2)
@@ -299,14 +347,17 @@ import argon.Op
     assert(Y10 == gold10)
     assert(Y11 == gold11)
     assert(Y12 == gold12)
+    assert(Y13 == gold13)
+    assert(Y14 == gold14)
   }
 
   override def checkIR(block: Block[_]): Result = {
     val regular_writes = block.nestedStms.collect{case x@Op(_:RegWrite[_]) => x }.size 
     val special_writes = block.nestedStms.collect{case x@Op(_:RegAccumOp[_]) => x }.size 
 
+    // These checksums may be wrong!
     require(regular_writes == 3, "Should have 3 regular RegWrites")
-    require(special_writes == 9, "Should have 9 specialized RegAccumOp")
+    require(special_writes == 11, "Should have 1 specialized RegAccumOp")
 
     // val acc1 = block.nestedStms.collect{case x@Op(RegWrite(reg,_,_)) if ARHelper.contains(reg.name, "acc1") => reg }.size
     // val acc2 = block.nestedStms.collect{case x@Op(RegAccumOp(reg,_,_,_,_)) if ARHelper.contains(reg.name, "acc2") => reg }.size

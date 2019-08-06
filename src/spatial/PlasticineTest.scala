@@ -427,12 +427,25 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
+  case object SpatialOnly extends PIRBackend {
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/$name/report"
+    def runPasses():Result = {
+      genpir() match {
+        case Unknown => Pass
+        case res => res
+      }
+    }
+  }
+
   override def backends: Seq[Backend] = 
     Asic +:
     P2PNoSim +:
     Dot +:
     Tst() +:
     Tst(module=true) +:
+    SpatialOnly +:
     super.backends
 
 }

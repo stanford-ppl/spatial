@@ -50,22 +50,21 @@ import spatial.tests.apps._
         val issue = FIFO[Int](2*rowTileSize)
         val result = FIFO[composite](2*rowTileSize)
 
-        // Receive
-        Pipe{
+        // Stage 1: consume cxp-like stream
+        Pipe {
           val raw: U256 = in.value
-//          val pxls = List.tabulate(256/pxlBits){i => raw.bits((i+1)*pxlBits-1::i*pxlBits).as[I16]}
-          input_fifo.enqVec(raw.asVec[I16])//Vec.ZeroFirst(pxls:_*))
+          input_fifo.enqVec(raw.asVec[I16])
         }
-        // Modify
-        Pipe{
-          SpatialHelper.ComputeUnit[T](COLS, sharp_kernel, input_fifo, issue, result, r, rowTileSize, LINES_TODO)
-        }
-        // SpatialHelper.ComputeUnit()
 
-        // Send
+        // Stage 2: Process (Force II = 1 to squeeze sr write and sr read into one cycle)
+        Pipe {
+          SpatialHelper.ComputeUnit[T](COLS, 1, sharp_kernel, input_fifo, issue, result, r, rowTileSize, LINES_TODO, true)
+        }
+
+        // Stage 3: Store
         Pipe{
           val numel = issue.deq()
-          if (numel > 0) {
+          if (numel > -1) { // Store every result since we don't care about bursting here
             // // DEBUG
             // deriv store deriv_fifo
             // Store results

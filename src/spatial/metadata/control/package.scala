@@ -954,9 +954,9 @@ package object control {
       case _ => throw new Exception(s"Could not find counter definition for $x")
     }
 
-    @stateful def start: Sym[F] = x.node.start
-    @stateful def step: Sym[F] = x.node.step
-    @stateful def end: Sym[F] = x.node.end
+    @stateful def start: Sym[F] = if (x.isForever) I32(0).asInstanceOf[Sym[F]] else x.node.start
+    @stateful def step: Sym[F] = if (x.isForever) I32(1).asInstanceOf[Sym[F]] else x.node.step
+    @stateful def end: Sym[F] = if (x.isForever) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
     @stateful def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
     @stateful def ctrParOr1: Int = ctrPar.toInt
     @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits

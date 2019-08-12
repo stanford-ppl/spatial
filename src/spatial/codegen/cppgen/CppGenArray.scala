@@ -146,7 +146,7 @@ trait CppGenArray extends CppGenCommon {
       case FixPtType(s,i,f) =>
         val elwidth = bitWidth(v.tp.typeArgs.head)
         emit(src"${lhs.tp} $lhs=0;")
-        emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${i+f}; ${lhs}_i = ${lhs}_i + $elwidth) { if(${lhs}_i < ${v}.size() * $elwidth) {${lhs} += ${v}[${lhs}_i/$elwidth] << ${lhs}_i;} }")
+        emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${i+f}; ${lhs}_i = ${lhs}_i + $elwidth) { if(${lhs}_i < ${v}.size() * $elwidth) {${lhs} += (${lhs.tp}) ${v}[${lhs}_i/$elwidth] << ${lhs}_i;} }")
     }
     case SimpleStruct(st) => 
       // val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")

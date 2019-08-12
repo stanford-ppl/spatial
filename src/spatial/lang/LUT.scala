@@ -167,6 +167,7 @@ object LUT {
 @ref class LUT1[A:Bits]
   extends LUT[A,LUT1]
     with LocalMem1[A,LUT1]
+    with ReadMem1[A]
     with Mem1[A,LUT1]
     with Ref[Array[Any],LUT1[A]] {
 
@@ -182,6 +183,7 @@ object LUT {
 @ref class LUT2[A:Bits]
   extends LUT[A,LUT2]
     with LocalMem2[A,LUT2]
+    with ReadMem2[A]
     with Mem2[A,LUT1,LUT2]
     with Ref[Array[Any],LUT2[A]] {
   def rank: Int = 2
@@ -195,6 +197,7 @@ object LUT {
 /** A 3-dimensional LUT with elements of type A. */
 @ref class LUT3[A:Bits]
   extends LUT[A,LUT3]
+    with ReadMem3[A]
     with LocalMem3[A,LUT3]
     with Mem3[A,LUT1,LUT2,LUT3]
     with Ref[Array[Any],LUT3[A]] {
@@ -209,6 +212,7 @@ object LUT {
 @ref class LUT4[A:Bits]
   extends LUT[A,LUT4]
     with LocalMem4[A,LUT4]
+    with ReadMem4[A]
     with Mem4[A,LUT1,LUT2,LUT3,LUT4]
     with Ref[Array[Any],LUT4[A]] {
 
@@ -224,6 +228,7 @@ object LUT {
 @ref class LUT5[A:Bits]
   extends LUT[A,LUT5]
     with LocalMem5[A,LUT5]
+    with ReadMem5[A]
     with Mem5[A,LUT1,LUT2,LUT3,LUT4,LUT5]
     with Ref[Array[Any],LUT5[A]] {
 

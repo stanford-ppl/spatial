@@ -277,12 +277,13 @@ trait PlasticineTest extends DSLTest { test =>
 
   object Asic extends PIRBackend {
     def runPasses():Result = {
-      val mapres = genpir() >>
-      runpir() >>
-      mappir("--net=asic")
-      val psimres = mapres >> genpsim() >> runpsim()
-      val tstres = mapres >> genruntst()
-      psimres >> tstres
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      genpir() >>
+      pirpass("gentst", s"--net=asic".split(" ").toList) >>
+      scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i /Top/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
+      scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runp2p")
     }
   }
 

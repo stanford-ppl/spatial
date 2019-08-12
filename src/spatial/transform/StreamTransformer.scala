@@ -20,16 +20,18 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
     stageBlock{
       block.stms.foreach{
         case x@Op(CounterChainNew(ctrs2)) => 
-          val newctrs = ctrs.map{ case Op(CounterNew(start, stop, step, par)) => 
-            val newctr = stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
-            newctr
+          val newctrs = ctrs.map{
+            case Op(CounterNew(start, stop, step, par)) =>
+              stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
+            case Op(ForeverNew()) =>
+              stage(ForeverNew())
           }
           val newcchain = stageWithFlow(CounterChainNew(newctrs ++ ctrs2)){lhs2 => transferData(x, lhs2)}
           subst += (x -> newcchain)
           newcchain
-        case x@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if x.isStreamControl && x.isOuterControl => 
-          stageWithFlow(UnitPipe(ens, injectCtrs(block, cchain.counters ++ ctrs, is ++ iters))){lhs2 => transferData(x, lhs2)}
-        case x@Op(OpForeach(ens, cchain, block, iters, stopWhen)) => 
+        case x@Op(OpForeach(ens, cchain, blk, iters, stopWhen)) if x.isStreamControl && stopWhen.isEmpty && x.isOuterControl =>
+          stageWithFlow(UnitPipe(ens, injectCtrs(blk, cchain.counters ++ ctrs, is ++ iters), stopWhen)){lhs2 => transferData(x, lhs2)}
+        case x@Op(OpForeach(ens, cchain, blk, iters, stopWhen)) =>
           val newctrs = subst(cchain).asInstanceOf[CounterChain].counters
           val newiters = is.zip(newctrs).map{case (i,ctr) => 
             val n = boundVar[I32]
@@ -38,11 +40,13 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
             n
           }
-          stageWithFlow(OpForeach(ens, subst(cchain).asInstanceOf[CounterChain], stageBlock{block.stms.foreach(visit)}, newiters ++ iters, stopWhen)){lhs2 => transferData(x, lhs2)}
-        case x@Op(UnitPipe(ens, block)) => 
-          val newctrs = ctrs.map{ case Op(CounterNew(start, stop, step, par)) => 
-            val newctr = stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
-            newctr
+          stageWithFlow(OpForeach(ens, subst(cchain).asInstanceOf[CounterChain], stageBlock{blk.stms.foreach(visit)}, newiters ++ iters, stopWhen)){lhs2 => transferData(x, lhs2)}
+        case x@Op(UnitPipe(ens, blk, stopWhen)) =>
+          val newctrs = ctrs.map{
+            case Op(CounterNew(start, stop, step, par)) =>
+              stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
+            case Op(ForeverNew()) =>
+              stage(ForeverNew())
           }
           val newcchain = stageWithFlow(CounterChainNew(newctrs)){lhs2 => transferData(x, lhs2)}
           val newiters = is.zip(newctrs).map{case (i,ctr) => 
@@ -52,8 +56,8 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
             n
           }
-          val lhs3 = stageWithFlow(OpForeach(ens, newcchain, stageBlock{block.stms.foreach(visit)}, newiters, None)){lhs2 => transferData(x, lhs2)}
-          lhs3.userSchedule = Sequenced
+          val lhs3 = stageWithFlow(OpForeach(ens, newcchain, stageBlock{blk.stms.foreach(visit)}, newiters, stopWhen)){lhs2 => transferData(x, lhs2)}
+          if (lhs3.isOuterControl) lhs3.userSchedule = Sequenced
         case x: Control[_] => throw new Exception(s"Cannot transform Stream controller with $x (${x.rhs}) child!  Please compile with --leaveStreamCounters flag to skip this transformer.")
 
         case x => visit(x)
@@ -64,8 +68,8 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
-    case OpForeach(ens, cchain, block, iters, stopWhen) if (inHw && stopWhen.isEmpty && lhs.isStreamControl && lhs.isOuterControl) =>
-      stageWithFlow(UnitPipe(ens, injectCtrs(block, cchain.counters, iters))){lhs2 => transferData(lhs, lhs2)}
+    case OpForeach(ens, cchain, block, iters, stopWhen) if inHw && lhs.isStreamControl && lhs.isOuterControl =>
+      stageWithFlow(UnitPipe(ens, injectCtrs(block, cchain.counters, iters), stopWhen)){lhs2 => transferData(lhs, lhs2)}
 
     case _ => dbgs(s"visiting $lhs = $rhs");super.transform(lhs,rhs)
   }

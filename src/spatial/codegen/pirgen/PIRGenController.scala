@@ -55,7 +55,7 @@ trait PIRGenController extends PIRCodegen {
     case AccelScope(func) =>
       emitController(lhs) { ret(func) }
 
-    case UnitPipe(ens, func) =>
+    case UnitPipe(ens, func, _) =>
       emitController(lhs, ens=ens) { ret(func) }
 
     case ParallelPipe(ens, func) =>

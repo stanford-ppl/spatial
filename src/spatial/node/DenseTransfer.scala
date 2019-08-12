@@ -157,7 +157,7 @@ object DenseTransfer {
       val ackStream  = StreamIn[Bit](BurstAckBus)
 
       // Command generator
-      Pipe {
+      Sequential {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
         cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
@@ -296,7 +296,7 @@ object DenseTransfer {
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command generator
-      Pipe {
+      Sequential {
         val addr = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val addr_bytes = addr
         val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
@@ -321,7 +321,7 @@ object DenseTransfer {
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command
-      Pipe {
+      Sequential {
         val aligned = alignmentCalc(dramAddr)
 
         cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true), dram.isAlloc)

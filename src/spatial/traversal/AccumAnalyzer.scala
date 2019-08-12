@@ -45,7 +45,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
         case IterAnd(is) => is
         case _ => writer.scopes.flatMap(_.iters).toSet
       }
-      if (iters.size > 0) Some(LCA(iters.map(_.parent))) else None
+      if (iters.nonEmpty) Some(LCA(iters.map(_.parent))) else None
     }
 
     // Find sets of cycles which are entirely disjoint
@@ -55,7 +55,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       def externalUses(s: Sym[_]): Seq[Sym[_]] = if (s.isVoid) Seq() else {
         // Only use data dependencies
         val consumers = s.consumers.filter(_.nonBlockInputs.contains(s))
-        consumers.toSet diff c1.symbols.toSet
+        consumers diff c1.symbols.toSet
       }.toSortedSeq
 
       // Intermediate accumulator values are allowed to be consumed by writes

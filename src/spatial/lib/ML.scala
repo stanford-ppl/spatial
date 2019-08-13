@@ -45,9 +45,14 @@ object ML extends HostML {
     N:scala.Int,
     ip:scala.Int,
   )(input:I32 => T):T = {
-    val sum = Reg[T]
-    Reduce(sum)(N par Math.min(ip,N)) { i => input(i) } { _ + _ }
-    sum.value
+    N match {
+      case 1 => 
+        input(0.to[I32])
+      case _ =>
+        val sum = Reg[T]
+        Reduce(sum)(N par Math.min(ip,N)) { i => input(i) } { _ + _ }
+        sum.value
+    }
   }
 
   @api def sum_tiled[T:Num](
@@ -162,31 +167,28 @@ object ML extends HostML {
     val dims = w.constDims
     val I = dims(0)
     val O = dims(1)
-
     val din = SRAM[T](batch, I)
-    Parallel {
+    Foreach(0 until batch par opb) { b =>
       Foreach(0 until I par opi) { i =>
-        Foreach(0 until O par opo) { o =>
-          val wdot = sum_tiled(batch, tsb, mpb, ipb) { b => 
-            in(b,i) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
-          }
-          w(i, o) = w(i, o) - wdot / batch * learnRate.to[T]
+        val dot = sum_tiled(O, tso, mpo, ipo) { o =>
+          w(i,o) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
         }
+        din(b,i) = dot
       }
+    }
+    Foreach(0 until I par opi) { i =>
       Foreach(0 until O par opo) { o =>
-        val sum = sum_tiled(batch, tsb, mpb, ipb) { b =>
-          dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+        val wdot = sum_tiled(batch, tsb, mpb, ipb) { b => 
+          in(b,i) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
         }
-        b(o) = b(o) - sum / batch * learnRate.to[T]
+        w(i, o) = w(i, o) - wdot / batch * learnRate.to[T]
       }
-      Foreach(0 until batch par opb) { b =>
-        Foreach(0 until I par opi) { i =>
-          val dot = sum_tiled(O, tso, mpo, ipo) { o =>
-            w(i,o) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
-          }
-          din(b,i) = dot
-        }
+    }
+    Foreach(0 until O par opo) { o =>
+      val sum = sum_tiled(batch, tsb, mpb, ipb) { b =>
+        dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
       }
+      b(o) = b(o) - sum / batch * learnRate.to[T]
     }
     din
   }

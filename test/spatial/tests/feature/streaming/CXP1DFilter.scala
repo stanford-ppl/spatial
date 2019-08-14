@@ -74,7 +74,7 @@ import spatial.tests.apps._
 
         // Stage 2: Process (Force II = 1 to squeeze sr write and sr read into one cycle)
         input_fifo.zipWithIndex.foreach{case (f,i) =>
-          Pipe{SpatialHelper.ComputeUnit[T](COLS, interleave_line_els, sharp_kernel, f, issue, results(i), r*interleave_factor + i, rowTileSize, LINES_TODO, i == (input_fifo.size-1))}
+          SpatialHelper.ComputeUnit[T](COLS, interleave_line_els, sharp_kernel, f, issue, results(i), r*interleave_factor + i, rowTileSize, LINES_TODO, i == (input_fifo.size-1))
         }
 
         // Stage 3: Store

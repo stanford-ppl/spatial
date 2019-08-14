@@ -14,6 +14,7 @@ This tutorial explains how to compile a Spatial application and run it on the Am
     + [Step 3: Creating the AFI](#step-3-creating-the-afi)
     + [Step 4: Opening an F1 instance](#step-4-opening-an-f1-instance)
     + [Step 5: Running the Spatial application](#step-5-running-the-spatial-application)
+  * [Important Tips](#important-tips)
   * [Frequently Asked Questions](#frequently-asked-questions)
 
 ## Prerequisites
@@ -174,6 +175,3 @@ Q. How do these steps differ from the F1 tutorial on the Spatial webpage?
 
 A. Those steps are out of date, these steps are current.
 
-Q. How do I fix the following error? `TopHost.cpp:816:8: error: ‘memcpy’ is not a member of ‘std’`
-
-A. Edit TopHost.cpp and replace `std::memcpy` with just `memcpy`

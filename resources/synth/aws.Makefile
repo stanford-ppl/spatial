@@ -131,11 +131,11 @@ aws-F1-afi:   aws-F1-hw
 	ln -s ${AWS_HOME}/hdk/cl/examples/${app_name}/ aws_dir
 	# NOTE: Clock recipes can be found here: https://github.com/aws/aws-fpga/blob/b4b9d74415a70f0470b02635604a34710cc1bb22/hdk/docs/clock_recipes.csv
 ifeq ($(CLOCK_FREQ_MHZ),125)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A0 -strategy TIMING -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A0 -strategy TIMING -uram_option 3 ${FOREGROUND}
 else ifeq ($(CLOCK_FREQ_MHZ),250)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A1 -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A1 -uram_option 3 ${FOREGROUND}
 else ifeq ($(CLOCK_FREQ_MHZ),5.625)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A2 -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A2 -uram_option 3 ${FOREGROUND}
 else
 	$(error Invalid CLOCK_FREQ_MHZ ${CLOCK_FREQ_MHZ})
 endif

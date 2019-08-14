@@ -51,8 +51,8 @@ import spatial.tests.apps._
     val in = StreamIn[U256](CXPPixelBus)
     val LINES_TODO = ArgIn[Int]
     setArg(LINES_TODO, rows)
-    val COLS = ArgIn[Int]
-    setArg(COLS, 1024)
+    val COLS = interleave_cols;
+//    setArg(COLS, 1024)
     val out = StreamOut[U256](CXPPixelBus)
 
     // Create HW accelerator

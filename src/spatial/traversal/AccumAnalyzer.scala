@@ -197,6 +197,14 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
   }
 
+  private object FixAddMux {
+    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_])] = s match {
+      case Op(FixAdd(data, Op(Mux(Op(FixEql(_, Const(_))), Const(_), Op(RegRead(reg)))))) =>
+        Some((reg, data))
+      case _ => None
+    }
+  }
+
   object AssociateReduce {
     def unapply(writer: Sym[_]): Option[AccumMarker] = writer match {
       case Op(RegWrite(reg,written,ens)) =>
@@ -239,6 +247,10 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
               case (RegFMA(`reg`,a0,a1), Times(m0,m1)) if m0==a0 && m1==a1 => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,sel,ens,invert=true))
               case _ => None
             }
+          case FixAddMux(`reg`, data) =>
+            Some(AccumMarker.Reg.Op(
+              reg, data, written, false, ens, AccumAdd, invert = false
+            ))
           case _ => None
         }
       case _ => None

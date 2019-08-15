@@ -1,5 +1,11 @@
 open_project 07_vivado_project/CustomLogic.xpr
 
+set CLOCK_FREQ_MHZ [lindex $argv 0]
+set CLOCK_FREQ_HZ  [expr $CLOCK_FREQ_MHZ * 1000000]
+set RST_FREQ [expr $CLOCK_FREQ_MHZ - 1]
+
+source bigIP.tcl
+
 # Add Spatial Top verilog module
 set origin_dir [file dirname [file normalize [info script]]]
 add_files -norecurse "$origin_dir/Top.v"

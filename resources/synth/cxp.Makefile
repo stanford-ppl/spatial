@@ -34,14 +34,21 @@ chisel:
 	sbt "runMain top.Instantiator --verilog --testArgs cxp"
 
 hw:
-	@[ "${CXP_EXAMPLE}" ] || ( echo ">> CXP_EXAMPLE is not set"; exit 1 )
+ifeq (,$(wildcard cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/))
+    $(error Euresys files not found!  Fix by running `git submodule update` in Spatial and recompile app.  Quick fix is to `cp -r $SPATIAL_HOME/resources/synth/cxp.hw-resources/euresys ./cxp.hw-resources/` after updating submodules)
+endif
+	#@[ "${CXP_EXAMPLE}" ] || ( echo ">> CXP_EXAMPLE is not set"; exit 1 )
+	mv ${BIGIP_SCRIPT} ${CXP_V_DIR}/
 	cat cxp.hw-resources/SRAMVerilogAWS.v >> ${CXP_V_DIR}/Top.v
 	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${CXP_V_DIR}/Top.v; fi
 	cp cxp.hw-resources/build/* ${CXP_V_DIR}
-	cp -r ${CXP_EXAMPLE}/02_coaxlink ${CXP_V_DIR}
-	cp ${CXP_EXAMPLE}/03_scripts/*.tcl ${CXP_V_DIR}
+	#cp -r ${CXP_EXAMPLE}/02_coaxlink ${CXP_V_DIR}
+	cp -r cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/02_coaxlink ${CXP_V_DIR}
+	#cp ${CXP_EXAMPLE}/03_scripts/*.tcl ${CXP_V_DIR}
+	cp cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/03_scripts/*.tcl ${CXP_V_DIR}
 	sed -i "s/\.\.\///g" ${CXP_V_DIR}/create_vivado_project.tcl
-	cp -r ${CXP_EXAMPLE}/04_ref_design ${CXP_V_DIR}
+	#cp -r ${CXP_EXAMPLE}/04_ref_design ${CXP_V_DIR}
+	cp -r cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/04_ref_design ${CXP_V_DIR}
 	# Replace custom logic with spatial rtl
 	mv ${CXP_V_DIR}/SpatialCustomLogic.vhd ${CXP_V_DIR}/04_ref_design/CustomLogic.vhd
 	make -C ${CXP_V_DIR}

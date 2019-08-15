@@ -464,9 +464,9 @@ trait MemoryUnrolling extends UnrollingBase {
   /** Helper classes for unrolling */
   sealed abstract class UnrolledAccess[T] { def s: Seq[Sym[_]] }
   case class URead[T](v: Sym[T]) extends UnrolledAccess[T] { def s: Seq[Sym[T]] = Seq(v) }
-  case class UVecRead[T](v: Vec[T])  extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Vec[T]] = Seq(v) }
-  case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Void] = Seq(v) }
-  case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s: Seq[_root_.spatial.lang.Void] = vs.flatMap(_.s) }
+  case class UVecRead[T](v: Vec[T])  extends UnrolledAccess[T] { def s: Seq[Vec[T]] = Seq(v) }
+  case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s: Seq[Void] = Seq(v) }
+  case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s: Seq[Void] = vs.flatMap(_.s) }
 
   sealed abstract class DataOption { def s: Option[Sym[_]] }
   case object NoData extends DataOption { def s: Option[Sym[_]] = None }

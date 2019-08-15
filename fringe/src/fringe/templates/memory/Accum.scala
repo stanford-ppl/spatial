@@ -116,7 +116,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
-  firstRound.io.input.reset := laneCtr.io.output.done | activeReset
+  firstRound.io.input.reset := laneCtr.io.output.done.D(opLatency.toInt) | activeReset
   val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())

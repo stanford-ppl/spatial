@@ -60,7 +60,7 @@ class FixFMAAccum(
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
-  firstRound.io.input.reset := laneCtr.io.output.done .D(fmaLatency)| activeReset
+  firstRound.io.input.reset := getRetimed(activeFirst, cycleLatency.toInt - 1, activeEn) | activeReset
   val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())

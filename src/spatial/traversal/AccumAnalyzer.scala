@@ -8,6 +8,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.retiming._
 import spatial.metadata.types._
+import spatial.metadata.access._
 import spatial.util.modeling._
 import utils.implicits.collections._
 
@@ -198,9 +199,9 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
   }
 
   private object FixAddMux {
-    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_])] = s match {
-      case Op(FixAdd(data, Op(Mux(Op(FixEql(_, Const(_))), Const(_), Op(RegRead(reg)))))) =>
-        Some((reg, data))
+    def unapply(s: Sym[_]): Option[(Reg[_], Bits[_], Bits[_], Bits[_])] = s match {
+      case Op(FixAdd(data, Op(Mux(Op(FixEql(ctrBind, ctrCheckVal)), _, Op(RegRead(reg)))))) =>
+        Some((reg, data, ctrBind, ctrCheckVal))
       case _ => None
     }
   }
@@ -208,6 +209,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
   object AssociateReduce {
     def unapply(writer: Sym[_]): Option[AccumMarker] = writer match {
       case Op(RegWrite(reg,written,ens)) =>
+
         dbgs(s"$writer matched as a RegWrite, written by $written")
         written match {
           // Specializing sums
@@ -247,10 +249,19 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
               case (RegFMA(`reg`,a0,a1), Times(m0,m1)) if m0==a0 && m1==a1 => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,sel,ens,invert=true))
               case _ => None
             }
-          case FixAddMux(`reg`, data) =>
-            Some(AccumMarker.Reg.Op(
-              reg, data, written, false, ens, AccumAdd, invert = false
-            ))
+
+          case FixAddMux(`reg`, data, ctrBind, ctrCheckVal) =>
+            val innerCounter = accessIterators(written, reg).last
+            val start = innerCounter.ctrStart
+            dbgs(s" Checking FixAddMux: innerCounter = ${innerCounter}, start = ${start}, " +
+              s"ctrBind = ${ctrBind}, ctrCheckVal = ${ctrCheckVal}")
+            (ctrBind, ctrCheckVal) match {
+              case (innerCounter, start) =>
+                Some(AccumMarker.Reg.Op(
+                  reg, data, written, false, ens, AccumAdd, invert = false
+                ))
+              case _ => None
+            }
           case _ => None
         }
       case _ => None

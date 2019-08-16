@@ -198,9 +198,17 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
   }
 
-  private object FixAddMux {
+  private object FixMuxAddAccum {
+    // TODO: This case should in fact be recursive.
+    // TODO: Should we check for the init value for the fold? Probably not.
     def unapply(s: Sym[_]): Option[(Reg[_], Bits[_], Bits[_], Bits[_])] = s match {
       case Op(FixAdd(data, Op(Mux(Op(FixEql(ctrBind, ctrCheckVal)), _, Op(RegRead(reg)))))) =>
+        Some((reg, data, ctrBind, ctrCheckVal))
+      case Op(FixAdd(data, Op(Mux(Op(FixNeq(ctrBind, ctrCheckVal)), Op(RegRead(reg)), _)))) =>
+        Some((reg, data, ctrBind, ctrCheckVal))
+      case Op(FixAdd(Op(Mux(Op(FixEql(ctrBind, ctrCheckVal)), _, Op(RegRead(reg)))), data)) =>
+        Some((reg, data, ctrBind, ctrCheckVal))
+      case Op(FixAdd(Op(Mux(Op(FixNeq(ctrBind, ctrCheckVal)), Op(RegRead(reg)), _ )), data)) =>
         Some((reg, data, ctrBind, ctrCheckVal))
       case _ => None
     }
@@ -250,13 +258,14 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
               case _ => None
             }
 
-          case FixAddMux(`reg`, data, ctrBind, ctrCheckVal) =>
+          case FixMuxAddAccum(`reg`, data, ctrBind, ctrCheckVal) =>
             val innerCounter = accessIterators(written, reg).last
             val start = innerCounter.ctrStart
-            dbgs(s" Checking FixAddMux: innerCounter = ${innerCounter}, start = ${start}, " +
+            dbgs(s" Checking FixMuxAddAccum: innerCounter = ${innerCounter}, start = ${start}, " +
               s"ctrBind = ${ctrBind}, ctrCheckVal = ${ctrCheckVal}")
             (ctrBind, ctrCheckVal) match {
               case (innerCounter, start) =>
+                dbgs(s" $written matched on FixMuxAddAccum($reg, $data, $ctrBind, $ctrCheckVal)")
                 Some(AccumMarker.Reg.Op(
                   reg, data, written, false, ens, AccumAdd, invert = false
                 ))

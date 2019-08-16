@@ -219,7 +219,7 @@ import argon.Op
       val acc10 = Reg[Int](0) // Valid accumulation
       'ACC10.Foreach(4 by 1) { i =>
         val t = List.tabulate(8) { j => X.value * X.value }.sumTree
-        acc10 := mux(i != 0, acc10.value, 0) + t
+        acc10 := mux(i == 0, 0, acc10.value) + t
       }
       Y10 := acc10
 

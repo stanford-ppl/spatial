@@ -60,7 +60,7 @@ class FixFMAAccum(
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
-  firstRound.io.input.reset := laneCtr.io.output.done | activeReset
+  firstRound.io.input.reset := laneCtr.io.output.done .D(fmaLatency)| activeReset
   val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())
@@ -141,7 +141,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     acc.io.rPort <> DontCare
     acc.io.reset := false.B
     acc.io.wPort(0).data(0) := result.r
-    acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
+    acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, cycleLatency.toInt)
     acc.io.wPort(0).reset := activeReset | activeLast.D(drain_latency + opLatency)
     acc.io.wPort(0).init := initBits
   }

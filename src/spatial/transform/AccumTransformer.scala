@@ -52,9 +52,12 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
 
     var beforeCycles: Seq[Sym[_]] = Nil
     var afterCycles: Seq[Sym[_]] = Nil
-    nonCycles.foreach{s =>
+    val cycleEnd = cycles.map(stms.indexOf).sorted.lastOption.getOrElse(stms.size)
+  dbgs(s"cycles are $cycles")
+    stms.zipWithIndex.collect{case (s,i) if nonCycles.contains(s) =>
       val usesCycle = (s.inputs intersect cycles).nonEmpty
-      val downstreamFromCycle = (s.inputs intersect afterCycles).nonEmpty
+      val downstreamFromCycle = (s.inputs intersect afterCycles).nonEmpty || i > cycleEnd
+      dbgs(s"placing $s: uses? ${usesCycle}, downstream? $downstreamFromCycle")
       if (usesCycle || downstreamFromCycle) afterCycles = afterCycles :+ s
       else beforeCycles = beforeCycles :+ s
     }

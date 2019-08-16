@@ -102,8 +102,12 @@ package object access {
 
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
     def isReader: Boolean = Reader.unapply(a).isDefined || isUnrolledReader
-    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter
+    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter || isSpecialWriter
 
+    def isSpecialWriter: Boolean = a match {
+      case Op(_:RegAccum[_]) => true
+      case _ => false
+    }
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
@@ -130,6 +134,7 @@ package object access {
     @stateful def writtenMem: Option[Sym[_]] = a match {
       case Op(d: Writer[_]) => Some(d.mem)
       case Op(d: VectorWriter[_]) => Some(d.mem)
+      case Op(d: RegAccum[_]) => Some(d.mem)
       case _ => None
     }
 

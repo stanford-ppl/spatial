@@ -29,7 +29,7 @@ trait NodeParams {
           val log2correction = if (nbits(d) < 6) 1 else 0
           (op.name + "Mul", Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.1875 + 1)/log(2), "drain" -> 0.1875*nbits(d), "correction" -> log2correction))
         case _ => 
-          val log2correction = if (nbits(d) < 33) 1 else 0
+          val log2correction = if (nbits(d) < 32) 1 else 0
           (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.03125 + 1)/log(2), "drain" -> nbits(d)/32, "correction" -> log2correction))
       }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))

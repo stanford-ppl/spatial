@@ -116,7 +116,7 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
-  firstRound.io.input.reset := laneCtr.io.output.done.D(opLatency.toInt) | activeReset
+  firstRound.io.input.reset := getRetimed(activeFirst, cycleLatency.toInt, activeEn) | activeReset
   val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())
@@ -132,16 +132,16 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     fixadd.r := acc.io.rPort(0).output(0)
     val result = Wire(new FixedPoint(s,d,f))
     t match {
-      case Accum.Add => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
-      case Accum.Mul => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), Math.mul(fixin1,fixadd, Some(opLatency), true.B, Truncate, Wrapping, "").r)
-      case Accum.Min => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
-      case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
+      case Accum.Add => result.r := Mux(isFirstRound, getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
+      case Accum.Mul => result.r := Mux(isFirstRound, getRetimed(fixin1.r, opLatency.toInt), Math.mul(fixin1,fixadd, Some(opLatency), true.B, Truncate, Wrapping, "").r)
+      case Accum.Min => result.r := Mux(isFirstRound, getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
+      case Accum.Max => result.r := Mux(isFirstRound, getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
     }
     acc.io.wPort <> DontCare
     acc.io.rPort <> DontCare
     acc.io.reset := false.B
     acc.io.wPort(0).data(0) := result.r
-    acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, cycleLatency.toInt)
+    acc.io.wPort(0).en(0) := getRetimed(activeEn & dispatchLane === lane, opLatency.toInt)
     acc.io.wPort(0).reset := activeReset | activeLast.D(drain_latency + opLatency)
     acc.io.wPort(0).init := initBits
   }

@@ -44,7 +44,6 @@ class FixedPoint(val value: BigInt, val valid: Boolean, val fmt: FixFormat) exte
 
   def bits: Array[Bool] = Array.tabulate(fmt.bits){i => Bool(value.testBit(i)) }
 
-
   def +!(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value + that.value, this.valid && that.valid, fmt)
   def -!(that: FixedPoint): FixedPoint = FixedPoint.saturating(this.value - that.value, this.valid && that.valid, fmt)
   def *!(that: FixedPoint): FixedPoint = FixedPoint.saturating((this.value * that.value) >> fmt.fbits, this.valid && that.valid, fmt)

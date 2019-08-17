@@ -29,6 +29,12 @@ package object access {
       case _ => false
     }
 
+    def isVectorAccess: Boolean = op match {
+      case _: FIFOVecDeq[_] => true
+      case _: FIFOVecEnq[_] => true
+      case _ => false
+    }
+
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
       case _:FIFORegDeq[_] => true
@@ -95,6 +101,7 @@ package object access {
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
+    def isVectorAccess: Boolean = a.op.exists(_.isVectorAccess)
     def isArgInRead: Boolean = a match {case Op(RegRead(Op(ArgInNew(_)))) => true; case _ => false}
 
     def isStreamStageEnabler: Boolean = a.op.exists(_.isStreamStageEnabler)

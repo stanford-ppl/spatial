@@ -7,7 +7,8 @@ import fringe.targets.DeviceTarget
 import fringe.{DRAMStream}
 
 class MAGToAXI4Bridge(val p: AXI4BundleParameters) extends Module {
-  Predef.assert(p.dataBits == 512, s"ERROR: Unsupported data width ${p.dataBits} in MAGToAXI4Bridge")
+  // TODO: Why is this assert here since not all targets use 512 bus width?
+  Predef.assert(p.dataBits == globals.EXTERNAL_W * globals.EXTERNAL_V, s"ERROR: Unsupported data width ${p.dataBits} in MAGToAXI4Bridge (Target expects ${globals.EXTERNAL_W} * ${globals.EXTERNAL_V}")
 
   val io = IO(new Bundle {
     val in = Flipped(new DRAMStream(globals.DATA_WIDTH, globals.WORDS_PER_STREAM))  // hardcoding stuff here

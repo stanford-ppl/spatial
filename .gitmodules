@@ -4,3 +4,6 @@
 [submodule "models/resources"]
 	path = models/resources
 	url = git@github.com:stanford-ppl/resource-pmmls.git
+[submodule "resources/synth/cxp.hw-resources/euresys"]
+	path = resources/synth/cxp.hw-resources/euresys
+	url = git@github.com:stanford-ppl/CXP-Resources.git

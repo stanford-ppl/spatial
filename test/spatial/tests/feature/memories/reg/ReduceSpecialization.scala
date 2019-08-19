@@ -231,4 +231,3 @@ Test Add16_Pipe:   ${goldAdd16_Pipe == results16(0)}
     super.checkIR(block)
   }
 }
-slac/xppc00117_r136_refsub_ipm4_del3.volume

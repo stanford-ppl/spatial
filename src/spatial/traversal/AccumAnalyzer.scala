@@ -1,6 +1,7 @@
 package spatial.traversal
 
 import argon._
+import argon.lang.Bit
 import argon.node._
 import spatial.lang._
 import spatial.node._
@@ -11,6 +12,8 @@ import spatial.metadata.types._
 import spatial.metadata.access._
 import spatial.util.modeling._
 import utils.implicits.collections._
+
+import scala.collection.mutable.ListBuffer
 
 case class AccumAnalyzer(IR: State) extends AccelTraversal {
 
@@ -214,20 +217,21 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
   }
 
-  private object ChainedBinaryCompareOp {
-    // Enforce that the BoolOps are the same down the chain.
-    private object BoolOp {
-      def unapply (s: Sym[_]): Option[(Bits[_], Bits[_])] = s match {
-        case Op(FixAnd(a, b)) => Some(a, b)
-        case Op(FixOr(a, b)) => Some(a, b)
-        case _ => None
-      }
+  private object BoolOp {
+    // TODO: Need to enforce that the BoolOps are the same down the chain.
+    def unapply (s: Sym[_]): Option[(Bits[_], Bits[_])] = s match {
+      case Op(And(a, b)) => Some(a, b)
+      case Op(Or(a, b)) => Some(a, b)
+      case _ => None
     }
+  }
 
+  private object ChainedBinaryCompareOp {
     def unapply(s: Sym[_]): Option[List[(Bits[_], Bits[_])]] = s match {
       case Op(FixEql(ctrBind, ctrCheckVal)) => Some(List((ctrBind, ctrCheckVal)))
       case Op(FixNeq(ctrBind, ctrCheckVal)) => Some(List((ctrBind, ctrCheckVal)))
-      case Op(BoolOp(a, b)) =>
+//      case Op(FixAnd(a, b)) =>
+      case Op(And(a, b)) =>
         val al: Option[List[(Bits[_], Bits[_])]] = a match {
             case ChainedBinaryCompareOp(ll) => Some(ll)
             case _ => None
@@ -238,22 +242,17 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
         }
 
         Some(al.toList.flatten ::: bl.toList.flatten)
-      case _ => Some(List())
+      case _ => None
     }
   }
 
   private object MultiSelectMux {
-    def unapply(s: Sym[_], counters: Seq[Idx]): Option[(Bit, Bits[_], Bits[_])] = s match {
+    def unapply(s: Sym[_]): Option[(Bit, Bits[_], Bits[_], List[(Bits[_], Bits[_])])] = s match {
       case Op(Mux(sel, x1, x2)) =>
-        (sel, counters) match {
-          case ChainedBinaryCompareOp(ctrList) => {
-            ctrList match {
-              case _ => Some((sel, x1, x2))
-            }
-            case _ => None
-          }
+        sel match {
+          case ChainedBinaryCompareOp(ctrList) => Some(sel, x1, x2, ctrList)
           case _ => None
-        }
+       }
       case _ => None
     }
   }
@@ -263,52 +262,60 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       case Op(RegWrite(reg,written,ens)) =>
 
         dbgs(s"$writer matched as a RegWrite, written by $written")
-        val counters = accessIterators(written, reg)
+        val ctrlCtrs = accessIterators(written, reg)
         written match {
           // Specializing sums
           // NOTE: Need RegAdd AND AddReg because for RegAdd(RegRead, RegRead),
           // the following match fails because it matches against the wrong reg in the private object's unapply
-          case RegAdd(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumAdd,invert=false))
-          case RegMul(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMul,invert=false))
-          case RegMin(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMin,invert=false))
-          case RegMax(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMax,invert=false))
-          case AddReg(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumAdd,invert=false))
-          case MulReg(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMul,invert=false))
-          case MinReg(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMin,invert=false))
-          case MaxReg(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMax,invert=false))
-          case RegFMA(`reg`,m0,m1) => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,false,ens,invert=false))
+          case RegAdd(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumAdd, invert = false))
+          case RegMul(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumMul, invert = false))
+          case RegMin(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumMin, invert = false))
+          case RegMax(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumMax, invert = false))
+          case AddReg(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumAdd, invert = false))
+          case MulReg(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumMul, invert = false))
+          case MinReg(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumMin, invert = false))
+          case MaxReg(`reg`, data) => Some(AccumMarker.Reg.Op(reg, data, written, false, ens, AccumMax, invert = false))
+          case RegFMA(`reg`, m0, m1) => Some(AccumMarker.Reg.FMA(reg, m0, m1, written, false, ens, invert = false))
 
-//          case Op(Mux(sel,x1,x2)) =>
-//          case MuxUnpack(ctrBind, ctrCheckVal, x1, x2)
-          case MultiSelectMux(sel, x1, x2) =>
-            dbgs(s"$written matched on mux (sel: $sel, x1: $x1, x2: $x2)")
-            (x1,x2) match {
-              case (`x1`, RegAdd(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
-              case (`x1`, RegMul(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMul,invert=false))
-              case (`x1`, RegMin(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMin,invert=false))
-              case (`x1`, RegMax(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMax,invert=false))
-              case (RegAdd(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumAdd,invert=true))
-              case (RegMul(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMul,invert=true))
-              case (RegMin(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMin,invert=true))
-              case (RegMax(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMax,invert=true))
-              case (`x1`, AddReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
-              case (`x1`, MulReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMul,invert=false))
-              case (`x1`, MinReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMin,invert=false))
-              case (`x1`, MaxReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMax,invert=false))
-              case (AddReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumAdd,invert=true))
-              case (MulReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMul,invert=true))
-              case (MinReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMin,invert=true))
-              case (MaxReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMax,invert=true))
-              // It'd be really nice if Scala allowed use of bound names within the same case pattern
-              // Note: the multiplication of m0 and m1 will be dropped upon transforming
-              case (Times(m0,m1), RegFMA(`reg`,a0,a1)) if m0==a0 && m1==a1 => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,sel,ens,invert=false))
-              case (RegFMA(`reg`,a0,a1), Times(m0,m1)) if m0==a0 && m1==a1 => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,sel,ens,invert=true))
-              case _ => None
+          case MultiSelectMux(sel, x1, x2, ctrList) =>
+            dbgs(s"$written matched on mux (sel: $sel, x1: $x1, x2: $x2, ctrList: $ctrList)")
+            val ctrTracker: ListBuffer[(Bits[_], Bits[_])] = ctrList.to[ListBuffer]
+            ctrlCtrs.reverse.foreach { b =>
+              // TODO: Still need to enforce the inner2outer check flow.
+              val chkPair: (Bits[_], Bits[_]) = (b.asInstanceOf[Bits[_]], b.ctrStart.asInstanceOf[Bits[_]])
+              ctrTracker -= chkPair
             }
+            if (ctrTracker.isEmpty) {
+              (x1,x2) match {
+                case (`x1`, RegAdd(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
+                case (`x1`, RegMul(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMul,invert=false))
+                case (`x1`, RegMin(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMin,invert=false))
+                case (`x1`, RegMax(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMax,invert=false))
+                case (RegAdd(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumAdd,invert=true))
+                case (RegMul(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMul,invert=true))
+                case (RegMin(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMin,invert=true))
+                case (RegMax(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMax,invert=true))
+                case (`x1`, AddReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
+                case (`x1`, MulReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMul,invert=false))
+                case (`x1`, MinReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMin,invert=false))
+                case (`x1`, MaxReg(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMax,invert=false))
+                case (AddReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumAdd,invert=true))
+                case (MulReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMul,invert=true))
+                case (MinReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMin,invert=true))
+                case (MaxReg(`reg`,`x2`), `x2`) => Some(AccumMarker.Reg.Op(reg,x2,written,sel,ens,AccumMax,invert=true))
+                // It'd be really nice if Scala allowed use of bound names within the same case pattern
+                // Note: the multiplication of m0 and m1 will be dropped upon transforming
+                case (Times(m0,m1), RegFMA(`reg`,a0,a1)) if m0==a0 && m1==a1 => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,sel,ens,invert=false))
+                case (RegFMA(`reg`,a0,a1), Times(m0,m1)) if m0==a0 && m1==a1 => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,sel,ens,invert=true))
+                case _ => None
+              }
+            } else None
 
           case FixMuxAddAccum(`reg`, data, ctrBind, ctrCheckVal) =>
+            val innerCtr = ctrlCtrs.last
+            val innerCtrStart = innerCtr.ctrStart
             (ctrBind, ctrCheckVal) match {
-              case (counters.last, counters.last.ctrStart) =>
+              case (`innerCtr`, `innerCtrStart`) =>
                 dbgs(s" $written matched on FixMuxAddAccum($reg, $data, $ctrBind, $ctrCheckVal)")
                 Some(AccumMarker.Reg.Op(
                   reg, data, written, false, ens, AccumAdd, invert = false
@@ -320,6 +327,4 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
       case _ => None
     }
   }
-
-
 }

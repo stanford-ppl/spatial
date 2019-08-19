@@ -74,7 +74,7 @@ class FringeZynq(
   fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   // AXI-lite bridge
-  if (target.isInstanceOf[targets.zynq.Zynq]) {
+  if (target.isInstanceOf[targets.zynq.Zynq] || target.isInstanceOf[targets.kcu1500.KCU1500]) {
     val axiLiteBridge = Module(new AXI4LiteToRFBridge(ADDR_WIDTH, DATA_WIDTH))
     axiLiteBridge.io.S_AXI <> io.S_AXI
 

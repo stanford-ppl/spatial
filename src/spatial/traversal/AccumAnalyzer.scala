@@ -198,9 +198,9 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
   }
 
+
   private object FixMuxAddAccum {
     // TODO: This case should in fact be recursive.
-    // TODO: Should we check for the init value for the fold? Probably not.
     def unapply(s: Sym[_]): Option[(Reg[_], Bits[_], Bits[_], Bits[_])] = s match {
       case Op(FixAdd(data, Op(Mux(Op(FixEql(ctrBind, ctrCheckVal)), _, Op(RegRead(reg)))))) =>
         Some((reg, data, ctrBind, ctrCheckVal))
@@ -214,14 +214,60 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
   }
 
+  private object ChainedBinaryCompareOp {
+    // Enforce that the BoolOps are the same down the chain.
+    private object BoolOp {
+      def unapply (s: Sym[_]): Option[(Bits[_], Bits[_])] = s match {
+        case Op(FixAnd(a, b)) => Some(a, b)
+        case Op(FixOr(a, b)) => Some(a, b)
+        case _ => None
+      }
+    }
+
+    def unapply(s: Sym[_]): Option[List[(Bits[_], Bits[_])]] = s match {
+      case Op(FixEql(ctrBind, ctrCheckVal)) => Some(List((ctrBind, ctrCheckVal)))
+      case Op(FixNeq(ctrBind, ctrCheckVal)) => Some(List((ctrBind, ctrCheckVal)))
+      case Op(BoolOp(a, b)) =>
+        val al: Option[List[(Bits[_], Bits[_])]] = a match {
+            case ChainedBinaryCompareOp(ll) => Some(ll)
+            case _ => None
+          }
+        val bl: Option[List[(Bits[_], Bits[_])]] = b match {
+          case ChainedBinaryCompareOp(ll) => Some(ll)
+          case _ => None
+        }
+
+        Some(al.toList.flatten ::: bl.toList.flatten)
+      case _ => Some(List())
+    }
+  }
+
+  private object MultiSelectMux {
+    def unapply(s: Sym[_], counters: Seq[Idx]): Option[(Bit, Bits[_], Bits[_])] = s match {
+      case Op(Mux(sel, x1, x2)) =>
+        (sel, counters) match {
+          case ChainedBinaryCompareOp(ctrList) => {
+            ctrList match {
+              case _ => Some((sel, x1, x2))
+            }
+            case _ => None
+          }
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
   object AssociateReduce {
     def unapply(writer: Sym[_]): Option[AccumMarker] = writer match {
       case Op(RegWrite(reg,written,ens)) =>
 
         dbgs(s"$writer matched as a RegWrite, written by $written")
+        val counters = accessIterators(written, reg)
         written match {
           // Specializing sums
-          // NOTE: Need RegAdd AND AddReg because for RegAdd(RegRead, RegRead), the following match fails because it matches against the wrong reg in the private object's unapply
+          // NOTE: Need RegAdd AND AddReg because for RegAdd(RegRead, RegRead),
+          // the following match fails because it matches against the wrong reg in the private object's unapply
           case RegAdd(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumAdd,invert=false))
           case RegMul(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMul,invert=false))
           case RegMin(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMin,invert=false))
@@ -232,7 +278,9 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
           case MaxReg(`reg`,data)  => Some(AccumMarker.Reg.Op(reg,data,written,false,ens,AccumMax,invert=false))
           case RegFMA(`reg`,m0,m1) => Some(AccumMarker.Reg.FMA(reg,m0,m1,written,false,ens,invert=false))
 
-          case Op(Mux(sel,x1,x2)) =>
+//          case Op(Mux(sel,x1,x2)) =>
+//          case MuxUnpack(ctrBind, ctrCheckVal, x1, x2)
+          case MultiSelectMux(sel, x1, x2) =>
             dbgs(s"$written matched on mux (sel: $sel, x1: $x1, x2: $x2)")
             (x1,x2) match {
               case (`x1`, RegAdd(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
@@ -259,12 +307,8 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
             }
 
           case FixMuxAddAccum(`reg`, data, ctrBind, ctrCheckVal) =>
-            val innerCounter = accessIterators(written, reg).last
-            val start = innerCounter.ctrStart
-            dbgs(s" Checking FixMuxAddAccum: innerCounter = ${innerCounter}, start = ${start}, " +
-              s"ctrBind = ${ctrBind}, ctrCheckVal = ${ctrCheckVal}")
             (ctrBind, ctrCheckVal) match {
-              case (innerCounter, start) =>
+              case (counters.last, counters.last.ctrStart) =>
                 dbgs(s" $written matched on FixMuxAddAccum($reg, $data, $ctrBind, $ctrCheckVal)")
                 Some(AccumMarker.Reg.Op(
                   reg, data, written, false, ens, AccumAdd, invert = false

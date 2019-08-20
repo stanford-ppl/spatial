@@ -126,9 +126,27 @@ trait CppGenArray extends CppGenCommon {
       case FixPtType(s,i,f) => 
         emit(src"${lhs.tp} $lhs=0;")
         emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${i+f}; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
-      // case BooleanType() =>
-      //   emit(src"${lhs.tp} $lhs=0;")
-      //   emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
+    }
+    case DataAsVec(bits)       =>
+      val elwidth = bitWidth(lhs.tp.typeArgs.head)
+      bits.tp match {
+        case FltPtType(m,e) =>
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"float* ${lhs}_ptr = &${toTrueFix(quote(bits), bits.tp)};")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${m+e}; ${lhs}_i = ${lhs}_i + $elwidth) { ${lhs}.push_back(*reinterpret_cast<int32_t*>(${lhs}_ptr) >> ${lhs}_i & ${(scala.math.pow(2,elwidth)-1).toInt}); }")
+        case FixPtType(s,i,f) =>
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${i+f}; ${lhs}_i = ${lhs}_i + $elwidth) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & ${(scala.math.pow(2,elwidth)-1).toInt}); }")
+        case BitType() =>
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"for (int ${lhs}_i = 0; ${lhs}_i < 1; ${lhs}_i = ${lhs}_i + $elwidth) { ${lhs}.push_back(${toTrueFix(quote(bits), bits.tp)} >> ${lhs}_i & ${(scala.math.pow(2,elwidth)-1).toInt}); }")
+      }
+    case VecAsData(v,mT) => mT match {
+      case FltPtType(_,_)   => throw new Exception("Bit-wise operations not supported on floating point values yet")
+      case FixPtType(s,i,f) =>
+        val elwidth = bitWidth(v.tp.typeArgs.head)
+        emit(src"${lhs.tp} $lhs=0;")
+        emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${i+f}; ${lhs}_i = ${lhs}_i + $elwidth) { if(${lhs}_i < ${v}.size() * $elwidth) {${lhs} += (${lhs.tp}) ${v}[${lhs}_i/$elwidth] << ${lhs}_i;} }")
     }
     case SimpleStruct(st) => 
       // val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
@@ -183,7 +201,7 @@ trait CppGenArray extends CppGenCommon {
 
 
 
-    case VecAlloc(elems)     => emit(src"${lhs.tp} $lhs = ${lhs.tp}($elems)")
+    case VecAlloc(elems)     => emit(src"${lhs.tp} $lhs{$elems};")
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
     case VecSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")
                 open(src"""for (int ${lhs}_i = 0; ${lhs}_i < ${start} - ${end} + 1; ${lhs}_i++){""") 

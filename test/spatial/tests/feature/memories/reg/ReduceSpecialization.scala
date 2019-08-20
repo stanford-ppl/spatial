@@ -19,6 +19,7 @@ import spatial.dsl._
     val minn = ArgOut[Int]
     val fma32 = ArgOut[Int]
     val fma8 = ArgOut[Int8]
+//    val midReset = ArgOut[Int]
 
     val out: List[DRAM1[Int]] = List.tabulate(6){i => DRAM[Int](32) }
     val out16: List[DRAM1[Int16]] = List.tabulate(6){i => DRAM[Int16](32) }
@@ -84,6 +85,14 @@ import spatial.dsl._
         data16(0)(i) = Reduce(sumAccum_Pipe)(0 until 32){j => sram16(j) + i.to[Int16] }{_+_}
       }
 
+      // This kind of reset mid-accumulation is not well supported because it may retime the reset to later than expected
+//      val resetAccum = Reg[Int]
+//      Foreach(32 by 1){i =>
+//        resetAccum :+= i
+//        if (i == 16) resetAccum.reset();
+//      }
+//      midReset := resetAccum.value
+
       // val intermediateAccum = Reg[Float]
       // Foreach(0 until 32){i =>
       //   intermediateAccum := intermediateAccum.value + i.to[Float]
@@ -100,6 +109,7 @@ import spatial.dsl._
     val goldMin  = data.reduce{(a,b) => min(a,b) }
     val goldFma32 = data.map{a => a*a}.reduce{_+_}
     val goldFma8 = Array.tabulate(32){i => 2.to[Int8] * 3.to[Int8]}.reduce{_+_}
+//    val goldMidReset = Array.tabulate(32){i => if (i <= 16) 0 else i}.reduce{_+_}
 
     val goldSum_Pipe  = (0 :: 32){i => goldSum + 32*i }
     val goldProd_Pipe = (0 :: 32){i => data.map(_+i).reduce{_*_} }
@@ -151,6 +161,9 @@ import spatial.dsl._
     println("--- Add16 [Pipe] ---")
     println(r"Result: ${results16(0)}")
     println(r"Golden: $goldAdd16_Pipe")
+//    println("--- MidReset ---")
+//    println(r"Result: ${midReset}")
+//    println(r"Golden: ${goldMidReset}")
 
     println(r"""
 Test Sum:         ${goldSum == sum.value}
@@ -180,6 +193,7 @@ Test Add16_Pipe:   ${goldAdd16_Pipe == results16(0)}
     assert(goldFma32_Pipe == results(4))
     assert(goldFma8_Pipe == results(5))
     assert(goldAdd16_Pipe == results16(0))
+//    assert(goldMidReset == midReset.value)
   }
 
   override def checkIR(block: Block[_]): Result = {

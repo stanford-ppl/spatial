@@ -7,6 +7,7 @@ package object targets {
     xilinx.ZedBoard,
     xilinx.AWS_F1,
     xilinx.KCU1500,
+    euresys.CXP,
     altera.DE1,
     altera.Arria10,
     generic.VCS
@@ -19,6 +20,7 @@ package object targets {
   lazy val ZCU = xilinx.ZCU
   lazy val Zynq = xilinx.Zynq
   lazy val ZedBoard = xilinx.ZedBoard
+  lazy val CXP = euresys.CXP
   lazy val VCS = generic.VCS
   lazy val DE1 = altera.DE1
   lazy val Arria10 = altera.Arria10

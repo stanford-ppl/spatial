@@ -56,6 +56,24 @@ trait ScalaGenBits extends ScalaCodegen {
       case BitType()        => emit(src"val $lhs = $v.head")
     }
 
+    case e@DataAsVec(a) =>
+      val (s,i,f) = lhs.tp.typeArgs.head match {
+        case FixPtType(s,i,f) => (s,i,f)
+        case _ => throw new Exception(s"Cannot convert data ${a.tp} to vec ${lhs.tp}!  Only Vec[FixPt] supported!")
+      }
+      a.tp match {
+        case FltPtType(_,_)   => emit(src"val $lhs = $a.bits.grouped(${i+f}).toList.map(FixedPoint.fromBits(_, FixFormat($s,$i,$f)))")
+        case FixPtType(_,_,_) => emit(src"val $lhs = $a.bits.grouped(${i+f}).toList.map(FixedPoint.fromBits(_, FixFormat($s,$i,$f)))")
+        case BitType()        => emit(src"val $lhs = Array[Bool]($a)")
+      }
+
+    case VecAsData(v,a) => a match {
+      case FltPtType(g,e)   => emit(src"val $lhs = FloatPoint.fromBits($v.flatMap(_.bits), FltFormat(${g-1},$e))")
+      case FixPtType(s,i,f) => emit(src"val $lhs = FixedPoint.fromBits($v.flatMap(_.bits), FixFormat($s,$i,$f))")
+      case BitType()        => emit(src"val $lhs = $v.head")
+    }
+
+
     case _ => super.gen(lhs,rhs)
   }
 }

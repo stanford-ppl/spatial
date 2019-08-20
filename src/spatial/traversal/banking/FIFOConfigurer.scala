@@ -19,7 +19,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
 
   override def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
-    (a.access == b.access && a.unroll != b.unroll) ||
+    (a.access == b.access && (a.unroll != b.unroll || a.access.isVectorAccess)) ||
       lca.isPipeLoop || lca.isOuterStreamLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       lca.isParallel
@@ -29,7 +29,8 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
     groups.zipWithIndex.flatMap{case (group,muxPort) =>
       // TODO: Broadcast possible for FIFOs?
       import scala.math.Ordering.Implicits._
-      group.toSeq.sortBy(_.unroll).zipWithIndex.map{case (matrix,muxOfs) =>
+      val (vec,uroll) = group.partition(_.access.isVectorAccess)
+      val urollMap = uroll.toSeq.sortBy(_.unroll).zipWithIndex.map{case (matrix,muxOfs) =>
         val port = Port(
           bufferPort = Some(0),
           muxPort    = muxPort,
@@ -39,6 +40,18 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
         )
         matrix -> port
       }
+      // Assumes only one vector access will be in each group.  Can this be wrong?
+      val vecMap = vec.toSeq.sortBy(_.unroll).map{matrix => 
+        val port = Port(
+          bufferPort = Some(0),
+          muxPort    = muxPort,
+          muxOfs     = 0,
+          castgroup  = Seq.fill(vec.size)(0),
+          broadcast  = Seq.fill(vec.size)(0)
+        )
+        matrix -> port
+      }
+      urollMap ++ vecMap
     }.toMap
   }
 

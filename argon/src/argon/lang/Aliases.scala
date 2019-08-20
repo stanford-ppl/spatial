@@ -10,6 +10,8 @@ trait InternalAliases extends CustomBitWidths {
   type Idx = Ind[_]
   type Rng = argon.lang.Series[Idx]
 
+  type I256 = FixPt[TRUE,_256,_0]
+  type I128 = FixPt[TRUE,_128,_0]
   type I64 = FixPt[TRUE,_64,_0]
   type I32 = FixPt[TRUE,_32,_0]
   type I16 = FixPt[TRUE,_16,_0]
@@ -28,6 +30,8 @@ trait InternalAliases extends CustomBitWidths {
   type  I3 = FixPt[TRUE, _3,_0]
   type  I2 = FixPt[TRUE, _2,_0]
 
+  type U256 = FixPt[FALSE,_256,_0]
+  type U128 = FixPt[FALSE,_128,_0]
   type U64 = FixPt[FALSE,_64,_0]
   type U32 = FixPt[FALSE,_32,_0]
   type U16 = FixPt[FALSE,_16,_0]

@@ -38,8 +38,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
   // Cache for skipping ahead to correct banking solution for patterns/axes that have already been solved
   private val solutionCache = scala.collection.mutable.HashMap[(Set[Set[SparseMatrix[Idx]]], NStrictness, AlphaStrictness, Seq[Int]), Option[ModBanking]]()
-  // Map for tracking which kinds of schemes already have a solution, used depending on what the banking effort is set to
+  // Map for tracking which kinds of schemes already have a solution, used depending on what the banking effort is set to.  Tracks BankingView and RegroupDims
   private val schemesFoundCount = scala.collection.mutable.HashMap[(BankingView,RegroupDims), Int]()
+
   /** Returns a Map from Seq(banking schemes) to the readers for these schemes.  
     * Generally, it will contain Map(Seq(flat_scheme, nested_scheme) -> all readers) but in 
     * the case of dephased accesses that cannot be banked together, there will be multiple 
@@ -161,7 +162,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
         )) false
         else if (effort == 2 && (
-          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0
+          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 1 ||
+          !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
+        )) false
+        else if (effort == 3 && (
+          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 1
         )) false
         else true
       }

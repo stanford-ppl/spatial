@@ -35,7 +35,7 @@ class SpatialConfig extends Config {
   var enableForceBanking: Boolean = false
   var groupUnrolledAccess: Boolean = false
   var enableParallelBinding: Boolean = true
-  var bankingEffort: Int = 1
+  var bankingEffort: Int = 2
   var unrollMetapipeOfParallels: Boolean = true
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false

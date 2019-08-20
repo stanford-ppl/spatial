@@ -597,17 +597,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val ctrls = reads.map(_.parent)
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
+    // All possible combinations of banking characteristics
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
-    val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds
+    val allAttemptDirectives: Seq[BankingOptions] = bankingOptionsIds
         .map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }
         .sortBy{x => (x.view.P, x.N.P, x.alpha.P, x.regroup.P)}
         .filter{x => (x.view.isInstanceOf[Hierarchical] || (x.view.isInstanceOf[Flat] && (x.regroup.dims.size == 0 || x.regroup.dims.size == x.view.rank)))}
-    if (attemptDirectives.size == 0) {
+    if (allAttemptDirectives.size == 0) {
       error(s"Unable to search for banking on ${mem.fullname}:")
       error(s"  ${mem.ctx})")
       error(s"  ${mem.ctx.content.getOrElse("<???>")}")
       throw new Exception(s"No banking options allowed!")
     }
+    // Partition directives list based on the "good" ones and "bad" ones (i.e. likelihood of successful scheme existing), and then repack them
+    val (goodDirectives, badDirectives) = allAttemptDirectives.partition{opts => !opts.undesired}
+    val (goodSameDirectives, goodDiffDirectives) = goodDirectives.partition{opts => opts.N.P == opts.alpha.P}
+    val attemptDirectives = goodSameDirectives ++ goodDiffDirectives ++ badDirectives
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)

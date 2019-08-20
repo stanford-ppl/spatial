@@ -299,13 +299,14 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.codeWindow = t
     }.text("""Size of code window for Java-style chunking, which breaks down large IR blocks into multiple levels of Java objects.  Increasing can sometimes solve the GC issue during Chisel compilation (default: 50)""")
 
-    cli.opt[Int]("bankingEffort").action{ (t,_) => 
+    cli.opt[Int]("bankingEffort").action{ (t,_) =>
       spatialConfig.bankingEffort = t
     }.text("""Specify the level of effort to put into banking local memories.  i.e:
       0: Quit banking analyzer after first banking scheme is found
-      1: (default) Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
-      2: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
-      3: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
+      1: Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
+      2: (default) Allow banking analyzer to find AT MOST 8 valid schemes (same as 1 except it searches for Pow2 N/Alpha schemes as well as Likely)
+      3: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
+      4: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
 """)
 
     cli.opt[Unit]("mop").action{ (_,_) => 

@@ -230,7 +230,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     def unapply(s: Sym[_]): Option[List[(Bits[_], Bits[_])]] = s match {
       case Op(FixEql(ctrBind, ctrCheckVal)) => Some(List((ctrBind, ctrCheckVal)))
       case Op(FixNeq(ctrBind, ctrCheckVal)) => Some(List((ctrBind, ctrCheckVal)))
-//      case Op(FixAnd(a, b)) =>
+      // TODO: Add case for OR.
       case Op(And(a, b)) =>
         val al: Option[List[(Bits[_], Bits[_])]] = a match {
             case ChainedBinaryCompareOp(ll) => Some(ll)
@@ -280,12 +280,15 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
           case MultiSelectMux(sel, x1, x2, ctrList) =>
             dbgs(s"$written matched on mux (sel: $sel, x1: $x1, x2: $x2, ctrList: $ctrList)")
             val ctrTracker: ListBuffer[(Bits[_], Bits[_])] = ctrList.to[ListBuffer]
+            var containsNonContinuousIter = false
+            dbgs(s"  controller counterchain: ${ctrlCtrs.reverse}, dependent sel counters = $ctrTracker")
             ctrlCtrs.reverse.foreach { b =>
-              // TODO: Still need to enforce the inner2outer check flow.
               val chkPair: (Bits[_], Bits[_]) = (b.asInstanceOf[Bits[_]], b.ctrStart.asInstanceOf[Bits[_]])
+              containsNonContinuousIter = ctrTracker.nonEmpty && ctrTracker.contains(chkPair)
+              dbgs(s"    containsNonContinuousIter = $containsNonContinuousIter, chkPair = $chkPair, ctrTracker = $ctrTracker")
               ctrTracker -= chkPair
             }
-            if (ctrTracker.isEmpty) {
+            if (!containsNonContinuousIter) {
               (x1,x2) match {
                 case (`x1`, RegAdd(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
                 case (`x1`, RegMul(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMul,invert=false))
@@ -312,6 +315,8 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
             } else None
 
           case FixMuxAddAccum(`reg`, data, ctrBind, ctrCheckVal) =>
+            // TODO: right now we are assuming that `data` exists within the WARCycle.
+            // TODO: there are cases where `data` can come outside of the WARCycle.
             val innerCtr = ctrlCtrs.last
             val innerCtrStart = innerCtr.ctrStart
             (ctrBind, ctrCheckVal) match {

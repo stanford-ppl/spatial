@@ -1,13 +1,9 @@
 package models
 
 import scala.collection.mutable.{HashMap, Set}
-import java.nio._
-import java.nio.{ file => javafile }
 import org.jpmml.evaluator._
 import scala.collection.JavaConverters._
-import _root_.java.io.File
 import org.dmg.pmml.FieldName
-import utils.math._
 import utils.math.isPow2
 
 class AreaEstimator {

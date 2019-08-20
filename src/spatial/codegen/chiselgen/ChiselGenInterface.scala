@@ -168,16 +168,16 @@ trait ChiselGenInterface extends ChiselGenCommon {
       if (spatialConfig.enableInstrumentation) {
         emit(src"val numCtrls = ${ctrls.size}")
         ctrls.zipWithIndex.foreach{case (s,i) => 
-          emit(src"val ${quote(s).toUpperCase}_instrctr = $i")
+          emit(src"val ${s.toString.toUpperCase}_instrctr = $i")
         }
       }
       instrumentCounters.foreach{case (s,_) => 
         val base = instrumentCounterIndex(s)
-        emit(src"val ${quote(s).toUpperCase}_cycles_arg = ${argIOs.toList.length + argOuts.toList.length + base}")
-        emit(src"val ${quote(s).toUpperCase}_iters_arg = ${argIOs.toList.length + argOuts.toList.length + base + 1}")
+        emit(src"val ${s.toString.toUpperCase}_cycles_arg = ${argIOs.toList.length + argOuts.toList.length + base}")
+        emit(src"val ${s.toString.toUpperCase}_iters_arg = ${argIOs.toList.length + argOuts.toList.length + base + 1}")
         if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
-          emit(src"val ${quote(s).toUpperCase}_stalled_arg = ${argIOs.toList.length + argOuts.toList.length + base + 2}")
-          emit(src"val ${quote(s).toUpperCase}_idle_arg = ${argIOs.toList.length + argOuts.toList.length + base + 3}")
+          emit(src"val ${s.toString.toUpperCase}_stalled_arg = ${argIOs.toList.length + argOuts.toList.length + base + 2}")
+          emit(src"val ${s.toString.toUpperCase}_idle_arg = ${argIOs.toList.length + argOuts.toList.length + base + 3}")
         }
       }
       emit (s"val numArgOuts_breakpts = ${1 max earlyExits.length}")

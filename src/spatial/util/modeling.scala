@@ -450,7 +450,7 @@ object modeling {
       case x if x.isWriter && x.writtenMem.isDefined => 
         if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
         if (x.writtenMem.get.isReg) protectRAWCycle(x)
-      case _ => 
+      case x =>
     }
 
     pushSegmentationAccesses()

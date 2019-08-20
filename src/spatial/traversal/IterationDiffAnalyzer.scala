@@ -14,7 +14,6 @@ import utils.implicits.collections._
 
 case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
-
   private def visitInnerControl(lhs: Sym[_], rhs: Op[_]): Unit = {
     dbgs(stm(lhs))
     val blks = rhs.blocks.map{block => latencyAndInterval(block) }

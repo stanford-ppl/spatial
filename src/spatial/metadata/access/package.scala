@@ -29,6 +29,12 @@ package object access {
       case _ => false
     }
 
+    def isVectorAccess: Boolean = op match {
+      case _: FIFOVecDeq[_] => true
+      case _: FIFOVecEnq[_] => true
+      case _ => false
+    }
+
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
       case _:FIFORegDeq[_] => true
@@ -95,6 +101,7 @@ package object access {
   implicit class AccessOps(a: Sym[_]) {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
+    def isVectorAccess: Boolean = a.op.exists(_.isVectorAccess)
     def isArgInRead: Boolean = a match {case Op(RegRead(Op(ArgInNew(_)))) => true; case _ => false}
 
     def isStreamStageEnabler: Boolean = a.op.exists(_.isStreamStageEnabler)
@@ -102,8 +109,12 @@ package object access {
 
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
     def isReader: Boolean = Reader.unapply(a).isDefined || isUnrolledReader
-    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter
+    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter || isSpecialWriter
 
+    def isSpecialWriter: Boolean = a match {
+      case Op(_:RegAccum[_]) => true
+      case _ => false
+    }
     def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
     def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
 
@@ -130,6 +141,7 @@ package object access {
     @stateful def writtenMem: Option[Sym[_]] = a match {
       case Op(d: Writer[_]) => Some(d.mem)
       case Op(d: VectorWriter[_]) => Some(d.mem)
+      case Op(d: RegAccum[_]) => Some(d.mem)
       case _ => None
     }
 

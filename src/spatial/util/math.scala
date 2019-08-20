@@ -1,25 +1,16 @@
 package spatial.util
 
 import argon._
-import forge.tags._
 
 import spatial.lang._
-import spatial.node._
 import emul.ResidualGenerator._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
-import spatial.metadata.memory._
 import spatial.metadata.types._
-import spatial.metadata.rewrites._
-import spatial.metadata.retiming._
-import spatial.metadata.math._
 
-import argon.node._
-
-import emul.FixedPoint
 import forge.tags.stateful
 
-import utils.math.{isPow2,log2,gcd}
+import utils.math.{log2,gcd}
 
 object math {
   /** Convert mod of pow2 into FixAnd */
@@ -47,7 +38,7 @@ object math {
   }
 
   @stateful def staticMod(lin: scala.Int, iter: Num[_], y: scala.Int): Boolean = {
-    if (iter.counter.ctr.isStaticStartAndStep) {
+    if (iter.counter.ctr.isStaticStartAndStep && !iter.counter.ctr.isForever) {
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt
       val g = gcd(par*step*lin,y)
@@ -59,7 +50,7 @@ object math {
   }
 
   @stateful def residual(lin: scala.Int, iter: Num[_], ofs: scala.Int, y: scala.Int): ResidualGenerator = {
-    if (iter.getCounter.isDefined && iter.counter.ctr.isStaticStartAndStep) {
+    if (iter.getCounter.isDefined && iter.counter.ctr.isStaticStartAndStep && !iter.counter.ctr.isForever) {
       val Final(start) = iter.counter.ctr.start
       val Final(step) = iter.counter.ctr.step
       val par = iter.counter.ctr.ctrPar.toInt

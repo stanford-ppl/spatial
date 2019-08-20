@@ -235,9 +235,9 @@ trait ChiselGenController extends ChiselGenCommon {
             emit("""val idles = Module(new InstrumentationCounter())""")          
             emit(src"stalls.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
             emit(src"idles.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
-            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${quote(lhs).toUpperCase}_instrctr, cycles.io.count, iters.io.count, stalls.io.count, idles.io.count)")
+            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles.io.count, iters.io.count, stalls.io.count, idles.io.count)")
           } else {
-            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${quote(lhs).toUpperCase}_instrctr, cycles.io.count, iters.io.count, 0.U, 0.U)")
+            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles.io.count, iters.io.count, 0.U, 0.U)")
           }
         }
 
@@ -317,7 +317,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val nMyChildren = lhs.children.count(_.s.get != lhs) max 1
     val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
     val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
-    val ctrWidths = if (lhs.cchains.nonEmpty && !lhs.cchains.head.isForever) src"List(${lhs.cchains.head.widths})" else "List(32)"
+    val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
     emit(src"val $lhs$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, $nMyChildren, $ctrcopies, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs.toList, " else ""}rr)")
     modifications
     // Wire signals to SM object
@@ -354,11 +354,11 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"$lhs$swobj.forwardpressure := ${getForwardPressure(lhs.toCtrl)} | $lhs$swobj.sm.io.doneLatch")
     emit(src"$lhs$swobj.sm.io.enableOut.zip($lhs$swobj.smEnableOuts).foreach{case (l,r) => r := l}")
 
-    lhs match {
-      case Op(UnrolledForeach(_,_,_,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"$lhs$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
-      case Op(UnrolledReduce(_,_,_,iters,valids,stopWhen)) if stopWhen.isDefined => emit(src"$lhs$swobj.sm.io.break := ${stopWhen.get}.rPort(0).output.head; ${stopWhen.get}.connectReset($done)")
-      case _ => emit(src"$lhs$swobj.sm.io.break := false.B")
-    }
+    // StreamTransformer means that parent breakWhen should also break/reset immediate child, since it becomes host of cchain
+    // val parentBreak = if (lhs.parent.s.isDefined && lhs.parent.s.get.stopWhen.isDefined) src"${lhs.parent.s.get.stopWhen.get}.rPort(0).output.head.apply(0)" else "false.B"
+    val myBreak = if (lhs.stopWhen.isDefined) src"${lhs.stopWhen.get}.rPort(0).output.head.apply(0); ${lhs.stopWhen.get}.connectReset($done)" else "false.B"
+    emit(src"$lhs$swobj.sm.io.break := $myBreak")
+
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
     val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
     val noop = if (lhs.cchains.nonEmpty) src"~$lhs.cchain.head.output.noop" else "true.B"
@@ -546,15 +546,15 @@ trait ChiselGenController extends ChiselGenCommon {
           val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(
-              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).cycs""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_cycles_arg).port.valid := top.io.enable""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).iters""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_iters_arg).port.valid := top.io.enable""",1,Seq[String]())
+              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).cycs""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.valid := top.io.enable""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).iters""",1,Seq[String]()),
+              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.valid := top.io.enable""",1,Seq[String]())
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).stalls""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_stalled_arg).port.valid := top.io.enable""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.bits := instrctrs(${quote(s).toUpperCase}_instrctr).idles""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${quote(s).toUpperCase}_idle_arg).port.valid := top.io.enable""",1,Seq[String]())
+                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).stalls""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.valid := top.io.enable""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).idles""",1,Seq[String]()),
+                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.valid := top.io.enable""",1,Seq[String]())
               )} else Nil}
 
           }
@@ -571,7 +571,7 @@ trait ChiselGenController extends ChiselGenCommon {
             isLive, 
             branchswobj, 
             arg, 
-            () => initChunkState
+            () => initChunkState()
           )(emit(_) )
 
           emit (s"val numArgOuts_breakpts = ${earlyExits.length}")

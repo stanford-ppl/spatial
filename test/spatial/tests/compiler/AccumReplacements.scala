@@ -303,6 +303,8 @@ import argon.Op
       }
       Y14 := acc14
 
+
+
     }
 
     val gold1 =  (args(0).to[Int] * args(0).to[Int]) * (4-1) * 8

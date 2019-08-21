@@ -35,7 +35,7 @@ import spatial.dsl._
 
             // II is analyzed correctly, however the VCS result is messed up.
             // Sim result is wrong, but adding a println fix the issue?
-            println("jTile = " + jTile + ", t = " + t + ", acc.value = " + acc.value)
+//            println("jTile = " + jTile + ", t = " + t + ", acc.value = " + acc.value)
             if (jTile == lastTile)
               cMem(iTile + accOffSet) = acc.value
         }

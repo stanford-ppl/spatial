@@ -53,8 +53,8 @@ import spatial.dsl._
       // Issue: this is related to intermediates. Seems that each accum reg are duplicated?
       // Issue: seems that this is related to buffering to an SRAM? There's one more consumer there and breaks the
       // noIntermediate test.
+      val fList: scala.List[Reg[T]] = scala.List.tabulate[Reg[T]](npFlatten) { _ => Reg[T](0.to[T]) }
       Foreach(M by baseStride, N by np, K by kp) { (m, nTile, kTile) =>
-        val fList: scala.List[Reg[T]] = scala.List.tabulate[Reg[T]](npFlatten) { _ => Reg[T](0.to[T]) }
         def reduceTreeDp(nIdx: I32): T = {
           scala.List
             .tabulate[T](kpFlatten) { ii =>
@@ -74,8 +74,8 @@ import spatial.dsl._
             )
 
 // is this a scala-sim bug? Adding this line back gives the right result: println("kTile = " + kTile + ", nTile = " + nTile + ", f = " + f.value)
-//            if (kTile == lastTile) // Seems that this line prevents insertion of an extra register. Why?
-            sramC(m, nIdx) = f.value
+            if (kTile == lastTile) // Seems that this line prevents insertion of an extra register. Why?
+              sramC(m, nIdx) = f.value
         }
       }
 

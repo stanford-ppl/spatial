@@ -295,7 +295,8 @@ package object access {
     // TODO: need to at least keep the counters from the parent of mem's declaration.
     val memoryIters = mem.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
     val accessIters = access.scopes.filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
-
+//    val memoryLastCtrlIters: Seq[I32] = mem.scopes.last.iters.filter(! _.counter.ctr.isForever)
+//    val diffIters: Seq[I32] = accessIters diff memoryIters
     accessIters diff memoryIters
   }
 

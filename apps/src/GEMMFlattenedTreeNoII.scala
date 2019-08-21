@@ -46,15 +46,10 @@ import spatial.dsl._
 
       sramA load A(baseAddr :: M, baseAddr :: K)
       sramB load B(baseAddr :: K, baseAddr :: N)
-//      sramC load C(baseAddr :: M, baseAddr :: N)
 
       val lastTile = (K / kp - 1.to[I32]) * kp
-      println("last Tile = " + lastTile)
-      // Issue: this is related to intermediates. Seems that each accum reg are duplicated?
-      // Issue: seems that this is related to buffering to an SRAM? There's one more consumer there and breaks the
-      // noIntermediate test.
-      val fList: scala.List[Reg[T]] = scala.List.tabulate[Reg[T]](npFlatten) { _ => Reg[T](0.to[T]) }
       Foreach(M by baseStride, N by np, K by kp) { (m, nTile, kTile) =>
+        val fList: scala.List[Reg[T]] = scala.List.tabulate[Reg[T]](npFlatten) { _ => Reg[T](0.to[T]) }
         def reduceTreeDp(nIdx: I32): T = {
           scala.List
             .tabulate[T](kpFlatten) { ii =>
@@ -64,17 +59,16 @@ import spatial.dsl._
           }
             .sumTree
         }
-        // Might be related to how accum is done with this guy.
+
         fList.zipWithIndex.foreach {
           case (f, idx) =>
             val nIdx: I32 = I32(idx) + nTile
             val t = reduceTreeDp(nIdx)
-            f := t + mux(
-              kTile == 0.to[I32], 0, f.value
+            f := mux(
+              kTile == 0.to[I32], t, t + f.value
             )
 
-// is this a scala-sim bug? Adding this line back gives the right result: println("kTile = " + kTile + ", nTile = " + nTile + ", f = " + f.value)
-            if (kTile == lastTile) // Seems that this line prevents insertion of an extra register. Why?
+            if (kTile == lastTile)
               sramC(m, nIdx) = f.value
         }
       }

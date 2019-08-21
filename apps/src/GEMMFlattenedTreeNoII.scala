@@ -69,8 +69,8 @@ import spatial.dsl._
           case (f, idx) =>
             val nIdx: I32 = I32(idx) + nTile
             val t = reduceTreeDp(nIdx)
-            f := mux(
-              kTile == 0.to[I32], t, t + f.value
+            f := t + mux(
+              kTile == 0.to[I32], 0, f.value
             )
 
 // is this a scala-sim bug? Adding this line back gives the right result: println("kTile = " + kTile + ", nTile = " + nTile + ", f = " + f.value)

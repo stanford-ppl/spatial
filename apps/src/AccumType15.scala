@@ -6,8 +6,8 @@ import spatial.dsl._
     val n = 128
     val k = 64
 
-    val A = (0 :: n, 0 :: k) {(i, j) => 1.to[Int]}
-    val BVec = (0 :: k) { i => 1.to[Int] }
+    val A = (0 :: n, 0 :: k) {(i, j) => (i + j % 8).to[Int]}
+    val BVec = (0 :: k) { i => i.to[Int] }
 
     val ADRAM = DRAM[Int](n, k)
     val BDRAM = DRAM[Int](k)

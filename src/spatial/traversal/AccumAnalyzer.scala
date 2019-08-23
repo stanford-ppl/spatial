@@ -120,7 +120,6 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
   }
 
-
   private object Times {
     def unapply(s: Sym[_]): Option[(Bits[_],Bits[_])] = s match {
       case Op(FixMul(a,b)) => Some((a,b))

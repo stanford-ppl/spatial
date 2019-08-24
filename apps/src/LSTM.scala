@@ -5,10 +5,9 @@ object LSTM extends SpatialApp {
   // This should take 5180 cycles to run...
   def main(args: Array[String]): Unit = {
     // This is describing the LSTM dataflow
-    type lowT = FixPt[TRUE, _4, _4]
-    type highT = FixPt[TRUE, _16, _16]
+    type lowT = FixPt[TRUE, _2, _6]
+    type highT = FixPt[TRUE, _10, _22]
 
-    // TODO: how to set these non-linear functions?
     val tanh: highT => highT = x => {
       // 0.0001616 + 0.86635 * x - 0.00042018 * x^2 - 0.13333 * x^3
 //      val x2: highT = x * x
@@ -58,10 +57,10 @@ object LSTM extends SpatialApp {
 
     val hu = 1
     val ru = 4
-    val rv = 16
+//    val rv = 16
+    val rv = 4
 
     // problem-specific params
-
     val nHiddenUnits = 128
     val nFeatures = 128
     val nTimeSteps = 1
@@ -72,16 +71,19 @@ object LSTM extends SpatialApp {
         val re: DRAM2[lowT] = DRAM[lowT](nHiddenUnits, nFeatures + nHiddenUnits)
         re
     }
+
     val ijfoData: scala.Array[Matrix[lowT]] = scala.Array.tabulate(nGates) {
       _ =>
         val re: Matrix[lowT] = Matrix.tabulate[lowT](
           nHiddenUnits.to[I32],
           (nFeatures + nHiddenUnits).to[I32]
         ) { (_, _) =>
-          random[lowT](1.to[lowT])
+//          random[lowT](1.to[lowT])
+          0.03125.to[lowT]
         }
         re
     }
+
     ijfoDRAMs zip ijfoData foreach {
       case (mem, data) =>
         setMem(mem, data)
@@ -89,7 +91,8 @@ object LSTM extends SpatialApp {
 
     def getVecDRAM(size: I32): DRAM1[lowT] = {
       val re = DRAM[lowT](size)
-      val reData = Array.tabulate[lowT](size)(_ => random[lowT](1.to[lowT]))
+//      val reData = Array.tabulate[lowT](size)(_ => random[lowT](1.to[lowT]))
+      val reData = Array.tabulate[lowT](size)(_ => 0.03125.to[lowT])
       setMem(re, reData)
       re
     }
@@ -114,6 +117,7 @@ object LSTM extends SpatialApp {
             SRAM[lowT](nHiddenUnits, nFeatures + nHiddenUnits)
           re
       }
+
       ijfoMems zip ijfoDRAMs foreach {
         case (sram, dram) =>
           sram load dram(
@@ -153,7 +157,7 @@ object LSTM extends SpatialApp {
             List
               .tabulate(ru * rv) { ii =>
                 val iuv = iuvTile + ii.to[I32]
-                val re: highT = (w(ih, iuv) * xh(iuv)).to[highT]
+                val re: highT = w(ih, iuv).to[highT] * xh(iuv).to[highT]
                 re
               }
               .sumTree
@@ -203,5 +207,39 @@ object LSTM extends SpatialApp {
     val hResult = getMem(hResultDRAM)
     printArray(cResult, "c = ")
     printArray(hResult, "h = ")
+
+    def tanhHost(x: Array[highT]): Array[highT] = x
+    def sigHost(x: Array[highT]): Array[highT] = x
+    def tanhEle(x: highT): highT = x
+
+    val biasesData: scala.Array[Tensor1[lowT]] = biasesDRAM.map(f => getMem(f))
+    val xh: Tensor1[lowT] = getMem(xhDRAM)
+    val c: Tensor1[lowT] = getMem(cInitDRAM)
+    val gates: scala.Array[Array[highT]] = ijfoData.zip(biasesData).map {
+      case (m: Matrix[_], b: Tensor1[_]) =>
+        Array.tabulate[highT](nHiddenUnits) { i =>
+          Array.tabulate[highT](nHiddenUnits + nFeatures){ j =>
+            m(i, j).to[highT] * xh(j).to[highT]
+          }.reduce(_+_) + b(i).to[highT]
+        }
+    }
+    val i = sigHost(gates.head)
+    val j = tanhHost(gates(1))
+    val f = sigHost(gates(2))
+    val o = sigHost(gates.last)
+
+    val cPrimeGold: Tensor1[highT] = Array.tabulate[highT](nHiddenUnits)( ih =>
+      i(ih) * j(ih) + c(ih).to[highT] * f(ih)
+    )
+
+    val hPrimeGold: Tensor1[highT] = Array.tabulate[highT](nHiddenUnits)( ih =>
+      tanhEle(cPrimeGold(ih)) * o(ih)
+    )
+
+    printArray(cPrimeGold)
+    printArray(hPrimeGold)
+
+
+
   }
 }

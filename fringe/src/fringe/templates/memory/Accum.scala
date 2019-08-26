@@ -57,24 +57,30 @@ class FixFMAAccum(
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + fmaLatency)
   laneCtr.io.setup.saturate := false.B
 
+  val resetLane = Module(new SRFF())
+  resetLane.io.input.set := activeReset
+  resetLane.io.input.asyn_reset := false.B
+  resetLane.io.input.reset := getRetimed(activeReset, fmaLatency.toInt + cycleLatency.toInt + 1, activeEn)
+  val shouldResetLane = resetLane.io.output || activeReset
+
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
-  firstRound.io.input.reset := laneCtr.io.output.done | activeReset
+  firstRound.io.input.reset := getRetimed(activeFirst, cycleLatency.toInt - 1, activeEn) | activeReset
   val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
   drainState.io.input.reset := activeLast.D(drain_latency + fmaLatency)
-  val isDrainState = drainState.io.output
+  val isDrainState = drainState.io.output || activeEn
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
   accums.foreach{case (acc, lane) => 
     acc.io <> DontCare
     val fixadd = Wire(new FixedPoint(s,d,f))
-    fixadd.r := Mux(isFirstRound, 0.U, acc.io.rPort(0).output(0))
+    fixadd.r := Mux(isFirstRound || shouldResetLane, 0.U, acc.io.rPort(0).output(0))
     val result = Wire(new FixedPoint(s,d,f))
     result.r := Math.fma(fixin1, fixin2, fixadd, Some(fmaLatency), true.B, "").r
     acc.io.rPort <> DontCare
@@ -113,17 +119,23 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
   laneCtr.io.input.reset := activeReset | activeLast.D(drain_latency + opLatency)
   laneCtr.io.setup.saturate := false.B
 
+  val resetLane = Module(new SRFF())
+  resetLane.io.input.set := activeReset
+  resetLane.io.input.asyn_reset := false.B
+  resetLane.io.input.reset := getRetimed(activeReset, opLatency.toInt + cycleLatency.toInt + 1, activeEn)
+  val shouldResetLane = resetLane.io.output || activeReset
+
   val firstRound = Module(new SRFF())
   firstRound.io.input.set := activeFirst & !laneCtr.io.output.done
   firstRound.io.input.asyn_reset := false.B
-  firstRound.io.input.reset := laneCtr.io.output.done | activeReset
+  firstRound.io.input.reset := getRetimed(activeFirst, opLatency.toInt + cycleLatency.toInt - 1, activeEn) | activeReset
   val isFirstRound = firstRound.io.output
 
   val drainState = Module(new SRFF())
   drainState.io.input.set := activeLast
   drainState.io.input.asyn_reset := false.B
   drainState.io.input.reset := activeLast.D(drain_latency + opLatency)
-  val isDrainState = drainState.io.output
+  val isDrainState = drainState.io.output || activeEn
 
   val dispatchLane = laneCtr.io.output.count(0).asUInt
   val accums = Array.tabulate(cycleLatency.toInt){i => (Module(new FF(d+f)), i.U(cw.W))}
@@ -132,10 +144,10 @@ class FixOpAccum(val t: Accum, val numWriters: Int, val cycleLatency: Double, va
     fixadd.r := acc.io.rPort(0).output(0)
     val result = Wire(new FixedPoint(s,d,f))
     t match {
-      case Accum.Add => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
-      case Accum.Mul => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), Math.mul(fixin1,fixadd, Some(opLatency), true.B, Truncate, Wrapping, "").r)
-      case Accum.Min => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
-      case Accum.Max => result.r := Mux(isFirstRound.D(opLatency.toInt), getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
+      case Accum.Add => result.r := Mux(isFirstRound | shouldResetLane, getRetimed(fixin1.r, opLatency.toInt), getRetimed(fixin1 + fixadd, opLatency.toInt).r)
+      case Accum.Mul => result.r := Mux(isFirstRound | shouldResetLane, getRetimed(fixin1.r, opLatency.toInt), Math.mul(fixin1,fixadd, Some(opLatency), true.B, Truncate, Wrapping, "").r)
+      case Accum.Min => result.r := Mux(isFirstRound | shouldResetLane, getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 < fixadd, fixin1, fixadd).r, opLatency.toInt))
+      case Accum.Max => result.r := Mux(isFirstRound | shouldResetLane, getRetimed(fixin1.r, opLatency.toInt), getRetimed(Mux(fixin1 > fixadd, fixin1, fixadd).r, opLatency.toInt))
     }
     acc.io.wPort <> DontCare
     acc.io.rPort <> DontCare

@@ -3,7 +3,7 @@ package spatial.tests.Rosetta
 import spatial.dsl._
 import spatial.targets._
 
-@spatial class SpamFilteringTmp extends SpatialTest {
+@spatial class SpamFiltering extends SpatialTest {
 	//override def runtimeArgs = "1 0"
 
     case class InferenceStats(tp : Int, tn : Int, fp : Int, fn : Int)
@@ -24,8 +24,8 @@ import spatial.targets._
 	val empty_str = ""
 
 	/* Params */
-	val parReduce 		= 16
-	val transfer_par  	= 16
+	val parReduce 		= 4
+	val transfer_par  	= 8
 
 	def sigmoid(exponent 	: FeatureType,
 				sigmoidLUT	: SRAM1[FeatureType],
@@ -172,7 +172,7 @@ import spatial.targets._
 										}	
 		setMem(sigmoid_lut_dram, host_sigmoid_lut)
 
-		val num_training_local  = 2 // num_training_samples
+		val num_training_local  = 20 // num_training_samples
 		val step_size 			= 60000 /* same as learning rate */
 
 
@@ -187,7 +187,7 @@ import spatial.targets._
 
 			/* Initialize sigmoid LUT */
 			sigmoidLUT load sigmoid_lut_dram 
-			Foreach(0 until num_features par 8) { t =>
+			Foreach(0 until num_features par 1) { t =>
 				theta_sram(t) = 0.to[FeatureType]
 			}
 
@@ -210,10 +210,10 @@ import spatial.targets._
 						val dp_result   = dotProduct(theta_sram, training_sample, training_id) //}
 						Pipe { prob_result := sigmoid(dp_result, sigmoidLUT, sigmoid_lut_size) }
 						
-						//Pipe {
+						
 						val training_label = label_sram(training_id)
 						computeTheta(theta_sram, training_sample, (prob_result.value - training_label.to[FeatureType]), training_id, step_size)					
-						//}
+						
 
 					}
 				}

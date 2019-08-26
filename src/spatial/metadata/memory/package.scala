@@ -66,8 +66,19 @@ package object memory {
     @stateful def bankingEffort: Int = metadata[BankingEffort](s).map(_.effort).getOrElse(spatialConfig.bankingEffort)
     def bankingEffort_=(effort: Int): Unit = metadata.add(s, BankingEffort(effort))
 
+    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int])] = metadata[ExplicitBanking](s).map(_.scheme)
+    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def explicitNs: Seq[Int] = explicitBanking.get._1
+    def explicitBs: Seq[Int] = explicitBanking.get._2
+    def explicitAlphas: Seq[Int] = explicitBanking.get._3
+    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).map(_.flag).getOrElse(false)
+    def forceExplicitBanking_=(flag: Boolean): Unit = metadata.add(s, ForceExplicitBanking(flag))
+
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
     def isNoFlatBank_=(flag: Boolean): Unit = metadata.add(s, NoFlatBank(flag))
+
+    def isMustMerge: Boolean = metadata[MustMerge](s).exists(_.flag)
+    def isMustMerge_=(flag: Boolean): Unit = metadata.add(s, MustMerge(flag))
 
     def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
     def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
@@ -285,6 +296,8 @@ package object memory {
         case Op(_: RegAccumFMA[_]) => Some(AccumFMA)
         case Op(_: RegAccumLambda[_]) => Some(AccumUnk)
       }
+
+    def isSingleton: Boolean = isReg || isArgIn || isArgOut || isHostIO || isFIFOReg
     def isReg: Boolean = mem.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgInNew[_]] }
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }
@@ -382,6 +395,19 @@ package object memory {
     /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */
     def scatterStreams: List[Sym[_]] = s.consumers.filter(_.isScatter).toList
 
+    def barrier: Option[Int] = metadata[Barrier](s).map(_.id)
+    def setBarrier(id: Int): Unit = metadata.add(s, Barrier(id))
+
+    def waitFors: Option[List[Int]] = metadata[Wait](s).map(_.ids.toList)
+    def waitFor(id: Int*): Unit = {
+      val wait = metadata[Wait](s).getOrElse {
+        val w = Wait()
+        metadata.add(s, w)
+        w
+      }
+      wait.ids ++= id
+    }
+
     /** Get BurstCmd bus */
     def addrStream: Sym[_] = s match {
       case Op(FringeDenseStore(_,cmd,_,_)) => cmd
@@ -403,6 +429,16 @@ package object memory {
       case Op(FringeSparseStore(_,_,ack)) => ack
       case _ => throw new Exception("No dataStream for $s")
     }
+  }
+
+  def transferSyncMeta(from:Sym[_], to:Sym[_]) = {
+    from.waitFors.foreach { ids =>
+      to.waitFor(ids:_*)
+    }
+    from.barrier.foreach { id =>
+      to.setBarrier(id)
+    }
+    to
   }
 
 

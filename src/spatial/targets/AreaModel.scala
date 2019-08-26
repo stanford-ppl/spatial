@@ -4,13 +4,11 @@ import argon._
 import argon.node._
 import forge.tags._
 import utils.math.{isPow2,log2}
-import utils.implicits.Readable._
 import utils.implicits.collections._
 import models._
 
 import spatial.lang._
 import spatial.node._
-import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 

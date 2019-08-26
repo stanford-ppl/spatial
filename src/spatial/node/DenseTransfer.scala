@@ -42,8 +42,8 @@ import spatial.util.memops._
     def isStore: Boolean = !isLoad
 
     override def effects: Effects = if (isStore) Effects.Writes(dram) else Effects.Writes(local)
-    @rig def lower(): Void = {
-      DenseTransfer.transfer(dram,local,forceAlign,ens,isLoad)
+    @rig def lower(old:Sym[Void]): Void = {
+      DenseTransfer.transfer(old, dram,local,forceAlign,ens,isLoad)
     }
     @rig def pars: Seq[I32] = {
       val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
@@ -61,6 +61,7 @@ import spatial.util.memops._
 
 object DenseTransfer {
   @rig def transfer[A,Dram[T]<:DRAM[T,Dram],Local[T]<:LocalMem[T,Local]](
+    old:        Sym[Void],
     dram:       Dram[A],
     local:      Local[A],
     forceAlign: Boolean,
@@ -156,7 +157,7 @@ object DenseTransfer {
       val ackStream  = StreamIn[Bit](BurstAckBus)
 
       // Command generator
-      Pipe {
+      Sequential {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
         cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
@@ -170,7 +171,8 @@ object DenseTransfer {
       }
 
       // Fringe
-      Fringe.denseStore[A,Dram](dram, cmdStream, dataStream, ackStream)
+      val store = Fringe.denseStore[A,Dram](dram, cmdStream, dataStream, ackStream)
+      transferSyncMeta(old, store)
 
       // Ack receiver
       // TODO[2]: Assumes one ack per command
@@ -272,7 +274,8 @@ object DenseTransfer {
           }
         }
         // Fringe
-        Fringe.denseStore(dram, cmdStream, dataStream, ackStream)
+        val store = Fringe.denseStore(dram, cmdStream, dataStream, ackStream)
+        transferSyncMeta(old, store)
         // Ack receive
         // TODO[4]: Assumes one ack per command
         Pipe {
@@ -293,7 +296,7 @@ object DenseTransfer {
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command generator
-      Pipe {
+      Sequential {
         val addr = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val addr_bytes = addr
         val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
@@ -301,7 +304,9 @@ object DenseTransfer {
         cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, true), dram.isAlloc)
       }
       // Fringe
-      Fringe.denseLoad(dram, cmdStream, dataStream)
+      val load = Fringe.denseLoad(dram, cmdStream, dataStream)
+      transferSyncMeta(old, load)
+
       Foreach(requestLength par p){i =>
         val data = dataStream.value()
         val addr = localAddr(i)
@@ -316,7 +321,7 @@ object DenseTransfer {
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command
-      Pipe {
+      Sequential {
         val aligned = alignmentCalc(dramAddr)
 
         cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, true), dram.isAlloc)
@@ -324,7 +329,8 @@ object DenseTransfer {
       }
 
       // Fringe
-      Fringe.denseLoad(dram, cmdStream, dataStream)
+      val load = Fringe.denseLoad(dram, cmdStream, dataStream)
+      transferSyncMeta(old, load)
 
       // Receive
       Pipe {
@@ -353,4 +359,5 @@ object DenseTransfer {
       }
     }
   }
+
 }

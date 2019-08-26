@@ -68,7 +68,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
   def bitBasedInputs(d: Op[_]): Seq[Sym[_]] = exps(d).filterNot(_.isGlobal).filter{e => Bits.unapply(e.tp).isDefined }.toSeq
 
   def pipeDelayLineArea(block: Block[_], par: Int): Area = {
-    val (latencies, cycles) = latenciesAndCycles(block, verbose = false)
+    val (latencies, cycles) = latenciesAndCycles(block)
     val cycleSyms = cycles.flatMap(_.symbols)
     val scope = latencies.keySet
     def delayOf(x: Sym[_]): Int = latencies.getOrElse(x, 0.0).toInt
@@ -141,26 +141,26 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
           body
         }
 
-      case ParallelPipe(en, block) =>
+      case ParallelPipe(_, block) =>
         val body = areaOfBlock(block, isInner = false, 1)
         dbgs(s"Parallel $lhs: ")
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
-      case UnitPipe(en, block)     =>
-        val body = areaOfBlock(block, isInner = lhs.children.size > 0, 1)
+      case UnitPipe(_, block, _)     =>
+        val body = areaOfBlock(block, isInner = lhs.children.nonEmpty, 1)
         dbgs(s"UnitPipe: $lhs")
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
-      case OpForeach(en, cchain, block, iters, _) =>
+      case OpForeach(_, cchain, block, _, _) =>
         val P = cchain.constPars.product
         val body = areaOfBlock(block,  isInner = lhs.children.size > 0, P)
         dbgs(s"Foreach: $lhs (P = $P)")
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
-      case op@OpReduce(en, cchain, accum, map, load, reduce, store, ident, fold, iters, _) =>
+      case op@OpReduce(_, cchain, _, map, load, reduce, store, _, _, _, _) =>
         val P = cchain.constPars.product
         val mapArea: Area = areaOfBlock(map,  isInner = lhs.children.size > 0, P) // Map is duplicated P times
         /*
@@ -219,7 +219,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         dbgs(s" - Body: $caseArea")
         caseArea + areaOf(lhs)
 
-      case StateMachine(en,start,notDone,action,nextState) =>
+      case StateMachine(_,_,notDone,action,nextState) =>
         val notDoneArea   = areaOfBlock(notDone,isInner = true,1)
         val actionArea    = areaOfBlock(action, isInner = lhs.children.size > 0,1)
         val nextStateArea = areaOfBlock(nextState,isInner = true,1)
@@ -231,13 +231,13 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         notDoneArea + actionArea + nextStateArea + areaOf(lhs)
 
       case _ if inHw =>
-        val blocks = rhs.blocks.map(blk => areaOfBlock(blk,false,1))
+        val blocks = rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1))
         val area = areaOf(lhs)
-        dbgs(s"${lhs}: $area")
+        dbgs(s"$lhs: $area")
         blocks.zipWithIndex.foreach{case (blk,i) => dbgs(s" - Block #$i: $blk") }
         area + blocks.fold(NoArea){_+_}
 
-      case _ => areaOf(lhs) + rhs.blocks.map(blk => areaOfBlock(blk,false,1)).fold(NoArea){_+_}
+      case _ => areaOf(lhs) + rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1)).fold(NoArea){_+_}
     }
     scopeArea = area +: scopeArea
   }

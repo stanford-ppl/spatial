@@ -1,13 +1,9 @@
 package models
 
 import scala.collection.mutable.{HashMap, Set}
-import java.nio._
-import java.nio.{ file => javafile }
 import org.jpmml.evaluator._
 import scala.collection.JavaConverters._
-import _root_.java.io.File
 import org.dmg.pmml.FieldName
-import utils.math._
 import utils.math.isPow2
 
 class AreaEstimator {
@@ -22,19 +18,19 @@ class AreaEstimator {
     if (useMLFlag) {
       // import scala.language.postfixOps
       // import sys.process._
-// 
+
       // val python3Exists = "python3" !
-// 
+
       // val pickleExists = "echo import pickle" #| "python3" !
-// 
+
       // val xgboostExists = "echo import xgboost" #| "python3" !
-      // 
+      
       // val sklearnExists = "echo import sklearn" #| "python3" !
-      // 
+      
       // (python3Exists, pickleExists, xgboostExists, sklearnExists) match {
-        // case (0,0,0,0) => useML = true
-        // case (1,_,_,_) => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] python3 missing!  Cannot run ML area models!"); useML = false
-        // case (_,_,_,_) => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Missing python3 libraries: ${if (pickleExists == 1) "pickle" else ""}${if (xgboostExists == 1) " xgboost" else ""}${if (sklearnExists == 1) " sklearn" else ""}!  Cannot run ML area models!"); useML = false
+      //   case (0,0,0,0) => useML = true
+      //   case (1,_,_,_) => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] python3 missing!  Cannot run ML area models!"); useML = false
+      //   case (_,_,_,_) => println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Missing python3 libraries: ${if (pickleExists == 1) "pickle" else ""}${if (xgboostExists == 1) " xgboost" else ""}${if (sklearnExists == 1) " sklearn" else ""}!  Cannot run ML area models!"); useML = false
       // }
     } else {
       useML = false

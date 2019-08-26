@@ -38,8 +38,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
   private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
   // Cache for skipping ahead to correct banking solution for patterns/axes that have already been solved
   private val solutionCache = scala.collection.mutable.HashMap[(Set[Set[SparseMatrix[Idx]]], NStrictness, AlphaStrictness, Seq[Int]), Option[ModBanking]]()
-  // Map for tracking which kinds of schemes already have a solution, used depending on what the banking effort is set to
+  // Map for tracking which kinds of schemes already have a solution, used depending on what the banking effort is set to.  Tracks BankingView and RegroupDims
   private val schemesFoundCount = scala.collection.mutable.HashMap[(BankingView,RegroupDims), Int]()
+
   /** Returns a Map from Seq(banking schemes) to the readers for these schemes.  
     * Generally, it will contain Map(Seq(flat_scheme, nested_scheme) -> all readers) but in 
     * the case of dephased accesses that cannot be banked together, there will be multiple 
@@ -54,21 +55,20 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     depth: Int
   ): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
 
-    // Return Set of iterator combined with its unroll address with which it dephases
-    def allDephasingIters(accs: Set[Set[AccessMatrix]]): Set[(Idx,Seq[Int])] = {
-      accs.map{grp => grp.map{a => 
-        grp.filter(_ != a).map{b => dephasingIters(a,b,mem)}.flatten
-      }.flatten}.flatten
+    // Generate substitution rules for each iter for each uid.  Given iter and its uid, generate a rule to replace it with a new iter and an offset to include in the access patterns c column
+    def generateSubstRules(accs: Set[Set[AccessMatrix]]): scala.collection.immutable.Map[(Idx,Seq[Int]),(Idx,Int)] = {
+      val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.map{a => dephasingIters(a,Seq.fill(a.unroll.size)(0),mem)}.flatten.toMap
+      toRewrite.map{
+        case((i,addr),ofs) if (ofs.isDefined) => ((i,addr) -> (i,ofs.get))
+        case((i,addr),ofs) if (!ofs.isDefined) => ((i,addr) -> (boundVar[I32],0))
+      }.toMap
     }
-    def generateSubstRules(toRewrite: Set[(Idx,Seq[Int])]): scala.collection.immutable.Map[(Idx,Seq[Int]),Idx] = {
-      toRewrite.collect{case(x,addr) if (addr.exists(_>0)) => ((x,addr) -> boundVar[I32])}.toMap
-    }
-    def rewriteAccesses(accs: Set[Set[AccessMatrix]], rules: Map[(Idx,Seq[Int]),Idx]): Set[Set[AccessMatrix]] = {
+    def rewriteAccesses(accs: Set[Set[AccessMatrix]], rules: Map[(Idx,Seq[Int]),(Idx,Int)]): Set[Set[AccessMatrix]] = {
       accs.map{grp => grp.map{a => 
         val aIters = accessIterators(a.access, mem)
-        val keyRules: scala.collection.immutable.Map[Idx,Idx] = aIters.zipWithIndex.collect{case(iter,i) if (rules.contains((iter,getDephasedUID(aIters,a.unroll,i)))) => (iter -> rules((iter,getDephasedUID(aIters,a.unroll,i))))}.toMap
+        val keyRules: scala.collection.immutable.Map[Idx,(Idx,Int)] = aIters.zipWithIndex.collect{case(iter,i) if (rules.contains((iter,getDephasedUID(aIters,a.unroll,i)))) => (iter -> rules((iter,getDephasedUID(aIters,a.unroll,i))))}.toMap
         if (keyRules.nonEmpty) {mem.addDephasedAccess(a.access); dbgs(s"Substituting due to dephasing: $keyRules")}
-        val newa = a.randomizeKeys(keyRules)
+        val newa = a.substituteKeys(keyRules)
         accMatrixMapping += (newa -> a)
         newa
       }.toSet}.toSet
@@ -156,24 +156,37 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         dbgs(s"incrementing ${scheme.view}, ${scheme.regroup} to ${count + 1} ")
       }
       def wantScheme(scheme: BankingOptions): Boolean = {
-        if (effort == 0 && (schemesFoundCount.map(_._2).sum > 1)) false
+        if (effort == 0 && (schemesFoundCount.map(_._2).sum > 0)) false
         else if (effort == 1 && (
           schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0 ||
           !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
         )) false
         else if (effort == 2 && (
-          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0
+          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 1 ||
+          !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
+        )) false
+        else if (effort == 3 && (
+          schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 1
         )) false
         else true
       }
 
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-      if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
-      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer) {
+      if (mem.isSingleton) {
+        if (myWrites.exists(_.size > 1) && !mem.shouldIgnoreConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
+        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      }
+      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && !mem.explicitBanking.isDefined) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && !mem.explicitBanking.isDefined) {
         val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1, 0)))))
       }
+      // else if (mem.explicitBanking.isDefined) {
+      //   if (mem.forceExplicitBanking) {
+      //     Seq()
+      //   }
+      // }
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(view, nStricts, aStricts, regroup) => 
           if (wantScheme(scheme)) {
@@ -255,24 +268,30 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     sparseMatrixMapping.clear()
 
     // Step 1: Modify access matrices due to lockstep dephasing and compute new "actual" grps
-    val readIterSubsts = generateSubstRules(allDephasingIters(reads))
+    val readIterSubsts = generateSubstRules(reads)
     if (readIterSubsts.nonEmpty) dbgs(s"General read dephasing rules for $mem: ${readIterSubsts.mkString("\n  - ")}")
-    val writeIterSubsts = generateSubstRules(allDephasingIters(writes))
+    val writeIterSubsts = generateSubstRules(writes)
     if (writeIterSubsts.nonEmpty) dbgs(s"General write dephasing rules for $mem: ${writeIterSubsts.mkString("\n  - ")}")
     val hostReads = scala.collection.mutable.Set[AccessMatrix]()
-    val newReads = rewriteAccesses(reads, readIterSubsts).map(_.toSeq.flatMap{x => 
-      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
-      if (x.parent != Ctrl.Host) Some(x.matrix)
-      else {
-        hostReads += x
-        None
-      }
-    }.distinct)
-    val newWrites = rewriteAccesses(writes, writeIterSubsts).map(_.toSeq.flatMap{x => 
-      // sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
-      if (x.parent != Ctrl.Host) Some(x.matrix)
-      else None
-    }.distinct)
+    val newReads = rewriteAccesses(reads, readIterSubsts).map{accs => 
+      val mats = accs.toSeq.flatMap{x => 
+                                      sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+                                      if (x.parent != Ctrl.Host) Some(x.matrix)
+                                      else {
+                                        hostReads += x
+                                        None
+                                      }
+                                    }
+      if (mem.isSingleton) mats else mats.distinct
+    }
+    val newWrites = rewriteAccesses(writes, writeIterSubsts).map{accs => 
+      val mats = accs.toSeq.flatMap{x => 
+                                      // sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
+                                      if (x.parent != Ctrl.Host) Some(x.matrix)
+                                      else None
+                                    }
+      if (mem.isSingleton) mats else mats.distinct
+    }
 
     // Step 2: Find schemes for these grps
     findSchemes(newReads, newWrites, hostReads.toSet)
@@ -373,7 +392,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
-    val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList).iterator
+    val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes).iterator
 
     val rank = axes.length
     var banking: Option[ModBanking] = None
@@ -381,12 +400,20 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     var attempts = 0
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
-      val As = aStricts.expand(rank, N, stagedDims)
+      val As = aStricts.expand(rank, N, stagedDims, axes)
+      if (mem.forceExplicitBanking) {
+        val alpha = As.next()
+        val t = computeP(N,1,alpha,stagedDims,mem)
+        val P = t._1
+        val darkVolume = t._2
+        // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
+        banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P,darkVolume))
+      }
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1
-        if (!mem.onlyBlockCyclic && checkCyclic(N,alpha,grps)) {
+        if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val t = computeP(N,1,alpha,stagedDims,mem)
           val P = t._1
@@ -394,7 +421,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           banking = Some(ModBanking(N,1,alpha,axes,P,darkVolume))
         }
         else if (!mem.noBlockCyclic) {
-          val B = mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val t = computeP(N, b, alpha, stagedDims,mem)

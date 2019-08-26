@@ -805,6 +805,15 @@ object Math {
     result
   }
 
+/*
+  def popcount[T <: chisel3.core.UInt](data : T) : UInt = {
+    val popcnter = Module(new Popcount())
+    val result = Wire(new UInt)
+    popcnter.io.bit_string := data
+    result := popcnter.io.popcnt_out
+    result
+  }
+ */
 
   def min[T <: chisel3.core.Data](a: T, b: T, myName: String): T = {
     (a,b) match {
@@ -819,7 +828,7 @@ object Math {
       case (_,_) => a // TODO: implement for other types
     }
   }
-
+ 
   // TODO: Use IP core.  Also be consistent with Module wrapping around logic in other defs
   def fma(m0: FixedPoint, m1: FixedPoint, add: FixedPoint, delay: Option[Double], flow: Bool, myName: String): FixedPoint = {
     class FMAWrapper(s: Boolean, d: Int, f: Int, delay: Option[Double], myName: String) extends Module{

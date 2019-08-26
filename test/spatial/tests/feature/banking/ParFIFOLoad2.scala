@@ -13,6 +13,7 @@ import spatial.dsl._
 
 
   def parFifoLoad[T:Num](src1: Array[T], src2: Array[T], src3: Array[T], in: Int): T = {
+    println(s"REMEMBER: This app relies on the pipe binding transformer!")
 
     val P1 = 1 (16 -> 16)
 

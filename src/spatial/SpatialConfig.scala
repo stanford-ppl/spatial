@@ -30,14 +30,16 @@ class SpatialConfig extends Config {
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var enableOptimizedReduce: Boolean = true
+  var distributeStreamCtr: Boolean = true
   var useAreaModels: Boolean = true
   var enableForceBanking: Boolean = false
   var groupUnrolledAccess: Boolean = false
   var enableParallelBinding: Boolean = true
-  var bankingEffort: Int = 1
+  var bankingEffort: Int = 2
   var unrollMetapipeOfParallels: Boolean = true
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false
+  var codeWindow: Int = 50
 
   var enableArchDSE: Boolean = false
 

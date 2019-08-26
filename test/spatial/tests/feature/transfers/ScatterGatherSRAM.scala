@@ -4,7 +4,6 @@ import spatial.dsl._
 
 @spatial class ScatterGatherSRAM extends SpatialTest {
   override def runtimeArgs: Args = "1536"
-  val N = 1920
 
   val tileSize = 384
   val P = param(1)

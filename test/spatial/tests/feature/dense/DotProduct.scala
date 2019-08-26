@@ -1,11 +1,6 @@
 package spatial.tests.feature.dense
 
 import spatial.dsl._
-import com.typesafe.config.ConfigFactory
-import pureconfig._
-import spatial.util.spatialConfig
-import spatial.metadata.params._
-import scala.reflect.ClassTag
 
 @spatial class DotProduct extends SpatialTest {
   override def dseModelArgs: Args = "640"
@@ -16,10 +11,10 @@ import scala.reflect.ClassTag
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
-    val ip = loadParam("ip", default=4 (1 -> 192))
-    val op = loadParam("op", default=2 (1 -> 6))
-    val ts  = loadParam("ts", default=32 (32 -> 64 -> 19200))
-    val loadPar = loadParam("loadPar", default=4 (1 -> 1 -> 16))
+    val ip = 4 (1 -> 192)
+    val op = 2 (1 -> 6)
+    val ts  = 32 (32 -> 64 -> 19200)
+    val loadPar = 4 (1 -> 1 -> 16)
 
     val B = ts
     val P1 = op

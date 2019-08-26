@@ -9,6 +9,8 @@ object LSTM extends SpatialApp {
     type highT = FixPt[TRUE, _10, _22]
     type F = FltPt[_24, _8]
 
+    val LUTLen: scala.Int = 128
+
     val tanh: highT => F = x => {
       val y = x
       y.to[F]
@@ -151,8 +153,12 @@ object LSTM extends SpatialApp {
     val cResult = getMem(cResultDRAM)
     val hResult = getMem(hResultDRAM)
 
-    def tanhHost(x: Array[highT]): Array[highT] = x
-    def sigHost(x: Array[highT]): Array[highT] = x
+    val tanhHost: Array[highT] => Array[highT] = x => {
+      x
+    }
+    def sigHost: Array[highT] => Array[highT] = x => {
+      x
+    }
     def tanhEle(x: highT): highT = x
 
     val biasesData: List[Tensor1[lowT]] = biasesDRAM.map(f => getMem(f))
@@ -168,11 +174,8 @@ object LSTM extends SpatialApp {
             .reduce(_ + _) + b(i).to[highT]
         }
     }
-    val i = sigHost(gates.head)
-    val j = tanhHost(gates(1))
-    val f = sigHost(gates(2))
-    val o = sigHost(gates.last)
 
+    val i :: j :: f :: o :: v = List(sigHost, tanhHost, sigHost, sigHost).zip(gates).map{ case (fn, g) => fn(g) }
     val cPrimeGold: Tensor1[highT] =
       Array.tabulate[highT](nHiddenUnits)(ih => i(ih) * j(ih) + c(ih) * f(ih))
 

@@ -73,6 +73,9 @@ object LSTM extends SpatialApp {
     val hResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
     val cResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
 
+
+    // TODO: Input is Float, and reschedule the input based on range?
+
     Accel {
       // Load all gates weights and x, c, h data in one shot
       val ijfoMems: List[SRAM2[lowT]] = List.tabulate(nGates) { _ =>
@@ -154,6 +157,7 @@ object LSTM extends SpatialApp {
     val hResult = getMem(hResultDRAM)
 
     val tanhHost: Array[highT] => Array[highT] = x => {
+//      Array.tabulate[highT](x.length)(i => tanh[Float](x(i).to[Float]).to[highT])
       x
     }
     def sigHost: Array[highT] => Array[highT] = x => {

@@ -312,20 +312,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 //  protected def quoteConst(tp: Type[_], c: Any, binConvert: scala.Boolean = false): String = (tp,c) match {
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
     case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + s".FP($s, $d, $f)"
-    case (FltPtType(g,e), _) => {
-      // We need to store the actual bits of c here. Chisel lookup table only accepts binary formats.
-      // c.toString in emul returns the float format.
-//      if (binConvert) {
-//        val cString = c match {
-//          case fp: FloatPoint => java.lang.Float.floatToIntBits(fp.toFloat).toString
-//          case _ => c.toString
-//        }
-//        cString + "l" + s".FlP($g, $e)"
-//      } else
-        c.toString + s".FlP($g, $e)"
-    }
-
-
+    case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
     case (_:Bit, c:Bool) => s"${c.value}.B"
     case (_:Text, c: String) => s"${c}"
     case _ => super.quoteConst(tp,c)

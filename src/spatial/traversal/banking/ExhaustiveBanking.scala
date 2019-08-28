@@ -179,8 +179,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       }
       else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && !mem.explicitBanking.isDefined) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
       else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && !mem.explicitBanking.isDefined) {
-        val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))
-        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1, 0)))))
+        val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))
+        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1)))))
       }
       // else if (mem.explicitBanking.isDefined) {
       //   if (mem.forceExplicitBanking) {
@@ -201,7 +201,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               *
               *   To convert to "banking," we want to take one entry from each Map and call it a new duplicate
               */
-            val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride, 0))} else Seq()
+            val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))} else Seq()
             val rawBanking: Seq[Map[Set[Set[AccessMatrix]], Option[ModBanking]]] = view.expand().map{axes => 
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
@@ -402,9 +402,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
         val P = computeP(N,1,alpha,stagedDims,mem)
-        val darkVolume = 0
         // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
-        banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P,darkVolume))
+        banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P))
       }
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
@@ -413,16 +412,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val P = computeP(N,1,alpha,stagedDims,mem)
-          val darkVolume = 0
-          banking = Some(ModBanking(N,1,alpha,axes,P,darkVolume))
+          banking = Some(ModBanking(N,1,alpha,axes,P))
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims,mem)
-            val darkVolume = 0
-            ModBanking(N, b, alpha, axes, P, darkVolume) 
+            ModBanking(N, b, alpha, axes, P)
           }
         }
       }

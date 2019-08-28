@@ -104,10 +104,6 @@ package object memory {
     def padding: Seq[Int] = getPadding.getOrElse{throw new Exception(s"No padding defined for $s")}
     def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
 
-    def getDarkVolume: Option[Int] = metadata[DarkVolume](s).map(_.b)
-    def darkVolume: Int = getDarkVolume.getOrElse{throw new Exception(s"No darkVolume defined for $s")}
-    def darkVolume_=(b: Int): Unit = metadata.add(s, DarkVolume(b))
-
     /** Stride info for LineBuffer */
     @stateful def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}
 

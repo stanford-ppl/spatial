@@ -21,17 +21,15 @@ sealed abstract class Banking {
   def dims: Seq[Int]
   def alphas: Seq[Int]
   def Ps: Seq[Int]
-  def darkVolume: Int
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], dv: Int) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int]) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
-  override def darkVolume: Int = dv
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
@@ -43,8 +41,8 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   }
 }
 object ModBanking {
-  def Unit(rank: Int, dims: Seq[Int]) = ModBanking(1, 1, Seq.fill(rank)(1), dims, Seq.fill(rank)(1), 0)
-  def Simple(banks: Int, dims: Seq[Int], stride: Int, darkVolume: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride), darkVolume)
+  def Unit(rank: Int, dims: Seq[Int]) = ModBanking(1, 1, Seq.fill(rank)(1), dims, Seq.fill(rank)(1))
+  def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
 }
 
 
@@ -91,10 +89,9 @@ case class Instance(
   cost:     Double,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
-  darkVolume: Int,                  // Number of elements inaccessible due to B > 1
   accType:  AccumType               // Type of accumulator for instance
 ) {
-  def toMemory: Memory = Memory(banking, depth, padding, darkVolume, accType)
+  def toMemory: Memory = Memory(banking, depth, padding, accType)
 
   def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
   def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
@@ -146,7 +143,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})),1,0,Map.empty,Seq.fill(rank)(0),0,AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})),1,0,Map.empty,Seq.fill(rank)(0),AccumType.None)
 }
 
 
@@ -157,13 +154,12 @@ case class Memory(
   banking: Seq[Banking],  // Banking information
   depth:   Int,           // Buffer depth
   padding: Seq[Int],      // Padding on each dim
-  darkVolume: Int,        // Number of elements inaccessible due to B > 1
   accType: AccumType      // Flags whether this instance is an accumulator
 ) {
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
-  def updateDepth(d: Int): Memory = Memory(banking, d, padding, darkVolume, accType)
+  def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def Ps: Seq[Int] = banking.map(_.Ps).flatten
   def Bs: Seq[Int] = banking.map(_.stride)
@@ -228,7 +224,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})), 1, Seq.fill(rank)(0), 0, AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})), 1, Seq.fill(rank)(0), AccumType.None)
 }
 
 
@@ -258,14 +254,6 @@ case class Duplicates(d: Seq[Memory]) extends Data[Duplicates](Transfer.Mirror)
   * Default: undefined
   */
 case class Padding(dims: Seq[Int]) extends Data[Padding](SetBy.Analysis.Self)
-
-/** Number of physical addresses in memory that are inaccessible (due to B > 1)
-  * Option:  sym.getDarkVolume
-  * Getter:  sym.darkVolume
-  * Setter:  sym.darkVolume = (Int)
-  * Default: undefined
-  */
-case class DarkVolume(b: Int) extends Data[DarkVolume](SetBy.Analysis.Self)
 
 
 /** Map of a set of memory dispatch IDs for each unrolled instance of an access node.
@@ -506,7 +494,7 @@ case object NBestGuess extends NStrictness {
   }
 
   def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = { 
-    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}.sorted
+    (numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product)).filter{x => x <= max && x >= min}.distinct.sorted
   }
 }
 case object NRelaxed extends NStrictness {
@@ -529,14 +517,14 @@ sealed trait AlphaStrictness extends SearchPriority {
   // Check if values are coprime
   def coprime(x: Seq[Int]): Boolean = {
     import utils.math._
-    x.forallPairs(gcd(_,_) == 1)
+    x.size == 1 || !x.forallPairs(gcd(_,_) > 1)
   }
   /** Creates all alpha vectors comprising of only values in the valids list and which are coprime */
   def selectAs(valids: Seq[Int], dim: Int, prev: Seq[Int], rank: Int): Iterator[Seq[Int]] = {
     if (dim < rank) {
-      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }.toList.filter(coprime).toIterator
+      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }.filter(coprime)
     }
-    else valids.iterator.map{aR => prev :+ aR }.toList.filter(coprime).toIterator
+    else valids.iterator.map{aR => prev :+ aR }.filter(coprime)
   }
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]]
   def isRelaxed: Boolean

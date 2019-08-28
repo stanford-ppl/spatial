@@ -4,9 +4,7 @@ import spatial.dsl._
 object SigTanhLUT extends SpatialApp {
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE, _10, _22]
-//    type highPrecT = FixPt[TRUE, _5, _27]
     type F = FltPt[_24, _8]
-    type highPrecT = F
 
     val tanhLUTLen: scala.Int = 256
     val sigLUTLen: scala.Int = 256
@@ -72,13 +70,13 @@ object SigTanhLUT extends SpatialApp {
 
         val rv = lutFn(
           i, x => sigFn(x / sigLUTLen.toDouble * sigRange.toDouble),
-          sigRange, sigLUTLen, 0, 1, (i, j) => mux(i < 0, 1.to[highPrecT] - j, j).to[F]
+          sigRange, sigLUTLen, 0, 1, (i, j) => mux(i < 0, 1.to[F] - j, j)
         )
         testOutputSigMem(idx) = rv
 
          val tv = lutFn(
           i, x => scala.math.tanh(x / tanhLUTLen.toDouble * tanhRange.toDouble),
-          tanhRange, tanhLUTLen, -1, 1, (i, j) => mux(i < 0, -j, j).to[F]
+          tanhRange, tanhLUTLen, -1, 1, (i, j) => mux(i < 0, -j, j)
         )
 
         testOutputTanhMem(idx) = tv

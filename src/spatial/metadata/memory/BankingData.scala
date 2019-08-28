@@ -191,19 +191,14 @@ case class Memory(
       val b = banking.head.stride
       val alpha = banking.head.alphas
       val P = banking.head.Ps
-      val banksInFence = allLoops(P,alpha,b,Nil).map(_%n).sorted
-      val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-      val degenerate = hist.map(_._2).max
       val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
         ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
-      val intrablockofs = (0 until D).map{t => 
-        addr(t)
-      }.sumTree % degenerate // Appears to work, but may not if bank degenerates are not adjacent
-      ofschunk * degenerate + intrablockofs
+      val intrablockofs = addr.zip(alpha).map{case(x,y) => x*y}.sumTree % b
+      ofschunk * b + intrablockofs
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)
@@ -212,30 +207,19 @@ case class Memory(
 
       val ofschunk = (0 until D).map{t =>
         val n = banking.map(_.nBanks).apply(t)
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
-        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-        val degenerate = hist.map(_._2).max
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
         val prevDimsOfs = (t+1 until D).map{i => 
-          val n_i = banking.map(_.nBanks).apply(i)
-          val banksInFence_i = allLoops(Seq(P(i)),Seq(alphas(i)),b(i),Nil).map(_%n_i).sorted
-          val hist_i = banksInFence_i.distinct.map{x => (x -> banksInFence_i.count(_ == x))}
-          val degenerate_i = hist_i.map(_._2).max
-          math.ceil(w(i)/P(i)).toInt * degenerate_i
+          math.ceil(w(i)/P(i)).toInt * b.product
         }.product
-        ofsdim_t * prevDimsOfs * degenerate
+        ofsdim_t * prevDimsOfs
       }.sumTree
       val intrablockofs = (0 until D).map{t => 
-        val n = banking.map(_.nBanks).apply(t)
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
-        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-        val degenerate = hist.map(_._2).max
-        // TODO: Want to mathematically prove addr(t) % degenerate resolves uniquely, but for now it seems to just work
-        addr(t) % degenerate 
-      }.sumTree 
-      ofschunk + intrablockofs
+        val bAbove = b.slice(t+1,D).product
+        bAbove * ((addr(t) * alpha(t)) % b(t))
+      }.sumTree
+      ofschunk * b.product + intrablockofs
     }
     else {
       // TODO: Bank address for mixed dimension groups
@@ -542,12 +526,17 @@ case object NRelaxed extends NStrictness {
   * 3) Everything else
   */
 sealed trait AlphaStrictness extends SearchPriority {
-  /** Creates all alpha vectors comprising of only values in the valids list */
+  // Check if values are coprime
+  def coprime(x: Seq[Int]): Boolean = {
+    import utils.math._
+    x.forallPairs(gcd(_,_) == 1)
+  }
+  /** Creates all alpha vectors comprising of only values in the valids list and which are coprime */
   def selectAs(valids: Seq[Int], dim: Int, prev: Seq[Int], rank: Int): Iterator[Seq[Int]] = {
     if (dim < rank) {
-      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }
+      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }.toList.filter(coprime).toIterator
     }
-    else valids.iterator.map{aR => prev :+ aR }
+    else valids.iterator.map{aR => prev :+ aR }.toList.filter(coprime).toIterator
   }
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]]
   def isRelaxed: Boolean

@@ -304,7 +304,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     grps.forall{a => a.toList.lengthLessThan(banks+1)}
   }
 
-  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): (Seq[Int], Int) = {
+  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Seq[Int] = {
     /* Offset correction not mentioned in Wang et. al., FPGA '14
        0. Equations in paper must be wrong.  Example 
            ex-     alpha = 1,2    N = 4     B = 1
@@ -363,24 +363,22 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
     */
     try {
-      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n,alpha(i))}
+      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
       val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted
       val hist = allBanksAccessible.distinct.map{x => (x -> allBanksAccessible.count(_ == x))}
       val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1 && b == 1) List(stagedDims(i)) else List()}} // Force B == 1 for stagedDim P to make life easier
       val options = combs(P_expanded.map(_.toList).toList)
-            .filter{x => if (b == 1) x.product == allBanksAccessible.distinct.length else x.product >= allBanksAccessible.distinct.length} // pre-filter yards that don't have enough entries to touch each bank
+            .collect{case p if p.product == n*b => p}
             .collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible.distinct) => p}
       val PandCostandBloat = options.map{option => 
         // Extra elements per dimension so that yards cover entire memory
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
         // Number of inaccessible address (caused by B > 1).  TODO: Does it matter which dimension we add these to?
-        val degenerate = hist.map(_._2).max
-        val darkVolume = computeDarkVolume(paddedDims, option, hist.toMap)
-        val volume = paddedDims.product + darkVolume
-        (option,volume,darkVolume)
+        val volume = paddedDims.product
+        (option,volume)
       }
-      (PandCostandBloat.minBy(_._2)._1, PandCostandBloat.minBy(_._2)._3)
+      PandCostandBloat.minBy(_._2)._1
     }
     catch { case t:Throwable =>
       bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha (memory $mem ${mem.ctx})")
@@ -403,9 +401,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val As = aStricts.expand(rank, N, stagedDims, axes)
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
-        val t = computeP(N,1,alpha,stagedDims,mem)
-        val P = t._1
-        val darkVolume = t._2
+        val P = computeP(N,1,alpha,stagedDims,mem)
+        val darkVolume = 0
         // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
         banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P,darkVolume))
       }
@@ -415,18 +412,16 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         attempts = attempts + 1
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
-          val t = computeP(N,1,alpha,stagedDims,mem)
-          val P = t._1
-          val darkVolume = t._2
+          val P = computeP(N,1,alpha,stagedDims,mem)
+          val darkVolume = 0
           banking = Some(ModBanking(N,1,alpha,axes,P,darkVolume))
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.map{b =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-            val t = computeP(N, b, alpha, stagedDims,mem)
-            val P = t._1
-            val darkVolume = t._2
+            val P = computeP(N, b, alpha, stagedDims,mem)
+            val darkVolume = 0
             ModBanking(N, b, alpha, axes, P, darkVolume) 
           }
         }

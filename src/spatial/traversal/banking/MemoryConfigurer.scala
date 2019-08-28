@@ -362,7 +362,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         if (gid == -1) grps :+ Set(a)
         else grps.zipWithIndex.map { case (grp, `gid`) => grp+a; case (grp, gid) => grp }
       }
-      dbg(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
+      dbgs(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
       grps
     }
 

@@ -124,7 +124,13 @@ trait ChiselGenMem extends ChiselGenCommon {
         val flatCoord = coords.zipWithIndex.map{ case (b,j) => 
           b * dims.drop(j+1).product
         }.sum
-        src"${quoteAsScala(inits(flatCoord))}.toDouble"
+        val iv = inits(flatCoord)
+        val quoteVal = (iv.tp, iv.rhs, mem.isLUT) match {
+          case (FltPtType(_, _), Def.Const(c: emul.FloatPoint), true) =>
+            I32(java.lang.Float.floatToIntBits(c.toFloat))
+          case _ => iv
+        }
+        src"${quoteAsScala(quoteVal)}.toDouble"
       }
       else 
         "0.toDouble"

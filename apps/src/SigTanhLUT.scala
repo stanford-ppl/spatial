@@ -4,8 +4,9 @@ import spatial.dsl._
 object SigTanhLUT extends SpatialApp {
   def main(args: Array[String]): Unit = {
     type T = FixPt[TRUE, _10, _22]
-    type highPrecT = FixPt[TRUE, _5, _27]
+//    type highPrecT = FixPt[TRUE, _5, _27]
     type F = FltPt[_24, _8]
+    type highPrecT = F
 
     val tanhLUTLen: scala.Int = 256
     val sigLUTLen: scala.Int = 256
@@ -41,12 +42,12 @@ object SigTanhLUT extends SpatialApp {
 
     Accel {
       val lutFn: (
-        T, scala.Double => scala.Double, scala.Int, scala.Int, scala.Int, scala.Int, (T, highPrecT) => F
+        T, scala.Double => scala.Double, scala.Int, scala.Int, scala.Int, scala.Int, (T, F) => F
         ) => F = (x, f, r, ll, lb, hb, invFn) => {
         // TODO: May want to smooth the curve by lattice regression.
         // TODO: Interpolation result is pretty bad close to zero.
-        val lut = LUT[highPrecT](ll)(Seq.tabulate[highPrecT](ll)(i => f(i)): _*)
-        val lutOut: highPrecT = lut(
+        val lut = LUT[F](ll)(Seq.tabulate[F](ll)(i => f(i)): _*)
+        val lutOut: F = lut(
           {
             val space: scala.Double = r.toDouble / ll.toDouble
             val idx = (abs(x) / space.to[T]).to[I32]
@@ -59,9 +60,6 @@ object SigTanhLUT extends SpatialApp {
           )
         )
       }
-
-      val testOutputRawSigLUTMem: SRAM1[F] = SRAM[F](nTestPoints)
-      val testOutputRawTanhLUTMem: SRAM1[F] = SRAM[F](nTestPoints)
 
       val testInputMem: SRAM1[T] = SRAM[T](nTestPoints)
       val testOutputTanhMem: SRAM1[F] = SRAM[F](nTestPoints)
@@ -88,8 +86,6 @@ object SigTanhLUT extends SpatialApp {
 
       testOutputSigDRAM store testOutputSigMem
       testOutputTanhDRAM store testOutputTanhMem
-//      testOutputRawSigDRAM store testOutputRawSigLUTMem
-//      testOutputRawTanhDRAM store testOutputRawTanhLUTMem
     }
 
     def variance(a: Tensor1[F], b: Tensor1[F]): F = Array.tabulate[F](a.length){ ih =>
@@ -105,6 +101,5 @@ object SigTanhLUT extends SpatialApp {
     println("")
     printArray(tanhGold, "tanhGold = ")
     printArray(getMem(testOutputTanhDRAM), "tanh = ")
-
   }
 }

@@ -90,7 +90,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     *   along the axes with dimensions 32 and 64 for SRAM(32,8,64), use the flag
     *   .duplicateaxes( List( List(), List(0,2), List(0,1,2) ) )
     */
-  @stateful def duplicateaxes(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 2.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
+  @stateful def duplicateaxes(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 3.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
   /** Do not attempt to bank memory by duplication */
   def noduplicate: C[A] = { this.isNoDuplicate = true; me }
   /** Do not attempt to bank memory with block-cyclic schemes */

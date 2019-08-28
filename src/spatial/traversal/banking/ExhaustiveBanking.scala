@@ -416,7 +416,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
-          banking = B.map{b =>
+          banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims,mem)
             ModBanking(N, b, alpha, axes, P)

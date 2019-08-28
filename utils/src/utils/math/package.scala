@@ -1,4 +1,5 @@
 package utils
+import utils.implicits.collections._
 
 package object math {
   def log2(x: Double): Double = Math.log10(x)/Math.log10(2)
@@ -20,6 +21,9 @@ package object math {
     }
 
   def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+  def coprime(x: Seq[Int]): Boolean = {
+    x.size == 1 || !x.forallPairs(gcd(_,_) > 1)
+  }
   def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
 
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),

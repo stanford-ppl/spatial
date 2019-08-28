@@ -514,11 +514,7 @@ case object NRelaxed extends NStrictness {
   * 3) Everything else
   */
 sealed trait AlphaStrictness extends SearchPriority {
-  // Check if values are coprime
-  def coprime(x: Seq[Int]): Boolean = {
-    import utils.math._
-    x.size == 1 || !x.forallPairs(gcd(_,_) > 1)
-  }
+  import utils.math._
   /** Creates all alpha vectors comprising of only values in the valids list and which are coprime */
   def selectAs(valids: Seq[Int], dim: Int, prev: Seq[Int], rank: Int): Iterator[Seq[Int]] = {
     if (dim < rank) {

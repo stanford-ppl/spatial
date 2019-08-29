@@ -97,10 +97,14 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def nBest: C[A] = { this.nConstraints = this.nConstraints :+ NBestGuess; me }
   /** Only attempt to bank with N's from the "pow2" category */
   def nPow2: C[A] = { this.nConstraints = this.nConstraints :+ NPowersOf2; me }
-  /** Only attempt to bank with N's from the "likely" category */
+  /** Only attempt to bank with N's from the "relaxed" category */
+  def nRelaxed: C[A] = { this.nConstraints = this.nConstraints :+ NRelaxed; me }
+  /** Only attempt to bank with alphas from the "likely" category */
   def alphaBest: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaBestGuess; me }
-  /** Only attempt to bank with N's from the "pow2" category */
+  /** Only attempt to bank with alphas from the "pow2" category */
   def alphaPow2: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaPowersOf2; me }
+  /** Only attempt to bank with alphas from the "relaxed" category */
+  def alphaRelaxed: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaRelaxed; me }
   /** Do not attempt to bank memory with block-cyclic schemes */
   def noblockcyclic: C[A] = { this.noBlockCyclic = true; me }
   /** Only attempt to bank memory with block-cyclic schemes */

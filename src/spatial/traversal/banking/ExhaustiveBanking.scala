@@ -369,8 +369,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 //            .collect{case p if p.product == n*b => p}
             .collect{case p if p.product == (P_raw.product / math.pow(n,P_raw.size-1)) => p}
             .collect{case p if spansAllBanks(p,alpha,n,b) => p}
-      Console.println(s"$n $b $alpha, ${P_raw}, ${P_expanded}")
-      val PandCostandBloat = options.map{option => 
+      val PandCostandBloat = options.map{option =>
         // Extra elements per dimension so that yards cover entire memory
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}

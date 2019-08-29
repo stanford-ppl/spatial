@@ -367,7 +367,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1 && b == 1) List(stagedDims(i)) else List()}} // Force B == 1 for stagedDim P to make life easier
       val options = combs(P_expanded.map(_.toList).toList)
 //            .collect{case p if p.product == n*b => p}
-            .collect{case p if p.product == (P_raw.product / math.pow(n,P_raw.size-1)) => p}
+            // Volume constraint
+            .collect{case p if p.length == 1 && p == P_raw => p
+                     case p if p.length > 1 && p.product == b*P_raw.map{pr => n - (pr % n)}.max => p
+                    }
+            // Census constraint
             .collect{case p if spansAllBanks(p,alpha,n,b) => p}
       val PandCostandBloat = options.map{option =>
         // Extra elements per dimension so that yards cover entire memory

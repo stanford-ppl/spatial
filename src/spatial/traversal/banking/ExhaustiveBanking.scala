@@ -364,17 +364,16 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     */
     try {
       val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
-      val allBanksAccessible = allLoops(P_raw.toList, alpha.toList, b, Nil).map(_%n).sorted
-      val hist = allBanksAccessible.distinct.map{x => (x -> allBanksAccessible.count(_ == x))}
       val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1 && b == 1) List(stagedDims(i)) else List()}} // Force B == 1 for stagedDim P to make life easier
       val options = combs(P_expanded.map(_.toList).toList)
-            .collect{case p if p.product == n*b => p}
-            .collect{case p if spansAllBanks(p,alpha,n,b,allBanksAccessible.distinct) => p}
+//            .collect{case p if p.product == n*b => p}
+            .collect{case p if p.product == (P_raw.product / math.pow(n,P_raw.size-1)) => p}
+            .collect{case p if spansAllBanks(p,alpha,n,b) => p}
+      Console.println(s"$n $b $alpha, ${P_raw}, ${P_expanded}")
       val PandCostandBloat = options.map{option => 
         // Extra elements per dimension so that yards cover entire memory
         val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
         val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
-        // Number of inaccessible address (caused by B > 1).  TODO: Does it matter which dimension we add these to?
         val volume = paddedDims.product
         (option,volume)
       }
@@ -391,7 +390,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
     val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes).iterator
-
+    val numChecks = grps.map{x => nCr(x.size, 2)}.sum
     val rank = axes.length
     var banking: Option[ModBanking] = None
 
@@ -412,14 +411,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val P = computeP(N,1,alpha,stagedDims,mem)
-          banking = Some(ModBanking(N,1,alpha,axes,P))
+          banking = Some(ModBanking(N,1,alpha,axes,P,numChecks))
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims,mem)
-            ModBanking(N, b, alpha, axes, P)
+            ModBanking(N, b, alpha, axes, P,numChecks)
           }
         }
       }

@@ -84,15 +84,23 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .onlyduplicate instead")}
 
   /** Do not attempt to bank memory at all, and only use bank-by-duplication for all lanes of all readers */
-  def onlyduplicate: C[A] = { this.isOnlyDuplicate = true; me }
+  def fullfission: C[A] = { this.isFullFission = true; me }
   /** Attempt to duplicate on the provided axes groups.  
     *   i.e. To try either no-duplication, full-duplication, or duplication
     *   along the axes with dimensions 32 and 64 for SRAM(32,8,64), use the flag
     *   .duplicateaxes( List( List(), List(0,2), List(0,1,2) ) )
     */
-  @stateful def duplicateaxes(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 3.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
+  @stateful def axesfission(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 3.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
   /** Do not attempt to bank memory by duplication */
-  def noduplicate: C[A] = { this.isNoDuplicate = true; me }
+  def nofission: C[A] = { this.isNoFission = true; me }
+  /** Only attempt to bank with N's from the "likely" category */
+  def nBest: C[A] = { this.nConstraints = this.nConstraints :+ NBestGuess; me }
+  /** Only attempt to bank with N's from the "pow2" category */
+  def nPow2: C[A] = { this.nConstraints = this.nConstraints :+ NPowersOf2; me }
+  /** Only attempt to bank with N's from the "likely" category */
+  def alphaBest: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaBestGuess; me }
+  /** Only attempt to bank with N's from the "pow2" category */
+  def alphaPow2: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaPowersOf2; me }
   /** Do not attempt to bank memory with block-cyclic schemes */
   def noblockcyclic: C[A] = { this.noBlockCyclic = true; me }
   /** Only attempt to bank memory with block-cyclic schemes */

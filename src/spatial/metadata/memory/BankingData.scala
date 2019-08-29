@@ -21,15 +21,17 @@ sealed abstract class Banking {
   def dims: Seq[Int]
   def alphas: Seq[Int]
   def Ps: Seq[Int]
+  def numChecks: Int
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int]) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], checks: Int = 0) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
+  override def numChecks: Int = checks  // Diagnostic for required number of ISL calls to verify scheme
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
@@ -37,7 +39,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   }
   override def toString: String = {
     val name = if (B == 1) "Cyclic" else "Block Cyclic"
-    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}>"
+    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}> ($numChecks checks)"
   }
 }
 object ModBanking {
@@ -338,6 +340,22 @@ case class NoBlockCyclic(flag: Boolean) extends Data[NoBlockCyclic](SetBy.User)
   */
 case class OnlyBlockCyclic(flag: Boolean) extends Data[OnlyBlockCyclic](SetBy.User)
 
+/** Flag set by the user to specify if only certain NStrictnesses should be checked
+  *
+  * Getter:  sym.nConstraints
+  * Setter:  sym.nConstraints = (true | false)
+  * Default: false
+  */
+case class NConstraints(typs: Seq[NStrictness]) extends Data[NConstraints](SetBy.User)
+
+/** Flag set by the user to specify if only certain AlphaStrictnesses should be checked
+  *
+  * Getter:  sym.alphaConstraints
+  * Setter:  sym.alphaConstraints = (true | false)
+  * Default: false
+  */
+case class AlphaConstraints(typs: Seq[AlphaStrictness]) extends Data[AlphaConstraints](SetBy.User)
+
 /** Flag set by the user for list of Bs to search for block cyclic banking schema
   *
   * Getter:  sym.blockCyclicBs
@@ -350,8 +368,8 @@ case class BlockCyclicBs(bs: Seq[Int]) extends Data[BlockCyclicBs](SetBy.User)
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isOnlyDuplicate
-  * Setter:  sym.isOnlyDuplicate = (true | false)
+  * Getter:  sym.isFullFission
+  * Setter:  sym.isFullFission = (true | false)
   * Default: false
   */
 case class OnlyDuplicate(flag: Boolean) extends Data[OnlyDuplicate](SetBy.User)
@@ -369,8 +387,8 @@ case class DuplicateOnAxes(opts: Seq[Seq[Int]]) extends Data[DuplicateOnAxes](Se
 /** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
   * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
   *
-  * Getter:  sym.isNoDuplicate
-  * Setter:  sym.isNoDuplicate = (true | false)
+  * Getter:  sym.isNoFission
+  * Setter:  sym.isNoFission = (true | false)
   * Default: false
   */
 case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
@@ -534,7 +552,7 @@ case object AlphaPowersOf2 extends AlphaStrictness {
   val P = 1
   def isRelaxed = false
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
-    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N).filter{x => x >= 0 && x <= N}
+    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0 || x == N).uniqueModN(N).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank)
   }
 }

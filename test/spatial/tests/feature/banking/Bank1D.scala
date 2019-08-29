@@ -94,7 +94,7 @@ import argon.Op
       val x = SRAM[Int](128)               // N = 9, B = 4, alpha = 3
       Foreach(128 by 1){i => x(i) = i}
       RESULT1 := Reduce(Reg[Int])(128 by 4 par 3){i => x(i+1) + x(i+2) + x(i+3)}{_+_}
-      val y = SRAM[Int](128).noduplicate.noblockcyclic // N = 16, B = 1, alpha = 1
+      val y = SRAM[Int](128).nofission.noblockcyclic // N = 16, B = 1, alpha = 1
       Foreach(128 by 1){i => y(i) = i}
       RESULT2 := Reduce(Reg[Int])(128 by 4 par 3){i => y(i+1) + y(i+2) + y(i+3)}{_+_}
     }
@@ -178,8 +178,8 @@ import argon.Op
     setArg(in, 1)
 
     Accel {
-      val mem1 = SRAM[Int](64).noduplicate
-      val mem2 = SRAM[Int](64).noduplicate
+      val mem1 = SRAM[Int](64).nofission
+      val mem2 = SRAM[Int](64).nofission
       mem1 load dram1
       Foreach(64 by 8){i => 
         if (in.value == 1) { // Make LCA an inner SwitchCase to confuse banking analyzer

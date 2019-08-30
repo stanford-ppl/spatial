@@ -68,10 +68,10 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 class NBufMem(np: NBufParams) extends Module {
 
   def this( mem: MemType, logicalDims: List[Int],
-    numBufs: Int, bitWidth: Int, banks: List[Int], strides: List[Int], 
+    numBufs: Int, bitWidth: Int, banks: List[Int], blocks: List[Int], neighborhood: List[Int],
     WMapping: List[Access], RMapping: List[Access],
     bankingMode: BankingMode, inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, numActives: Int = 1, myName: String = "NBuf"
-  ) = this(NBufParams(numBufs, mem, MemParams(FIFOInterfaceType, logicalDims,bitWidth,banks,strides,WMapping,RMapping,bankingMode,inits,syncMem,fracBits,true,numActives,myName)))
+  ) = this(NBufParams(numBufs, mem, MemParams(FIFOInterfaceType, logicalDims,bitWidth,banks,blocks,neighborhood,WMapping,RMapping,bankingMode,inits,syncMem,fracBits,true,numActives,myName)))
 
   override def desiredName = np.p.myName
 
@@ -97,7 +97,7 @@ class NBufMem(np: NBufParams) extends Module {
     case BankedSRAMType => 
       val srams = (0 until np.numBufs).map{ i => 
         val x = Module(new BankedSRAM(np.p.logicalDims, np.p.bitWidth,
-                        np.p.banks, np.p.strides, 
+                        np.p.banks, np.p.blocks, np.p.neighborhood,
                         np.p.WMapping, np.p.RMapping,
                         np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, np.p.numActives, "SRAM"))
         x.io <> DontCare
@@ -156,7 +156,7 @@ class NBufMem(np: NBufParams) extends Module {
         if (isShiftEntry) shiftEntryBuf = Some(i)
         val WPorts = np.p.WMapping.filter{x => x.port.bufPort == Some(i) || !x.port.bufPort.isDefined}
         val RPorts = np.p.RMapping.filter(_.port.bufPort == Some(i))
-        val x = Module(new ShiftRegFile(np.p.logicalDims, np.p.bitWidth, np.p.logicalDims, np.p.logicalDims,
+        val x = Module(new ShiftRegFile(np.p.logicalDims, np.p.bitWidth, np.p.logicalDims, np.p.blocks, np.p.logicalDims, // TODO: should neighborhood be set to np.p.logicaldims??
                         if (WPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else WPorts, if (RPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else RPorts,
                         np.p.inits, np.p.syncMem, np.p.fracBits, isBuf = !isShiftEntry, np.p.numActives, "sr"))
         x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
@@ -181,11 +181,11 @@ class NBufMem(np: NBufParams) extends Module {
       }
 
     case LineBufferType => 
-      val rowstride = np.p.strides(0)
+      val rowstride = np.p.neighborhood(0)
       val numrows = np.p.logicalDims(0) + (np.numBufs-1)*rowstride
       val numcols = np.p.logicalDims(1)
       val lb = Module(new BankedSRAM(List(numrows,numcols), np.p.bitWidth,
-                               List(numrows,np.p.banks(1)), np.p.strides,
+                               List(numrows,np.p.banks(1)), np.p.blocks, np.p.neighborhood,
                                np.p.WMapping.map(_.randomBanks), np.p.RMapping.map(_.randomBanks),
                                np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, numActives = np.p.numActives, "lb"))
       lb.io <> DontCare
@@ -264,7 +264,7 @@ class NBufMem(np: NBufParams) extends Module {
 class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") extends Module { 
   val wMap = List(AccessHelper.singularOnPort(0, bitWidth))
   val rMap = List.tabulate(numBufs-1){i => AccessHelper.singularOnPort(i+1, bitWidth)}
-  val io = IO( new NBufInterface(NBufParams(numBufs, FFType, MemParams(FIFOInterfaceType, List(1), bitWidth, List(1), List(1), wMap, rMap, BankedMemory))))
+  val io = IO( new NBufInterface(NBufParams(numBufs, FFType, MemParams(FIFOInterfaceType, List(1), bitWidth, List(1), List(1), List(1), wMap, rMap, BankedMemory))))
 
   override def desiredName = myName
   
@@ -275,7 +275,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
   io.almostEmpty := DontCare
   io.numel := DontCare
 
-  val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), wMap, rMap, BankedMemory))
+  val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), List(1), wMap, rMap, BankedMemory))
   io <> nbufFF.io
 
   def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {

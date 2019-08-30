@@ -31,15 +31,16 @@ import spatial.targets._
 		}
 	}
 
-	def zculling(fragments 	: FIFO[CandidatePixel],
+	def zculling(fragments 	: SRAM1[CandidatePixel],
+				 size_fragment : Int,
 				 pixels 	: SRAM1[Pixel],
 				 z_buffer 	: SRAM2[UInt8]) : Int = {
 
 		val pixel_reg = Reg[Int](0)
 	    pixel_reg := 0.to[Int]
 
-		Foreach(fragments.numel by 1) { p =>
-			val curr_fragment = fragments.deq() //.deq()
+		Foreach(size_fragment by 1) { p =>
+			val curr_fragment = fragments(p) //.deq()
 			if (curr_fragment.z < z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32])) {
 				pixels(p) = Pixel(curr_fragment.x, curr_fragment.y, curr_fragment.color)
 				z_buffer(curr_fragment.y.to[I32], curr_fragment.x.to[I32]) = curr_fragment.z
@@ -55,7 +56,7 @@ import spatial.targets._
 					   xmax_index	: Reg[Int],
 					   ymax_index	: Reg[Int],
 					   sample_triangle2D : triangle2D,
-					   fragments 	: FIFO[CandidatePixel]) : Unit = {
+					   fragments 	: SRAM1[CandidatePixel]) : Int = {
 
 		def pixel_in_triangle(x : Int16, y : Int16, tri2D : triangle2D) : Boolean = {
 
@@ -74,6 +75,8 @@ import spatial.targets._
 		val x_max = xmax_index.value //(max_min(1).to[I32] - max_min(0).to[I32]).to[I32]
 		val y_max = ymax_index.value //(max_min(3).to[I32] - max_min(2).to[I32]).to[I32]
 
+		val frag_reg = Reg[Int](0)
+		frag_reg := 0.to[Int]
 		if ( (!flag) ) {
 		   	Foreach(x_max by 1, y_max by 1 par 1){ (x_t, y_t) =>
 				val x = max_min(0).to[Int16] + x_t.to[Int16]
@@ -87,10 +90,12 @@ import spatial.targets._
 				val frag_color = color
 
 				if (in_triangle == true) {
-					fragments.enq(CandidatePixel(frag_x, frag_y, frag_z, frag_color))
+					fragments(frag_reg.value) = CandidatePixel(frag_x, frag_y, frag_z, frag_color)
+					frag_reg := frag_reg +  1.to[Int]
 				}
 			}
 		}
+		frag_reg.value
 
 	}
 
@@ -245,34 +250,38 @@ import spatial.targets._
 			}
 
 			val do_triangles = last_triangle - tri_start
-			Foreach(do_triangles by 1) { i =>
-				val c = i % vec_sram_len
+			Foreach(do_triangles by vec_sram_len) { i =>
 
-				val triangle3D_vector_sram = SRAM[triangle3D](vec_sram_len).nonbuffer
-				if (c == 0) {
-					val load_len = min(vec_sram_len.to[Int], do_triangles - i)
-					triangle3D_vector_sram load triangle3D_vector_dram(i :: i + vec_sram_len par 4)
+				val load_len = min(vec_sram_len.to[Int], do_triangles - i)
+				val triangle3D_vector_sram = SRAM[triangle3D](vec_sram_len)
+
+				triangle3D_vector_sram load triangle3D_vector_dram(i :: i + vec_sram_len par 4)
+
+				Foreach(load_len by 1) { c =>
+
+					val curr_triangle3D = triangle3D_vector_sram(c + tri_start)
+					val tri2D = Reg[triangle2D].buffer
+
+					val max_min	= RegFile[UInt8](5)
+					val xmax_index = Reg[Int](0)
+					val ymax_index = Reg[Int](0)
+
+					val pixels = SRAM[Pixel](500)
+
+					val flag = Reg[Boolean](false)
+					val size_fragment = Reg[Int](0.to[Int])
+					val size_pixels = Reg[Int](0.to[Int])
+
+					val fragment = SRAM[CandidatePixel](500)
+
+					'proj.Pipe { projection(curr_triangle3D, tri2D, angle) }
+					'rast1.Pipe { flag := rasterization1(tri2D, max_min, xmax_index, ymax_index) }
+					'rast2.Pipe { size_fragment := rasterization2(flag.value, max_min, xmax_index, ymax_index, tri2D, fragment) }
+					'zcull.Pipe { size_pixels := zculling(fragment, size_fragment.value, pixels, z_buffer) }
+					'color.Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
+
 				}
 
-				val curr_triangle3D = triangle3D_vector_sram(c + tri_start)
-				val tri2D = Reg[triangle2D].buffer
-
-				val max_min	= RegFile[UInt8](5)
-				val xmax_index = Reg[Int](0)
-				val ymax_index = Reg[Int](0)
-
-				val pixels = SRAM[Pixel](500)
-
-				val flag = Reg[Boolean](false)
-				val size_pixels = Reg[Int](0.to[Int])
-
-				val fragment = FIFO[CandidatePixel](1024)
-
-				'proj.Pipe { projection(curr_triangle3D, tri2D, angle) }
-				'rast1.Pipe { flag := rasterization1(tri2D, max_min, xmax_index, ymax_index) }
-				'rast2.Pipe { rasterization2(flag.value, max_min, xmax_index, ymax_index, tri2D, fragment) }
-				'zcull.Pipe { size_pixels := zculling(fragment, pixels, z_buffer) }
-				'color.Pipe { coloringFB(size_pixels.value, pixels, frame_buffer) }
 			}
 
 			//host_z_buffer store z_buffer
@@ -315,7 +324,6 @@ import spatial.targets._
 
 		val cksum = frame_output.zip(gold_output) { _ == _ }.reduce( _ && _ )
 		println("Pass? " + cksum)
-		assert(cksum)
 
 	}
 }

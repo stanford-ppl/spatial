@@ -21,6 +21,7 @@ sealed abstract class Banking {
   def dims: Seq[Int]
   def alphas: Seq[Int]
   def Ps: Seq[Int]
+  def hiddenVolume: Int
   def numChecks: Int
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
@@ -31,6 +32,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
+  override def hiddenVolume: Int = B*P.map{_ % N}.min
   override def numChecks: Int = checks  // Diagnostic for required number of ISL calls to verify scheme
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
@@ -209,11 +211,11 @@ case class Memory(
         val p = P(t)
         val ofsdim_t = xt / p
         val prevDimsOfs = (t+1 until D).map{i => 
-          math.ceil(w(i)/P(i)).toInt * b.product
+          math.ceil(w(i)/P(i)).toInt
         }.product
         ofsdim_t * prevDimsOfs
       }.sumTree
-      val intrablockofs = (0 until D).map{t => 
+      val intrablockofs = (0 until D).map{t =>
         val bAbove = b.slice(t+1,D).product
         bAbove * ((addr(t) * alpha(t)) % b(t))
       }.sumTree

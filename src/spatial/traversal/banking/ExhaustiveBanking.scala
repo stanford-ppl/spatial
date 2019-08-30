@@ -392,7 +392,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
-    val Ns = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes).iterator
+    val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)
+    val Ns = possibleNs.iterator
     val numChecks = grps.map{x => nCr(x.size, 2)}.sum
     val rank = axes.length
     var banking: Option[ModBanking] = None
@@ -401,6 +402,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     while(Ns.hasNext && banking.isEmpty) {
       val N = Ns.next()
       val As = aStricts.expand(rank, N, stagedDims, axes)
+      val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
         val P = computeP(N,1,alpha,stagedDims,mem)
@@ -414,14 +416,15 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val P = computeP(N,1,alpha,stagedDims,mem)
-          banking = Some(ModBanking(N,1,alpha,axes,P,numChecks))
+          banking = Some(ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks))
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          val numBs = B.size
           banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims,mem)
-            ModBanking(N, b, alpha, axes, P,numChecks)
+            ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)
           }
         }
       }

@@ -23,17 +23,19 @@ sealed abstract class Banking {
   def Ps: Seq[Int]
   def hiddenVolume: Int
   def numChecks: Int
+  def solutionVolume: Int
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], checks: Int = 0) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], sv: Int = 1, checks: Int = 0) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
   override def hiddenVolume: Int = B*P.map{_ % N}.min
   override def numChecks: Int = checks  // Diagnostic for required number of ISL calls to verify scheme
+  override def solutionVolume: Int = sv
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
@@ -41,7 +43,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   }
   override def toString: String = {
     val name = if (B == 1) "Cyclic" else "Block Cyclic"
-    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}> ($numChecks checks)"
+    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}> ($solutionVolume solutions, $numChecks checks)"
   }
 }
 object ModBanking {

@@ -227,7 +227,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   def this(logicalDims: List[Int], bitWidth: Int,
            banks: List[Int], blocks: List[Int], neighborhood: List[Int],
            WMapping: List[Access], RMapping: List[Access],
-           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FIFO") = this(MemParams(FIFOInterfaceType,logicalDims, bitWidth, banks, List(1), List(1), WMapping, RMapping, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
+           bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FIFO") = this(MemParams(FIFOInterfaceType,logicalDims, bitWidth, banks, blocks, neighborhood, WMapping, RMapping, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
 
   // Create bank counters
   val headCtr = Module(new CompactingCounter(p.WMapping.map(_.par).sum, p.depth, p.elsWidth)); headCtr.io <> DontCare

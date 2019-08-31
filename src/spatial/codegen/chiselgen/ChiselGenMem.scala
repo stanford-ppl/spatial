@@ -171,7 +171,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val dimensions = paddedDims(mem, name).mkString("List[Int](", ",", ")") //dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
     val blockCycs = {if (mem.isLUT | mem.isRegFile) List.fill(dims.size)(1) else inst.Bs}.map(_.toString).mkString("List[Int](",",",")")
-    val neighborhood = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
+    val neighborhood = {if (mem.isLUT | mem.isRegFile) dims else inst.Ps}.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"

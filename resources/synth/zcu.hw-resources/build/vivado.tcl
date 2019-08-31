@@ -87,22 +87,23 @@ report_utilization -packthru -file ./synth_utilization.rpt
 report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file ./synth_utilization_hierarchical.rpt
 report_ram_utilization -detail -file ./synth_ram_utilization.rpt
 
-launch_runs impl_1 -jobs 6
-wait_on_run impl_1
-launch_runs impl_1 -to_step write_bitstream -jobs 6
-wait_on_run impl_1
-
-# Reports
-open_run -name implDesign impl_1
-report_timing_summary -file ./par_timing_summary.rpt
-report_utilization -packthru -file  ./par_utilization.rpt
-report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file  ./par_utilization_hierarchical.rpt
-report_ram_utilization -detail -file ./par_ram_utilization.rpt
-report_high_fanout_nets -ascending -timing -load_types -file ./par_high_fanout_nets.rpt
-
-#Export bitstream (vivado 2019 seems to drop _wrapper from the .bit)
-if {[string match 2019* $ver]} {
-    file copy -force ./project_1/project_1.runs/impl_1/design_1.bit ./accel.bit
-} else {
-    file copy -force ./project_1/project_1.runs/impl_1/design_1_wrapper.bit ./accel.bit
-}
+echo "P&R TEMPORARILY DISABLED, PLEASE TURN BACK ON!"
+# launch_runs impl_1 -jobs 6
+# wait_on_run impl_1
+# launch_runs impl_1 -to_step write_bitstream -jobs 6
+# wait_on_run impl_1
+#
+# # Reports
+# open_run -name implDesign impl_1
+# report_timing_summary -file ./par_timing_summary.rpt
+# report_utilization -packthru -file  ./par_utilization.rpt
+# report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file  ./par_utilization_hierarchical.rpt
+# report_ram_utilization -detail -file ./par_ram_utilization.rpt
+# report_high_fanout_nets -ascending -timing -load_types -file ./par_high_fanout_nets.rpt
+#
+# #Export bitstream (vivado 2019 seems to drop _wrapper from the .bit)
+# if {[string match 2019* $ver]} {
+#     file copy -force ./project_1/project_1.runs/impl_1/design_1.bit ./accel.bit
+# } else {
+#     file copy -force ./project_1/project_1.runs/impl_1/design_1_wrapper.bit ./accel.bit
+# }

@@ -409,7 +409,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
         banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P))
       }
-      dbgs(s" Solution space: ${numAs} * ${possibleNs} * ${mem.blockCyclicBs.size} (B), check complexity: ${numChecks}")
+      dbgs(s" Solution space: ${numAs} * ${possibleNs.size} * ${mem.blockCyclicBs.size} (B), check complexity: ${numChecks}")
       while (As.hasNext && banking.isEmpty) {
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")

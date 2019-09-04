@@ -106,6 +106,22 @@ object SparseTransfer {
               val data = dataBus.value()
               local.__write(data, Seq(i), Set())
             }
+
+          case (requestLength, iters) if spatialConfig.enablePIR =>
+            Foreach(iters par p){i =>
+              val cond = i < requestLength
+              val addr: I64 = mux(cond, ((addrs.__read(Seq(i),Set(cond)) + origin) * bytesPerWord).to[I64] + dram.address, dram.address)
+              addrBus := (addr, dram.isAlloc)
+            }
+            // Fringe
+            val load = Fringe.sparseLoad(dram, addrBus, dataBus)
+            transferSyncMeta(old, load)
+            // Receive
+            Foreach(iters par p){i =>
+              val data = dataBus.value()
+              local.__write(data, Seq(i), Set(i < requestLength))
+            }
+
           case (requestLength, iters) =>
             Foreach(iters par p){i =>
               val lastAddr = Reg[I64]

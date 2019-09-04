@@ -260,7 +260,7 @@ trait MemoryUnrolling extends UnrollingBase {
           val segment = if (lhs.segmentMapping.nonEmpty) banked.map(_._3).apply(ii) else 0
           // If broadcast exists within a vectorized unrolled access, then just broadcast that ulane.
           // For PIR only
-          // portReordering is a list o lane IDs. For FPGA, it's a list of lanes. For Plasticine,
+          // portReordering is a list of lane IDs. For FPGA, it's a list of lanes. For Plasticine,
           // it's List(0) for vectorized lane
           val reordered = portReordering.flatMap { ln =>
             // For FPGA will be Seq of one element

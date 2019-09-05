@@ -190,7 +190,8 @@ object FixFmt {
   /** Returns the maximum value representable by this number's format. */
   def maxValue: Fix[S,I,F] = uconst(fmt.toEmul.MAX_VALUE_FP)
 
-  @api override def toText: Text = stage(FixToText(this))
+  @api override def toText: Text = stage(FixToText(this, None))
+  @api def toText(format:Option[String]): Text = stage(FixToText(this, format))
 
   @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
     stage(FixToFix[S,I,F,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))

@@ -130,7 +130,7 @@ case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencie
     case FixMax(x, y) => fixOp += 1
     case FixMin(x, y) => fixOp += 1
     case FixToFlt(x, fmt) => fixOp += 1
-    case FixToText(x) => fixOp += 1
+    case FixToText(x,format) => fixOp += 1
     case TextToFix(x, _) => fixOp += 1
     case FixRandom(Some(max)) => fixOp += 1
     case FixRandom(None) => fixOp += 1

@@ -10,7 +10,7 @@ import spatial.metadata.retiming._
 trait ChiselGenDebug extends ChiselGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-	case FixToText(_)  => emit(src"""val $lhs = "" """)
+	  case FixToText(_,_)  => emit(src"""val $lhs = "" """)
     case TextConcat(_) =>  emit(src"""val $lhs = "" """)
     case PrintIf(_,_) =>  emit(src"""val $lhs = "" """)
     case BitToText(_) =>  emit(src"""val $lhs = "" """)
@@ -36,6 +36,6 @@ trait ChiselGenDebug extends ChiselGenCommon {
         emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & ($datapathEn).D(${lhs.fullDelay}))")
         earlyExits = earlyExits :+ lhs
 
-	case _ => super.gen(lhs, rhs)
+	  case _ => super.gen(lhs, rhs)
   }
 }

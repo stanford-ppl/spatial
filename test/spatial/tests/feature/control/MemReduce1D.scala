@@ -135,6 +135,7 @@ import spatial.dsl._
     setMem(srcFPGA, src)
 
     Accel {
+      // Reducing on an accum is NOT recommended
       val accum = FIFO[T](tileSize)
       MemReduce(accum)(-sizeIn until 0 by tileSize par p){ i  =>
         val tile = FIFO[T](tileSize)

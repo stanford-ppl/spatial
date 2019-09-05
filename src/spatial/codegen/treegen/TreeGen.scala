@@ -1,19 +1,14 @@
 package spatial.codegen.treegen
 
 import argon._
-
-import spatial.metadata.control._
 import spatial.lang._
-import spatial.node._
-import spatial.util.spatialConfig
-import spatial.codegen.naming.NamedCodegen
 import spatial.metadata.access._
-import spatial.metadata.types._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.util.modeling.scrubNoise
-import emul.ResidualGenerator._
+import spatial.util.spatialConfig
 
 import scala.collection.mutable.HashMap
 
@@ -201,7 +196,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
           else ""
-        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth, dv = ${mem.getDarkVolume.getOrElse(0)})", s"nBufs*volume = $bufVolume", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
+        printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     inCell("Single-Buffered Mems", true) {
@@ -223,7 +218,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         val hist = 
           if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
           else ""
-        printMem(mem, s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth, dv = ${mem.getDarkVolume.getOrElse(0)})", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
+        printMem(mem, s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth)", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
     emit("</body>")

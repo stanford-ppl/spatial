@@ -575,7 +575,8 @@ case object AlphaBestGuess extends AlphaStrictness {
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = { 
     val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product).uniqueModN(N)
     val dimBased = Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N).uniqueModN(N)
-    val possibleAs = (List(0,1) ++ accessBased ++ dimBased).filter{x => x >= 0 && x <= N}
+    val coprimes = Seq.tabulate(N){i => i}.collect{case i if coprime(Seq(i,N)) => i}
+    val possibleAs = (List(0,1) ++ accessBased ++ dimBased ++ coprimes).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank)
   }
 }

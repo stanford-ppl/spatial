@@ -1,7 +1,7 @@
 import spatial.dsl._
 
 @spatial
-object LSTM extends SpatialApp {
+object LSTMVerified extends SpatialApp {
   // This should take 5180 cycles to run...
   def main(args: Array[String]): Unit = {
     // This is describing the LSTM dataflow
@@ -9,8 +9,7 @@ object LSTM extends SpatialApp {
     type highT = FixPt[TRUE, _10, _22]
     type F = FltPt[_24, _8]
 
-    val nTimeSteps = ArgIn[I32]
-    setArg(nTimeSteps, args(0).to[I32])
+    val LUTLen: scala.Int = 128
 
     val tanh: highT => F = x => {
       val y = x
@@ -32,7 +31,7 @@ object LSTM extends SpatialApp {
     // problem-specific params
     val nHiddenUnits = 128
     val nFeatures = 128
-//    val nTimeSteps = 1
+    val nTimeSteps = 1
     val nGates = 4
 
     val ijfoDRAMs: scala.List[DRAM2[lowT]] = scala.List.tabulate(nGates) { _ =>
@@ -73,8 +72,10 @@ object LSTM extends SpatialApp {
 
     val hResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
     val cResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
+    val iResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
 
     Accel {
+      // Load all gates weights and x, c, h data in one shot
       val ijfoMems: List[SRAM2[lowT]] = List.tabulate(nGates) { _ =>
         val re: SRAM2[lowT] =
           SRAM[lowT](nHiddenUnits, nFeatures + nHiddenUnits)
@@ -100,6 +101,7 @@ object LSTM extends SpatialApp {
       }
 
       val c: SRAM1[highT] = SRAM[highT](nHiddenUnits)
+      val iResult: SRAM1[highT] = SRAM[highT](nHiddenUnits)
       val xh: SRAM1[highT] = SRAM[highT](nFeatures + nHiddenUnits)
       c load cInitDRAM(0.to[I32] :: nHiddenUnits.to[I32])
       xh load xhDRAM(0.to[I32] :: (nFeatures + nHiddenUnits).to[I32])
@@ -107,7 +109,7 @@ object LSTM extends SpatialApp {
       val hNew: SRAM1[highT] = SRAM[highT](nHiddenUnits)
       val cNew: SRAM1[highT] = SRAM[highT](nHiddenUnits)
 
-      Sequential.Foreach(nTimeSteps.value by 1.to[I32]) { iStep =>
+      Sequential.Foreach(nTimeSteps by 1.to[I32]) { _ =>
         val lastIterUV: I32 =
           (((nHiddenUnits + nFeatures) / (ru * rv) - 1) * (ru * rv)).to[I32]
         val accumRegs = List.tabulate(nGates)(_ => Reg[highT])
@@ -142,26 +144,21 @@ object LSTM extends SpatialApp {
               }
 
             val cPrime = i * j + c(ih).to[highT] * f
-//            cNew(ih) = cPrime
-//            hNew(ih) = cPrime * o
-            c(ih) = cPrime
-            xh(ih + nFeatures) = cPrime * o
+            cNew(ih) = cPrime
+            hNew(ih) = cPrime * o
+            iResult(ih) = i
           }
         }
 
-//        cResultDRAM store cNew(0.to[I32] :: nHiddenUnits.to[I32])
-//        hResultDRAM store hNew(0.to[I32] :: nHiddenUnits.to[I32])
-
-        // TODO: the dirty data is probably brought in by the double-writer.
-        if (iStep == nTimeSteps - 1) {
-          cResultDRAM store c(0 :: nHiddenUnits)
-          hResultDRAM store xh(nFeatures :: nFeatures + nHiddenUnits)
-        }
+        cResultDRAM store cNew(0.to[I32] :: nHiddenUnits.to[I32])
+        hResultDRAM store hNew(0.to[I32] :: nHiddenUnits.to[I32])
+        iResultDRAM store iResult(0.to[I32] :: nHiddenUnits.to[I32])
       }
     }
 
     val cResult = getMem(cResultDRAM)
     val hResult = getMem(hResultDRAM)
+    val iResult = getMem(iResultDRAM)
 
     val tanhHost: Array[highT] => Array[highT] = x => {
 //      Array.tabulate[highT](x.length)(i => tanh[Float](x(i).to[Float]).to[highT])
@@ -201,6 +198,8 @@ object LSTM extends SpatialApp {
     println("var h = " + variance(hResult, hPrimeGold))
     printArray(cResult, "cResult = ")
     printArray(hResult, "hResult = ")
+    printArray(iResult, "iResult = ")
+    printArray(i, "iGold = ")
     printArray(cPrimeGold, "cPrimeGold = ")
     printArray(hPrimeGold, "hPrimeGold = ")
   }

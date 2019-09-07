@@ -3,6 +3,12 @@ package utils
 package object math {
   def log2(x: Double): Double = Math.log10(x)/Math.log10(2)
   def isPow2(x: Int): Boolean = (x & (x-1)) == 0
+  def sigmoid(x: Double): Double = {
+    1.toDouble / (1.toDouble + scala.math.exp(-x))
+  }
+
+  def tanh(x: Double): Double = scala.math.tanh(x)
+
   
   // TODO: fix scaladoc here
   /* Find all combinations out of list of lists.  i.e.

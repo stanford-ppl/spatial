@@ -48,8 +48,8 @@ import spatial.dsl._
       sramB load B(baseAddr :: K, baseAddr :: N)
 
       val lastTile = (K / kp - 1.to[I32]) * kp
+      val fList: scala.List[Reg[T]] = scala.List.tabulate[Reg[T]](npFlatten) { _ => Reg[T](0.to[T]) }
       Foreach(M by baseStride, N by np, K by kp) { (m, nTile, kTile) =>
-        val fList: scala.List[Reg[T]] = scala.List.tabulate[Reg[T]](npFlatten) { _ => Reg[T](0.to[T]) }
         def reduceTreeDp(nIdx: I32): T = {
           scala.List
             .tabulate[T](kpFlatten) { ii =>

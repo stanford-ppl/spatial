@@ -72,9 +72,7 @@ object LSTM extends SpatialApp {
 
     val hResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
     val cResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
-
-
-    // TODO: Input is Float, and reschedule the input based on range?
+    val iResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
 
     Accel {
       // Load all gates weights and x, c, h data in one shot
@@ -103,6 +101,7 @@ object LSTM extends SpatialApp {
       }
 
       val c: SRAM1[highT] = SRAM[highT](nHiddenUnits)
+      val iResult: SRAM1[highT] = SRAM[highT](nHiddenUnits)
       val xh: SRAM1[highT] = SRAM[highT](nFeatures + nHiddenUnits)
       c load cInitDRAM(0.to[I32] :: nHiddenUnits.to[I32])
       xh load xhDRAM(0.to[I32] :: (nFeatures + nHiddenUnits).to[I32])
@@ -139,22 +138,27 @@ object LSTM extends SpatialApp {
           if (iuvTile == lastIterUV) {
             val i :: j :: f :: o :: v =
               accumRegs.zip(biasesMems).zip(ijfoActs).map {
-                case ((a, b), ac) => ac(a.value + b(ih).to[highT])
+                case ((a, b), ac) =>
+                //                ac(a.value + b(ih).to[highT])
+                  a.value + b(ih).to[highT]
               }
 
-            val cPrime = i * j + c(ih).to[F] * f
-            cNew(ih) = cPrime.to[highT]
-            hNew(ih) = (tanh(cPrime.to[highT]) * o).to[highT]
+            val cPrime = i * j + c(ih).to[highT] * f
+            cNew(ih) = cPrime
+            hNew(ih) = cPrime * o
+            iResult(ih) = i
           }
         }
 
         cResultDRAM store cNew(0.to[I32] :: nHiddenUnits.to[I32])
         hResultDRAM store hNew(0.to[I32] :: nHiddenUnits.to[I32])
+        iResultDRAM store iResult(0.to[I32] :: nHiddenUnits.to[I32])
       }
     }
 
     val cResult = getMem(cResultDRAM)
     val hResult = getMem(hResultDRAM)
+    val iResult = getMem(iResultDRAM)
 
     val tanhHost: Array[highT] => Array[highT] = x => {
 //      Array.tabulate[highT](x.length)(i => tanh[Float](x(i).to[Float]).to[highT])
@@ -192,5 +196,11 @@ object LSTM extends SpatialApp {
 
     println("var c = " + variance(cResult, cPrimeGold))
     println("var h = " + variance(hResult, hPrimeGold))
+    printArray(cResult, "cResult = ")
+    printArray(hResult, "hResult = ")
+    printArray(iResult, "iResult = ")
+    printArray(i, "iGold = ")
+    printArray(cPrimeGold, "cPrimeGold = ")
+    printArray(hPrimeGold, "hPrimeGold = ")
   }
 }

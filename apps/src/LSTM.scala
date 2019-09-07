@@ -64,7 +64,8 @@ object LSTM extends SpatialApp {
     }
 
     val cInitDRAM = getVecDRAM[highT](nHiddenUnits.to[I32])
-    val xhDRAM = getVecDRAM[highT]((nFeatures + nHiddenUnits).to[I32])
+    val xDRAM = getVecDRAM[highT](nFeatures)
+    val hDRAM = getVecDRAM[highT](nFeatures)
 
     val biasesDRAM: List[DRAM1[lowT]] = List.tabulate(nGates) { _ =>
       val re: DRAM1[lowT] = getVecDRAM[lowT](nHiddenUnits.to[I32])
@@ -99,15 +100,17 @@ object LSTM extends SpatialApp {
           sram load dram(0.to[I32] :: nHiddenUnits.to[I32])
       }
 
+      val x: SRAM1[highT] = SRAM[highT](nFeatures)
       val c: SRAM1[highT] = SRAM[highT](nHiddenUnits)
-      val xh: SRAM1[highT] = SRAM[highT](nFeatures + nHiddenUnits)
-      c load cInitDRAM(0.to[I32] :: nHiddenUnits.to[I32])
-      xh load xhDRAM(0.to[I32] :: (nFeatures + nHiddenUnits).to[I32])
-
-      val hNew: SRAM1[highT] = SRAM[highT](nHiddenUnits)
+      val h: SRAM1[highT] = SRAM[highT](nHiddenUnits)
       val cNew: SRAM1[highT] = SRAM[highT](nHiddenUnits)
+      val hNew: SRAM1[highT] = SRAM[highT](nHiddenUnits)
 
-      Sequential.Foreach(nTimeSteps.value by 1.to[I32]) { iStep =>
+      x load xDRAM(0 :: nHiddenUnits)
+      h load hDRAM(0 :: nHiddenUnits)
+      c load hDRAM(0 :: nHiddenUnits)
+
+      Sequential.Foreach(nTimeSteps by 1.to[I32]) { iStep =>
         val lastIterUV: I32 =
           (((nHiddenUnits + nFeatures) / (ru * rv) - 1) * (ru * rv)).to[I32]
         val accumRegs = List.tabulate(nGates)(_ => Reg[highT])
@@ -122,7 +125,10 @@ object LSTM extends SpatialApp {
                 List
                   .tabulate(ru * rv) { ii =>
                     val iuv = iuvTile + ii.to[I32]
-                    val re: highT = w(ih, iuv).to[highT] * xh(iuv).to[highT]
+                    val iuvOffset = iuv - nFeatures
+                    val re: highT = w(ih, iuv).to[highT] * mux(
+                      iuv < nFeatures, x(iuv), h(iuvOffset)
+                    ).to[highT]
                     re
                   }
                   .sumTree
@@ -137,32 +143,32 @@ object LSTM extends SpatialApp {
             val i :: j :: f :: o :: v =
               accumRegs.zip(biasesMems).zip(ijfoActs).map {
                 case ((a, b), ac) =>
-                //                ac(a.value + b(ih).to[highT])
+                // ac(a.value + b(ih).to[highT])
                   a.value + b(ih).to[highT]
               }
 
             val cPrime = i * j + c(ih).to[highT] * f
-//            cNew(ih) = cPrime
-//            hNew(ih) = cPrime * o
-            c(ih) = cPrime
-            xh(ih + nFeatures) = cPrime * o
+            cNew(ih) = cPrime
+            hNew(ih) = cPrime * o
           }
         }
 
-//        cResultDRAM store cNew(0.to[I32] :: nHiddenUnits.to[I32])
-//        hResultDRAM store hNew(0.to[I32] :: nHiddenUnits.to[I32])
+        Foreach(nHiddenUnits by ru * rv) { i =>
+          List.tabulate(ru * rv) { ii =>
+            h(i + ii) = hNew(i + ii)
+            c(i + ii) = cNew(i + ii)
+          }
+        }
 
-        // TODO: the dirty data is probably brought in by the double-writer.
         if (iStep == nTimeSteps - 1) {
           cResultDRAM store c(0 :: nHiddenUnits)
-          hResultDRAM store xh(nFeatures :: nFeatures + nHiddenUnits)
+          hResultDRAM store h(0 :: nFeatures)
         }
       }
     }
 
     val cResult = getMem(cResultDRAM)
     val hResult = getMem(hResultDRAM)
-
     val tanhHost: Array[highT] => Array[highT] = x => {
 //      Array.tabulate[highT](x.length)(i => tanh[Float](x(i).to[Float]).to[highT])
       x
@@ -173,14 +179,16 @@ object LSTM extends SpatialApp {
     def tanhEle(x: highT): highT = x
 
     val biasesData: List[Tensor1[lowT]] = biasesDRAM.map(f => getMem(f))
-    val xh: Tensor1[highT] = getMem(xhDRAM)
+    val x: Tensor1[highT] = getMem(xDRAM)
+    val h: Tensor1[highT] = getMem(hDRAM)
     val c: Tensor1[highT] = getMem(cInitDRAM)
     val gates: List[Array[highT]] = ijfoData.zip(biasesData).map {
       case (m: Matrix[_], b: Tensor1[_]) =>
         Array.tabulate[highT](nHiddenUnits) { i =>
           Array
-            .tabulate[highT](nHiddenUnits + nFeatures) { j =>
-              m(i, j).to[highT] * xh(j)
+            .tabulate[highT](nFeatures + nHiddenUnits) { j =>
+              val a: highT = if (j < nFeatures.to[I32]) x(j) else h(j - nFeatures)
+              m(i, j).to[highT] * a
             }
             .reduce(_ + _) + b(i).to[highT]
         }

@@ -22,7 +22,7 @@ case class DSEThread(
   workQueue: LinkedBlockingQueue[Seq[DesignPoint]],
   outQueue:  LinkedBlockingQueue[Array[String]],
   PROFILING: Boolean
-)(implicit val state: State, val isl: ISL, val areamodel: models.AreaEstimator) extends Runnable { thread =>
+)(implicit val state: State, val isl: ISL, val mlModel: models.AreaEstimator) extends Runnable { thread =>
   // --- Thread stuff
   private var isAlive: Boolean = true
   private var hasTerminated: Boolean = false
@@ -60,7 +60,7 @@ case class DSEThread(
   private lazy val memoryAnalyzer = new MemoryAnalyzer(state)
 
   // private lazy val contentionAnalyzer = new ContentionAnalyzer(state)
-  private lazy val areaAnalyzer  = target.areaAnalyzer(state)
+  private lazy val areaAnalyzer  = target.areaAnalyzer(mlModel)(state)
   private lazy val cycleAnalyzer = target.cycleAnalyzer(state)
 
   def init(): Unit = {
@@ -113,7 +113,7 @@ case class DSEThread(
     val array = new Array[String](requests.size)
     var i: Int = 0
     val paramRewrites = requests.map{pt => pt.show(indexedSpace, prods, dims)}
-    println(s"paramRewrites for thread $threadId = ${paramRewrites(0)} ${paramRewrites(1)} ${paramRewrites(2)} ")
+    if (paramRewrites.size >= 3) println(s"paramRewrites for thread $threadId = ${paramRewrites(0)} ${paramRewrites(1)} ${paramRewrites(2)} ")
     val runtimes = evaluateLatency(paramRewrites)
     requests.foreach{pt =>
       state.resetErrors()

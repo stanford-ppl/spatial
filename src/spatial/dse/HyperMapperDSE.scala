@@ -131,7 +131,7 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
         workQueue = workQueue,
         outQueue  = resultQueue,
         PROFILING = PROFILING
-      )(threadState, this.isl, this.areamodel)
+      )(threadState, this.isl, this.mlModel)
     }
 
     val HEADER = space.map(_.name).mkString(",") + "," + workers.head.areaHeading.mkString(",") + ",Cycles,Valid,Timestamp"

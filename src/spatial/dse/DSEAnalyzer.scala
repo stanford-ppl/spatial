@@ -20,7 +20,7 @@ import java.nio.file.StandardOpenOption
 import java.nio.channels._
 import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
 
-case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: AreaEstimator) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
+case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val mlModel: AreaEstimator) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
 
   override protected def process[R](block: Block[R]): Block[R] = {
     dbgs("Tile sizes: ")
@@ -342,11 +342,11 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
         workQueue = workQueue,
         outQueue  = fileQueue,
         PROFILING = PROFILING
-      )(threadState, isl, areamodel)
+      )(threadState, isl, mlModel)
     }
     dbgs("Initializing models...")
 
-    // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
+      // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
     workers.foreach{worker => worker.init() }
 
     //val superHeader = List.tabulate(names.length){i => if (i == 0) "INPUTS" else "" }.mkString(",") + "," +

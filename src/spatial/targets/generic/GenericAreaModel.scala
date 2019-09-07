@@ -5,11 +5,11 @@ import argon._
 import forge.tags._
 import models._
 
-class GenericAreaModel(target: HardwareTarget) extends AreaModel(target) {
+class GenericAreaModel(target: HardwareTarget, mlModel: AreaEstimator) extends AreaModel(target, mlModel) {
   import GenericDevice._
 
   @stateful override def summarize(area: Area): (Area, String) = {
-    val design = area + model("Fringe")()
+    val design = area //+ model("Fringe")()
 
     val routingLUTs = 0 //calculateRoutingLUTs(design)
     val routingRegs = 0 //calculateRoutingRegs(design)

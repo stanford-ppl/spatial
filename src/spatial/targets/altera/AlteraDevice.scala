@@ -82,7 +82,7 @@ abstract class AlteraDevice extends HardwareTarget {
     else             Area(RAM64M->N) * Math.ceil(depth/64.0)
   }
 
-  protected def makeAreaModel: AreaModel = new AlteraAreaModel(this)
+  protected def makeAreaModel(mlModel: AreaEstimator): AreaModel = new AlteraAreaModel(this, mlModel)
   protected def makeLatencyModel: LatencyModel = new LatencyModel(this)
 
 }

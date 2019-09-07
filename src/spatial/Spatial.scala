@@ -33,6 +33,7 @@ trait Spatial extends Compiler with ParamLoader {
   final val desc: String = "Spatial compiler"
   final val script: String = "spatial"
   private var overrideRetime = false
+  implicit val mlModel: AreaEstimator = new AreaEstimator
 
   private class SpatialISL extends ISL {
     override def domain[K](key: K): ConstraintMatrix[K] = key match {
@@ -56,8 +57,7 @@ trait Spatial extends Compiler with ParamLoader {
   def runPasses[R](block: Block[R]): Block[R] = {
     implicit val isl: ISL = new SpatialISL
     isl.startup()
-    implicit val areamodel: AreaEstimator = new AreaEstimator
-    areamodel.startup(spatialConfig.useAreaModels) 
+    mlModel.startup(spatialConfig.useAreaModels)
 
     // --- Debug
     lazy val printer = IRPrinter(state, enable = config.enDbg)
@@ -491,7 +491,7 @@ trait Spatial extends Compiler with ParamLoader {
       IR.logError()
     }
     else {
-      spatialConfig.target.areaModel.init()
+      spatialConfig.target.areaModel(mlModel).init()
       spatialConfig.target.latencyModel.init()
     }
     if (config.genDirOverride && java.nio.file.Files.exists(java.nio.file.Paths.get(config.genDir)) ||

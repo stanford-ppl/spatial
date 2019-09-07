@@ -1,23 +1,20 @@
 package spatial.dse
 
 import argon._
+import models._
 import spatial.lang._
-import spatial.node._
-import spatial.util.spatialConfig
-import spatial.util.modeling._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
-import spatial.metadata.control._
-import spatial.metadata.memory._
-import spatial.traversal._
+import spatial.node._
 import spatial.targets._
-import models._
-import argon.node._
+import spatial.traversal._
+import spatial.util.modeling._
 
 import scala.collection.mutable
 
-case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal  {
+case class DSEAreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal  {
   private def NoArea: Area = areaModel.NoArea
+  val mlModel = areaModel.mlModel
 
   var totalArea: (Area, String) = (NoArea, "")
   var scopeArea: Seq[Area] = Nil
@@ -55,13 +52,17 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
     val total = (saved +: scopeArea).fold(NoArea){_+_}
     val area = areaModel.summarize(total)
     totalArea = area
+    println(s"$total $area")
 
     if (config.enDbg) { areaModel.reportMissing() }
 
     super.postprocess(block)
   }
 
-  def areaOf(e: Sym[_]): Area = areaModel.areaOf(e, inHw, inReduce)
+  def areaOf(e: Sym[_]): Area = {
+    val a = areaModel.areaOf(e, inHw, inReduce)
+    a
+  }
   def requiresRegisters(x: Sym[_], inReduce: Boolean): Boolean = latencyModel.requiresRegisters(x, inReduce)
   def retimingDelay(x: Sym[_], inReduce: Boolean): Int = if (requiresRegisters(x,inReduce)) latencyOf(x).toInt else 0
 
@@ -186,7 +187,6 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         dbgs(s" - Tree:   $treeArea")
         dbgs(s" - Delays: $treeDelayArea")
         dbgs(s" - Cycle:  ${loadArea + storeArea + cycleArea}")
-
         mapArea + treeArea + treeDelayArea + loadArea + cycleArea + storeArea + areaOf(lhs)
 
       case op@OpMemReduce(en,cchainMap,cchainRed,accum,map,loadRes,loadAcc,reduce,storeAcc,ident,fold,itersMap,itersRed,_) =>
@@ -239,6 +239,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
       case _ => areaOf(lhs) + rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1)).fold(NoArea){_+_}
     }
+
     scopeArea = area +: scopeArea
   }
 

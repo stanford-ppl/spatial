@@ -5,14 +5,18 @@ object LSTM extends SpatialApp {
   // This should take 5180 cycles to run...
   def main(args: Array[String]): Unit = {
     // This is describing the LSTM dataflow
-    type lowT = FixPt[TRUE, _2, _6]
+//    type lowT = FixPt[TRUE, _2, _6]
+    type lowT = FixPt[TRUE, _10, _22]
     type highT = FixPt[TRUE, _10, _22]
     type F = FltPt[_24, _8]
 
     val controlRegs = List.tabulate(3)(_ => ArgIn[I32])
     val testArgs = List(2, 64, 64)
 //    controlRegs.zipWithIndex.foreach(t => setArg(t._1, args(t._2).to[I32]))
-    controlRegs.zipWithIndex.foreach(t => setArg(t._1, testArgs(t._2).to[I32]))
+//    controlRegs.zipWithIndex.foreach(t => setArg(t._1, testArgs(t._2).to[I32]))
+    setArg(controlRegs.head, 2)
+    setArg(controlRegs(1), 64)
+    setArg(controlRegs(2), 64)
 
     val tanh: highT => F = x => {
       val y = x
@@ -134,6 +138,32 @@ object LSTM extends SpatialApp {
           iterCDebugRegs(1) := c(0)
         }
 
+        println("iStep = " + iStep)
+        println("h = ")
+        Pipe.II(1).Foreach(nHiddenUnitsConfig by 1) { ih =>
+          val currH = h(ih)
+          print(currH)
+          print(" ,")
+        }
+        println("")
+
+        println("c = ")
+        Pipe.II(1).Foreach(nHiddenUnitsConfig by 1) { ic =>
+          val currC = c(ic)
+          print(currC)
+          print(" ,")
+        }
+        println("")
+
+        println("x = ")
+        Pipe.II(1).Foreach(nFeaturesConfig by 1) { ix =>
+          val currX = x(ix)
+          print(currX)
+          print(" ,")
+        }
+        println("")
+
+        println("i = ")
         Pipe.II(1).Foreach(nHiddenUnitsConfig by 1, innerBound by ru * rv) { (ih, iuvTile) =>
           accumRegs.zip(ijfoMems).foreach {
             case (acc, w) =>
@@ -141,9 +171,9 @@ object LSTM extends SpatialApp {
                 List
                   .tabulate(ru * rv) { ii =>
                     val iuv = iuvTile + ii.to[I32]
-                    val iuvOffset = iuv - nFeatures
+                    val iuvOffset = iuv - nFeaturesConfig
                     val re: highT = w(ih, iuv).to[highT] * mux(
-                      iuv < nFeatures, x(iuv), h(iuvOffset)
+                      iuv < nFeaturesConfig, x(iuv), h(iuvOffset)
                     ).to[highT]
                     re
                   }
@@ -162,14 +192,17 @@ object LSTM extends SpatialApp {
                 // ac(a.value + b(ih).to[highT])
                   a.value + b(ih).to[highT]
               }
-
+            print(i)
+            print(",")
             val cPrime = i * j + c(ih).to[highT] * f
             cNew(ih) = cPrime
             hNew(ih) = cPrime * o
           }
         }
 
-        Foreach(nHiddenUnits by ru * rv) { i =>
+        println("")
+
+        Pipe.II(1).Foreach(nHiddenUnitsConfig by ru * rv) { i =>
           List.tabulate(ru * rv) { ii =>
             h(i + ii) = hNew(i + ii)
             c(i + ii) = cNew(i + ii)

@@ -9,8 +9,10 @@ object LSTM extends SpatialApp {
     type highT = FixPt[TRUE, _10, _22]
     type F = FltPt[_24, _8]
 
-    val nTimeSteps = ArgIn[I32]
-    setArg(nTimeSteps, args(0).to[I32])
+    val controlRegs = List.tabulate(3)(_ => ArgIn[I32])
+    val testArgs = List(2, 64, 64)
+//    controlRegs.zipWithIndex.foreach(t => setArg(t._1, args(t._2).to[I32]))
+    controlRegs.zipWithIndex.foreach(t => setArg(t._1, testArgs(t._2).to[I32]))
 
     val tanh: highT => F = x => {
       val y = x
@@ -29,10 +31,8 @@ object LSTM extends SpatialApp {
 //    val rv = 16
     val rv = 4
 
-    // problem-specific params
     val nHiddenUnits = 128
     val nFeatures = 128
-//    val nTimeSteps = 1
     val nGates = 4
 
     val ijfoDRAMs: scala.List[DRAM2[lowT]] = scala.List.tabulate(nGates) { _ =>
@@ -75,6 +75,13 @@ object LSTM extends SpatialApp {
     val hResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
     val cResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
 
+    val hResultDRAMProbe: DRAM1[highT] = DRAM[highT](nHiddenUnits)
+    val cResultDRAMProbe: DRAM1[highT] = DRAM[highT](nHiddenUnits)
+
+    val iterHDebugRegs: List[Reg[highT]] = List.tabulate(2)(_ => ArgOut[highT])
+    val iterCDebugRegs: List[Reg[highT]] = List.tabulate(2)(_ => ArgOut[highT])
+
+
     Accel {
       val ijfoMems: List[SRAM2[lowT]] = List.tabulate(nGates) { _ =>
         val re: SRAM2[lowT] =
@@ -110,15 +117,24 @@ object LSTM extends SpatialApp {
       h load hDRAM(0 :: nHiddenUnits)
       c load hDRAM(0 :: nHiddenUnits)
 
-      Sequential.Foreach(nTimeSteps by 1.to[I32]) { iStep =>
+      val nTimeSteps :: nFeaturesConfig :: nHiddenUnitsConfig :: nn = controlRegs.map(r => r.value)
+      Sequential.Foreach(nTimeSteps by 1) { iStep =>
+        val innerBound: I32 = nHiddenUnitsConfig + nFeaturesConfig
         val lastIterUV: I32 =
-          (((nHiddenUnits + nFeatures) / (ru * rv) - 1) * (ru * rv)).to[I32]
+          ((innerBound / (ru * rv) - 1) * (ru * rv)).to[I32]
         val accumRegs = List.tabulate(nGates)(_ => Reg[highT])
 
-        Foreach(
-          nHiddenUnits.to[I32] by 1.to[I32],
-          (nHiddenUnits + nFeatures).to[I32] by (ru * rv).to[I32]
-        ) { (ih, iuvTile) =>
+        // Sample 1 h to verify correctness
+        if (iStep == 0) {
+          iterHDebugRegs.head := h(0)
+          iterCDebugRegs.head := c(0)
+        } else {
+          // istep == 1
+          iterHDebugRegs(1) := h(0)
+          iterCDebugRegs(1) := c(0)
+        }
+
+        Pipe.II(1).Foreach(nHiddenUnitsConfig by 1, innerBound by ru * rv) { (ih, iuvTile) =>
           accumRegs.zip(ijfoMems).foreach {
             case (acc, w) =>
               val t =
@@ -140,7 +156,7 @@ object LSTM extends SpatialApp {
           }
 
           if (iuvTile == lastIterUV) {
-            val i :: j :: f :: o :: v =
+            val i :: j :: f :: o :: vv =
               accumRegs.zip(biasesMems).zip(ijfoActs).map {
                 case ((a, b), ac) =>
                 // ac(a.value + b(ih).to[highT])
@@ -161,16 +177,27 @@ object LSTM extends SpatialApp {
         }
 
         if (iStep == nTimeSteps - 1) {
-          cResultDRAM store c(0 :: nHiddenUnits)
-          hResultDRAM store h(0 :: nFeatures)
+          cResultDRAM store cNew(0 :: nHiddenUnits)
+          hResultDRAM store hNew(0 :: nHiddenUnits)
+        } else {
+          cResultDRAMProbe store c(0 :: nHiddenUnits)
+          hResultDRAMProbe store h(0 :: nHiddenUnits)
         }
       }
     }
 
-    val cResult = getMem(cResultDRAM)
-    val hResult = getMem(hResultDRAM)
+    def getPartialArrayHead[T:Num](array: Tensor1[T], len: I32): Array[T] = {
+      Array.tabulate[T](len)(i => array(i))
+    }
+
+    val nt :: nh :: nf :: nn = controlRegs.map(a => a.value)
+    val cResult = getPartialArrayHead(
+      getMem(cResultDRAM), nh
+    )
+    val hResult = getPartialArrayHead(
+      getMem(hResultDRAM), nh
+    )
     val tanhHost: Array[highT] => Array[highT] = x => {
-//      Array.tabulate[highT](x.length)(i => tanh[Float](x(i).to[Float]).to[highT])
       x
     }
     def sigHost: Array[highT] => Array[highT] = x => {
@@ -180,36 +207,44 @@ object LSTM extends SpatialApp {
 
     val biasesData: List[Tensor1[lowT]] = biasesDRAM.map(f => getMem(f))
     val x: Tensor1[highT] = getMem(xDRAM)
-    val h: Tensor1[highT] = getMem(hDRAM)
-    val c: Tensor1[highT] = getMem(cInitDRAM)
-    val gates: List[Array[highT]] = ijfoData.zip(biasesData).map {
-      case (m: Matrix[_], b: Tensor1[_]) =>
-        Array.tabulate[highT](nHiddenUnits) { i =>
-          Array
-            .tabulate[highT](nFeatures + nHiddenUnits) { j =>
-              val a: highT = if (j < nFeatures.to[I32]) x(j) else h(j - nFeatures)
-              m(i, j).to[highT] * a
-            }
-            .reduce(_ + _) + b(i).to[highT]
-        }
+    val hGold: Tensor1[highT] = getMem(hDRAM)
+    val cGold: Tensor1[highT] = getMem(cInitDRAM)
+
+    for (_ <- nt by 1) {
+      val gates: List[Array[highT]] = ijfoData.zip(biasesData).map {
+        case (m: Matrix[_], b: Tensor1[_]) =>
+          Array.tabulate[highT](nh) { i =>
+            Array
+              .tabulate[highT](nh + nf) { j =>
+                val a: highT = if (j < nf) x(j) else hGold(j - nf)
+                m(i, j).to[highT] * a
+              }
+              .reduce(_ + _) + b(i).to[highT]
+          }
+      }
+
+      val i :: j :: f :: o :: v = List(
+        sigHost, tanhHost, sigHost, sigHost
+      ).zip(gates).map{ case (fn, g) => fn(g) }
+
+      for (ih <- nh by 1) {
+        cGold(ih) = i(ih) * j(ih) + cGold(ih) * f(ih)
+        hGold(ih) = tanhEle(cGold(ih) * o(ih))
+      }
     }
 
-    val i :: j :: f :: o :: v = List(sigHost, tanhHost, sigHost, sigHost).zip(gates).map{ case (fn, g) => fn(g) }
-    val cPrimeGold: Tensor1[highT] =
-      Array.tabulate[highT](nHiddenUnits)(ih => i(ih) * j(ih) + c(ih) * f(ih))
-
-    val hPrimeGold: Tensor1[highT] =
-      Array.tabulate[highT](nHiddenUnits)(ih => tanhEle(cPrimeGold(ih)) * o(ih))
-
-    def variance(a: Tensor1[highT], b: Tensor1[highT]): highT = Array.tabulate[highT](nHiddenUnits){ ih =>
-      pow(abs(cResult(ih) - cPrimeGold(ih)), 2)
+    def variance(a: Tensor1[highT], b: Tensor1[highT]): highT = Array.tabulate[highT](nh){ ih =>
+      pow(abs(a(ih) - b(ih)), 2)
     }.reduce((a, b) => a + b) / nHiddenUnits
 
-    println("var c = " + variance(cResult, cPrimeGold))
-    println("var h = " + variance(hResult, hPrimeGold))
     printArray(cResult, "cResult = ")
     printArray(hResult, "hResult = ")
-    printArray(cPrimeGold, "cPrimeGold = ")
-    printArray(hPrimeGold, "hPrimeGold = ")
+    printArray(getPartialArrayHead(getMem(cResultDRAMProbe), nh), "cResultProbe = ")
+    printArray(getPartialArrayHead(getMem(hResultDRAMProbe), nh), "hResultProbe = ")
+    printArray(cGold, "cGold = ")
+    printArray(hGold, "hGold = ")
+
+    println("iter0: c = " + getArg(iterCDebugRegs.head) + ", h = " + getArg(iterHDebugRegs.head))
+    println("iter1: c = " + getArg(iterCDebugRegs(1)) + ", h = " + getArg(iterHDebugRegs(1)))
   }
 }

@@ -4,9 +4,7 @@ import spatial.dsl._
 object LSTM extends SpatialApp {
   // This should take 5180 cycles to run...
   def main(args: Array[String]): Unit = {
-    // This is describing the LSTM dataflow
-//    type lowT = FixPt[TRUE, _2, _6]
-    type lowT = FixPt[TRUE, _10, _22]
+    type lowT = FixPt[TRUE, _2, _6]
     type highT = FixPt[TRUE, _10, _22]
     type F = FltPt[_24, _8]
 
@@ -79,13 +77,6 @@ object LSTM extends SpatialApp {
     val hResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
     val cResultDRAM: DRAM1[highT] = DRAM[highT](nHiddenUnits)
 
-    val hResultDRAMProbe: DRAM1[highT] = DRAM[highT](nHiddenUnits)
-    val cResultDRAMProbe: DRAM1[highT] = DRAM[highT](nHiddenUnits)
-
-    val iterHDebugRegs: List[Reg[highT]] = List.tabulate(2)(_ => ArgOut[highT])
-    val iterCDebugRegs: List[Reg[highT]] = List.tabulate(2)(_ => ArgOut[highT])
-
-
     Accel {
       val ijfoMems: List[SRAM2[lowT]] = List.tabulate(nGates) { _ =>
         val re: SRAM2[lowT] =
@@ -128,42 +119,6 @@ object LSTM extends SpatialApp {
           ((innerBound / (ru * rv) - 1) * (ru * rv)).to[I32]
         val accumRegs = List.tabulate(nGates)(_ => Reg[highT])
 
-        // Sample 1 h to verify correctness
-        if (iStep == 0) {
-          iterHDebugRegs.head := h(0)
-          iterCDebugRegs.head := c(0)
-        } else {
-          // istep == 1
-          iterHDebugRegs(1) := h(0)
-          iterCDebugRegs(1) := c(0)
-        }
-
-        println("iStep = " + iStep)
-        println("h = ")
-        Pipe.II(1).Foreach(nHiddenUnitsConfig by 1) { ih =>
-          val currH = h(ih)
-          print(currH)
-          print(" ,")
-        }
-        println("")
-
-        println("c = ")
-        Pipe.II(1).Foreach(nHiddenUnitsConfig by 1) { ic =>
-          val currC = c(ic)
-          print(currC)
-          print(" ,")
-        }
-        println("")
-
-        println("x = ")
-        Pipe.II(1).Foreach(nFeaturesConfig by 1) { ix =>
-          val currX = x(ix)
-          print(currX)
-          print(" ,")
-        }
-        println("")
-
-        println("i = ")
         Pipe.II(1).Foreach(nHiddenUnitsConfig by 1, innerBound by ru * rv) { (ih, iuvTile) =>
           accumRegs.zip(ijfoMems).foreach {
             case (acc, w) =>
@@ -189,18 +144,15 @@ object LSTM extends SpatialApp {
             val i :: j :: f :: o :: vv =
               accumRegs.zip(biasesMems).zip(ijfoActs).map {
                 case ((a, b), ac) =>
-                // ac(a.value + b(ih).to[highT])
+//                  ac(a.value + b(ih).to[highT])
                   a.value + b(ih).to[highT]
               }
-            print(i)
-            print(",")
-            val cPrime = i * j + c(ih).to[highT] * f
+
+            val cPrime = i * j + c(ih) * f
             cNew(ih) = cPrime
             hNew(ih) = cPrime * o
           }
         }
-
-        println("")
 
         Pipe.II(1).Foreach(nHiddenUnitsConfig by ru * rv) { i =>
           List.tabulate(ru * rv) { ii =>
@@ -212,9 +164,6 @@ object LSTM extends SpatialApp {
         if (iStep == nTimeSteps - 1) {
           cResultDRAM store cNew(0 :: nHiddenUnits)
           hResultDRAM store hNew(0 :: nHiddenUnits)
-        } else {
-          cResultDRAMProbe store c(0 :: nHiddenUnits)
-          hResultDRAMProbe store h(0 :: nHiddenUnits)
         }
       }
     }
@@ -224,12 +173,6 @@ object LSTM extends SpatialApp {
     }
 
     val nt :: nh :: nf :: nn = controlRegs.map(a => a.value)
-    val cResult = getPartialArrayHead(
-      getMem(cResultDRAM), nh
-    )
-    val hResult = getPartialArrayHead(
-      getMem(hResultDRAM), nh
-    )
     val tanhHost: Array[highT] => Array[highT] = x => {
       x
     }
@@ -270,14 +213,9 @@ object LSTM extends SpatialApp {
       pow(abs(a(ih) - b(ih)), 2)
     }.reduce((a, b) => a + b) / nHiddenUnits
 
-    printArray(cResult, "cResult = ")
-    printArray(hResult, "hResult = ")
-    printArray(getPartialArrayHead(getMem(cResultDRAMProbe), nh), "cResultProbe = ")
-    printArray(getPartialArrayHead(getMem(hResultDRAMProbe), nh), "hResultProbe = ")
-    printArray(cGold, "cGold = ")
-    printArray(hGold, "hGold = ")
-
-    println("iter0: c = " + getArg(iterCDebugRegs.head) + ", h = " + getArg(iterHDebugRegs.head))
-    println("iter1: c = " + getArg(iterCDebugRegs(1)) + ", h = " + getArg(iterHDebugRegs(1)))
+    printArray(getPartialArrayHead(getMem(cResultDRAM), nh), "cResult = ")
+    printArray(getPartialArrayHead(getMem(hResultDRAM), nh), "hResult = ")
+    printArray(getPartialArrayHead(cGold, nh), "cResultProbe = ")
+    printArray(getPartialArrayHead(hGold, nh), "hResultProbe = ")
   }
 }

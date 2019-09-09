@@ -394,7 +394,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 	lol = worksheet.get_all_values()
 	lolhash = [x[0] for x in lol if x[0] != '']
 	# id = len(lolhash) + 1
-	freq = os.environ['CLOCK_FREQ_MHZ']
+	freq = os.environ.get('CLOCK_FREQ_MHZ', '125')
 	numthreads = os.environ['NUM_THREADS']
 	if ("hash" in lol[1]):
 		hcol=lol[1].index("hash")

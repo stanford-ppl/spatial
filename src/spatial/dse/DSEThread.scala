@@ -1,16 +1,13 @@
 package spatial.dse
 
+import java.util.concurrent.LinkedBlockingQueue
+
 import argon._
-import spatial.metadata._
-import poly.ISL
-import models.AreaEstimator
-import spatial.targets._
-import spatial.metadata.params._
-import spatial.metadata.bounds._
-import spatial.traversal._
-import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
-import spatial.util.spatialConfig
 import models._
+import poly.ISL
+import spatial.metadata.params._
+import spatial.traversal._
+import spatial.util.spatialConfig
 
 case class DSEThread(
   threadId:  Int,
@@ -112,8 +109,9 @@ case class DSEThread(
   def run(requests: Seq[DesignPoint]): Array[String] = {
     val array = new Array[String](requests.size)
     var i: Int = 0
+    println(s"requests ${requests(0)} ${requests(1)}")
     val paramRewrites = requests.map{pt => pt.show(indexedSpace, prods, dims)}
-    if (paramRewrites.size >= 3) println(s"paramRewrites for thread $threadId = ${paramRewrites(0)} ${paramRewrites(1)} ${paramRewrites(2)} ")
+    if (paramRewrites.size >= 3) println(s"paramRewrites for thread $threadId = ${paramRewrites(0)} ${paramRewrites(1)} ${paramRewrites(2)} ...")
     val runtimes = evaluateLatency(paramRewrites)
     requests.foreach{pt =>
       state.resetErrors()

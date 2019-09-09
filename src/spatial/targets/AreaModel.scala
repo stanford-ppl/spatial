@@ -82,10 +82,12 @@ abstract class AreaModel(target: HardwareTarget, mModel: AreaEstimator) extends 
     val alpha = Seq.tabulate(dims.size){i => 1}
     val P = Seq.tabulate(dims.size){i => 1} // Very wrong
     val bitWidth = wordWidth(mem)
-    val luts = mlModel.estimateMem("LUTs", name, dims, bitWidth, depth, B, N, alpha, P, hist)
-    val ffs = mlModel.estimateMem("FFs", name, dims, bitWidth, depth, B, N, alpha, P, hist)
-    val ram18 = scala.math.ceil(mlModel.estimateMem("RAMB18", name, dims, bitWidth, depth, B, N, alpha, P, hist)).toInt
-    val ram36 = scala.math.ceil(mlModel.estimateMem("RAMB36", name, dims, bitWidth, depth, B, N, alpha, P, hist)).toInt
+    val luts = mlModel.estimateMem("LUTs", name, dims, bitWidth, depth, B, N, alpha, P, hist) * (depth + 1)
+    val ffs = mlModel.estimateMem("FFs", name, dims, bitWidth, depth, B, N, alpha, P, hist) * (depth + 1)
+//    val ram18 = scala.math.ceil(mlModel.estimateMem("RAMB18", name, dims, bitWidth, depth, B, N, alpha, P, hist)).toInt
+//    val ram36 = scala.math.ceil(mlModel.estimateMem("RAMB36", name, dims, bitWidth, depth, B, N, alpha, P, hist)).toInt
+    val ram36 = N.head * (1 max scala.math.ceil((dims.product / (N.head * 36000))).toInt) * (depth + 1) // TODO: models give wildly large numbers, ram = N should be more realistic for now
+    val ram18 = 0
     if (name == "NoImpl") NoArea else Area(("RAM18", ram18), ("RAM36", ram36), ("Regs", ffs), ("Slices", luts))
   }
 

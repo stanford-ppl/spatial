@@ -1,13 +1,12 @@
 package spatial.dse
 
-import argon._
 import java.io.BufferedReader
 import java.util.concurrent.BlockingQueue
 
-import scala.io.Source
+import argon._
 import spatial.metadata.params._
-import spatial.metadata.bounds._
 
+import scala.io.Source
 import scala.util.Try
 import scala.util.matching.Regex
 

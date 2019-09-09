@@ -1,23 +1,13 @@
 package spatial.dse
 
-import java.io.PrintStream
 import java.util.concurrent.{Executors, LinkedBlockingQueue, TimeUnit}
 
 import argon._
-
-import utils.process.BackgroundProcess
-import spatial.metadata.control._
-import spatial.metadata.params._
-import spatial.metadata.memory._
-import spatial.node._
-import spatial.lang.I32
-import spatial.metadata.bounds._
-import spatial.metadata.types._
-import spatial.traversal._
-import poly.ISL
-import models.AreaEstimator
 import spatial.SpatialConfig
+import spatial.metadata.memory._
+import spatial.metadata.params._
 import spatial.util.spatialConfig
+import utils.process.BackgroundProcess
 
 trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
   final val PROFILING = true
@@ -75,9 +65,9 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |  "number_of_cpus": 6,
              |  "number_of_repetitions": 1,
              |  "hypermapper_mode": {
-             |    "mode": "interactive"
+             |    "mode": "client-server"
              |  },
-             |  "optimization_objectives": ["ALMs", "Cycles"],
+             |  "optimization_objectives": ["Slices", "Cycles"],
              |  "feasible_output": {
              |    "name": "Valid",
              |    "true_value": "true",
@@ -139,6 +129,7 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
     val hm = BackgroundProcess(workDir, List("python", spatialConfig.HYPERMAPPER + "/scripts/hypermapper.py", workDir + "/" + jsonFile))
     println("Starting up HyperMapper...")
     println(s"python ${spatialConfig.HYPERMAPPER}/scripts/hypermapper.py $workDir/$jsonFile")
+    println(s"  NOTE: If something seems fishy and no DSE points are tested, run the python on its own to see if you have all the required libs")
     val (hmOutput, hmInput) = hm.run()
 
     val receiver = HyperMapperReceiver(
@@ -159,12 +150,13 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
       HEADER    = HEADER
     )
 
-    println("Starting up workers...")
+    println(s"Starting up workers...")
     val startTime = System.currentTimeMillis()
     workers.foreach{worker => pool.submit(worker) }
     workers.foreach{worker => worker.START = startTime }
     commPool.submit(receiver)
     commPool.submit(sender)
+    println(s"done queue $doneQueue")
 
     val done = doneQueue.take()
     if (done) {

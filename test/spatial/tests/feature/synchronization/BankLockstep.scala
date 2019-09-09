@@ -27,7 +27,7 @@ import spatial.dsl._
       val dataInConfl = SRAM[Int](16,16)//.flat?   // Should duplicate
       val dataInNoConfl = SRAM[Int](16,16)//.flat?  // Should not duplicate
       val dataOut = SRAM[Int](4,16,16).hierarchical     // Should bank N = 4
-      val cols_todo = SRAM[Int](16).noduplicate
+      val cols_todo = SRAM[Int](16).nofission
       cols_todo load cols_dram
       dataInConfl load dram
       dataInNoConfl load dram

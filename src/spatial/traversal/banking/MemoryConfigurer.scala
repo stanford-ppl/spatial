@@ -35,11 +35,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                                          else if (mem.isNoFlatBank) Seq(Hierarchical(rank)) 
                                          else Seq(Flat(rank))
 
-  lazy val nStricts: Seq[NStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs)) else Seq(NPowersOf2, NBestGuess, NRelaxed)
-  lazy val aStricts: Seq[AlphaStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas)) else Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+  lazy val nStricts: Seq[NStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs)) else if (mem.nConstraints.isEmpty) Seq(NPowersOf2, NBestGuess, NRelaxed) else mem.nConstraints
+  lazy val aStricts: Seq[AlphaStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas)) else if (mem.alphaConstraints.isEmpty) Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed) else mem.alphaConstraints
   lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
-                                                    else if (mem.isNoDuplicate) RegroupHelper.regroupNone
-                                                    else if (mem.isOnlyDuplicate) RegroupHelper.regroupAll(rank)
+                                                    else if (mem.isNoFission) RegroupHelper.regroupNone
+                                                    else if (mem.isFullFission) RegroupHelper.regroupAll(rank)
                                                     else if (mem.duplicateOnAxes.isDefined) mem.duplicateOnAxes.get.map{x: Seq[Int] => RegroupDims(x.toList)}.toList
                                                     else if (mem.isDuplicatable & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) 
                                                     else RegroupHelper.regroupNone
@@ -644,7 +644,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val isBuffAccum = writes.cross(winningRdGrps.flatten).exists{case (wr,rd) => rd.parent == wr.parent }
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
             val accTyp = mem.accumType | accum
-            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,winningBanking.head.darkVolume,accTyp))
+            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,accTyp))
           }.flatten.toSeq
         )
       }

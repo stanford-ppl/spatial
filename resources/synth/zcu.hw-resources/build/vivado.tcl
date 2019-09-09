@@ -87,6 +87,7 @@ report_utilization -packthru -file ./synth_utilization.rpt
 report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file ./synth_utilization_hierarchical.rpt
 report_ram_utilization -detail -file ./synth_ram_utilization.rpt
 
+echo "P&R TEMPORARILY DISABLED, PLEASE TURN BACK ON!"
 launch_runs impl_1 -jobs 6
 wait_on_run impl_1
 launch_runs impl_1 -to_step write_bitstream -jobs 6

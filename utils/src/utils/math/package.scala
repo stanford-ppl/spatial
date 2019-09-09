@@ -1,4 +1,5 @@
 package utils
+import utils.implicits.collections._
 
 package object math {
   def log2(x: Double): Double = Math.log10(x)/Math.log10(2)
@@ -26,6 +27,13 @@ package object math {
     }
 
   def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+  def coprime(x: Seq[Int]): Boolean = {
+    x.size == 1 || !x.forallPairs(gcd(_,_) > 1)
+  }
+  def nCr(n: Int, r: Int): Int = {
+    if (n > r) ({n-r+1} to n).map{i => i}.product/(1 to r).map{i => i}.product
+    else 1
+  }
   def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
 
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),
@@ -37,9 +45,9 @@ package object math {
     case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}
     case h::tail if tail.isEmpty => (0 to h-1).map{i => i*a.head/B + iterators.sum}
   }
-  def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int, allPossible: Seq[Int]): Boolean = {
+  def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int): Boolean = {
     val banksInFence = allLoops(p,a,B,Nil).map(_%N)
-    allPossible.forall{b => val occurs = banksInFence.count(_==b); occurs >= 1 && occurs <= B}
+    List.tabulate(N){i => i}.forall{i => banksInFence.count(_ == i) <= B}
   }
   /** Given (padded) dims of a memory, P for that memory, and histogram mapping bank to number of degenerates for that bank per yard,
     * figure out how many inaccessible physical addresses exist

@@ -14,7 +14,8 @@ all: chisel hw sw
 
 help:
 	@echo "------- INFO -------"
-	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
+	@echo "export KEEP_HIERARCHY=1 # add dont_touch annotation to all verilog modules"
+	@echo "export USE_BRAM=1 # add ram_style = block annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make           : CXP SW + HW build"
 	@echo "make hw        : Build Chisel for CXP"
@@ -40,7 +41,10 @@ endif
 	#@[ "${CXP_EXAMPLE}" ] || ( echo ">> CXP_EXAMPLE is not set"; exit 1 )
 	mv ${BIGIP_SCRIPT} ${CXP_V_DIR}/
 	cat cxp.hw-resources/SRAMVerilogAWS.v >> ${CXP_V_DIR}/Top.v
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${CXP_V_DIR}/Top.v; fi
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/Top.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${CXP_V_DIR}/Top.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/Top.v; \
+	fi; fi; fi;
 	cp cxp.hw-resources/build/* ${CXP_V_DIR}
 	#cp -r ${CXP_EXAMPLE}/02_coaxlink ${CXP_V_DIR}
 	cp -r cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/02_coaxlink ${CXP_V_DIR}

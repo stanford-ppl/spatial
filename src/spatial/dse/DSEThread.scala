@@ -109,7 +109,6 @@ case class DSEThread(
   def run(requests: Seq[DesignPoint]): Array[String] = {
     val array = new Array[String](requests.size)
     var i: Int = 0
-    println(s"requests ${requests(0)} ${requests(1)}")
     val paramRewrites = requests.map{pt => pt.show(indexedSpace, prods, dims)}
     if (paramRewrites.size >= 3) println(s"paramRewrites for thread $threadId = ${paramRewrites(0)} ${paramRewrites(1)} ${paramRewrites(2)} ...")
     val runtimes = evaluateLatency(paramRewrites)

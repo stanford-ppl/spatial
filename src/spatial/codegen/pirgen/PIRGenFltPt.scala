@@ -33,7 +33,7 @@ trait PIRGenFltPt extends PIRCodegen {
     case FltToFlt(x, fmt)     => genOp(lhs, inputs=Some(Seq(x)))
     case FltToFix(x, fmt)     => genOp(lhs, inputs=Some(Seq(x)))
     //case TextToFlt(x,fmt)     => genOp(lhs)
-    case FltToText(x,format)         => genOp(lhs)
+    case FltToText(x,format)  => genOp(lhs, inputs=Some(Seq(x)))
     case FltRandom(Some(max)) => genOp(lhs)
     case FltRandom(None)      => genOp(lhs)
     case FltAbs(x)            => genOp(lhs)

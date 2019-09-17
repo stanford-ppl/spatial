@@ -108,8 +108,12 @@ object SparseTransfer {
             }
 
           case (requestLength, iters) if spatialConfig.enablePIR =>
+            val condFIFO = FIFO[Bit](10)
+            Foreach(iters par p){i => // Limitation in PIR. The FIFO read enable must be a counter valid or computed in another CU
+              condFIFO.enq(i < requestLength)
+            }
             Foreach(iters par p){i =>
-              val cond = i < requestLength
+              val cond = condFIFO.deq
               val addr: I64 = mux(cond, ((addrs.__read(Seq(i),Set(cond)) + origin) * bytesPerWord).to[I64] + dram.address, dram.address)
               addrBus := (addr, dram.isAlloc)
             }

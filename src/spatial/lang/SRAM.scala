@@ -152,6 +152,7 @@ object SRAM {
       extends SRAM[A,SRAM1]
          with LocalMem1[A,SRAM1]
          with Mem1[A,SRAM1]
+         with ReadMem1[A]
          with Ref[Array[Any],SRAM1[A]] {
 
   def rank: Int = 1
@@ -171,6 +172,7 @@ object SRAM {
       extends SRAM[A,SRAM2]
          with LocalMem2[A,SRAM2]
          with Mem2[A,SRAM1,SRAM2]
+         with ReadMem2[A]
          with Ref[Array[Any],SRAM2[A]] {
   def rank: Int = 2
   @api def rows: I32 = dims.head
@@ -188,6 +190,7 @@ object SRAM {
 @ref class SRAM3[A:Bits]
       extends SRAM[A,SRAM3]
          with LocalMem3[A,SRAM3]
+         with ReadMem3[A]
          with Mem3[A,SRAM1,SRAM2,SRAM3]
          with Ref[Array[Any],SRAM3[A]] {
 
@@ -206,6 +209,7 @@ object SRAM {
 @ref class SRAM4[A:Bits]
       extends SRAM[A,SRAM4]
          with LocalMem4[A,SRAM4]
+         with ReadMem4[A]
          with Mem4[A,SRAM1,SRAM2,SRAM3,SRAM4]
          with Ref[Array[Any],SRAM4[A]] {
 
@@ -223,6 +227,7 @@ object SRAM {
 @ref class SRAM5[A:Bits]
       extends SRAM[A,SRAM5]
          with LocalMem5[A,SRAM5]
+         with ReadMem5[A]
          with Mem5[A,SRAM1,SRAM2,SRAM3,SRAM4,SRAM5]
          with Ref[Array[Any],SRAM5[A]] {
 

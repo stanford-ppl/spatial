@@ -3,6 +3,8 @@ package spatial.lib
 import forge.tags._
 import spatial.dsl._
 import spatial.metadata.memory._
+import spatial.lang.types._
+import argon._
 
 object ML extends HostML {
 
@@ -18,12 +20,7 @@ object ML extends HostML {
     N:scala.Int,
     ip:scala.Int,
   )(input:I32 => (T,T)):T = {
-    val dot = Reg[T]
-    Reduce(dot)(N par Math.min(ip,N)) { i =>
-      val (x,y) = input(i)
-      x * y
-    } { _ + _ }
-    dot.value
+    sum_flat[T](N, ip) { i => val (a,b) = input(i); a * b }
   }
 
   /*
@@ -41,15 +38,38 @@ object ML extends HostML {
     op:scala.Int,
     ip:scala.Int,
   )(input:I32 => (T,T)):T = {
-    def InnerDot(ts:scala.Int, io:Int) = dp_flat(ts, ip) { ii => input(io+ii) }
+    sum_tiled[T](N, ts, op, ip) { i => val (a,b) = input(i); a * b }
+  }
+
+  @api def sum_flat[T:Num](
+    N:scala.Int,
+    ip:scala.Int,
+  )(input:I32 => T):T = {
     N match {
-      case N if N <= ts => InnerDot(N, 0)
+      case 1 => 
+        input(0.to[I32])
+      case _ =>
+        val sum = Reg[T]
+        Reduce(sum)(N par Math.min(ip,N)) { i => input(i) } { _ + _ }
+        sum.value
+    }
+  }
+
+  @api def sum_tiled[T:Num](
+    N:scala.Int,
+    ts:scala.Int,
+    op:scala.Int,
+    ip:scala.Int,
+  )(input:I32 => T):T = {
+    def inner(ts:scala.Int, io:Int) = sum_flat(ts, ip) { ii => input(io+ii) }
+    N match {
+      case N if N <= ts => inner(N, 0)
       case _ => 
-        val dot = Reg[T]
-        Reduce(dot)(N by ts par Math.min(N/ts,op)) { io =>
-          InnerDot(ts, io)
+        val totalSum = Reg[T]
+        Reduce(totalSum)(N by ts par Math.min(N/ts,op)) { io =>
+          inner(ts, io)
         } { _ + _ }
-        dot.value
+        totalSum.value
     }
   }
 
@@ -59,105 +79,127 @@ object ML extends HostML {
    *  +-----+   x  i|    w     |   =    +----------+
    *  +-----+       |          |        +----------+
    *                +----------+
-   * tiled on-chip neural net layer
-   * @param ip inner reduce par. If the I dimension == ip, the reduction dimension will not be
-   * tiled.
-   * @param inPar number of parallel tiles of the inner reduce
-   * i: Reduction dimension is tiled by ip
-   * @param in Can either be a input SRAM1 or a lambda which takes a index and return a T
-   * @param out Can either be a input SRAM1 or a lambda which takes a index and a data T and writes
-   * to an externally allocated SRAM
+   * Tiled on-chip dense layer
+   * @param w weights
+   * @param b bias
+   * @param activation activation function
+   * @param in input layer access function
+   * @param lout linear output layer update function
+   * @param nlout non-linear output layer update function
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
-  @api def denselayer_tiled[T:Num](
-    w:LUT2[T], 
-    b:LUT1[T], 
-    ip:scala.Int,
-    inPar:scala.Int,
-    outPar:scala.Int, 
+  @api def denselayer[T:Num](
+    w:Sym[_] with ReadMem2[T], 
+    b:Sym[_] with ReadMem1[T], 
     activation: T => T,
-    in:Either[I32 => T, SRAM1[T]],
-    out:Either[(I32, T) => Unit, SRAM1[T]],
+    in:I32 => T,
+    nlout:(I32, T) => scala.Unit,
+    lout:(I32, T) => scala.Unit = { (i:I32,d:T) => () },
+  )(
+    ip:scala.Int=16,
+    mp:scala.Int=1,
+    op:scala.Int=1, 
   ):Option[T] = {
     val dims = w.constDims
     val I = dims(0)
     val O = dims(1)
 
     def InnerNN(o:Int) = {
-      val dot = dp_tiled(I,ip,inPar,ip) { i => 
-        val input = in match {
-          case Left(read) => read(i)
-          case Right(in) => in(i)
-        }
-        (input, w(i,o))
+      val dot = dp_tiled(I,ip,mp,ip) { i => 
+        (in(i), w(i,o))
       }
-      val d = activation(dot + b(o))
-      out match {
-        case Left(write) => write(o,d)
-        case Right(out) => out(o) = d
-      }
-      d
+      val lo = dot + b(o)
+      lout(o,lo)
+      val nlo = activation(lo)
+      nlout(o,nlo)
+      nlo
     }
     O match {
       case 1 => Some(InnerNN(0))
       case _ =>
-        Foreach(O par outPar) { o =>
+        Foreach(O par op) { o =>
           InnerNN(o)
         }
         None
     }
   }
-  @api def denselayer_tiled[T:Num](
-    w:LUT2[T], 
-    b:LUT1[T], 
-    ip:scala.Int,
-    inPar:scala.Int,
-    outPar:scala.Int, 
-    activation: T => T,
-  )(in:I32 => T)(out:(Idx, T) => Unit):Option[T] = {
-    denselayer_tiled(w,b,ip,inPar,outPar,activation,Left(in),Left(out))
+
+  /*                                                       
+   *   b                            o
+   *  +--+          o           +----------+ 
+   * i|in|   x   ---------     i|    w     |
+   *  |  |     b |  out  |  =   |          |
+   *  +--+       ---------      +----------+
+   * Tiled on-chip dense layer backward propagation
+   * @param w weights [IxO] 
+   * @param b bias [O] 
+   * @param batch batch size
+   * @param learnRate learning rate
+   * @param dactivation derivative of activation function, taking input and output of the activation
+   * function as inputs.
+   * @param in input layer access function
+   * @param nlout non-linear output layer access function
+   * @param lout linear output layer access function
+   * @param dnlout derivative of non-linear output
+   * to an externally allocated SRAM
+   * */
+  @api def denselayer_backward[T:Num](
+    w:SRAM2[T], 
+    b:SRAM1[T], 
+    batch:scala.Int,
+    learnRate:scala.Float,
+    dactivation: (T,T) => T,
+    in:(I32, I32) => T,
+    nlout:(I32, I32) => T,
+    lout:(I32, I32) => T,
+    dnlout:(I32, I32) => T,
+  )(
+    opb:scala.Int = 1,
+    tsb:scala.Int = 16,
+    mpb:scala.Int = 1,
+    ipb:scala.Int = 16,
+    opo:scala.Int = 1,
+    tso:scala.Int = 16,
+    mpo:scala.Int = 1,
+    ipo:scala.Int = 16,
+    opi:scala.Int = 1,
+  ):SRAM2[T] = {
+    val dims = w.constDims
+    val I = dims(0)
+    val O = dims(1)
+    val din = SRAM[T](batch, I)
+    Foreach(0 until batch par opb) { b =>
+      Foreach(0 until I par opi) { i =>
+        val dot = sum_tiled(O, tso, mpo, ipo) { o =>
+          w(i,o) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+        }
+        din(b,i) = dot
+      }
+    }
+    Foreach(0 until I par opi) { i =>
+      Foreach(0 until O par opo) { o =>
+        val wdot = sum_tiled(batch, tsb, mpb, ipb) { b => 
+          in(b,i) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+        }
+        w(i, o) = w(i, o) - wdot / batch * learnRate.to[T]
+      }
+    }
+    Foreach(0 until O par opo) { o =>
+      val sum = sum_tiled(batch, tsb, mpb, ipb) { b =>
+        dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+      }
+      b(o) = b(o) - sum / batch * learnRate.to[T]
+    }
+    din
   }
 
-  @api def denselayer_tiled[T:Num](
-    w:LUT2[T], 
-    b:LUT1[T], 
-    ip:scala.Int,
-    inPar:scala.Int,
-    outPar:scala.Int, 
-    activation: T => T,
-    in:SRAM1[T],
-  )(out:(Idx, T) => Unit):Option[T] = {
-    denselayer_tiled(w,b,ip,inPar,outPar,activation,Right(in),Left(out))
-  }
-
-  @api def denselayer_tiled[T:Num](
-    w:LUT2[T], 
-    b:LUT1[T], 
-    ip:scala.Int,
-    inPar:scala.Int,
-    outPar:scala.Int, 
-    activation: T => T,
-    out:SRAM1[T],
-  )(in:I32 => T):Option[T] = {
-    denselayer_tiled(w,b,ip,inPar,outPar,activation,Left(in),Right(out))
-  }
-
-  @api def denselayer_tiled[T:Num](
-    w:LUT2[T], 
-    b:LUT1[T], 
-    ip:scala.Int,
-    inPar:scala.Int,
-    outPar:scala.Int, 
-    activation: T => T,
-    in:SRAM1[T],
-    out:SRAM1[T],
-  ):Option[T] = {
-    denselayer_tiled(w,b,ip,inPar,outPar,activation,Right(in),Right(out))
-  }
+  @api def loss_squre_backward[T:Num](yhat:T, y:T):T = yhat - y
 
   // Activation Functions
-  @api def activation[T:Num](x:T => T) = x
+  @api def identity[T:Num]: T => T = { x => x}
+  @api def identity_backward[T:Num]: (T,T) => T = { (x,y) => 1.to[T]}
   @api def relu[T:Num](x:T) = max(x,0.to[T])
+  @api def relu_backward[T:Num](x:T,y:T) = mux(x > 0.to[T], 1.to[T], 0.to[T])
 
    /*
     * SVM regression inference

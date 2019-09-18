@@ -376,7 +376,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point conversion to text */
-@op case class FixToText[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixOp[S,I,F,Text] {
+@op case class FixToText[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], format:Option[String]) extends FixOp[S,I,F,Text] {
   override val canAccel: Boolean = true
 
   @rig override def rewrite: Text = a match {

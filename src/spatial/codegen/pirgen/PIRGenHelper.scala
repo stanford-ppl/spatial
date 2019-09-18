@@ -20,14 +20,14 @@ trait PIRGenHelper extends PIRFormatGen {
     vec.head
   }
 
-  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Any]=None, tp:Option[String]=None) = {
+  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Any]=None, tp:Option[String]=None, depth:Option[Int]=None) = {
     val padding = lhs.getPadding.getOrElse {
       lhs.constDims.map { _ => 0 }
     }
     stateStruct(lhs, lhs.asMem.A, tp=tp)(field => 
       src"$rhs" + 
       inits.ms(inits => src".inits($inits)") + 
-      src".depth(${lhs.instance.depth})" +
+      src".depth(${depth.getOrElse(lhs.instance.depth)})" +
       src".dims(${lhs.constDims.zip(padding).map { case (d,p) => d + p }})" +
       src".banks(${lhs.instance.banking.map { b => b.nBanks}})" +
       src".tp(${field.map {_._2}.getOrElse(lhs.asMem.A)})" + 

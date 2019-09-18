@@ -5,7 +5,8 @@ import spatial.dsl._
 @spatial class LUTSimple extends SpatialTest {
   override def runtimeArgs: Args = "2"
 
-  type T = FixPt[TRUE,_32,_32]
+  //type T = FixPt[TRUE,_32,_32]
+  type T = FixPt[TRUE,_32,_0]
 
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals

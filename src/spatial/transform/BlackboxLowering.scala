@@ -6,7 +6,6 @@ import argon.transform.MutateTransformer
 import spatial.node._
 import spatial.lang._
 import spatial.traversal.AccelTraversal
-import spatial.metadata.memory._
 
 case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTransformer with AccelTraversal {
 

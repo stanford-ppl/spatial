@@ -1004,7 +1004,7 @@ package object control {
     @stateful def willFullyUnroll: Boolean = {
       if (x.isForever) false
       else (nIters,ctrPar) match {
-        case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+        case (Some(Final(nIter)), Final(par)) => par >= nIter
         case _ => false
       }
     }

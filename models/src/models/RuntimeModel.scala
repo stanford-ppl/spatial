@@ -245,7 +245,7 @@ object Runtime {
       val burstSize = 512 // bits
       val bitsPerCommand = numel * bitsPerCycle
       val x = if (bitsPerCommand % burstSize == 0) numel
-              else ((burstSize - (bitsPerCommand % burstSize)) / bitsPerCycle).toInt + numel
+              else ((burstSize - (bitsPerCommand % burstSize)) / bitsPerCycle) + numel
       x
     }
     def congestionModel(competitors: Competitors): Int = {
@@ -270,8 +270,9 @@ object Runtime {
         (countersContribution * stallPenalty * (congestionContribution + countersContribution / bitsPerCycle * j) + startup) * parallelizationScale
       }
       val p = ModelData.curve_fit(this.resolvedSchedule.toString).map(_.toDouble)
-      val r = 170 max fitFunc4(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
-      Console.println(s"infer on ${Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble)} = $r")
+      val ticksToDeq = (1 max upperCChainIters) * (1 max (numel / cchain.last.ctrs.last.par.lookup))
+      val r = (170 + numel / ticksToDeq) max fitFunc4(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble), p(0),p(1),p(2),p(3),p(4),p(5),p(6),p(7),p(8),p(9),p(10),p(11),p(12),p(13),p(14)).toInt
+//      Console.println(s"infer on ${Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble)} = $r")
       r
     }
 
@@ -292,7 +293,9 @@ object Runtime {
     /** Extract num iters from cchain, or else 1 */
     def cchainIters: Int = if (cchain.size >= 1) cchain.head.N else 1
 
-    /** Extract num iters from cchains excluding last level, or else 1 */
+    /** Extract num iters from cchains excluding last level, or else 1
+      * TODO: I think this is only used for transfers, but not sure if codegen already fractured the
+      * multilevel cchain into purely upper and purely inner cchains*/
     def upperCChainIters: Int = if (cchain.size == 2) cchain.head.N else 1
 
     /** Extract max child or else 1 */

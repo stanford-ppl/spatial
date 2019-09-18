@@ -156,7 +156,6 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
     workers.foreach{worker => worker.START = startTime }
     commPool.submit(receiver)
     commPool.submit(sender)
-    println(s"done queue $doneQueue")
 
     val done = doneQueue.take()
     if (done) {
@@ -196,7 +195,7 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
       println(s"Runtime analysis:    $cyclTime" + " (%.3f)".format(100*cyclTime.toDouble/total) + "%")
     }
 
-    sys.exit(0) // Bail for now
+//    sys.exit(0) // Bail for now
 
   }
 

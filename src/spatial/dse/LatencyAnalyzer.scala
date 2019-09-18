@@ -3,13 +3,8 @@ package spatial.dse
 import argon._
 import spatial.lang._
 import spatial.node._
-import spatial.util.spatialConfig
-import spatial.util.modeling._
-import spatial.traversal._
 import spatial.targets._
-import java.io.File
-import models._
-import argon.node._
+import spatial.traversal._
 
 
 case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelTraversal {
@@ -20,6 +15,7 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelT
 
   def getListOfFiles(d: String):List[String] = {
     import java.nio.file.{FileSystems, Files}
+
     import scala.collection.JavaConverters._
     val dir = FileSystems.getDefault.getPath(d) 
     Files.walk(dir).iterator().asScala.filter(Files.isRegularFile(_)).map(_.toString).toList//.foreach(println)
@@ -31,19 +27,21 @@ case class LatencyAnalyzer(IR: State, latencyModel: LatencyModel) extends AccelT
 
 
   def test(rewriteParams: Seq[Seq[Any]]): Unit = {
-    import scala.language.postfixOps
     import java.io.File
+
+    import scala.language.postfixOps
     import sys.process._
 
     val gen_dir = if (config.genDir.startsWith("/")) config.genDir + "/" else config.cwd + s"/${config.genDir}/"
     val modelJar = getListOfFiles(gen_dir + "/model").filter(_.contains("RuntimeModel-assembly")).head
     totalCycles = rewriteParams.grouped(batchSize).flatMap{params => 
       val batchedParams = params.map{rp => "tune " + rp.mkString(" ")}.mkString(" ")
-      val cmd = s"""java -jar ${modelJar} ni ${batchedParams}"""
-      // println(s"running cmd: $cmd")
+      val cmd = s"""java -jar $modelJar ni $batchedParams"""
+//       println(s"running cmd: $cmd")
       val output = Process(cmd, new File(gen_dir)).!!
       output.split("\n").filter(_.contains("Total Cycles for App")).map{r => 
-        "^.*: ".r.replaceAllIn(r,"").trim.toLong
+        val raw = "^.*: ".r.replaceAllIn(r,"").trim.toLong
+        if (raw < 0) Long.MaxValue else raw
       }.toSeq
     }.toSeq
     // println(s"DSE Model result: $totalCycles")

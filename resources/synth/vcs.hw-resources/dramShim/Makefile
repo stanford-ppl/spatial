@@ -5,7 +5,7 @@ CROSS_COMPILE=
 SOURCES := $(wildcard *.cpp)
 
 INCLUDES += -I../cpp/SW \
-			-I../sw-resources \
+			-I../vcs.sw-resources \
 						-I.                   \
 
 OBJECTS=$(SOURCES:.cpp=.o)

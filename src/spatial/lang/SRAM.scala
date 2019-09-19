@@ -74,21 +74,37 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def hierarchical: C[A] = { this.isNoFlatBank = true; me }
   /** Only attempt to bank memory in a flattened manner */
   def flat: C[A] = { this.isNoHierarchicalBank = true; me }
+  /** Guarantee that it is safe to merge different duplicates. 
+    * Only use this if you know exactly what you are doing! 
+    */
+  def mustmerge: C[A] = { this.isMustMerge = true; me }
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}
   def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .onlyduplicate instead")}
 
   /** Do not attempt to bank memory at all, and only use bank-by-duplication for all lanes of all readers */
-  def onlyduplicate: C[A] = { this.isOnlyDuplicate = true; me }
+  def fullfission: C[A] = { this.isFullFission = true; me }
   /** Attempt to duplicate on the provided axes groups.  
     *   i.e. To try either no-duplication, full-duplication, or duplication
     *   along the axes with dimensions 32 and 64 for SRAM(32,8,64), use the flag
     *   .duplicateaxes( List( List(), List(0,2), List(0,1,2) ) )
     */
-  @stateful def duplicateaxes(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 2.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
+  @stateful def axesfission(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 3.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
   /** Do not attempt to bank memory by duplication */
-  def noduplicate: C[A] = { this.isNoDuplicate = true; me }
+  def nofission: C[A] = { this.isNoFission = true; me }
+  /** Only attempt to bank with N's from the "likely" category */
+  def nBest: C[A] = { this.nConstraints = this.nConstraints :+ NBestGuess; me }
+  /** Only attempt to bank with N's from the "pow2" category */
+  def nPow2: C[A] = { this.nConstraints = this.nConstraints :+ NPowersOf2; me }
+  /** Only attempt to bank with N's from the "relaxed" category */
+  def nRelaxed: C[A] = { this.nConstraints = this.nConstraints :+ NRelaxed; me }
+  /** Only attempt to bank with alphas from the "likely" category */
+  def alphaBest: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaBestGuess; me }
+  /** Only attempt to bank with alphas from the "pow2" category */
+  def alphaPow2: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaPowersOf2; me }
+  /** Only attempt to bank with alphas from the "relaxed" category */
+  def alphaRelaxed: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaRelaxed; me }
   /** Do not attempt to bank memory with block-cyclic schemes */
   def noblockcyclic: C[A] = { this.noBlockCyclic = true; me }
   /** Only attempt to bank memory with block-cyclic schemes */
@@ -97,6 +113,15 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def blockcyclic_Bs(bs:Seq[Int]): C[A] = { this.blockCyclicBs = bs; me }
   /** Specify banking search effort for this memory */
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
+  /** Allow "unsafe" banking, where two writes can technically happen simultaneously and one will be dropped.
+    * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
+    * due to data-dependent control flow or that you don't care if one write gets dropped
+    */
+  def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
+  /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will crash. It will also assume only one duplicate */
+  def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): C[A] = { this.explicitBanking = (N, B, alpha); me }
+  /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will NOT crash. It will also assume only one duplicate */
+  def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): C[A] = { this.explicitBanking = (N, B, alpha); this.forceExplicitBanking = true; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
@@ -127,6 +152,7 @@ object SRAM {
       extends SRAM[A,SRAM1]
          with LocalMem1[A,SRAM1]
          with Mem1[A,SRAM1]
+         with ReadMem1[A]
          with Ref[Array[Any],SRAM1[A]] {
 
   def rank: Int = 1
@@ -146,6 +172,7 @@ object SRAM {
       extends SRAM[A,SRAM2]
          with LocalMem2[A,SRAM2]
          with Mem2[A,SRAM1,SRAM2]
+         with ReadMem2[A]
          with Ref[Array[Any],SRAM2[A]] {
   def rank: Int = 2
   @api def rows: I32 = dims.head
@@ -163,6 +190,7 @@ object SRAM {
 @ref class SRAM3[A:Bits]
       extends SRAM[A,SRAM3]
          with LocalMem3[A,SRAM3]
+         with ReadMem3[A]
          with Mem3[A,SRAM1,SRAM2,SRAM3]
          with Ref[Array[Any],SRAM3[A]] {
 
@@ -181,6 +209,7 @@ object SRAM {
 @ref class SRAM4[A:Bits]
       extends SRAM[A,SRAM4]
          with LocalMem4[A,SRAM4]
+         with ReadMem4[A]
          with Mem4[A,SRAM1,SRAM2,SRAM3,SRAM4]
          with Ref[Array[Any],SRAM4[A]] {
 
@@ -198,6 +227,7 @@ object SRAM {
 @ref class SRAM5[A:Bits]
       extends SRAM[A,SRAM5]
          with LocalMem5[A,SRAM5]
+         with ReadMem5[A]
          with Mem5[A,SRAM1,SRAM2,SRAM3,SRAM4,SRAM5]
          with Ref[Array[Any],SRAM5[A]] {
 

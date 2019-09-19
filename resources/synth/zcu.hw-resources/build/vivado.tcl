@@ -12,6 +12,7 @@ set CLOCK_FREQ_HZ  [expr $CLOCK_FREQ_MHZ * 1000000]
 set RST_FREQ [expr $CLOCK_FREQ_MHZ - 1]
 
 source settings.tcl
+set ver [version -short]
 
 ## Create a second project to build the design
 create_project project_1 ./project_1 -part $PART
@@ -86,6 +87,7 @@ report_utilization -packthru -file ./synth_utilization.rpt
 report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file ./synth_utilization_hierarchical.rpt
 report_ram_utilization -detail -file ./synth_ram_utilization.rpt
 
+echo "P&R TEMPORARILY DISABLED, PLEASE TURN BACK ON!"
 launch_runs impl_1 -jobs 6
 wait_on_run impl_1
 launch_runs impl_1 -to_step write_bitstream -jobs 6
@@ -99,5 +101,9 @@ report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_
 report_ram_utilization -detail -file ./par_ram_utilization.rpt
 report_high_fanout_nets -ascending -timing -load_types -file ./par_high_fanout_nets.rpt
 
-#Export bitstream
-file copy -force ./project_1/project_1.runs/impl_1/design_1_wrapper.bit ./accel.bit
+#Export bitstream (vivado 2019 seems to drop _wrapper from the .bit)
+if {[string match 2019* $ver]} {
+    file copy -force ./project_1/project_1.runs/impl_1/design_1.bit ./accel.bit
+} else {
+    file copy -force ./project_1/project_1.runs/impl_1/design_1_wrapper.bit ./accel.bit
+}

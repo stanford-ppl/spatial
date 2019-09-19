@@ -276,6 +276,7 @@ public:
   void connect() {
     int id = sendCmd(READY);
     simCmd *cmd = recvResp();
+    EPRINTF("Sent cmd id %d payload %d. Echoed cmd id %d payload %d\n", id, READY, cmd->id, cmd->cmd);
     ASSERT(cmd->id == id, "Error: Received ID does not match sent ID\n");
     ASSERT(cmd->cmd == READY, "Error: Received cmd is not 'READY'\n");
     EPRINTF("Connection successful!\n");
@@ -320,8 +321,8 @@ public:
     close(respChannel->writeFd());
 
     // Connect with simulator
-    connect();
     EPRINTF("FPGA PID is %d\n", sim_pid);
+    connect();
 
     // Configure settings from environment
     debugRegs = envToBool("DEBUG_REGS");
@@ -366,7 +367,7 @@ public:
           break;
       }
     }
-    EPRINTF("Design ran for %lu cycles, status = %u\n", numCycles, status);
+    EPRINTF("Design ran for %lu cycles, status = %lu\n", numCycles, status.bits);
     if (!status.done && !status.timeout) { // Design did not run to completion
       EPRINTF("=========================================\n");
       EPRINTF("ERROR: Simulation terminated after %lu cycles\n", numCycles);

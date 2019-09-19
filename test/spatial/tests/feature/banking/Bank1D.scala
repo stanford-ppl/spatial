@@ -1,6 +1,9 @@
 package spatial.tests.feature.banking
 
+import spatial.node._
 import spatial.dsl._
+import argon.Block
+import argon.Op
 
 @spatial class Bank1D extends SpatialTest {
   override def dseModelArgs: Args = "16 16 16 16 16"
@@ -33,6 +36,8 @@ import spatial.dsl._
       val directW5 = SRAM[Int](C)
       val xBarW1   = SRAM[Int](tile)
       val xBarW2   = SRAM[Int](C)
+      val explicit1 = SRAM[Int](tile).forcebank(N=Seq(8),B=Seq(1),alpha=Seq(1)) // Compiler does not verify that this is valid
+      val explicit2 = SRAM[Int](tile).bank(N=Seq(8),B=Seq(1),alpha=Seq(1)) // Compiler verifies if this is valid
       directW1             load dram(0::tile par 8)
       directW2             load dram(16::16 + tile par 8)
       directW3             load dram(0::LEN par 8)     // Unaligned but local addr should start at const 0
@@ -40,11 +45,13 @@ import spatial.dsl._
       directW5(21::21+LEN) load dram(21::21+LEN par 8) // Unaligned but local addr should start at const 21
       xBarW1               load dram(START::START + 16 par 8) // Cannot be direct bank
       xBarW2(START::START+LEN)   load dram(START::START + 16 par 8) // Cannot be direct bank
+      explicit1            load dram(0::tile par 8)
+      explicit2            load dram(0::tile par 8)
 
-      RESULT := directW1(PROBE.value) + directW2(PROBE.value) + directW3(PROBE.value) + directW4(PROBE.value) + directW5(21 + PROBE.value) + xBarW1(PROBE.value) + xBarW2(START.value + PROBE.value)
+      RESULT := directW1(PROBE.value) + directW2(PROBE.value) + directW3(PROBE.value) + directW4(PROBE.value) + directW5(21 + PROBE.value) + xBarW1(PROBE.value) + xBarW2(START.value + PROBE.value) + explicit1(PROBE.value) + explicit2(PROBE.value)
     }
 
-    val gold = data(probe) + data(probe + 16) + data(probe) + data(probe + 21) + data(probe + 21) + data(probe + start) + data(probe + start)
+    val gold = data(probe) + data(probe + 16) + data(probe) + data(probe + 21) + data(probe + 21) + data(probe + start) + data(probe + start) + data(probe) + data(probe)
     val result = getArg(RESULT)
     println(r"got $result, wanted $gold")
     assert(result == gold)
@@ -87,7 +94,7 @@ import spatial.dsl._
       val x = SRAM[Int](128)               // N = 9, B = 4, alpha = 3
       Foreach(128 by 1){i => x(i) = i}
       RESULT1 := Reduce(Reg[Int])(128 by 4 par 3){i => x(i+1) + x(i+2) + x(i+3)}{_+_}
-      val y = SRAM[Int](128).noduplicate.noblockcyclic // N = 16, B = 1, alpha = 1
+      val y = SRAM[Int](128).nofission.noblockcyclic // N = 16, B = 1, alpha = 1
       Foreach(128 by 1){i => y(i) = i}
       RESULT2 := Reduce(Reg[Int])(128 by 4 par 3){i => y(i+1) + y(i+2) + y(i+3)}{_+_}
     }
@@ -110,7 +117,7 @@ import spatial.dsl._
     setArg(in,1)
     val out1 = ArgOut[Int]
     val out2 = ArgOut[Int]
-    val dummy = ArgOut[Int]
+    val dummy = ArgOut[Int].conflictable
 
     Accel {
       val f1 = FIFO[Int](64)
@@ -128,6 +135,7 @@ import spatial.dsl._
           comm1.enq(true)
           comm2.enq(true)
         }
+        // Both reads to problem could happen on same cycle, so it should not merge the two instances
         Pipe{
           dummy := comm1.deq().to[Int]
           out1 := problem(i*8 + 7)
@@ -146,5 +154,45 @@ import spatial.dsl._
     val gold2 = 7
     println(r"Answers: $got1 =?= $gold1, $got2 =?= $gold2")
     assert(got1 == gold1 && got2 == gold2)
+  }
+
+  override def checkIR(block: Block[_]): Result = {
+    val problem_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) => sram }.size
+
+    require(problem_count == 2, "Should only have 2 duplicates of problem SRAM")
+
+    super.checkIR(block)
+  }
+
+
+}
+
+
+@spatial class MetaprogrammedConflict extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+    val dram1 = DRAM[Int](64)
+    val dram2 = DRAM[Int](64)
+    setMem(dram1, Array.tabulate(64){i => i.to[Int]})
+    val in = ArgIn[Int]
+    setArg(in, 1)
+
+    Accel {
+      val mem1 = SRAM[Int](64).nofission
+      val mem2 = SRAM[Int](64).nofission
+      mem1 load dram1
+      Foreach(64 by 8){i => 
+        if (in.value == 1) { // Make LCA an inner SwitchCase to confuse banking analyzer
+          List.tabulate(8){j => 
+            mem2(i+j) = mem1(i+j) // Used to bank this N=7 since first lane does not have addition in the address path, which is wrong if II = 1
+          }
+        }
+      }
+      dram2 store mem2
+    }
+
+    printArray(getMem(dram2), "got")
+    println(r"Pass: ${getMem(dram2) == getMem(dram1)}")
+    assert(getMem(dram2) == getMem(dram1))
   }
 }

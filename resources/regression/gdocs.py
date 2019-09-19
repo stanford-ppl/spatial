@@ -1,13 +1,10 @@
 # This is called by regression_run.sh / scrape.sh / regression_functions.sh / receive.sh / synth_launcher.sh / synth_regression.sh
 
 import re
-import gspread
 import getpass
 import pygsheets
 import sys
 import os
-from oauth2client.service_account import ServiceAccountCredentials
-import datetime
 from datetime import datetime, timezone
 import time
 import socket

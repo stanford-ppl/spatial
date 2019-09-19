@@ -79,6 +79,8 @@ trait CppGenInterface extends CppGenCommon {
           emit(src"${lhs.tp} $lhs = (${lhs.tp}(${get_string}));")
       }
 
+    case StreamInNew(stream) => 
+    case StreamOutNew(stream) => 
 
     case SetMem(dram, data) =>
       val rawtp = asIntType(dram.tp.typeArgs.head)

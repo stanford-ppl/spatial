@@ -12,7 +12,8 @@ all: hw sw
 
 help:
 	@echo "------- INFO -------"
-	@echo "export KEEP_HIERARCHY=1 # add keep_hierarchy annotation to all verilog modules"
+	@echo "export KEEP_HIERARCHY=1 # add dont_touch annotation to all verilog modules"
+	@echo "export USE_BRAM=1 # add ram_style = block annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make           : Zynq SW + HW build"
 	@echo "make hw        : Build Chisel for Zynq"
@@ -23,7 +24,7 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/zynq.mk cpp/Makefile
+	cp zynq.sw-resources/Makefile cpp/Makefile
 	make -C cpp -j8
 	tar -czf $(APPNAME).tar.gz -C ${ZYNQ_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C ../zynq.sw-resources/utils set_perms setClocks.sh run.sh
 
@@ -33,7 +34,10 @@ hw:
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zynq.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/Top.v
 	cp zynq.hw-resources/build/* ${ZYNQ_V_DIR}
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${ZYNQ_V_DIR}/Top.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${ZYNQ_V_DIR}/Top.v; \
+	fi; fi; fi;
 	mv ${ZYNQ_V_DIR}/fsbl.elf._ ${ZYNQ_V_DIR}/fsbl.elf
 	mv ${ZYNQ_V_DIR}/u-boot.elf._ ${ZYNQ_V_DIR}/u-boot.elf
 	make -C ${ZYNQ_V_DIR}

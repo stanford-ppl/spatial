@@ -90,7 +90,8 @@ trait ScalaGenFltPt extends ScalaGenBits {
       case TextToFlt(x, fmt) =>
         emit(src"val $lhs = FloatPoint($x, FltFormat(${fmt.mbits - 1},${fmt.ebits}))")
 
-      case FltToText(x) => emit(src"val $lhs = $x.toString")
+      case FltToText(x, None) => emit(src"val $lhs = $x.toString")
+      case FltToText(x, Some(format)) => emit(src"""val $lhs = f"$$$x$format"""")
 
       case FltRandom(Some(max)) =>
         val FltPtType(g, e) = lhs.tp

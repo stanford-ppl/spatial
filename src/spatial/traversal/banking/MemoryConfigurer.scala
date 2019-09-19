@@ -25,25 +25,29 @@ import spatial.metadata.types._
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL, areamodel: AreaEstimator) {
   protected lazy val rank: Int = mem.sparseRank.length
-  protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut
+  protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut || mem.isHostIO
 
-  lazy val bankViews: Seq[BankingView] = if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
+  lazy val bankViews: Seq[BankingView] = if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
+                                         else if (mem.explicitBanking.isDefined && mem.explicitNs.size > 1) Seq(Hierarchical(rank))
+                                         else if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
                                          else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank) Seq(Flat(rank), Hierarchical(rank)) 
                                          else if (mem.isNoHierarchicalBank) Seq(Flat(rank)) 
                                          else if (mem.isNoFlatBank) Seq(Hierarchical(rank)) 
                                          else Seq(Flat(rank))
 
-  lazy val nStricts: Seq[NStrictness] = Seq(NPowersOf2, NBestGuess, NRelaxed)
-  lazy val aStricts: Seq[AlphaStrictness] = Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
-  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.isNoDuplicate) RegroupHelper.regroupNone
-                                                    else if (mem.isOnlyDuplicate) RegroupHelper.regroupAll(rank)
+  lazy val nStricts: Seq[NStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs)) else if (mem.nConstraints.isEmpty) Seq(NPowersOf2, NBestGuess, NRelaxed) else mem.nConstraints
+  lazy val aStricts: Seq[AlphaStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas)) else if (mem.alphaConstraints.isEmpty) Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed) else mem.alphaConstraints
+  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
+                                                    else if (mem.isNoFission) RegroupHelper.regroupNone
+                                                    else if (mem.isFullFission) RegroupHelper.regroupAll(rank)
                                                     else if (mem.duplicateOnAxes.isDefined) mem.duplicateOnAxes.get.map{x: Seq[Int] => RegroupDims(x.toList)}.toList
                                                     else if (mem.isDuplicatable & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) 
                                                     else RegroupHelper.regroupNone
 
   // Mapping from BankingOptions to its "duplicates."  Each "duplicate" contains a histogram (Seq[Int]), a Seq of auxilliary nodes (Seq[String]), and a 7-element Seq of its cost components (total, mem luts/ffs/brams, aux luts/ffs/brams) (Seq[Int])
   type DUPLICATE = (Seq[Banking], Seq[Int], Seq[String], Seq[Double])
-  val schemesInfo = scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]()
+  val schemesInfo = scala.collection.mutable.HashMap[Int,scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]]()
+  private val latestSchemesInfo = scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]()
 
   def configure(): Unit = {
     dbg(s"---------------------------------------------------------------------")
@@ -58,6 +62,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     dbgs(s"NStrictness:   ${nStricts}")
     dbgs(s"AlphaStrictness:   ${aStricts}")
     dbgs(s"DimensionDuplication: ${dimensionDuplication}")
+    dbgs(s"Explicit Banking: ${mem.explicitBanking}")
+    dbgs(s"Force Explicit Banking: ${mem.forceExplicitBanking}")
     dbg(s"---------------------------------------------------------------------")
     val readers = mem.readers
     val writers = mem.writers
@@ -198,12 +204,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && outermost.parent.s.get.isLockstepAcross(itersDiffer, Some(a.access), Some(outermost.parent))
+        spatialConfig.enableBroadcast && divergedIters(a, b, mem).values.forall(_.isDefined)
       }
     }
     else true
   }
-
 
   protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = 
     if (spatialConfig.groupUnrolledAccess) groupAccessUnroll(accesses)
@@ -233,7 +238,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     sortedAccesses.foreach{a =>
       dbg(s"    Access: ${a.short} [${a.parent}]")
       val grpId = {
-        if (mem.parent == Ctrl.Host) { if (groups.isEmpty) -1 else 0 }
+        if (mem.parent == Ctrl.Host) groups.zipWithIndex.indexWhere{case (grp,i) => 
+          val samePort = grp.filter{b => requireConcurrentPortAccess(a,b)}
+          if (samePort.nonEmpty && !mem.shouldIgnoreConflicts) dbgs(s"      WARNING: $mem has conflictable writers.  Do you want to add .conflictable flag to it?")
+          samePort.nonEmpty && !mem.shouldIgnoreConflicts
+        }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
           // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
           // Should drop in data broadcasting node in this case
@@ -241,8 +250,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // A conflict occurs if there are accesses on the same port with overlapping addresses
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
-          val conflicts = samePort.filter{b => a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)}
-          samePort.foreach{b => val conflictable = dephasingIters(a,b,mem); if (conflictable.nonEmpty) dbgs(s"      WARNING: Group contains iters ${conflictable.map(_._1)} that dephase due to non-lockstep controllers")}
+          val conflicts = samePort.filter{b => overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")
           if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
@@ -251,7 +259,23 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           else                    dbg(s"      Group #$i same port: <none> ")
           if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
 
-          samePort.nonEmpty && conflicts.isEmpty
+          val noConflicts = if (isWrite) {
+            if (conflicts.nonEmpty && !mem.shouldIgnoreConflicts) {
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              warn(s"    Consider either:")
+              warn(s"       1) Remove parallelization on all ancestor controllers")
+              warn(s"       2) Declare this memory inside the innermost outer controller with parallelization > 1")
+              warn(s"       3) Manually deconflicting them and add .conflictable flag to the memory. Use this if you know" +
+                       "the address pattern is actually safe to bank (i.e. accesses are timed so they won't conflict or are masked so they won't all trigger at the same time")
+              warn(s"    Note that banking analysis may hang or crash here...")
+              true
+            } else if (conflicts.nonEmpty && mem.shouldIgnoreConflicts) {
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+              false
+            } else conflicts.isEmpty
+          } else conflicts.isEmpty
+          samePort.nonEmpty && noConflicts
         }
       }
       if (grpId != -1) { groups(grpId) = groups(grpId) + a } else { groups += Set(a) }
@@ -292,6 +316,21 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     reduced.toList
   }
 
+  private def overlapsAddress(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    val substRules = divergedIters(a, b, mem)
+    val keyRules: scala.collection.immutable.Map[Idx,(Idx,Int)]  = accessIterators(a.access, mem).zipWithIndex.collect{
+      case(iter,i) if (substRules.contains(iter) && substRules(iter).isDefined) => 
+        if (substRules(iter).get != 0) dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally lockstepped iterator, $iter, with offset ${substRules(iter).get}") 
+        (iter -> (iter, substRules(iter).get))
+      case(iter,i) if (substRules.contains(iter) && !substRules(iter).isDefined && a.matrix.keys.contains(iter)) => 
+        dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally dephased iterator, $iter")
+        return true
+        // (iter -> (boundVar[I32], 0))
+    }.toMap
+    val newa = a.substituteKeys(keyRules)
+    newa.overlapsAddress(b)
+  }
+
   protected def groupAccessUnroll(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = {
     val isWrite = accesses.exists(_.access.isWriter)
     val tp = if (isWrite) "Write" else "Read"
@@ -303,11 +342,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     // Two accesses can be grouped if they are in the same port and they don't conflict
     def canGroup(a:AccessMatrix, b:AccessMatrix) = cache.getOrElseUpdate((a,b),{
       val samePort = requireConcurrentPortAccess(a, b)
-      val conflict = if (samePort) {
-        a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
-      } else false
-      val dephaseIter = if (samePort) dephasingIters(a,b,mem) else Set.empty
-      dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict dephaseIter:$dephaseIter")
+      val conflict = if (samePort) {overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)} else false
+      dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict")
       samePort && !conflict
     })
 
@@ -326,7 +362,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         if (gid == -1) grps :+ Set(a)
         else grps.zipWithIndex.map { case (grp, `gid`) => grp+a; case (grp, gid) => grp }
       }
-      dbg(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
+      dbgs(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
       grps
     }
 
@@ -375,18 +411,20 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
+    val controllerLCA = lca.ancestors.collectFirst{case x if (x.isInnerControl && !x.isSwitch) => x} // Outermost controller that is inner controller
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       (lca.isOuterPipeLoop && !isWrittenIn(lca)) ||
-      (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) ||
-      (lca.isParallel || lca.isOuterStreamLoop)
+      (a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay) || 
+      ((a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay != b.access.fullDelay) && (controllerLCA.isDefined && controllerLCA.get.isLoopControl)) ||
+      (lca.isParallel || (a.access.parent == b.access.parent && (Seq(lca) ++ lca.ancestors).exists(_.willUnroll))) || (lca.isOuterControl && lca.isStreamControl)
   }
 
 
   protected def bank(readers: Set[AccessMatrix], writers: Set[AccessMatrix]): Seq[Instance] = {
-    val rdGroups = groupAccesses(readers)
-    val wrGroups = groupAccesses(writers)
+    val rdGroups = if (mem.forceExplicitBanking) Set(readers) else groupAccesses(readers)
+    val wrGroups = if (mem.forceExplicitBanking) Set(writers) else groupAccesses(writers)
     if      (readers.nonEmpty) mergeReadGroups(rdGroups, wrGroups)
     else if (writers.nonEmpty) mergeWriteGroups(wrGroups)
     else Seq(Instance.Unit(rank))
@@ -559,22 +597,28 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val ctrls = reads.map(_.parent)
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
+    // All possible combinations of banking characteristics
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
-    val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds
+    val allAttemptDirectives: Seq[BankingOptions] = bankingOptionsIds
         .map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }
         .sortBy{x => (x.view.P, x.N.P, x.alpha.P, x.regroup.P)}
         .filter{x => (x.view.isInstanceOf[Hierarchical] || (x.view.isInstanceOf[Flat] && (x.regroup.dims.size == 0 || x.regroup.dims.size == x.view.rank)))}
-    if (attemptDirectives.size == 0) {
+    if (allAttemptDirectives.size == 0) {
       error(s"Unable to search for banking on ${mem.fullname}:")
       error(s"  ${mem.ctx})")
       error(s"  ${mem.ctx.content.getOrElse("<???>")}")
       throw new Exception(s"No banking options allowed!")
     }
+    // Partition directives list based on the "good" ones and "bad" ones (i.e. likelihood of successful scheme existing), and then repack them
+    val (goodDirectives, badDirectives) = allAttemptDirectives.partition{opts => !opts.undesired}
+    val (goodSameDirectives, goodDiffDirectives) = goodDirectives.partition{opts => opts.N.P == opts.alpha.P}
+    val attemptDirectives = goodSameDirectives ++ goodDiffDirectives ++ badDirectives
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
+        latestSchemesInfo.clear()
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
         dbgs(s"**************************************************************************************")
         dbgs(s"Analyzing costs for ${bankings.toList.size} banking schemes found for ${mem.fullname}")
@@ -583,7 +627,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           val c = banking.toList.zipWithIndex.map{case ((rds, b),i) => 
             dbgs(s"  - ${rds.map(_.size).sum} readers connect to duplicate #$i (${b})")
             val dup = cost(b,depth,rds,reachingWrGroups)
-            schemesInfo += (scheme -> {schemesInfo.getOrElse(scheme, Seq()) ++ Seq(dup)})
+            latestSchemesInfo += (scheme -> {latestSchemesInfo.getOrElse(scheme, Seq()) ++ Seq(dup)})
             dup._4.head
           }.sum
           scheme -> c
@@ -600,7 +644,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val isBuffAccum = writes.cross(winningRdGrps.flatten).exists{case (wr,rd) => rd.parent == wr.parent }
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
             val accTyp = mem.accumType | accum
-            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,winningBanking.head.darkVolume,accTyp))
+            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,accTyp))
           }.flatten.toSeq
         )
       }
@@ -619,7 +663,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
-    val conflicting = a.overlapsAddress(b) && !canBroadcast(a, b) && (a.segmentAssignments == b.segmentAssignments)
+    val conflicting = (overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
     val trueConflict = concurrent && conflicting && !mem.isReg
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict
@@ -640,23 +684,26 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   3. Either instance is an accumulator and there is at least one pipelined ancestor controller.
     */
   protected def getMergeAttemptError(a: Instance, b: Instance): Option[String] = {
-    lazy val reads = a.reads.flatten ++ b.reads.flatten
-    lazy val writes = a.writes.flatten ++ b.writes.flatten
-    lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
-    val commonCtrl = a.ctrls intersect b.ctrls
-    val conflicts  = getInstanceConflict(a, b)
+    if (mem.isMustMerge) None
+    else {
+      lazy val reads = a.reads.flatten ++ b.reads.flatten
+      lazy val writes = a.writes.flatten ++ b.writes.flatten
+      lazy val metapipes = findAllMetaPipes(reads.map(_.access), writes.map(_.access)).keys
+      val commonCtrl = a.ctrls intersect b.ctrls
+      val conflicts  = getInstanceConflict(a, b)
 
-    if (spatialConfig.enablePIR) Some("Do not merge accesses for plasticine")
-    else if (commonCtrl.nonEmpty && !isGlobal)
-      Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
-    else if (conflicts.nonEmpty)
-      Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")
-    else if (metapipes.size > 1)
-      Some("Ambiguous metapipes")
-    else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce && !mem.shouldCoalesce)
-      Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
-    else
-      None
+      if (spatialConfig.enablePIR) Some("Do not merge accesses for plasticine")
+      else if (commonCtrl.nonEmpty && !isGlobal)
+        Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
+      else if (conflicts.nonEmpty)
+        Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")
+      else if (metapipes.size > 1)
+        Some("Ambiguous metapipes")
+      else if (metapipes.nonEmpty && (a.accType | b.accType) >= AccumType.Reduce && !mem.shouldCoalesce)
+        Some(s"Accumulator conflict (A Type: ${a.accType}, B Type: ${b.accType})")
+      else
+        None
+    }
   }
 
   /** Should not complete merging instances if any of the following hold:
@@ -691,6 +738,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         case Right(insts) =>
           var instIdx = 0
           var merged = false
+          val unmergedSchemesInfo = latestSchemesInfo.clone()
           while (instIdx < instances.length && !merged && insts.length == 1) {
             dbgs(s"Attempting to merge group #$grpId with instance #$instIdx: ")
             state.logTab += 1
@@ -709,19 +757,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                     else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
                   }
 
-                case Left(issue) =>
-                  dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
+                case Left(issue) => dbgs(s"Did not merge $grpId into instance $instIdx: ${issue.name}")
               }
             }
-            else dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+            else {
+              dbgs(s"Did not merge $grpId into instance $instIdx: ${err.get}")
+            }
             state.logTab -= 1
             instIdx += 1
           }
           if (!merged) {
+            schemesInfo += (instances.length -> unmergedSchemesInfo)
             insts.foreach{i1 => instances += i1}
             dbgs(s"Result: Created instance #${instances.length-1}")
           }
           else {
+            schemesInfo += ({instIdx-1} -> latestSchemesInfo)
             dbgs(s"Result: Merged $grpId into instance ${instIdx-1}")
           }
 

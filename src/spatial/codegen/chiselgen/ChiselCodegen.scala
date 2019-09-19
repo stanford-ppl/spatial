@@ -19,7 +19,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   override val lang: String = "chisel"
   override val ext: String = "scala"
   backend = "accel"
-  final val CODE_WINDOW: Int = 50
+  final val CODE_WINDOW: Int = spatialConfig.codeWindow
 
   protected var globalBlockID: Int = 0
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
@@ -77,6 +77,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     emit("import fringe.templates.memory.implicits._")
     emit("import fringe.templates.retiming._")
     emit("import emul.ResidualGenerator._")
+    emit("import fringe.templates.euresys._")
     emit("import api._")
     emit("import chisel3._")
     emit("import chisel3.util._")
@@ -106,7 +107,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     markCChainObjects(b)
     def printableStms(stms: Seq[Sym[_]]): Seq[StmWithWeight[Sym[_]]] = stms.collect{case x: Sym[_] if (x.parent == Ctrl.Host) => StmWithWeight[Sym[_]](x, 0, Seq[String]()); case x: Sym[_] if !x.isBroadcastAddr => StmWithWeight[Sym[_]](x, x.parOrElse1,cchainCopies.getOrElse(x, Seq[String]()).map{c => src"_copy${c}"})}
     def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists{x => x.nestedInputs.contains(s) || bufMapping.getOrElse(x, List[BufMapping]()).map{_.mem}.contains(s)})
-    def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
+    // TODO: is branchSfx still required?  Its crashing when s is an inner switch with return type defined
+    def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch && !(s.isSwitch && s.isInnerControl)) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
     def initChunkState(): Unit = {ensigs = new scala.collection.mutable.ListBuffer[String]}
     val hierarchyDepth = (scala.math.log(1 max printableStms(b.stms).map(_.weight).sum) / scala.math.log(CODE_WINDOW)).toInt
     globalBlockID = javaStyleChunk[Sym[_]](
@@ -135,35 +137,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("import fringe.templates.vector._")
       emit ("import fringe.templates.memory._")
       emit ("import fringe.templates.retiming._")
-
-      emit ("class CustomAccelInterface(")
-      emit ("  val io_w: Int, ")
-      emit ("  val io_v: Int, ")
-      emit ("  val io_loadStreamInfo: List[StreamParInfo], ")
-      emit ("  val io_storeStreamInfo: List[StreamParInfo], ")
-      emit ("  val io_gatherStreamInfo: List[StreamParInfo], ")
-      emit ("  val io_scatterStreamInfo: List[StreamParInfo], ")
-      emit ("  val io_numAllocators: Int, ")
-      emit ("  val io_numArgIns: Int, ")
-      emit ("  val io_numArgOuts: Int, ")
-      emit (") extends AccelInterface{")
-      emit ("  // Control IO")
-      emit ("  val enable = Input(Bool())")
-      emit ("  val done = Output(Bool())")
-      emit ("  val reset = Input(Bool())")
-      emit ("  ")
-      emit ("  // DRAM IO")
-      emit ("  val memStreams = Flipped(new AppStreams(io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo))")
-      emit ("  ")
-      emit ("  // HEAP IO")
-      emit ("  val heap = Flipped(Vec(io_numAllocators, new HeapIO()))")
-      emit ("  ")
-      emit ("  // Scalar IO")
-      emit ("  val argIns = Input(Vec(io_numArgIns, UInt(64.W)))")
-      emit ("  val argOuts = Vec(io_numArgOuts, new ArgOut())")
-      emit ("")
-      emit ("  override def cloneType = (new CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts)).asInstanceOf[this.type] // See chisel3 bug 358")
-      emit ("}")
       
       open("trait IOModule extends Module {")
      emit (s"""val io_w = if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 8 else 32 // TODO: How to generate these properly?""")
@@ -236,7 +209,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("globals.streamOutsInfo = io_streamOutsInfo")
       emit ("globals.numAllocators = io_numAllocators")
 
-      open("val io = IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
+      emit("val io = globals.target match {")
+      emit("""  case _:targets.cxp.CXP     => IO(new CXPAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))""")
+      emit("  case _ => IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
+      emit("}")
       emit ("var outStreamMuxMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map[String,Int]()")
       open("def getStreamOutLane(id: String): Int = {")
         emit ("val lane = outStreamMuxMap.getOrElse(id, 0)")
@@ -385,7 +361,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case BurstAckBus => "DecoupledIO[Bool]"
           case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
           case ScatterAckBus => "DecoupledIO[Bool]"
-          case _ => super.remap(tp)
+          case CXPPixelBus => "DecoupledIO[CXPStream]"
+          case _ => s"DecoupledIO[UInt]"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
         bus match {
@@ -393,7 +370,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: BurstFullDataBus[_] => "DecoupledIO[AppStoreData]"
           case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
           case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
-          case _ => super.remap(tp)
+          case CXPPixelBus => "DecoupledIO[CXPStream]"
+          case _ => s"DecoupledIO[UInt]"
         }
 
       case _ => super.remap(tp)
@@ -439,6 +417,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
             val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => (ens.length, bitWidth(e.A.tp)) }
             s"Flipped(Decoupled(Vec(${par},UInt(${width}.W))))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
+          case CXPPixelBus => "Flipped(Decoupled(new CXPStream()))"
           case _ => super.remap(tp)
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
@@ -447,6 +426,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: BurstFullDataBus[_] => src"""Decoupled(new AppStoreData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case GatherAddrBus => src"""Decoupled(new AppCommandSparse(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case _: ScatterCmdBus[_] => src"""Decoupled(new ScatterCmdStream(ModuleParams.getParams("${x}_p").asInstanceOf[StreamParInfo] ))"""
+          case CXPPixelBus => "Decoupled(new CXPStream())"
           case _ => super.remap(tp)
         }
 

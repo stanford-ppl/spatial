@@ -161,7 +161,23 @@ case class InitiationInterval(interval: Double) extends Data[InitiationInterval]
 case class UserII(interval: Double) extends Data[UserII](SetBy.User)
 
 
-/** Memories which are written in a given controller.
+/** DRAMs which are written in a given controller.
+  *
+  * Getter: sym.writtenDRAMs
+  * Setter: sym.writtenDRAMs = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class WrittenDRAMs(drams: Set[Sym[_]]) extends Data[WrittenDRAMs](SetBy.Flow.Consumer)
+
+/** Local memories which are read in a given controller.
+  *
+  * Getter: sym.readDRAMs
+  * Setter: sym.readDRAMs = (Set[ Sym[_] ])
+  * Default: empty set
+  */
+case class ReadDRAMs(drams: Set[Sym[_]]) extends Data[ReadDRAMs](SetBy.Flow.Consumer)
+
+/** Local memories which are written in a given controller.
   *
   * Getter: sym.writtenMems
   * Setter: sym.writtenMems = (Set[ Sym[_] ])
@@ -169,7 +185,7 @@ case class UserII(interval: Double) extends Data[UserII](SetBy.User)
   */
 case class WrittenMems(mems: Set[Sym[_]]) extends Data[WrittenMems](SetBy.Flow.Consumer)
 
-/** Memories which are read in a given controller.
+/** Local memories which are read in a given controller.
   *
   * Getter: sym.readMems
   * Setter: sym.readMems = (Set[ Sym[_] ])

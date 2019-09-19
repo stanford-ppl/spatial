@@ -16,11 +16,11 @@ import argon.Block
     setMem(dram,data)
     val out = ArgOut[Int]
     Accel {
-      val x = SRAM[Int](I,R,C,O).noduplicate
-      x load dram
+      val x_hier = SRAM[Int](I,R,C,O).nofission.hierarchical // flat is also possible but takes way longer to find
+      x_hier load dram
 
       out := Reduce(Reg[Int])(0 until I par PI, 0 until R par PR, 0 until C par PC, 0 until O par PO){case List(i,r,c,o) =>
-        x(i,r,c,o)
+        x_hier(i,r,c,o)
       }{_+_}
     }
 
@@ -84,11 +84,11 @@ import argon.Block
       }
 
       // Hierarchical scheme, 1 duplicate
-      val hier = SRAM[Int](3,12,8).hierarchical.noduplicate 
+      val hier = SRAM[Int](3,12,8).hierarchical.nofission
       val r1 = run(hier)
 
       // Flat scheme, 1 duplicate
-      val flat = SRAM[Int](3,12,8).flat.noduplicate         
+      val flat = SRAM[Int](3,12,8).flat.nofission
       val r2 = run(flat)
 
       // Could choose anything, should take relatively long to bank
@@ -96,28 +96,28 @@ import argon.Block
       val r3 = run(any)
 
       // Hierarchical scheme, 24 duplicates
-      val hierdup = SRAM[Int](3,12,8).hierarchical.onlyduplicate       
+      val hierdup = SRAM[Int](3,12,8).hierarchical.fullfission
       val r4 = run(hierdup)
 
       // Hierarchical scheme, either 3 duplicates (first option) or 8 duplicates (second option)
-      val hiersomedup = SRAM[Int](3,12,8).hierarchical.duplicateaxes(List( List(0), List(1,2) ) ) 
+      val hiersomedup = SRAM[Int](3,12,8).hierarchical.axesfission(List( List(0), List(1,2) ) )
       val r5 = run(hiersomedup)
 
       // Flat scheme, 1 duplicate (should have really expensive histogram)
-      val windowflat = SRAM[Int](3,12,8).flat.noduplicate
+      val windowflat = SRAM[Int](3,12,8).flat.nofission
       val r6 = slidingWindowRun(windowflat)
 
       // Hierarchical scheme, 1 duplicate (should have really expensive histogram)
-      val windowhier = SRAM[Int](3,12,8).hierarchical.noduplicate           
+      val windowhier = SRAM[Int](3,12,8).hierarchical.nofission
       val r7 = slidingWindowRun(windowhier)
 
       // Any scheme, 2 duplicates (should have really expensive histogram)
-      val windowdup = SRAM[Int](3,12,8).duplicateaxes(List(List(0)))       
+      val windowdup = SRAM[Int](3,12,8).axesfission(List(List(0)))
       val r8 = slidingWindowRun(windowdup)
 
       // "Weird" case where you have a regular access pattern and a static column in parallel
-      val noblockcyc = SRAM[Int](2,32).hierarchical.noblockcyclic.noduplicate // Needs 32 banks
-      val blockcyc = SRAM[Int](2,32).hierarchical.onlyblockcyclic.noduplicate // Needs fewer banks (funky scheme) but more darkVolume
+      val noblockcyc = SRAM[Int](2,32).hierarchical.noblockcyclic.nofission // Needs 32 banks
+      val blockcyc = SRAM[Int](2,32).hierarchical.onlyblockcyclic.nofission // Needs fewer banks (funky scheme) but more darkVolume
       Foreach(2 by 1, 32 by 1){(i,j) => noblockcyc(i,j) = i + j; blockcyc(i,j) = i + j}
       val r9 = Reduce(Reg[Int])(2 by 1, 31 by 1){(i,j) => noblockcyc(i,j) + noblockcyc(i,31)}{_+_}
       val r10 = Reduce(Reg[Int])(2 by 1, 31 by 1){(i,j) => blockcyc(i,j) + blockcyc(i,31)}{_+_}
@@ -156,10 +156,10 @@ import argon.Block
     setMem(dram,data)
     val out = DRAM[Int](3,3,64)
     Accel {
-      val x = SRAM[Int](64).noduplicate // Assert there is only 2 copies of this (or 1 copy if k is par 1)
+      val x = SRAM[Int](64).nofission // Assert there is only 2 copies of this (or 1 copy if k is par 1)
       x load dram
-      val y = SRAM[Int](3,3,64).noduplicate
-      val z = SRAM[Int](3,3).noduplicate
+      val y = SRAM[Int](3,3,64).nofission
+      val z = SRAM[Int](3,3).nofission
       Foreach(3 by 1, 3 by 1){(i,j) => z(i,j) = i+j}
 
       Foreach(10 by 1){i => 
@@ -218,7 +218,7 @@ import argon.Block
     setMem(INPUT_DATA, input)
 
     Accel{
-      val in_sram = SRAM[Int](3,3,32).hierarchical.noduplicate
+      val in_sram = SRAM[Int](3,3,32).hierarchical.nofission
       Foreach(5 by 1){row =>
         Foreach(5 by 1){col => 
           val idx0 = row * ARG.value

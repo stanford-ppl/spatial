@@ -24,7 +24,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
   var delayLines: Map[Sym[_], SortedSet[ValueDelay]] = Map.empty
   var delayConsumers: Map[Sym[_], List[ValueDelay]] = Map.empty
   var latencies: Map[Sym[_], Double] = Map.empty
-  var cycles: Set[Sym[_]] = Set.empty
+  var cycles: Seq[Sym[_]] = Seq()
   var hierarchy: Int = 0
   var inInnerScope: Boolean = false
 

@@ -20,16 +20,15 @@ trait PIRGenHelper extends PIRFormatGen {
     vec.head
   }
 
-  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Any]=None, tp:Option[String]=None) = {
+  def stateMem(lhs:Sym[_], rhs:String, inits:Option[Any]=None, tp:Option[String]=None, depth:Option[Int]=None) = {
     val padding = lhs.getPadding.getOrElse {
       lhs.constDims.map { _ => 0 }
     }
     stateStruct(lhs, lhs.asMem.A, tp=tp)(field => 
       src"$rhs" + 
       inits.ms(inits => src".inits($inits)") + 
-      src".depth(${lhs.instance.depth})" +
+      src".depth(${depth.getOrElse(lhs.instance.depth)})" +
       src".dims(${lhs.constDims.zip(padding).map { case (d,p) => d + p }})" +
-      src".darkVolume(${lhs.getDarkVolume.getOrElse(0)})" +
       src".banks(${lhs.instance.banking.map { b => b.nBanks}})" +
       src".tp(${field.map {_._2}.getOrElse(lhs.asMem.A)})" + 
       src".isInnerAccum(${lhs.isInnerAccum})"
@@ -54,8 +53,8 @@ trait PIRGenHelper extends PIRFormatGen {
 
   def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
     val bufferPort = lhs.port.bufferPort
-    val broadcast = assertOne(lhs.port.broadcast)
-    val castgroup = assertOne(lhs.port.castgroup)
+    val broadcast = lhs.port.broadcast
+    val castgroup = lhs.port.castgroup
     val muxPort = lhs.port.muxPort
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
@@ -83,8 +82,8 @@ trait PIRGenHelper extends PIRFormatGen {
   def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
     val bufferPort = lhs.port.bufferPort
     val muxPort = lhs.port.muxPort
-    val broadcast = assertOne(lhs.port.broadcast)
-    val castgroup = assertOne(lhs.port.castgroup)
+    val broadcast = lhs.port.broadcast
+    val castgroup = lhs.port.castgroup
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
       var body = (bank, ofs) match {

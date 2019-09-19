@@ -29,7 +29,6 @@ trait PIRGenDebugging extends PIRCodegen {
       state(lhs) { 
         src"""ExitIf().en($ens)"""
       }
-      emit(src"""val $lhs = if (${and(ens)}) { System.out.println("${lhs.ctx}: Exit"); sys.exit() }""")
 
     case _ => super.genAccel(lhs, rhs)
   }

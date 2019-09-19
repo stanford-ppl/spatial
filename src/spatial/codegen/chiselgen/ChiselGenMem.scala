@@ -55,7 +55,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
-    if (mem.isFIFOReg) src"~$break && $done"
+    if (mem.isFIFOReg && lhs.parent.s.get.isOuterControl) src"~$break && $done" // Don't know why this is the rule, but this is what works
     else               src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
   }
 
@@ -170,13 +170,14 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     val dimensions = paddedDims(mem, name).mkString("List[Int](", ",", ")") //dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
-    val strides = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
+    val blockCycs = {if (mem.isLUT | mem.isRegFile) List.fill(dims.size)(1) else inst.Bs}.map(_.toString).mkString("List[Int](",",",")")
+    val neighborhood = {if (mem.isLUT | mem.isRegFile) dims else inst.Ps}.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     createMemObject(mem) {
       mem.writers.zipWithIndex.foreach{ case (w, i) => 
-        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product+mem.darkVolume)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
+        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                          else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
         val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                           else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -186,7 +187,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       }
       if (mem.writers.isEmpty) {emit(src"val w0 = AccessHelper.singular(32)")}
       mem.readers.zipWithIndex.foreach{ case (r, i) => 
-        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product+mem.darkVolume)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
+        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
                          else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
         val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
                           else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
@@ -198,10 +199,11 @@ trait ChiselGenMem extends ChiselGenCommon {
       if (mem.readers.isEmpty) {emit(src"val r0 = AccessHelper.singular(32)")}
 
       emit(src"""val m = Module(new $templateName 
-    $dimensions, ${mem.darkVolume},
+    $dimensions,
     $depth ${bitWidth(mem.tp.typeArgs.head)}, 
-    $numBanks, 
-    $strides, 
+    $numBanks,
+    $blockCycs,
+    $neighborhood,
     ${List.tabulate(1 max mem.writers.size){i => s"w$i"}.mkString("List(", ",", ")")},
     ${List.tabulate(1 max mem.readers.size){i => s"r$i"}.mkString("List(", ",", ")")},
     $bankingMode, 

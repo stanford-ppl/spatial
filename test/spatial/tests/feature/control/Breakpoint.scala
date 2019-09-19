@@ -81,8 +81,8 @@ import spatial.dsl._
 
         val stop5 = Reg[Bit](false)
         stop5 := false
-        Stream(breakWhen = stop5).Foreach(*){i => 
-          val fifo = FIFO[Int](4)
+        val fifo = FIFO[Int](4)
+        Stream(breakWhen = stop5).Foreach(*){i =>
           Pipe{fifo.enq(i)}
           Pipe{
             val x = fifo.deq
@@ -91,6 +91,7 @@ import spatial.dsl._
             stop5 := x == oBreakAt.value
           }
         }
+        // FSM(false){drained => !drained}{_ => println(r"${fifo.deq()}")}{drained => fifo.isEmpty}
       }
     }
 

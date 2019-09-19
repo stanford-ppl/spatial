@@ -214,7 +214,7 @@ trait Implicits extends ImplicitsPriority1 {
 
   class Cvt_Text_Fix[S:BOOL,I:INT,F:INT] extends Cast2Way[Text,Fix[S,I,F]] {
     @rig def apply(x: Text): Fix[S,I,F] = stage(TextToFix(x,FixFmt.from[S,I,F]))
-    @rig def applyLeft(x: Fix[S,I,F]): Text = stage(FixToText(x))
+    @rig def applyLeft(x: Fix[S,I,F]): Text = stage(FixToText(x,None))
   }
   implicit def CastTextToFix[S:BOOL,I:INT,F:INT]: Cast[Text,Fix[S,I,F]] = Right(new Cvt_Text_Fix[S,I,F])
   implicit def CastFixToText[S:BOOL,I:INT,F:INT]: Cast[Fix[S,I,F],Text] = Left(new Cvt_Text_Fix[S,I,F])
@@ -231,7 +231,7 @@ trait Implicits extends ImplicitsPriority1 {
 
   class Cvt_Text_Flt[M:INT,E:INT] extends Cast2Way[Text,Flt[M,E]] {
     @rig def apply(x: Text): Flt[M,E] = stage(TextToFlt(x,FltFmt.from[M,E]))
-    @rig def applyLeft(x: Flt[M,E]): Text = stage(FltToText(x))
+    @rig def applyLeft(x: Flt[M,E]): Text = stage(FltToText(x,None))
   }
   implicit def CastTextToFlt[M:INT,E:INT]: Cast[Text,Flt[M,E]] = Right(new Cvt_Text_Flt[M,E])
   implicit def CastFltToText[M:INT,E:INT]: Cast[Flt[M,E],Text] = Left(new Cvt_Text_Flt[M,E])

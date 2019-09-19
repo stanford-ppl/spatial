@@ -23,7 +23,7 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/vcs.mk cpp/Makefile
+	cp vcs.sw-resources/Makefile cpp/Makefile
 	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :

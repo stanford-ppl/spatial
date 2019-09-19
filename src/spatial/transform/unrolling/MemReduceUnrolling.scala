@@ -62,9 +62,6 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val blk = stageLambda1(accum){
       logs(s"[Accum-fold $lhs] Unrolling map")
       unrollWithoutResult(func, mapLanes)
-      val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
-
-      val mvalids = () => mapLanes.valids.map{_.andTree}
 
       logs(s"[Accum-fold $lhs] Unrolling unit pipe reduction")
       redLanes.foreach{p =>
@@ -74,14 +71,14 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
       stageWithFlow(UnitPipe(enables ++ ens, stageBlock{
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes, mop)
-      })){lhs2 =>
+      }, stopWhen)){lhs2 =>
         transferData(lhs,lhs2)
         lhs2.unrollBy = redLanes.Ps.product
       }
     
     }
 
-    val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
+    val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk, stopWhen)){lhs2 =>
       transferData(lhs,lhs2)
       lhs2.unrollBy = mapLanes.Ps.product
     }
@@ -128,9 +125,6 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val blk = stageLambda1(accum){
       logs(s"[Accum-fold $lhs] Unrolling map")
       unrollWithoutResult(func, mapLanes)
-      val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
-
-      val mvalids = () => mapLanes.valids.map{_.andTree}
 
       logs(s"[Accum-fold $lhs] Unrolling unit pipe reduction")
       redLanes.foreach{p =>
@@ -142,7 +136,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, start, mapLanes, redLanes, mop)
         // val foldValue = if (fold) Some( loadAcc.inline() ) else None
         // unrollReduceAccumulate[A,C](accum, values, mvalids(), ident, foldValue, reduce, loadAcc, storeAcc, isMap2.map(_.head), start, redLanes, isInner = false)
-      })){lhs2 =>
+      }, stopWhen)){lhs2 =>
         transferData(lhs,lhs2)
         lhs2.unrollBy = redLanes.Ps.product
       }
@@ -207,7 +201,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
       stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, None))
     }
 
-    val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk)){lhs2 =>
+    val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk, stopWhen)){lhs2 =>
       transferData(lhs,lhs2)
       lhs2.unrollBy = mapLanes.Ps.product
     }
@@ -238,7 +232,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     logs(s"Unrolling accum-fold $lhs -> $accum")
 
     val mapLanes = PartialUnroller(s"${lhs}_map", cchainMap, itersMap, isInnerLoop = false, mop)
-    val redLanes = PartialUnroller(s"${lhs}_red", cchainRed, itersRed, true, mop)
+    val redLanes = PartialUnroller(s"${lhs}_red", cchainRed, itersRed, isInnerLoop = true, mop = mop)
     val isMap2   = mapLanes.indices
     val isRed2   = redLanes.indices
     val mvs      = mapLanes.indexValids
@@ -316,7 +310,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
     val mvalids = () => mapLanes.valids.map{_.andTree}
 
-    val values: Seq[Seq[A]] = inReduce(redType,false){
+    val values: Seq[Seq[A]] = inReduce(redType,isInner = false){
       mapLanes.map{ case List(i) =>
         register(intermed -> mems(i))
         unroll(loadRes, redLanes)
@@ -324,13 +318,14 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     }
 
     logs(s"[Accum-fold $lhs] Unrolling accum loads")
-    val accValues = inReduce(redType,false){
+    val accValues = inReduce(redType,isInner = false){
       register(loadAcc.input -> accum)
       unroll(loadAcc, redLanes)
     }
 
     logs(s"[Accum-fold $lhs] Unrolling reduction trees and cycles")
-    val results = redLanes.map{ case List(p) =>
+    val results = redLanes.map{ lane =>
+      val p = redLanes.ulanes.indexOf(lane)
       val laneValid = if (redLanes.valids(p).isEmpty) Bit(true) else redLanes.valids(p).andTree
 
       logs(s"Lane #$p:")
@@ -342,10 +337,11 @@ trait MemReduceUnrolling extends ReduceUnrolling {
       val result = inReduce(redType,true){
         val treeResult = unrollReduceTree(inputs, valids, ident, reduce.toFunction2)
 
-        val isFirst = if (mapLanes.isInstanceOf[PartialUnroller]) {
-          mapLanes.asInstanceOf[PartialUnroller].indices.map(_.head).zip(start).map{case (i,st) => i === st }.andTree  
-        } else {
-          Bit(true)
+        val isFirst = mapLanes match {
+          case unroller: PartialUnroller =>
+            unroller.indices.map(_.head).zip(start).map { case (i, st) => i === st }.andTree
+          case _ =>
+            Bit(true)
         }
         
 
@@ -369,7 +365,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     logs(s"[Accum-fold $lhs] Unrolling accumulator store")
     // Use a default substitution for the reduction result to satisfy the block scheduler
-    inReduce(redType,false){ isolateSubst(){
+    inReduce(redType,isInner = false){ isolateSubst(){
       register(storeAcc.inputA -> accum)
       register(reduce.result -> results.head)
       unroll(storeAcc, redLanes)

@@ -92,6 +92,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     // --- Transformer
     lazy val friendlyTransformer   = FriendlyTransformer(state)
+    lazy val streamTransformer     = StreamTransformer(state)
     lazy val switchTransformer     = SwitchTransformer(state)
     lazy val switchOptimizer       = SwitchOptimizer(state)
     lazy val blackboxLowering1     = BlackboxLowering(state, lowerTransfers = false)
@@ -101,7 +102,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val transientCleanup      = TransientCleanup(state)
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
+    lazy val laneStaticTransformer = LaneStaticTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
+    lazy val bindingTransformer    = BindingTransformer(state)
     lazy val retiming              = RetimingTransformer(state)
     lazy val accumTransformer      = AccumTransformer(state)
     lazy val regReadCSE            = RegReadCSE(state)
@@ -143,6 +146,7 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
+        ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** CSE on regs */
@@ -150,6 +154,8 @@ trait Spatial extends Compiler with ParamLoader {
         /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
+        /** Stream controller rewrites */
+        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==> 
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
@@ -168,7 +174,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
-        flatteningTransformer ==> 
+        flatteningTransformer ==> bindingTransformer ==>
         /** Update buffer depths */
         bufferRecompute     ==> printer ==> transformerChecks ==>
         /** Accumulation Specialization **/
@@ -281,17 +287,26 @@ trait Spatial extends Compiler with ParamLoader {
     cli.note("")
     cli.note("Experimental:")
 
+    cli.opt[Unit]("noModifyStream").action{ (_,_) => 
+      spatialConfig.distributeStreamCtr = false
+    }.text("Disable transformer that converts Stream.Foreach controllers into Stream Unit Pipes with the counter tacked on to children counters (default: do modify stream [i.e. run transformer])")
+
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false
-    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies""")
+    }.text("""Automatically wrap consecutive stages of a controller in a Parallel pipe if they do not have any dependencies (default: bind parallels)""")
 
-    cli.opt[Int]("bankingEffort").action{ (t,_) => 
+    cli.opt[Int]("codeWindow").action{ (t,_) => 
+      spatialConfig.codeWindow = t
+    }.text("""Size of code window for Java-style chunking, which breaks down large IR blocks into multiple levels of Java objects.  Increasing can sometimes solve the GC issue during Chisel compilation (default: 50)""")
+
+    cli.opt[Int]("bankingEffort").action{ (t,_) =>
       spatialConfig.bankingEffort = t
     }.text("""Specify the level of effort to put into banking local memories.  i.e:
       0: Quit banking analyzer after first banking scheme is found
-      1: (default) Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
-      2: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
-      3: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
+      1: Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
+      2: (default) Allow banking analyzer to find AT MOST 8 valid schemes (same as 1 except it searches for Pow2 N/Alpha schemes as well as Likely)
+      3: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
+      4: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
 """)
 
     cli.opt[Unit]("mop").action{ (_,_) => 

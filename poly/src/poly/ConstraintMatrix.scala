@@ -12,10 +12,12 @@ case class ConstraintMatrix[K](rows: Set[SparseConstraint[K]], hasDomain: Boolea
     keys.map{k => isl.domain(k) }.fold(ConstraintMatrix.empty){_::_}
   }
 
-  def replaceKeys(keySwap: Map[K,K]): ConstraintMatrix[K] = {
+  def replaceKeys(keySwap: Map[K,(K,Int)]): ConstraintMatrix[K] = {
     val rows2 = rows.map{r => 
-      val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,k) -> v)}
-      SparseConstraint[K](cols2, r.c, r.tp)
+      val cols2 = r.cols.map{case (k,v) => (keySwap.getOrElse(k,(k,0))._1 -> v)}
+      // TODO: Not sure if this is the correct way to include offset adjustment for a constraint
+      val offset = r.cols.collect{case (k,_) if (keySwap.contains(k)) => keySwap(k)._2}.sum
+      SparseConstraint[K](cols2, r.c + offset, r.tp)
     }
     ConstraintMatrix[K](rows2, hasDomain)
   }

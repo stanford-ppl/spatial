@@ -5,6 +5,7 @@ import argon.DSLTest
 import spatial.util.spatialConfig
 import utils.io.files._
 import scala.reflect.runtime.universe._
+import scala.io.Source
 
 trait PlasticineTest extends DSLTest { test =>
 
@@ -15,11 +16,14 @@ trait PlasticineTest extends DSLTest { test =>
   protected def pirArgs:List[String] = 
     "bash" ::
     "run.sh" ::
-    //"--dot=true" ::
-    //"--debug=true" ::
     Nil
 
-  abstract class PIRBackend extends Backend(name, args="--pir --dot", "", "", "") {
+  def timer = System.getProperty("os.name") match {
+    case "Mac OS X" => s"""gtime -f Runtime:%E"""
+    case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
+  }
+
+  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
     def compileOnly = checkFlag(s"test.compileOnly")
@@ -90,7 +94,7 @@ trait PlasticineTest extends DSLTest { test =>
     def pirpass(pass:String, args:List[String]) = {
       var cmd = pirArgs ++ args
       cmd ++= cmdlnArgs
-      val timeout = 3000
+      val timeout = 100000
       scommand(pass, cmd, timeout, parsepir _, RunError.apply)
     }
 
@@ -141,6 +145,7 @@ trait PlasticineTest extends DSLTest { test =>
 
     def parseMake(line:String) = {
       if (line.contains("error") || line.contains("exception")) Fail
+      else if (line.contains("Runtime")) Pass
       else Unknown
     }
 
@@ -161,7 +166,7 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runtst(args:String="", fifo:Int=20) = {
+    def genruntst(args:String="", fifo:Int=20) = {
       var gentstcmd = pirArgs :+
       "--load=true" :+
       "--ckpt=2" :+
@@ -174,8 +179,17 @@ trait PlasticineTest extends DSLTest { test =>
       gentstcmd ++= cmdlnArgs
       val timeout = 3000
       scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply) >>
-      scommand(s"maketst", "make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runtst", "./tungsten".split(" "), timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      scommand(s"maketst", "time make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst(timeout=timeout)
+    }
+
+    def runtst(name:String="runtst", timeout:Int=6000) = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      val res = scommand(name, s"$timer ./tungsten $runArg".split(" "), timeout=timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      res match {
+        case Unknown => Pass
+        case res => res
+      }
     }
 
     def parseProute(vcLimit:Int)(line:String) = {
@@ -187,13 +201,26 @@ trait PlasticineTest extends DSLTest { test =>
       }
     }
 
-    def runproute(row:Int=16, col:Int=8, vlink:Int=2, slink:Int=4, time:Int = -1, iter:Int=1000, vcLimit:Int=4, stopScore:Int= -1) = {
-      var cmd = s"${buildPath(IR.config.cwd, "pir", "plastiroute", "plastiroute")}" :: 
-      "-n" :: s"${IR.config.genDir}/plastisim/node.csv" ::
-      "-l" :: s"${IR.config.genDir}/plastisim/link.csv" ::
-      "-v" :: s"${IR.config.genDir}/plastisim/summary.csv" ::
-      "-g" :: s"${IR.config.genDir}/plastisim/proute.dot" ::
-      "-o" :: s"${IR.config.genDir}/plastisim/final.place" ::
+    def runproute(
+      row:Int=16, 
+      col:Int=8, 
+      vlink:Int=2, 
+      slink:Int=4, 
+      time:Int = -1, 
+      iter:Int=1000, 
+      vcLimit:Int=4, 
+      stopScore:Int= -1,
+      prefix:String="Top"
+    ) = {
+      val prouteHome = Source.fromFile(buildPath(sys.env("HOME"), s".pirconf")).getLines.flatMap { line =>
+        if (line.contains("proute-home")) Some(line.split("proute-home=")(1).trim) else None
+      }.toList.headOption.getOrElse(buildPath(IR.config.cwd, "pir", "plastiroute"))
+      var cmd = s"${buildPath(prouteHome, "plastiroute")}" :: 
+      "-n" :: s"node.csv" ::
+      "-l" :: s"link.csv" ::
+      "-v" :: s"summary.csv" ::
+      "-g" :: s"proute.dot" ::
+      "-G" :: s"final.place" ::
       "-T" :: "checkerboard" ::
       "-a" :: "route_min_directed_valient" ::
       "-r" :: s"$row" ::
@@ -206,10 +233,12 @@ trait PlasticineTest extends DSLTest { test =>
       "-s0" ::
       s"-i$iter" ::
       Nil
+      if (prefix != "") cmd :+= s"-X$prefix"
       cmd ++= "-p100 -t1 -d100".split(" ").map(_.trim).toList
       val timeout = 10800 * 2 // 6 hours
       val name = "runproute"
-      scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply)
+      cmd = timer.split(" ").toList ++ cmd
+      scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply, wd=IR.config.genDir+"/plastisim")
     }
 
     def parsePsim(line:String) = {
@@ -248,12 +277,13 @@ trait PlasticineTest extends DSLTest { test =>
 
   object Asic extends PIRBackend {
     def runPasses():Result = {
-      val mapres = genpir() >>
-      runpir() >>
-      mappir("--net=asic")
-      val psimres = mapres >> genpsim() >> runpsim()
-      val tstres = mapres >> runtst()
-      psimres >> tstres
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      genpir() >>
+      pirpass("gentst", s"--net=asic".split(" ").toList) >>
+      scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i /Top/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
+      scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runp2p")
     }
   }
 
@@ -280,7 +310,7 @@ trait PlasticineTest extends DSLTest { test =>
       runpir() >>
       mappir(s"--net=p2p --row=$row --col=$col") 
       val psimres = mapres >> genpsim() >> runpsim()
-      //val tstres = mapres >> runtst()
+      //val tstres = mapres >> genruntst()
       psimres //>> tstres
     }
   }
@@ -365,19 +395,48 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
-  case object Tst extends PIRBackend {
+  case class Tst(
+    row:Int=20,
+    col:Int=20,
+    vlink:Int = 3,
+    slink:Int = 4,
+    iter:Int = 300,
+    vcLimit:Int = 4,
+    module:Boolean = false,
+  ) extends PIRBackend {
+    override val name = if (module) "MDTst" else "Tst"
     private val genName = name + "_" + property("project").getOrElse("")
     override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
     override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
     override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
-    val row:Int=14
-    val col:Int=14
+    val runhybrid = property("hybrid").map { _ == "true" }.getOrElse(false)
     def runPasses():Result = {
-      val result = genpir() >>
-      pirpass("gentst", s"--mapping=true --codegen=true --net=inf --row=$row --col=$col --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", "make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
-      runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      genpir() >>
+      pirpass("gentst", s"${if (module) "--module" else ""} --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=$row --col=$col".split(" ").toList) >>
+      (if (module) scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p extlink.csv -d link.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") else Pass) >>
+      scommand(s"maketst", s"$timer make".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
+      scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runp2p", timeout=1000000) >>
+      scommand(s"p2pstat", s"python bin/simstat.py".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      (if (runhybrid)
+      runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
+      scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runhybrid", 1000000)
+      else Pass
+      )
+    }
+  }
+
+  case object SpatialOnly extends PIRBackend {
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/$name/report"
+    def runPasses():Result = {
+      genpir() match {
+        case Unknown => Pass
+        case res => res
       }
     }
   }
@@ -385,11 +444,10 @@ trait PlasticineTest extends DSLTest { test =>
   override def backends: Seq[Backend] = 
     Asic +:
     P2PNoSim +:
-    P2P(row=14,col=14) +:
-    Hybrid(row=14,col=14,vlink=4,slink=4) +: 
-    Static(row=14,col=14,vlink=4,slink=4) +: 
     Dot +:
-    Tst +:
+    Tst() +:
+    Tst(module=true) +:
+    SpatialOnly +:
     super.backends
 
 }

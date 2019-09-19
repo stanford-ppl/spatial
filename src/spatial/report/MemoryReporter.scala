@@ -48,14 +48,13 @@ case class MemoryReporter(IR: State) extends Pass {
         emit("\n")
         emit(s"Instance Summary: ")
         duplicates.zipWithIndex.foreach{case (inst,id) =>
-          val Memory(banking,depth,padding,darkVolume,isAccum) = inst
+          val Memory(banking,depth,padding,isAccum) = inst
           val banks  = banking.map(_.nBanks).mkString(", ")
           val format = if (banks.length == 1) "Flat" else "Hierarchical"
           emit(s"  #$id: Banked")
           emit(s"     Resource: ${inst.resource.name}")
           emit(s"     Depth:    $depth")
           emit(s"     Padding:  $padding")
-          emit(s"     DarkVolume:  $darkVolume")
           emit(s"     Accum:    $isAccum")
           emit(s"     Banks:    $banks <$format>")
           banking.foreach{grp => emit(s"       $grp") }

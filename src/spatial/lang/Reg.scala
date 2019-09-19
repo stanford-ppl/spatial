@@ -13,6 +13,7 @@ import spatial.metadata.memory._
 
   // --- Infix Methods
   @api def :=(data: A): Void = Reg.write(this, data)
+  @rig def write(data: A, ens: Bit*): Void = Reg.write(this, data, ens.toSet)
   @api def value: A = Reg.read(this)
   @api def reset(): Void = stage(RegReset(this,Set.empty))
   @api def reset(en: Bit): Void = stage(RegReset(this,Set(en)))
@@ -24,6 +25,11 @@ import spatial.metadata.memory._
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
   /** Do not buffer memory */
   def nonbuffer: Reg[A] = { this.isNonBuffer = true; me }
+  /** Allow "unsafe" banking, where two writes can technically happen simultaneously and one will be dropped.
+    * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
+    * due to data-dependent control flow or that you don't care if one write gets dropped
+    */
+  def conflictable: Reg[A] = { this.shouldIgnoreConflicts = true; me }
 
   // --- Typeclass Methods
   @rig def __sread(): A = Reg.read(this)

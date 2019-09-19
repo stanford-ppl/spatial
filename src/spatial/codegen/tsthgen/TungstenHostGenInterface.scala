@@ -16,14 +16,42 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
       emit("""
 #include <iostream>
 
-std::stringstream stopsim;
-
 """)
+    }
+
+  }
+
+  val allocated = scala.collection.mutable.ListBuffer[String]()
+
+  override def emitFooter = {
+    genIO {
+      open(src"void AllocAllMems() {")
+      allocated.foreach { a =>
+        emit(s"$a();")
+      }
+      close(src"}")
+    }
+    allocated.clear
+    super.emitFooter
+  }
+
+  def genIO(block: => Unit):Unit = {
+    inGen(out, "hostio.h") {
+      block
     }
   }
 
-  def genIO(block: => Unit) = {
-    inGen(out, "hostio.h") {
+  def genAlloc(lhs:Sym[_], inFunc:Boolean)(block: => Unit):Unit = {
+    if (inFunc) {
+      val func = s"Alloc${lhs}" 
+      allocated += func
+      emit(src"$func();")
+      genIO {
+        open(src"void $func() {")
+        block
+        close(src"}")
+      }
+    } else {
       block
     }
   }
@@ -65,9 +93,11 @@ std::stringstream stopsim;
         // Make sure allocated address is burst aligned
         emit(src"""void* $lhs;""")
       }
-      emit(src"$lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});")
-      emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
-      emit(src"""cout << "Allocate mem of size ${dims.map(quote).mkString("*")} at " << ($tp*)${lhs} << endl;""")
+      genAlloc(lhs, dims.forall { _.isConst }) { 
+        emit(src"$lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});")
+        emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
+        emit(src"""cout << "Allocate mem of size ${dims.map(quote).mkString("*")} at " << ($tp*)${lhs} << endl;""")
+      }
 
     case SetMem(dram, data) =>
       //val rawtp = asIntType(dram.tp.typeArgs.head)

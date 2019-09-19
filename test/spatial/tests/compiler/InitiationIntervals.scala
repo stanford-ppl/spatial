@@ -34,7 +34,7 @@ import spatial.metadata.control._
       val result_1D = SRAM[Int](4096)
       val result_2D = SRAM[Int](16,256)
       val result_3D = SRAM[Int](16,16,16)
-      val result_rand = SRAM[Int](16)
+      val result_rand = SRAM[Int](16).conflictable
       'LOOP1D.Foreach(0 until 16, 0 until 16 par 4, 0 until 16){(a,b,c) => 
         result_1D(c * size2 + a * oc + b) = a + b + c
       }
@@ -314,7 +314,7 @@ import spatial.metadata.control._
     setArg(ONE, 1)
     val m = ArgOut[Int]
     Accel {
-      val x = SRAM[T](8, 16).hierarchical.noduplicate
+      val x = SRAM[T](8, 16).hierarchical.nofission
       Foreach(8 by 1, A by 1 par 4){(i,j) => x(i,j) = (i + j).to[T]}
 
       val y = SRAM[T](3, 3, 8).buffer
@@ -410,7 +410,7 @@ import spatial.metadata.control._
     val out = DRAM[Int](1,N)
 
     Accel {
-      val sram = SRAM[Int](M,N).noduplicate.buffer
+      val sram = SRAM[Int](M,N).nofission.buffer.hierarchical
       Foreach(iters.value by 1) { _ => 
         Foreach(N by 1){j => sram(0,j) = j}
         Foreach(1 until M by 1, N by 1 par N/2){(i,j) =>  // II = 1 for par = 1 and then increases for higher pars

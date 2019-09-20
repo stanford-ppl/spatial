@@ -323,8 +323,8 @@ import spatial.targets._
 		}
 
 		val cksum = frame_output.zip(gold_output) { _ == _ }.reduce( _ && _ )
-		println("Pass? " + cksum)
-
+		println("PASS: " + cksum + "(Rendering3D)")
+		assert(cksum)
 	}
 }
 

@@ -285,9 +285,10 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
               val chkPair: (Bits[_], Bits[_]) = (b.asInstanceOf[Bits[_]], b.ctrStart.asInstanceOf[Bits[_]])
               containsNonContinuousIter = ctrTracker.nonEmpty && ctrTracker.contains(chkPair)
               dbgs(s"    containsNonContinuousIter = $containsNonContinuousIter, chkPair = $chkPair, ctrTracker = $ctrTracker")
+              // The tracker could be empty in 1 iteration if the controller is outermost.
               ctrTracker -= chkPair
             }
-            if (!containsNonContinuousIter) {
+            if (!containsNonContinuousIter || ctrTracker.isEmpty) {
               (x1,x2) match {
                 case (`x1`, RegAdd(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumAdd,invert=false))
                 case (`x1`, RegMul(`reg`,`x1`)) => Some(AccumMarker.Reg.Op(reg,x1,written,sel,ens,AccumMul,invert=false))

@@ -51,7 +51,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     } else 0
   }
   protected def instrumentCounterArgs(): Int = {
-    if (spatialConfig.enableInstrumentation) {
+    if (spatialConfig.enableInstrumentation && instrumentCounters.nonEmpty) {
       val last = instrumentCounters.last._1
       instrumentCounterIndex(last) + 2 + {if (hasBackPressure(last.toCtrl) || hasForwardPressure(last.toCtrl)) 2 else 0}
     } else 0

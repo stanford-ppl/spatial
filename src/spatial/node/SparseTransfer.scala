@@ -129,19 +129,18 @@ object SparseTransfer {
         val ackBus = StreamIn[Bit](ScatterAckBus)
 
         (requestLength, iters) match {
-          case (Final(requestLength), Final(iters)) if iters >= requestLength & spatialConfig.enablePIR => // Special case iters == requestLength
+          case (requestLength, iters) if spatialConfig.enablePIR => // Special case iters == requestLength
             // Send
-            Foreach(iters par p){i =>
-              val pad_addr = max(requestLength - 1, 0.to[I32])
-              val addr: I64  = ((origin + addrs.__read(Seq(i), Set())) * bytesPerWord).to[I64] + dram.address
-              val data     = local.__read(Seq(i), Set())
+            Foreach(requestLength par p){i =>
+              val addr: I64  = ((origin + addrs.__read(Seq(i), Set.empty)) * bytesPerWord).to[I64] + dram.address
+              val data     = local.__read(Seq(i), Set.empty)
               cmdBus := (pack(data, addr), dram.isAlloc)
             }
             // Fringe
             val store = Fringe.sparseStore(dram, cmdBus, ackBus)
             transferSyncMeta(old, store)
             // Receive
-            Foreach(iters by 1 par p){i =>
+            Foreach(requestLength by 1 par p){i =>
               val ack = ackBus.value()
             }
           case (requestLength, iters) =>

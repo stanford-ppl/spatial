@@ -5,7 +5,7 @@ import chisel3.util._
 import fringe.globals._
 import fringe.templates.axi4._
 import fringe.{Fringe, StreamParInfo, AppStreams, HeapIO}
-import fringe.utils.log2Up
+import _root_.utils.math.log2Up
 
 /** Top module for Arria 10 FPGA shell
   * @param blockingDRAMIssue TODO: What is this?

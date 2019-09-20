@@ -6,10 +6,11 @@ import fringe.templates.counters.{NBufCtr, SingleCounter}
 import fringe.Ledger._
 import fringe.globals
 import fringe.templates.math.FixedPoint
-import fringe.utils.{getRetimed, log2Up, risingEdge}
+import fringe.utils.{getRetimed, risingEdge}
 import fringe.utils.HVec
 import fringe.utils._
 import fringe.utils.implicits._
+import _root_.utils.math._
 
 /* Controller that is instantiated in NBuf templates to handle port -> module muxing */
 class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
@@ -96,8 +97,8 @@ class NBufMem(np: NBufParams) extends Module {
   np.mem match {
     case BankedSRAMType => 
       val srams = (0 until np.numBufs).map{ i => 
-        val x = Module(new BankedSRAM(np.p.logicalDims, np.p.bitWidth,
-                        np.p.banks, np.p.blocks, np.p.neighborhood,
+        val x = Module(new BankedSRAM(np.p.Ds, np.p.bitWidth,
+                        np.p.Ns, np.p.Bs, np.p.Ps,
                         np.p.WMapping, np.p.RMapping,
                         np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, np.p.numActives, "SRAM"))
         x.io <> DontCare
@@ -156,7 +157,7 @@ class NBufMem(np: NBufParams) extends Module {
         if (isShiftEntry) shiftEntryBuf = Some(i)
         val WPorts = np.p.WMapping.filter{x => x.port.bufPort == Some(i) || !x.port.bufPort.isDefined}
         val RPorts = np.p.RMapping.filter(_.port.bufPort == Some(i))
-        val x = Module(new ShiftRegFile(np.p.logicalDims, np.p.bitWidth, np.p.logicalDims, np.p.blocks, np.p.logicalDims, // TODO: should neighborhood be set to np.p.logicaldims??
+        val x = Module(new ShiftRegFile(np.p.Ds, np.p.bitWidth, np.p.Ds, np.p.Bs, np.p.Ds, // TODO: should neighborhood be set to np.p.logicaldims??
                         if (WPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else WPorts, if (RPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else RPorts,
                         np.p.inits, np.p.syncMem, np.p.fracBits, isBuf = !isShiftEntry, np.p.numActives, "sr"))
         x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
@@ -181,11 +182,11 @@ class NBufMem(np: NBufParams) extends Module {
       }
 
     case LineBufferType => 
-      val rowstride = np.p.neighborhood(0)
-      val numrows = np.p.logicalDims(0) + (np.numBufs-1)*rowstride
-      val numcols = np.p.logicalDims(1)
+      val rowstride = np.p.Ps(0)
+      val numrows = np.p.Ds(0) + (np.numBufs-1)*rowstride
+      val numcols = np.p.Ds(1)
       val lb = Module(new BankedSRAM(List(numrows,numcols), np.p.bitWidth,
-                               List(numrows,np.p.banks(1)), np.p.blocks, np.p.neighborhood,
+                               List(numrows,np.p.Ns(1)), np.p.Bs, np.p.Ps,
                                np.p.WMapping.map(_.randomBanks), np.p.RMapping.map(_.randomBanks),
                                np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, numActives = np.p.numActives, "lb"))
       lb.io <> DontCare
@@ -233,10 +234,10 @@ class NBufMem(np: NBufParams) extends Module {
       lb.io.wPort.zip(io.wPort).foreach { case (mem, nbuf) =>
         mem.en := nbuf.en
         mem.data := nbuf.data
-        mem.ofs := writeColAddrs.map{x => (x.asUInt - colCorrectionValue) / np.p.banks(1).U}
+        mem.ofs := writeColAddrs.map{x => (x.asUInt - colCorrectionValue) / np.p.Ns(1).U}
         mem.banks.zipWithIndex.map{case (b,i) => 
           if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - (((np.numBufs-1)*rowstride - 1).U - nbuf.banks(0))
-          else b := (writeColAddrs(i/2).asUInt - colCorrectionValue) % np.p.banks(1).U
+          else b := (writeColAddrs(i/2).asUInt - colCorrectionValue) % np.p.Ns(1).U
         }
       }
 

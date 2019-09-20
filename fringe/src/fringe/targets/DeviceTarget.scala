@@ -2,7 +2,7 @@ package fringe.targets
 
 import chisel3.Data
 import fringe._
-import fringe.utils.log2Up
+import _root_.utils.math.log2Up
 
 trait DeviceTarget {
   type Reset = chisel3.core.Reset

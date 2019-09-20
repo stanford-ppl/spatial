@@ -217,30 +217,28 @@ object DenseTransfer {
 
       */
 
-      if (!spatialConfig.enablePIR) {
-         val elementsPerBurst = (target.burstSize/A.nbits).to[I32]
-         val bytesPerBurst = (target.burstSize/8).to[I32]
+      if (A.nbits < 8) {
+        val elementsPerBurst = (target.burstSize / A.nbits).to[I32]
+        val bytesPerBurst = (target.burstSize / 8).to[I32]
 
-         val maddr_bytes  = dramAddr() * bytesPerWord     // Raw address in bytes
-         val start_bytes  = maddr_bytes % bytesPerBurst    // Number of bytes offset from previous burst aligned address
-         val length_bytes = requestLength * bytesPerWord / wordsPackedInByte   // Raw length in bytes
-         val offset_bytes = maddr_bytes - start_bytes      // Burst-aligned start address, in bytes
-         val raw_end      = maddr_bytes + length_bytes     // Raw end, in bytes, with burst-aligned start
+        val maddr_bytes = dramAddr() * bytesPerWord // Raw address in bytes
+        val start_bytes = maddr_bytes % bytesPerBurst // Number of bytes offset from previous burst aligned address
+        val length_bytes = requestLength * bytesPerWord / wordsPackedInByte // Raw length in bytes
+        val offset_bytes = maddr_bytes - start_bytes // Burst-aligned start address, in bytes
+        val raw_end = maddr_bytes + length_bytes // Raw end, in bytes, with burst-aligned start
 
-         val end_bytes = mux(raw_end % bytesPerBurst === 0.to[I32],  0.to[I32], bytesPerBurst - raw_end % bytesPerBurst) // Extra useless bytes at end
+        val end_bytes = mux(raw_end % bytesPerBurst === 0.to[I32], 0.to[I32], bytesPerBurst - raw_end % bytesPerBurst) // Extra useless bytes at end
 
-         // FIXME: What to do for bursts which split individual words?
-         val start = wordsPackedInByte * start_bytes / bytesPerWord     // Number of WHOLE elements to ignore at start
-         val extra = wordsPackedInByte * end_bytes / bytesPerWord       // Number of WHOLE elements that will be ignored at end
-         val end   = start + requestLength          // Index of WHOLE elements to start ignoring at again
-         val size  = end + extra  // Total number of WHOLE elements to expect
+        // FIXME: What to do for bursts which split individual words?
+        val start = wordsPackedInByte * start_bytes / bytesPerWord // Number of WHOLE elements to ignore at start
+        val extra = wordsPackedInByte * end_bytes / bytesPerWord // Number of WHOLE elements that will be ignored at end
+        val end = start + requestLength // Index of WHOLE elements to start ignoring at again
+        val size = end + extra // Total number of WHOLE elements to expect
 
-         val size_bytes = length_bytes + start_bytes + end_bytes  // Burst aligned length
-         val addr_bytes = offset_bytes.to[I64] + dram.address     // Burst-aligned offchip byte address
-         AlignmentData(start, end, size, addr_bytes, size_bytes)
-
+        val size_bytes = length_bytes + start_bytes + end_bytes // Burst aligned length
+        val addr_bytes = offset_bytes.to[I64] + dram.address // Burst-aligned offchip byte address
+        AlignmentData(start, end, size, addr_bytes, size_bytes)
       } else {
-
          // In Plasticine dram.address is guaranteed to be burst aligned when host malloc
          // TODO: On plasticine only consider word width dividable by burstSize
          // This logic should be easily extendable to FPGA by converting addresses first to bitPerBurst instead of wordPerBurst. 
@@ -257,36 +255,6 @@ object DenseTransfer {
 
          val size_bytes = endBurstAlignedByte
          val addr_bytes = offsetBurstAlignedByte.to[I64] + dram.address
-
-         //spatial.dsl.println(Text("offsetWord ") + offsetWord + Text(" requestLength ") + requestLength)
-
-         //val aligned = {
-            //val elementsPerBurst = (target.burstSize/A.nbits).to[I32]
-            //val bytesPerBurst = (target.burstSize/8).to[I32]
-
-            //val maddr_bytes  = dramAddr() * bytesPerWord     // Raw address in bytes
-            //val start_bytes  = maddr_bytes % bytesPerBurst    // Number of bytes offset from previous burst aligned address
-            //val length_bytes = requestLength * bytesPerWord / wordsPackedInByte   // Raw length in bytes
-            //val offset_bytes = maddr_bytes - start_bytes      // Burst-aligned start address, in bytes
-            //val raw_end      = maddr_bytes + length_bytes     // Raw end, in bytes, with burst-aligned start
-
-            //val end_bytes = mux(raw_end % bytesPerBurst === 0.to[I32],  0.to[I32], bytesPerBurst - raw_end % bytesPerBurst) // Extra useless bytes at end
-
-            //val start = wordsPackedInByte * start_bytes / bytesPerWord     // Number of WHOLE elements to ignore at start
-            //val extra = wordsPackedInByte * end_bytes / bytesPerWord       // Number of WHOLE elements that will be ignored at end
-            //val end   = start + requestLength          // Index of WHOLE elements to start ignoring at again
-            //val size  = end + extra  // Total number of WHOLE elements to expect
-
-            //val size_bytes = length_bytes + start_bytes + end_bytes  // Burst aligned length
-            //val addr_bytes = offset_bytes.to[I64] + dram.address     // Burst-aligned offchip byte address
-            //AlignmentData(start, end, size, addr_bytes, size_bytes)
-         //}
-
-         //spatial.dsl.assert(aligned.start===start, Text(s"start ") + aligned.start + " " + start)
-         //spatial.dsl.assert(aligned.end===end, Text(s"end " )+ aligned.end + " " + end)
-         //spatial.dsl.assert(aligned.size===size, Text(s"size ") + aligned.size + " " + size)
-         //spatial.dsl.assert(aligned.addr_bytes===addr_bytes, Text(s"addr_bytes ") + aligned.addr_bytes + " " + addr_bytes)
-         //spatial.dsl.assert(aligned.size_bytes===size_bytes, Text(s"size_bytes ") + aligned.size_bytes + " " + size_bytes)
 
          AlignmentData(start, end, size, addr_bytes, size_bytes)
       }

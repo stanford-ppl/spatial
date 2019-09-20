@@ -59,7 +59,6 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   // TODO: Upcast dims to evenly bank
   val numMems = p.Ns.product
   val bankDim = math.ceil(p.volume.toDouble / numMems.toDouble).toInt
-
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until numMems).map{ i =>
     val mem = Module(new Mem1D(bankDim, p.bitWidth, p.syncMem))

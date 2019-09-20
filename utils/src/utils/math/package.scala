@@ -61,8 +61,15 @@ package object math {
   def log2Up(n: Double): Int = log2Up(n.toInt)
   def nhoods(Ds: Seq[Int], Ps: Seq[Int]): Int = Ds.zip(Ps).map{case (d,s) => scala.math.ceil(d/s).toInt}.product
   def hiddenVolume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]) : Int = {
-    if (Ns.size == 1) Bs.head*Ps.map{_ % Ns.head}.min*nhoods(Ds, Ps)
-    else Ps.zip(Ns).zipWithIndex.map{case ((s,n),i) => Bs(i)*(s % n)*Ps.patch(i,Nil,1).product}.sum * nhoods(Ds, Ps)
+    if (Ps.size == 0) 0
+    else if (Ns.size == 1) {
+      val hang = Ps.map{_ % Ns.head}.min
+      if (hang == 0) 0 else Bs.head*(Ns.head - hang)*nhoods(Ds, Ps)
+    }
+    else Ps.zip(Ns).zipWithIndex.map{case ((p,n),i) =>
+      val hang = p % n
+      if (hang == 0) 0 else Bs(i)*(n - hang)*Ps.patch(i,Nil,1).product
+    }.sum * nhoods(Ds, Ps)
   }
   def volume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]): Int = Ds.product + hiddenVolume(Ns, Bs, Ps, Ds)
   def numBanks(Ns: Seq[Int]): Int = Ns.product

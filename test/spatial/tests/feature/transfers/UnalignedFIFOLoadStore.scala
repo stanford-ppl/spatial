@@ -2,7 +2,7 @@ package spatial.tests.feature.transfers
 import spatial.dsl._
 
 @spatial class UnalignedFIFOLoadStore extends SpatialTest {
-  val N = 1024
+  val N = 64
 
   def main(args: Array[String]): Unit = {
     type T = Int

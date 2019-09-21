@@ -1,16 +1,10 @@
 package fringe.templates.memory
 
-import chisel3._
-import fringe._
-import fringe.templates.counters.{NBufCtr, SingleCounter}
-import fringe.Ledger._
-import fringe.globals
-import fringe.templates.math.FixedPoint
-import fringe.utils.{getRetimed, risingEdge}
-import fringe.utils.HVec
-import fringe.utils._
-import fringe.utils.implicits._
 import _root_.utils.math._
+import chisel3._
+import fringe.templates.counters.{NBufCtr, SingleCounter}
+import fringe.templates.math.FixedPoint
+import fringe.utils.{getRetimed, risingEdge, _}
 
 /* Controller that is instantiated in NBuf templates to handle port -> module muxing */
 class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
@@ -43,7 +37,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   // Counters for reporting writer and reader buffer pointers
   // Mapping input write ports to their appropriate bank
   val statesInW = portsWithWriter.distinct.sorted.zipWithIndex.map { case (t,i) =>
-    val c = Module(new NBufCtr(1,Some(t), Some(numBufs), 1+log2Up(numBufs)))
+    val c = Module(new NBufCtr(1,Some(t), Some(numBufs), numBufs-1))
     c.io <> DontCare
     c.io.input.enable := swap
     c.io.input.countUp := false.B
@@ -53,7 +47,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 
   // Mapping input read ports to their appropriate bank
   val statesInR = (0 until numBufs).map{  i => 
-    val c = Module(new NBufCtr(1,Some(i), Some(numBufs), 1+log2Up(numBufs)))
+    val c = Module(new NBufCtr(1,Some(i), Some(numBufs), numBufs-1))
     c.io <> DontCare
     c.io.input.enable := swap
     c.io.input.countUp := false.B

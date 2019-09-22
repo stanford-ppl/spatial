@@ -27,7 +27,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut || mem.isHostIO
 
-  lazy val bankViews: Seq[BankingView] = if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
+  lazy val bankViews: Seq[BankingView] = if (strategy.isInstanceOf[FullyBanked]) Seq(Hierarchical(rank))
+                                         else if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
                                          else if (mem.explicitBanking.isDefined && mem.explicitNs.size > 1) Seq(Hierarchical(rank))
                                          else if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
                                          else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank) Seq(Flat(rank), Hierarchical(rank)) 
@@ -35,8 +36,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                                          else if (mem.isNoFlatBank) Seq(Hierarchical(rank)) 
                                          else Seq(Flat(rank))
 
-  lazy val nStricts: Seq[NStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs)) else if (mem.nConstraints.isEmpty) Seq(NPowersOf2, NBestGuess, NRelaxed) else mem.nConstraints
-  lazy val aStricts: Seq[AlphaStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas)) else if (mem.alphaConstraints.isEmpty) Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed) else mem.alphaConstraints
+  lazy val nStricts: Seq[NStrictness] = if (strategy.isInstanceOf[FullyBanked]) Seq(NRelaxed)
+                                        else if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs))
+                                        else if (mem.nConstraints.isEmpty) Seq(NPowersOf2, NBestGuess, NRelaxed)
+                                        else mem.nConstraints
+  lazy val aStricts: Seq[AlphaStrictness] = if (strategy.isInstanceOf[FullyBanked]) Seq(AlphaRelaxed)
+                                            else if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas))
+                                            else if (mem.alphaConstraints.isEmpty) Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+                                            else mem.alphaConstraints
   lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
                                                     else if (mem.isNoFission) RegroupHelper.regroupNone
                                                     else if (mem.isFullFission) RegroupHelper.regroupAll(rank)

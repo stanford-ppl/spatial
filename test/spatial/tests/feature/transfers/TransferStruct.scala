@@ -85,7 +85,7 @@ import spatial.dsl._
     println(r"vel: ${velcksum}")
     println(r"fram: ${framcksum}")
     println(r"tri: ${tricksum}")
-    println(r"tensor: ${tensorcksum}")
+    println(r"tensor: ${tensorcksum} (apparently failure here is expected?)")
     println(r"$x == 42*43 == ${42*43}")
 
     assert(velcksum && framcksum && tricksum)

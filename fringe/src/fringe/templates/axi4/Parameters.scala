@@ -4,7 +4,7 @@ package fringe.templates.axi4
 import chisel3._
 import chisel3.util._
 import fringe.templates.diplomacy._
-import fringe.utils.log2Up
+import _root_.utils.math.log2Up
 
 import scala.math.max
 

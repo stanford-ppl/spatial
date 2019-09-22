@@ -247,3 +247,19 @@ trait Mem5[A,M1[T],M2[T],M3[T],M4[T],M5[T]] extends Mem[A,M5] {
   /** Creates a view of a 5-dimensional, dense region of this memory. */
   @api def apply(x: Rng, q: Rng, p: Rng, r: Rng, c: Rng): M5[A] = stage(MemDenseAlias[A,M5,M5](me, Seq(x, q, p, r, c)))
 }
+
+trait ReadMem1[A] {
+  @api def apply(pos: I32): A
+}
+trait ReadMem2[A] {
+  @api def apply(row: I32, col: I32): A
+}
+trait ReadMem3[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32): A
+}
+trait ReadMem4[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3:I32): A
+}
+trait ReadMem5[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3:I32, d4:I32): A
+}

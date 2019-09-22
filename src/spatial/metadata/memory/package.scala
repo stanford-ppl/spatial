@@ -80,14 +80,20 @@ package object memory {
     def isMustMerge: Boolean = metadata[MustMerge](s).exists(_.flag)
     def isMustMerge_=(flag: Boolean): Unit = metadata.add(s, MustMerge(flag))
 
-    def isOnlyDuplicate: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
-    def isOnlyDuplicate_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
+    def isFullFission: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
+    def isFullFission_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
 
     def duplicateOnAxes: Option[Seq[Seq[Int]]] = metadata[DuplicateOnAxes](s).map(_.opts)
     def duplicateOnAxes_=(opts: Seq[Seq[Int]]): Unit = metadata.add(s, DuplicateOnAxes(opts))
 
-    def isNoDuplicate: Boolean = metadata[NoDuplicate](s).exists(_.flag)
-    def isNoDuplicate_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
+    def nConstraints: Seq[NStrictness] = metadata[NConstraints](s).map(_.typs).getOrElse(Seq())
+    def nConstraints_=(t: Seq[NStrictness]): Unit = metadata.add(s, NConstraints(t))
+
+    def alphaConstraints: Seq[AlphaStrictness] = metadata[AlphaConstraints](s).map(_.typs).getOrElse(Seq())
+    def alphaConstraints_=(t: Seq[AlphaStrictness]): Unit = metadata.add(s, AlphaConstraints(t))
+
+    def isNoFission: Boolean = metadata[NoDuplicate](s).exists(_.flag)
+    def isNoFission_=(flag: Boolean): Unit = metadata.add(s, NoDuplicate(flag))
 
     def shouldCoalesce: Boolean = metadata[ShouldCoalesce](s).exists(_.flag)
     def shouldCoalesce_=(flag: Boolean): Unit = metadata.add(s, ShouldCoalesce(flag))
@@ -103,10 +109,6 @@ package object memory {
     def getPadding: Option[Seq[Int]] = metadata[Padding](s).map(_.dims)
     def padding: Seq[Int] = getPadding.getOrElse{throw new Exception(s"No padding defined for $s")}
     def padding_=(ds: Seq[Int]): Unit = metadata.add(s, Padding(ds))
-
-    def getDarkVolume: Option[Int] = metadata[DarkVolume](s).map(_.b)
-    def darkVolume: Int = getDarkVolume.getOrElse{throw new Exception(s"No darkVolume defined for $s")}
-    def darkVolume_=(b: Int): Unit = metadata.add(s, DarkVolume(b))
 
     /** Stride info for LineBuffer */
     @stateful def stride: Int = s match {case Op(_@LineBufferNew(_,_,stride)) => stride match {case Expect(c) => c.toInt; case _ => -1}; case _ => -1}

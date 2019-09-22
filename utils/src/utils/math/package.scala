@@ -1,4 +1,5 @@
 package utils
+import utils.implicits.collections._
 
 package object math {
   def log2(x: Double): Double = Math.log10(x)/Math.log10(2)
@@ -20,6 +21,13 @@ package object math {
     }
 
   def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
+  def coprime(x: Seq[Int]): Boolean = {
+    x.size == 1 || !x.forallPairs(gcd(_,_) > 1)
+  }
+  def nCr(n: Int, r: Int): Int = {
+    if (n > r) ({n-r+1} to n).map{i => i}.product/(1 to r).map{i => i}.product
+    else 1
+  }
   def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
 
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),
@@ -31,9 +39,9 @@ package object math {
     case h::tail if tail.nonEmpty => (0 to h-1).flatMap{i => allLoops(tail, a.tail, B, iterators ++ Seq(i*a.head/B))}
     case h::tail if tail.isEmpty => (0 to h-1).map{i => i*a.head/B + iterators.sum}
   }
-  def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int, allPossible: Seq[Int]): Boolean = {
+  def spansAllBanks(p: Seq[Int], a: Seq[Int], N: Int, B: Int): Boolean = {
     val banksInFence = allLoops(p,a,B,Nil).map(_%N)
-    allPossible.forall{b => val occurs = banksInFence.count(_==b); occurs >= 1 && occurs <= B}
+    List.tabulate(N){i => i}.forall{i => banksInFence.count(_ == i) <= B}
   }
   /** Given (padded) dims of a memory, P for that memory, and histogram mapping bank to number of degenerates for that bank per yard,
     * figure out how many inaccessible physical addresses exist
@@ -43,4 +51,29 @@ package object math {
     hist.map(_._2).map(degenerate - _).sum * paddedDims.zip(P).map{case(x,y) => x/y}.product 
   }
 
+
+  /** Cyclic banking helper functions */
+  def log2Ceil(n: BigInt): Int = 1 max (scala.math.ceil(scala.math.log(1 max (1+n.toInt))/scala.math.log(2)).toInt)
+  def log2Ceil(n: Int): Int = log2Ceil(BigInt(n))
+  def log2Ceil(n: Double): Int = log2Ceil(BigInt(n.toInt))
+  def log2Up(n: Int): Int = log2Up(BigInt(n))
+  def log2Up(n: BigInt): Int = if (n < 0) log2Ceil((n.abs + 1) max 1) max 1 else log2Ceil(n max 1) max 1
+  def log2Up(n: Double): Int = log2Up(n.toInt)
+  def nhoods(Ds: Seq[Int], Ps: Seq[Int]): Int = Ds.zip(Ps).map{case (d,s) => scala.math.ceil(d/s).toInt}.product
+  def hiddenVolume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]) : Int = {
+    if (Ps.size == 0) 0
+    else if (Ns.size == 1) {
+      val hang = Ps.map{_ % Ns.head}.min
+      if (hang == 0) 0 else Bs.head*(Ns.head - hang)*nhoods(Ds, Ps)
+    }
+    else Ps.zip(Ns).zipWithIndex.map{case ((p,n),i) =>
+      val hang = p % n
+      if (hang == 0) 0 else Bs(i)*(n - hang)*Ps.patch(i,Nil,1).product
+    }.sum * nhoods(Ds, Ps)
+  }
+  def volume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]): Int = Ds.product + hiddenVolume(Ns, Bs, Ps, Ds)
+  def numBanks(Ns: Seq[Int]): Int = Ns.product
+  def ofsWidth(volume: Int, Ns: Seq[Int]): Int = log2Up(scala.math.ceil(volume/Ns.product))
+  def banksWidths(Ns: Seq[Int]): Seq[Int] = Ns.map(log2Up)
+  def elsWidth(volume: Int): Int = log2Up(volume) + 2
 }

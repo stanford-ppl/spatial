@@ -15,7 +15,7 @@ trait PIRGenReg extends PIRCodegen {
       stateMem(lhs, s"""argIn("${lhs.name.getOrElse(s"$lhs")}")""", tp=Some("Reg"), inits=Some(init))
 
     case op@HostIONew(Const(init))  =>
-      stateMem(lhs, "argIn()", tp=Some("Reg"), inits=Some(init))
+      stateMem(lhs, "hostIO()", tp=Some("Reg"), inits=Some(init))
 
     case op@ArgOutNew(Const(init)) =>
       stateMem(lhs, "argOut()", tp=Some("Reg"), inits=Some(init))

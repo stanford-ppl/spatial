@@ -10,6 +10,8 @@ import spatial.metadata.retiming._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
 
+import utils.math._
+
 trait ChiselGenMem extends ChiselGenCommon {
 
   private var memsWithReset: List[Sym[_]] = List()
@@ -170,27 +172,20 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     val dimensions = paddedDims(mem, name).mkString("List[Int](", ",", ")") //dims.zip(padding).map{case (d,p) => s"$d+$p"}.mkString("List[Int](", ",", ")")
     val numBanks = {if (mem.isLUT | mem.isRegFile) dims else inst.nBanks}.map(_.toString).mkString("List[Int](", ",", ")")
-    val strides = inst.Ps.map(_.toString).mkString("List[Int](",",",")")
+    val blockCycs = {if (mem.isLUT | mem.isRegFile) List.fill(dims.size)(1) else inst.Bs}.map(_.toString).mkString("List[Int](",",",")")
+    val neighborhood = {if (mem.isLUT | mem.isRegFile) dims else inst.Ps}.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
+    val ofsWidth = utils.math.ofsWidth(utils.math.volume(inst.nBanks, inst.Bs, inst.Ps, paddedDims(mem,name)), inst.nBanks)
+    val banksWidths = utils.math.banksWidths(inst.nBanks)
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"
     createMemObject(mem) {
       mem.writers.zipWithIndex.foreach{ case (w, i) => 
-        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product+mem.darkVolume)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
-                         else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
-        val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-                          else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-
         val resids = w.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
         emit(src"val w$i = Access(${w.hashCode}, ${w.port.muxPort}, ${w.port.muxOfs}, ${w.port.castgroup.mkString("List(",",",")")}, ${w.port.broadcast.mkString("List(",",",")")}, ${w.shiftAxis}, PortInfo(${w.port.bufferPort}, ${1 max w.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
       }
       if (mem.writers.isEmpty) {emit(src"val w0 = AccessHelper.singular(32)")}
-      mem.readers.zipWithIndex.foreach{ case (r, i) => 
-        val ofsWidth = if (!mem.isLineBuffer) Math.max(1, Math.ceil(scala.math.log((paddedDims(mem,name).product+mem.darkVolume)/mem.instance.nBanks.product)/scala.math.log(2)).toInt)
-                         else Math.max(1, Math.ceil(scala.math.log(paddedDims(mem,name).last/mem.instance.nBanks.last)/scala.math.log(2)).toInt)
-        val banksWidths = if (mem.isRegFile || mem.isLUT) paddedDims(mem,name).map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-                          else mem.instance.nBanks.map{x => Math.ceil(scala.math.log(x)/scala.math.log(2)).toInt}
-
+      mem.readers.zipWithIndex.foreach{ case (r, i) =>
         val resids = r.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
         if (!r.port.bufferPort.isDefined && mem.isNBuffered && !mem.isLineBuffer) throw new Exception(src"Unsure how to handle broadcasted read @ ${r.ctx.content.getOrElse("<?:?:?>")} ($mem port $r)")
         emit(src"val r$i = Access(${r.hashCode}, ${r.port.muxPort}, ${r.port.muxOfs}, ${r.port.castgroup.mkString("List(",",",")")}, ${r.port.broadcast.mkString("List(",",",")")}, ${r.shiftAxis}, PortInfo(${r.port.bufferPort}, ${1 max r.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
@@ -198,10 +193,11 @@ trait ChiselGenMem extends ChiselGenCommon {
       if (mem.readers.isEmpty) {emit(src"val r0 = AccessHelper.singular(32)")}
 
       emit(src"""val m = Module(new $templateName 
-    $dimensions, ${mem.darkVolume},
+    $dimensions,
     $depth ${bitWidth(mem.tp.typeArgs.head)}, 
-    $numBanks, 
-    $strides, 
+    $numBanks,
+    $blockCycs,
+    $neighborhood,
     ${List.tabulate(1 max mem.writers.size){i => s"w$i"}.mkString("List(", ",", ")")},
     ${List.tabulate(1 max mem.readers.size){i => s"r$i"}.mkString("List(", ",", ")")},
     $bankingMode, 

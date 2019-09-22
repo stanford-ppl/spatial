@@ -22,7 +22,7 @@ import spatial.node._
     setMem(dram, data)
 
     Accel {
-      val sram = SRAM[Int](4,16).hierarchical.noduplicate // Only try to bank hierarchically to expose bug #123
+      val sram = SRAM[Int](4,16).hierarchical.nofission // Only try to bank hierarchically to expose bug #123
       sram load dram
       out := 'LOOP1.Reduce(Reg[Int])(4 by 1 par 2){i => 
         // val max = if (in.value < 10) 16 else 8 // Should always choose 16, but looks random to compiler (NOT TRUE AS OF 7/12/2019 BECAUSE CONDITION IS LANE-INVARIANT)

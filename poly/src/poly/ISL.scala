@@ -26,6 +26,13 @@ trait ISL {
     val emptiness_path = java.nio.file.Paths.get(emptiness_bin)
 
     {
+      // Step 0: Check if libisl is installed, since 90% of people get stuck on it
+      {
+        import sys.process._
+        val isl_missing = ("whereis libisl" !!).indexOf("/") == -1
+        if (isl_missing) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] libisl appears to be missing!  Please install http://isl.gforge.inria.fr/")
+      }
+      
       // step 1: Acquire channel to emptiness_lock
       val channel = {
         try {
@@ -53,6 +60,7 @@ trait ISL {
           case _: Throwable => throw new Exception("Could not get emptiness.c source code")
         }
       }
+
       val emptiness_exists = java.nio.file.Files.exists(emptiness_path)
       val needsCompile = try {
         if (emptiness_exists) {

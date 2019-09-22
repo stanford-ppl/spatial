@@ -1,15 +1,10 @@
 package fringe.templates.memory
 
+import _root_.utils.math._
 import chisel3._
-import fringe._
 import fringe.templates.counters.{NBufCtr, SingleCounter}
-import fringe.Ledger._
-import fringe.globals
 import fringe.templates.math.FixedPoint
-import fringe.utils.{getRetimed, log2Up, risingEdge}
-import fringe.utils.HVec
-import fringe.utils._
-import fringe.utils.implicits._
+import fringe.utils.{getRetimed, risingEdge, _}
 
 /* Controller that is instantiated in NBuf templates to handle port -> module muxing */
 class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
@@ -42,7 +37,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
   // Counters for reporting writer and reader buffer pointers
   // Mapping input write ports to their appropriate bank
   val statesInW = portsWithWriter.distinct.sorted.zipWithIndex.map { case (t,i) =>
-    val c = Module(new NBufCtr(1,Some(t), Some(numBufs), 1+log2Up(numBufs)))
+    val c = Module(new NBufCtr(1,Some(t), Some(numBufs), numBufs-1))
     c.io <> DontCare
     c.io.input.enable := swap
     c.io.input.countUp := false.B
@@ -52,7 +47,7 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 
   // Mapping input read ports to their appropriate bank
   val statesInR = (0 until numBufs).map{  i => 
-    val c = Module(new NBufCtr(1,Some(i), Some(numBufs), 1+log2Up(numBufs)))
+    val c = Module(new NBufCtr(1,Some(i), Some(numBufs), numBufs-1))
     c.io <> DontCare
     c.io.input.enable := swap
     c.io.input.countUp := false.B
@@ -67,11 +62,11 @@ class NBufController(numBufs: Int, portsWithWriter: List[Int]) extends Module {
 
 class NBufMem(np: NBufParams) extends Module {
 
-  def this( mem: MemType, logicalDims: List[Int], darkVolume: Int,
-    numBufs: Int, bitWidth: Int, banks: List[Int], strides: List[Int], 
+  def this( mem: MemType, logicalDims: List[Int],
+    numBufs: Int, bitWidth: Int, banks: List[Int], blocks: List[Int], neighborhood: List[Int],
     WMapping: List[Access], RMapping: List[Access],
     bankingMode: BankingMode, inits: Option[List[Double]] = None, syncMem: Boolean = false, fracBits: Int = 0, numActives: Int = 1, myName: String = "NBuf"
-  ) = this(NBufParams(numBufs, mem, MemParams(FIFOInterfaceType, logicalDims,darkVolume,bitWidth,banks,strides,WMapping,RMapping,bankingMode,inits,syncMem,fracBits,true,numActives,myName)))
+  ) = this(NBufParams(numBufs, mem, MemParams(FIFOInterfaceType, logicalDims,bitWidth,banks,blocks,neighborhood,WMapping,RMapping,bankingMode,inits,syncMem,fracBits,true,numActives,myName)))
 
   override def desiredName = np.p.myName
 
@@ -96,8 +91,8 @@ class NBufMem(np: NBufParams) extends Module {
   np.mem match {
     case BankedSRAMType => 
       val srams = (0 until np.numBufs).map{ i => 
-        val x = Module(new BankedSRAM(np.p.logicalDims, np.p.darkVolume, np.p.bitWidth,
-                        np.p.banks, np.p.strides, 
+        val x = Module(new BankedSRAM(np.p.Ds, np.p.bitWidth,
+                        np.p.Ns, np.p.Bs, np.p.Ps,
                         np.p.WMapping, np.p.RMapping,
                         np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, np.p.numActives, "SRAM"))
         x.io <> DontCare
@@ -156,7 +151,7 @@ class NBufMem(np: NBufParams) extends Module {
         if (isShiftEntry) shiftEntryBuf = Some(i)
         val WPorts = np.p.WMapping.filter{x => x.port.bufPort == Some(i) || !x.port.bufPort.isDefined}
         val RPorts = np.p.RMapping.filter(_.port.bufPort == Some(i))
-        val x = Module(new ShiftRegFile(np.p.logicalDims, np.p.darkVolume, np.p.bitWidth, np.p.logicalDims, np.p.logicalDims,
+        val x = Module(new ShiftRegFile(np.p.Ds, np.p.bitWidth, np.p.Ds, np.p.Bs, np.p.Ds, // TODO: should neighborhood be set to np.p.logicaldims??
                         if (WPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else WPorts, if (RPorts.isEmpty) List(AccessHelper.singular(np.p.bitWidth)) else RPorts,
                         np.p.inits, np.p.syncMem, np.p.fracBits, isBuf = !isShiftEntry, np.p.numActives, "sr"))
         x.io.asInstanceOf[ShiftRegFileInterface] <> DontCare
@@ -181,11 +176,11 @@ class NBufMem(np: NBufParams) extends Module {
       }
 
     case LineBufferType => 
-      val rowstride = np.p.strides(0)
-      val numrows = np.p.logicalDims(0) + (np.numBufs-1)*rowstride
-      val numcols = np.p.logicalDims(1)
-      val lb = Module(new BankedSRAM(List(numrows,numcols), 0, np.p.bitWidth,
-                               List(numrows,np.p.banks(1)), np.p.strides,
+      val rowstride = np.p.Ps(0)
+      val numrows = np.p.Ds(0) + (np.numBufs-1)*rowstride
+      val numcols = np.p.Ds(1)
+      val lb = Module(new BankedSRAM(List(numrows,numcols), np.p.bitWidth,
+                               List(numrows,np.p.Ns(1)), np.p.Bs, np.p.Ps,
                                np.p.WMapping.map(_.randomBanks), np.p.RMapping.map(_.randomBanks),
                                np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, numActives = np.p.numActives, "lb"))
       lb.io <> DontCare
@@ -233,10 +228,10 @@ class NBufMem(np: NBufParams) extends Module {
       lb.io.wPort.zip(io.wPort).foreach { case (mem, nbuf) =>
         mem.en := nbuf.en
         mem.data := nbuf.data
-        mem.ofs := writeColAddrs.map{x => (x.asUInt - colCorrectionValue) / np.p.banks(1).U}
+        mem.ofs := writeColAddrs.map{x => (x.asUInt - colCorrectionValue) / np.p.Ns(1).U}
         mem.banks.zipWithIndex.map{case (b,i) => 
           if (i % 2 == 0) b := writeRow.io.output.count + (rowstride-1).U - (((np.numBufs-1)*rowstride - 1).U - nbuf.banks(0))
-          else b := (writeColAddrs(i/2).asUInt - colCorrectionValue) % np.p.banks(1).U
+          else b := (writeColAddrs(i/2).asUInt - colCorrectionValue) % np.p.Ns(1).U
         }
       }
 
@@ -264,7 +259,7 @@ class NBufMem(np: NBufParams) extends Module {
 class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") extends Module { 
   val wMap = List(AccessHelper.singularOnPort(0, bitWidth))
   val rMap = List.tabulate(numBufs-1){i => AccessHelper.singularOnPort(i+1, bitWidth)}
-  val io = IO( new NBufInterface(NBufParams(numBufs, FFType, MemParams(FIFOInterfaceType, List(1), 0, bitWidth, List(1), List(1), wMap, rMap, BankedMemory))))
+  val io = IO( new NBufInterface(NBufParams(numBufs, FFType, MemParams(FIFOInterfaceType, List(1), bitWidth, List(1), List(1), List(1), wMap, rMap, BankedMemory))))
 
   override def desiredName = myName
   
@@ -275,7 +270,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
   io.almostEmpty := DontCare
   io.numel := DontCare
 
-  val nbufFF = Module(new NBufMem(FFType, List(1), 0, numBufs, bitWidth, List(1), List(1), wMap, rMap, BankedMemory))
+  val nbufFF = Module(new NBufMem(FFType, List(1), numBufs, bitWidth, List(1), List(1), List(1), wMap, rMap, BankedMemory))
   io <> nbufFF.io
 
   def connectStageCtrl(done: Bool, en: Bool, port: Int): Unit = {

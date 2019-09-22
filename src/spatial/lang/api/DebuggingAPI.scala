@@ -178,12 +178,9 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   }
 
 
-  @api def checkGold[T:Bits](dram:DRAM1[T], goldFile:java.lang.String)(implicit ev:Cast[Text,T]):Bit = {
-    val goldData = loadCSV1D[T](goldFile)
-    checkGold(dram, goldData)
-  }
-
-  @api def checkGold[T:Bits](dram:DRAM1[T], gold:Array[T])(implicit ev:Cast[Text,T]):Bit = {
+  @api def checkGold[T:Bits](dram:DRAM1[T], gold:Array[T])(implicit ev:Cast[Text,T]):Bit =
+    checkGold(dram, gold, 0)
+  @api def checkGold[T:Bits](dram:DRAM1[T], gold:Array[T], margin:scala.Double)(implicit ev:Cast[Text,T]):Bit = {
     val result = getMem(dram)
     println(s"${dram.name.getOrElse(s"$dram")} Result: ")
     printArray(result)
@@ -191,14 +188,28 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     println(s"${dram.name.getOrElse(s"$dram")} Gold: ")
     printArray(gold)
 
-    approxEql[T](result, gold)
+    approxEql[T](result, gold, margin)
   }
 
-  @api def checkGold[T:Bits](reg:Reg[T], gold:T)(implicit ev:Cast[T,Text]):Bit = {
+  @api def checkGold[T:Bits](dram:DRAM2[T], gold:Tensor2[T])(implicit ev:Cast[Text,T]):Bit =
+    checkGold(dram, gold, 0)
+  @api def checkGold[T:Bits](dram:DRAM2[T], gold:Tensor2[T], margin:scala.Double)(implicit ev:Cast[Text,T]):Bit = {
+    val result = getMem(dram)
+    println(s"${dram.name.getOrElse(s"$dram")} Result: ")
+    printArray(result)
+
+    println(s"${dram.name.getOrElse(s"$dram")} Gold: ")
+    printMatrix(gold)
+
+    approxEql[T](result, gold.flatten, margin)
+  }
+
+  @api def checkGold[T:Bits](reg:Reg[T], gold:T)(implicit ev:Cast[T,Text]):Bit = checkGold(reg, gold, 0)
+  @api def checkGold[T:Bits](reg:Reg[T], gold:T,margin:scala.Double)(implicit ev:Cast[T,Text]):Bit = {
     val result = getArg(reg)
     println(Text(s"${reg.name.getOrElse(s"$reg")} Result: ") + result.to[Text])
     println(Text(s"${reg.name.getOrElse(s"$reg")} Gold: ") + gold.to[Text])
-    approxEql[T](result, gold)
+    approxEql[T](result, gold, margin)
   }
 
   // Unstaged if statement

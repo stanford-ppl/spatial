@@ -103,7 +103,9 @@ object FltFmt {
     case c => c
   }
 
-  @api override def toText: Text = stage(FltToText(this))
+  @api override def toText: Text = stage(FltToText(this, None))
+  @api def toText(format:Option[String]): Text = stage(FltToText(this, format))
+
   @rig def __toFix[S2:BOOL,I2:INT,F2:INT]: Fix[S2,I2,F2] = {
     stage(FltToFix[M,E,S2,I2,F2](this, FixFmt(BOOL[S2],INT[I2],INT[F2])))
   }

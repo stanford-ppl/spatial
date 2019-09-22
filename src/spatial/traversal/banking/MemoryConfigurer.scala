@@ -27,7 +27,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected lazy val rank: Int = mem.sparseRank.length
   protected lazy val isGlobal: Boolean = mem.isArgIn || mem.isArgOut || mem.isHostIO
 
-  lazy val bankViews: Seq[BankingView] = if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
+  lazy val bankViews: Seq[BankingView] = if (strategy.isInstanceOf[FullyBanked]) Seq(Hierarchical(rank))
+                                         else if (mem.explicitBanking.isDefined && mem.explicitNs.size == 1) Seq(Flat(rank))
                                          else if (mem.explicitBanking.isDefined && mem.explicitNs.size > 1) Seq(Hierarchical(rank))
                                          else if (mem.isLineBuffer) Seq(Hierarchical(rank, Some(List(rank-1))))
                                          else if (rank > 1 && !mem.isNoHierarchicalBank && !mem.isNoFlatBank) Seq(Flat(rank), Hierarchical(rank)) 
@@ -35,11 +36,17 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                                          else if (mem.isNoFlatBank) Seq(Hierarchical(rank)) 
                                          else Seq(Flat(rank))
 
-  lazy val nStricts: Seq[NStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs)) else Seq(NPowersOf2, NBestGuess, NRelaxed)
-  lazy val aStricts: Seq[AlphaStrictness] = if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas)) else Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+  lazy val nStricts: Seq[NStrictness] = if (strategy.isInstanceOf[FullyBanked]) Seq(NRelaxed)
+                                        else if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs))
+                                        else if (mem.nConstraints.isEmpty) Seq(NPowersOf2, NBestGuess, NRelaxed)
+                                        else mem.nConstraints
+  lazy val aStricts: Seq[AlphaStrictness] = if (strategy.isInstanceOf[FullyBanked]) Seq(AlphaRelaxed)
+                                            else if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas))
+                                            else if (mem.alphaConstraints.isEmpty) Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+                                            else mem.alphaConstraints
   lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
-                                                    else if (mem.isNoDuplicate) RegroupHelper.regroupNone
-                                                    else if (mem.isOnlyDuplicate) RegroupHelper.regroupAll(rank)
+                                                    else if (mem.isNoFission) RegroupHelper.regroupNone
+                                                    else if (mem.isFullFission) RegroupHelper.regroupAll(rank)
                                                     else if (mem.duplicateOnAxes.isDefined) mem.duplicateOnAxes.get.map{x: Seq[Int] => RegroupDims(x.toList)}.toList
                                                     else if (mem.isDuplicatable & !spatialConfig.enablePIR) RegroupHelper.regroupAny(rank) 
                                                     else RegroupHelper.regroupNone
@@ -362,7 +369,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         if (gid == -1) grps :+ Set(a)
         else grps.zipWithIndex.map { case (grp, `gid`) => grp+a; case (grp, gid) => grp }
       }
-      dbg(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
+      dbgs(s"access group $access: [${grps.map{_.size}.mkString(",")}]")
       grps
     }
 
@@ -597,17 +604,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val ctrls = reads.map(_.parent)
     val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
+    // All possible combinations of banking characteristics
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
-    val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds
+    val allAttemptDirectives: Seq[BankingOptions] = bankingOptionsIds
         .map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }
         .sortBy{x => (x.view.P, x.N.P, x.alpha.P, x.regroup.P)}
         .filter{x => (x.view.isInstanceOf[Hierarchical] || (x.view.isInstanceOf[Flat] && (x.regroup.dims.size == 0 || x.regroup.dims.size == x.view.rank)))}
-    if (attemptDirectives.size == 0) {
+    if (allAttemptDirectives.size == 0) {
       error(s"Unable to search for banking on ${mem.fullname}:")
       error(s"  ${mem.ctx})")
       error(s"  ${mem.ctx.content.getOrElse("<???>")}")
       throw new Exception(s"No banking options allowed!")
     }
+    // Partition directives list based on the "good" ones and "bad" ones (i.e. likelihood of successful scheme existing), and then repack them
+    val (goodDirectives, badDirectives) = allAttemptDirectives.partition{opts => !opts.undesired}
+    val (goodSameDirectives, goodDiffDirectives) = goodDirectives.partition{opts => opts.N.P == opts.alpha.P}
+    val attemptDirectives = goodSameDirectives ++ goodDiffDirectives ++ badDirectives
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
@@ -639,7 +651,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             val isBuffAccum = writes.cross(winningRdGrps.flatten).exists{case (wr,rd) => rd.parent == wr.parent }
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
             val accTyp = mem.accumType | accum
-            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,winningBanking.head.darkVolume,accTyp))
+            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,accTyp))
           }.flatten.toSeq
         )
       }

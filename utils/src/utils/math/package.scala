@@ -53,7 +53,7 @@ package object math {
 
 
   /** Cyclic banking helper functions */
-  def log2Ceil(n: BigInt): Int = 1 max (scala.math.ceil(scala.math.log(1 max (1+n.toInt))).toInt + 2)
+  def log2Ceil(n: BigInt): Int = 1 max (scala.math.ceil(scala.math.log(1 max (1+n.toInt))/scala.math.log(2)).toInt)
   def log2Ceil(n: Int): Int = log2Ceil(BigInt(n))
   def log2Ceil(n: Double): Int = log2Ceil(BigInt(n.toInt))
   def log2Up(n: Int): Int = log2Up(BigInt(n))
@@ -73,7 +73,7 @@ package object math {
   }
   def volume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]): Int = Ds.product + hiddenVolume(Ns, Bs, Ps, Ds)
   def numBanks(Ns: Seq[Int]): Int = Ns.product
-  def ofsWidth(volume: Int, Ns: Seq[Int]): Int = log2Up(volume/Ns.product)
+  def ofsWidth(volume: Int, Ns: Seq[Int]): Int = log2Up(scala.math.ceil(volume/Ns.product))
   def banksWidths(Ns: Seq[Int]): Seq[Int] = Ns.map(log2Up)
   def elsWidth(volume: Int): Int = log2Up(volume) + 2
 }

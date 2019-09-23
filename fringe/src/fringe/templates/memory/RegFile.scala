@@ -2,8 +2,9 @@ package fringe.templates.memory
 
 import chisel3._
 import chisel3.util._
-import fringe.utils.{log2Up, MuxN}
+import fringe.utils.{MuxN}
 import fringe.globals
+import utils.math.log2Up
 
 /** Register file parameterized by width and height similar to SRAM
   * @param w: Word width

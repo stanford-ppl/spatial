@@ -6,9 +6,10 @@ import chisel3.util.Mux1H
 import fringe.templates.math._
 import fringe.Ledger._
 import fringe.templates.counters.SingleCounter
-import fringe.utils.{log2Up, getRetimed}
+import fringe.utils.{getRetimed}
 import fringe.utils.implicits._
 import fringe.Ledger
+import _root_.utils.math.log2Up
 
 import scala.math.log
 

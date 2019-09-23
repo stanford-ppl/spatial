@@ -133,7 +133,7 @@ val fringe_settings = base ++ Seq(
 /** Projects **/
 lazy val utils  = project.settings(utils_settings)
 lazy val emul   = project.settings(emul_settings)
-lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
+lazy val fringe = project.settings(fringe_settings).dependsOn(emul, utils)
 lazy val models = project.settings(models_settings).dependsOn(utils)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils, emul)

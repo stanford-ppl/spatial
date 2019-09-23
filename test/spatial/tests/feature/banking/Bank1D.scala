@@ -91,7 +91,7 @@ import argon.Op
     val RESULT2 = ArgOut[Int]
 
     Accel {
-      val x = SRAM[Int](128)               // N = 9, B = 4, alpha = 3
+      val x = SRAM[Int](128).nofission.onlyblockcyclic.nRelaxed               // N = 9, B = 4, alpha = 3
       Foreach(128 by 1){i => x(i) = i}
       RESULT1 := Reduce(Reg[Int])(128 by 4 par 3){i => x(i+1) + x(i+2) + x(i+3)}{_+_}
       val y = SRAM[Int](128).nofission.noblockcyclic // N = 16, B = 1, alpha = 1

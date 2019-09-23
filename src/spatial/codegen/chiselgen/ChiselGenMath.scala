@@ -157,7 +157,7 @@ trait ChiselGenMath extends ChiselGenCommon {
         case Some(_) => s"$x"
         case None => "4096"
       }
-      emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
+      emit(s"val ${quote(lhs)}_bitsize = _root_.utils.math.log2Up($size) max 1")
       emit(src"""val ${lhs}_rng = Module(new PRNG($seed)); ${lhs}_rng.suggestName("$lhs")""")
       val en = if (lhs.parent.s.isDefined) src"$datapathEn" else "true.B"
       emit(src"${lhs}_rng.io.en := $en")

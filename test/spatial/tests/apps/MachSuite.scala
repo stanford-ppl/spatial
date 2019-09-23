@@ -866,7 +866,7 @@ import utils.io.files._
       Foreach(length+1 by 1 par row_par){ r =>
 
         // If running multiple rows in parallel, ensure a later row does not scan an element until previous row has populated it
-        val this_body = r % row_par
+        val this_body = (r % row_par)*2
 
         // Compute cost for each element in row
         Sequential.Foreach(-this_body until length+1 by 1) { c =>

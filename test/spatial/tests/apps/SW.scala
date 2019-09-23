@@ -96,7 +96,7 @@ import spatial.dsl._
       // Build score matrix
       Reduce(entry_point)(length+1 by 1 par row_par){ r =>
         val possible_entry_point = Reg[entry_tuple]
-        val this_body = r % row_par
+        val this_body = (r % row_par)*2
         Sequential.Foreach(-this_body until length+1 by 1) { c => // Bug #151, should be able to remove previous_result reg when fixed
           val previous_result = Reg[sw_tuple]
           val update = if (r == 0) (sw_tuple(0, 0)) else if (c == 0) (sw_tuple(0, 1)) else {

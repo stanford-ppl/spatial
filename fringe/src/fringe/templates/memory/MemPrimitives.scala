@@ -601,14 +601,17 @@ class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWid
   val io = IO( new Bundle {
       val numEnabled =Input(UInt(width.W))
       val in = Vec(1 max ports.sum, Input(new enqPort(bitWidth)))
-      val out = Vec(1 max ports.sum, Output(new enqPort(bitWidth)))
+      val out = Vec(1 max banks, Output(new enqPort(bitWidth)))
     })
 
-    (0 until ports.sum).foreach{i =>
+    val enBelow = List.tabulate[UInt](ports.sum){j => (0 until j).map{ k => Mux(io.in(k).en, 1.U(16.W), 0.U(16.W)) }.foldLeft(0.U(16.W)){_+_}}
+    (0 until banks).foreach{i =>
       // Identify first lane between i and ports.sum that is enabled
       val takeThisLane = List.tabulate(ports.sum){j =>
         if (j < i) false.B
-        else io.in(j).en && (i until j).map{ k => !io.in(k).en }.foldLeft(true.B){_&&_}
+        else {
+          io.in(j).en && enBelow(j) === i.U
+        }
       }
       io.out(i).data := chisel3.util.PriorityMux(takeThisLane, io.in.map(_.data))
       io.out(i).en := takeThisLane.foldLeft(false.B){_||_}
@@ -644,7 +647,7 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val outs = (0 until banks).map{ i =>
     val lane_enable = Mux(i.S(width.W) < num_straddling | (i.S(width.W) >= current_base_bank & i.S(width.W) < current_base_bank + numEnabled.asSInt), true.B, false.B)
     val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, i.S(width.W) - current_base_bank)
-    val port_vals = (0 until num_compactors).map{ i => 
+    val port_vals = (0 until banks).map{ i =>
       (i.U(width.W) -> compactor.io.out(i).data)
     }
     val lane_data = chisel3.util.MuxLookup(id_from_base.asUInt, 0.U(bitWidth.W), port_vals)

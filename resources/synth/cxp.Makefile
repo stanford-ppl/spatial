@@ -36,7 +36,7 @@ chisel:
 
 hw:
 ifeq (,$(wildcard cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/))
-    $(error Euresys files not found!  Fix by running `git submodule update` in Spatial and recompile app.  Quick fix is to `cp -r $SPATIAL_HOME/resources/synth/cxp.hw-resources/euresys ./cxp.hw-resources/` after updating submodules)
+    $(error Euresys files not found!  Fix by running `git submodule update` in Spatial and recompile app.  Quick fix is to `cp -r $$SPATIAL_HOME/resources/synth/cxp.hw-resources/euresys ./cxp.hw-resources/` after updating submodules)
 endif
 	#@[ "${CXP_EXAMPLE}" ] || ( echo ">> CXP_EXAMPLE is not set"; exit 1 )
 	mv ${BIGIP_SCRIPT} ${CXP_V_DIR}/
@@ -57,6 +57,7 @@ endif
 	mv ${CXP_V_DIR}/SpatialCustomLogic.vhd ${CXP_V_DIR}/04_ref_design/CustomLogic.vhd
 	make -C ${CXP_V_DIR}
 	echo "$$(date +%s)" > end.log
+	echo "Hooray! Bitstream has been generated at ${CXP_V_DIR}/accel.bit.  Go to ${CXP_EXAMPLE}/0 whatever and flash fpga with this bitstream "
 
 hw-clean:
 	make -C ${CXP_V_DIR} clean

@@ -9,8 +9,8 @@ import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Lite, AXI4P
 import fringe.templates.axi4._
 
 class KCU1500Interface extends TopInterface {
-  val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
-  val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 32)
+  val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 4)
+  val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 4)
 
   val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))

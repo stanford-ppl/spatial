@@ -1,4 +1,4 @@
 #!/bin/bash
 
 args=$@
-sbt "; set offline := true; runMain AccelMain $args"
+sbt "; runMain AccelMain $args"

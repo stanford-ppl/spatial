@@ -9,7 +9,7 @@ import spatial.dsl._
     val P = 16
     val result = DRAM[I32](d)
     Accel{
-      val lockSRAM = LockSRAM[I32](d)
+      val lockSRAM = LockSRAM[I32](d).buffer // Buffer because w - w/r accesses in pipeline
       val lockSRAMUnit = Lock[I32](P)
 
       Foreach(4 by 1 par 1) { i =>

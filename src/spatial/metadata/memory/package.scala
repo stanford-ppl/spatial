@@ -328,6 +328,10 @@ package object memory {
     }
     def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
+    def isLockSRAM: Boolean = mem match {
+      case _: LockSRAM[_,_] => true
+      case _ => false
+    }
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
     def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
     def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]

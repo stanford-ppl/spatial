@@ -140,7 +140,7 @@ object modeling {
 
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
-    val memories = readersByMem.keySet intersect writersByMem.keySet
+    val memories = (readersByMem.keySet intersect writersByMem.keySet).filter(!_.isLockSRAM)
     dbgs(s"Memories with both reads and writes in this scope: $memories")
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)

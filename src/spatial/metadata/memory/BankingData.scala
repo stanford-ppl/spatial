@@ -18,17 +18,36 @@ import utils.implicits.collections._
 sealed abstract class Banking {
   def nBanks: Int
   def stride: Int
-  def dims: Seq[Int]
+  def axes: Seq[Int]
   def alphas: Seq[Int]
   def Ps: Seq[Int]
   def hiddenVolume: Int
-  def numChecks: Int
-  def solutionVolume: Int
+  def numChecks: Int // Diagnostic for required number of ISL calls to verify scheme
+  def solutionVolume: Int // Diagnostic for volume of solution space that scheme came from
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
+case class UnspecifiedBanking(axes: Seq[Int]) extends Banking {
+  override def nBanks: Int = 1
+  override def stride: Int = 1
+  override def alphas: Seq[Int] = axes.map{_ => 1}
+  override def Ps: Seq[Int] = axes.map{_ => 1}
+  override def hiddenVolume: Int = 0
+  override def numChecks: Int = 1
+  override def solutionVolume: Int = 1
+  override def toString: String = {
+    s"Dims {${axes.mkString(",")}}: Unspecified Banking"
+  }
+  @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = addr
+  @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = addr.last
+  @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
+    import spatial.util.IntLike._
+    addr.sumTree
+  }
+}
+
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], sv: Int = 1, checks: Int = 0) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], axes: Seq[Int], P: Seq[Int], sv: Int = 1, checks: Int = 0) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
@@ -37,7 +56,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
     val hang = P.map{_ % N}.min
     if (hang == 0) 0 else B*(N-P.map{_ % N}.min)
   }
-  override def numChecks: Int = checks  // Diagnostic for required number of ISL calls to verify scheme
+  override def numChecks: Int = checks
   override def solutionVolume: Int = sv
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
@@ -46,7 +65,7 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   }
   override def toString: String = {
     val name = if (B == 1) "Cyclic" else "Block Cyclic"
-    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}> ($solutionVolume solutions, $numChecks checks)"
+    s"Dims {${axes.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}> ($solutionVolume solutions, $numChecks checks)"
   }
 }
 object ModBanking {
@@ -176,7 +195,7 @@ case class Memory(
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
-      val size = if (dims.nonEmpty) bank.dims.map{i => dims(i) }.product else 1
+      val size = if (dims.nonEmpty) bank.axes.map{ i => dims(i) }.product else 1
       Math.ceil(size.toDouble / bank.nBanks)    // Assumes evenly divided
     }.product.toInt
   }

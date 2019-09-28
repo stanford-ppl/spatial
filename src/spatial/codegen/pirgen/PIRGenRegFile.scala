@@ -22,10 +22,18 @@ trait PIRGenRegFile extends PIRCodegen {
       //emit(src"val $lhs = if (${and(en)}) $rf.shiftInVec($ctx, Seq($addr), $axis, $data)")
 
     case op@RegFileVectorRead(rf,addr,ens)       => 
-      stateRead(lhs, rf, Some(addr), Some(addr.map(_.map { _ => "Const(0)" })), ens)
+      stateAccess(lhs, rf, ens) {
+        src"BankedRead()" +
+        src".bank(${assertOne(addr)})" + 
+        src".offset(${assertOne(addr.map(_.map { _ => "Const(0)" }))})"
+      }
 
     case op@RegFileVectorWrite(rf,data,addr,ens) => 
-      stateWrite(lhs, rf, Some(addr), Some(addr.map(_.map { _ => "Const(0)" })), data, ens)
+      stateAccess(lhs, rf, ens, data=Some(data)) {
+        src"BankedWrite()" +
+        src".bank(${assertOne(addr)})" + 
+        src".offset(${addr.map(_.map { _ => "Const(0)" })})"
+      }
 
     //case RegFileBankedShiftIn(rf,data,addr,en,axis) =>
       //val ctx = s""""${lhs.ctx}""""

@@ -12,7 +12,11 @@ trait PIRGenLUTs extends PIRCodegen {
     case op@LUTNew(_,elems) => 
       stateMem(lhs, "LUT()", inits=Some(elems.map { case Const(c) => c }))
     case op@LUTBankedRead(lut,bank,ofs,ens) => 
-      stateRead(lhs, lut, Some(bank), Some(ofs), ens)
+      stateAccess(lhs, lut, ens) {
+        src"BankedRead()" +
+        src".bank(${assertOne(bank)})" + 
+        src".offset(${assertOne(ofs)})"
+      }
     case _ => super.genAccel(lhs, rhs)
   }
 

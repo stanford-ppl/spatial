@@ -20,10 +20,14 @@ trait PIRGenLIFO extends PIRCodegen {
     //case LIFONumel(lifo,_) => 
 
     case op@LIFOBankedPop(lifo, ens) =>
-      stateRead(lhs, lifo, None, None, ens)
+      stateAccess(lhs, lifo, ens) {
+        src"MemRead()"
+      }
 
     case LIFOBankedPush(lifo, data, ens) =>
-      stateWrite(lhs, lifo, None, None, data, ens)
+      stateAccess(lhs, lifo, ens, data=Some(data)) {
+        src"MemWrite()"
+      }
 
     case _ => super.genAccel(lhs, rhs)
   }

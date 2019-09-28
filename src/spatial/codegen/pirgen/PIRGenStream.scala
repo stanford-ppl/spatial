@@ -19,10 +19,14 @@ trait PIRGenStream extends PIRCodegen {
       emit(src"""streamOut($streams, $bus)""")
 
     case op@StreamInBankedRead(strm, ens) =>
-      stateRead(lhs, strm, None, None, ens)
+      stateAccess(lhs, strm, ens) {
+        src"MemRead()"
+      }
 
     case StreamOutBankedWrite(strm, data, ens) =>
-      stateWrite(lhs, strm, None, None, data, ens)
+      stateAccess(lhs, strm, ens, data=Some(data)) {
+        src"MemWrite()"
+      }
 
     case _ => super.genAccel(lhs, rhs)
   }

@@ -51,59 +51,27 @@ trait PIRGenHelper extends PIRFormatGen {
     }
   }
 
-  def stateRead(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], ens:Seq[Set[Bit]]) = {
-    val bufferPort = lhs.port.bufferPort
-    val broadcast = lhs.port.broadcast
-    val castgroup = lhs.port.castgroup
-    val muxPort = lhs.port.muxPort
-    stateStruct(lhs, mem.asMem.A){ field => 
-      val name = field.map { _._1 }
-      var body = (bank, ofs) match {
-        case (Some(bank), Some(ofs)) =>
-          src"BankedRead()" +
-          src".bank(${assertOne(bank)})" + 
-          src".offset(${assertOne(ofs)})"
-        case _ => 
-          src"MemRead()"
-      }
-      body += 
-        src".setMem(${Lhs(mem,name)})" + 
-        src".en(${assertOne(ens)})" + 
-        src".port($bufferPort)" + 
-        src".muxPort($muxPort)" +
-        src".broadcast($broadcast)" + 
-        src".castgroup($castgroup)" + 
-        src".tp(${field.map{_._2}.getOrElse(lhs.tp)})" +
-        (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
-      body
-    }
-  }
-
-  def stateWrite(lhs:Sym[_], mem:Sym[_], bank:Option[Seq[Seq[Sym[_]]]], ofs:Option[Seq[Any]], data:Seq[Sym[_]], ens:Seq[Set[Bit]]) = {
+  def stateAccess(
+    lhs:Sym[_], 
+    mem:Sym[_], 
+    ens:Seq[Set[Bit]],
+    data:Option[Seq[Sym[_]]]=None,
+  )(body: => String) = {
     val bufferPort = lhs.port.bufferPort
     val muxPort = lhs.port.muxPort
     val broadcast = lhs.port.broadcast
     val castgroup = lhs.port.castgroup
     stateStruct(lhs, mem.asMem.A){ field => 
       val name = field.map { _._1 }
-      var body = (bank, ofs) match {
-        case (Some(bank), Some(ofs)) =>
-          src"BankedWrite()" + 
-          src".bank(${assertOne(bank)})" + 
-          src".offset(${assertOne(ofs)})"
-        case _ => 
-          src"MemWrite()"
-      }
-      body += 
-        src".setMem(${Lhs(mem,name)})" + 
-        src".en(${assertOne(ens)})" + 
-        src".data(${Lhs(assertOne(data),name)})" + 
-        src".port($bufferPort)" + 
-        src".muxPort($muxPort)" +
-        src".broadcast($broadcast)" + 
-        src".castgroup($castgroup)" + 
-        (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
-      body
+      body + 
+      src".setMem(${Lhs(mem,name)})" + 
+      src".en(${assertOne(ens)})" + 
+      data.fold("") { data => src".data(${Lhs(assertOne(data),name)})" } +
+      src".port($bufferPort)" + 
+      src".muxPort($muxPort)" +
+      src".broadcast($broadcast)" + 
+      src".castgroup($castgroup)" + 
+      (if (lhs.sym.isInnerReduceOp) ".isInnerReduceOp(true)" else "")
     }
   }
 

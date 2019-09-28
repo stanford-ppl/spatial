@@ -34,7 +34,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
           dbgs(s"\n\nFound cycles in $lhs ($iters): ")
           cycles.foreach{c => dbgs(s"  $c")}
           val allWritePositions = cycles.map(_.write.affineMatrices.head.matrix.collapse.sorted.headOption.getOrElse(0))
-          cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem && reader != writer) => 
+          cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem && reader != writer && !mem.shouldIgnoreConflicts) =>
 
             if (reader.affineMatrices.nonEmpty && writer.affineMatrices.nonEmpty) {
               val huge = 99999

@@ -38,7 +38,7 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
     * The number of indices should match the LockSRAM's rank.
     * NOTE: Use the apply method if the LockSRAM's rank is statically known.
     */
-  @api def read(addr: Seq[Idx], lock: Option[Lock[I32]] = None, ens: Set[Bit] = Set.empty): A = {
+  @api def read(addr: Seq[Idx], lock: Option[LockWithKeys[I32]] = None, ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(LockSRAMRead[A,C](me,addr,lock,ens))
   }
@@ -47,7 +47,7 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
     * The number of indices should match the LockSRAM's rank.
     * NOTE: Use the update method if the LockSRAM's rank is statically known.
     */
-  @api def write(data: A, addr: Seq[Idx], lock: Option[Lock[I32]], ens: Set[Bit] = Set.empty): Void = {
+  @api def write(data: A, addr: Seq[Idx], lock: Option[LockWithKeys[I32]], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
     stage(LockSRAMWrite[A,C](me,data,addr,lock,ens))
   }
@@ -128,7 +128,7 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
 }
 object LockSRAM {
   /** Allocates a 1-dimensional [[LockSRAM1]] with capacity of `length` elements of type A. */
-  @api def apply[A:Bits](length: I32): LockSRAM1[A] = stage(LockSRAMNew[A,LockSRAM1](Seq(length)))
+  @api def apply[A:Bits](length: I32): LockSRAM1[A] = stage(LockSRAMNew[A,LockSRAM1](Seq(length))).conflictable.mustmerge
 }
 
 /** A 1-dimensional LockSRAM with elements of type A. */
@@ -145,11 +145,11 @@ object LockSRAM {
 
   /** Returns the value at `pos`. */
   @api def apply(pos: I32): A = stage(LockSRAMRead(this,Seq(pos),None,Set.empty))
-  @api def apply(pos: I32, lock: Lock[I32]): A = stage(LockSRAMRead(this,Seq(pos),Some(lock),Set.empty))
+  @api def apply(pos: I32, lock: LockWithKeys[I32]): A = stage(LockSRAMRead(this,Seq(pos),Some(lock),Set.empty))
 
   /** Updates the value at `pos` to `data`. */
   @api def update(pos: I32, data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos),None,Set.empty))
-  @api def update(pos: I32, lock: Lock[I32], data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos),Some(lock),Set.empty))
+  @api def update(pos: I32, lock: LockWithKeys[I32], data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos),Some(lock),Set.empty))
 
 }
 
@@ -158,7 +158,12 @@ object LockSRAM {
   val A: Bits[A] = Bits[A]
   override val __neverMutable = true
 
-  @api def lock(elements: A*): Lock[A] = stage(LockOnKeys[A](elements))
+  @api def lock(elements: A*): LockWithKeys[A] = stage(LockOnKeys[A](this, elements))
+}
+
+@ref class LockWithKeys[A:Bits] extends Top[LockWithKeys[A]] with Ref[scala.Array[Any],LockWithKeys[A]] {
+  val A: Bits[A] = Bits[A]
+  override val __neverMutable = true
 }
 
 object Lock {

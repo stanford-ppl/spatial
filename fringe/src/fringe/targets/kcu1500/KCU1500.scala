@@ -61,11 +61,11 @@ class KCU1500 extends DeviceTarget {
     io
   }
 
-  override val addrWidth: Int = 40
-  override val dataWidth: Int = 64
-  override val external_w: Int = 64
-  override val external_v: Int = 8
+  override val addrWidth: Int = 32
+  override val dataWidth: Int = 32
+  override val external_w: Int = 512
+  override val external_v: Int = 1
   override val wordsPerStream: Int = 8
-  override val num_channels = 2
+  override val num_channels = 1
 
 }

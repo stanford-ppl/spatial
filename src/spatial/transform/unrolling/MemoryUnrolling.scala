@@ -165,6 +165,8 @@ trait MemoryUnrolling extends UnrollingBase {
     implicit val A: Bits[A] = rhs.A
     if (!lhs.isUnusedAccess) {
       val mem  = rhs.mem
+      val lock = rhs.asInstanceOf[Op[_]].getLockNode
+
       val addr = if (rhs.addr.isEmpty) None else Some(rhs.addr)
       val data = rhs.dataOpt // Note that this is the OLD data symbol, if any
       val mems = getInstances(lhs, mem, isLoad = data.isEmpty, None)
@@ -215,6 +217,8 @@ trait MemoryUnrolling extends UnrollingBase {
         def vecToLaneAddr(vec: Int): Int = vec2Lane.map(_.apply(vec)).getOrElse(laneIds.apply(vec))
 
         dbgs(s"  Masters: $masters // Lanes that do not have duplicated address")
+        dbgs(s"  Locks: $lock")
+        val locks = if (lock.isDefined) Some(masters.map{t => lanes.inLanes(laneIds){p => f(lock.get)}(laneIdToChunkId(t))}) else None
         // Writing two different values to the same address currently just writes the last value
         // Note this defines a race condition, so its behavior is undefined by the language
         val data2 = data.map{d =>
@@ -225,7 +229,6 @@ trait MemoryUnrolling extends UnrollingBase {
         //val ens2   = masters.map{t => 
           //lanes.inLanes(laneIds){p => f(rhs.ens) ++ lanes.flatValids(p) }(laneIdToChunkId(t))
         //}
-
 
         //val broadcast = port.broadcast.map(_ > 0)
 
@@ -244,11 +247,11 @@ trait MemoryUnrolling extends UnrollingBase {
             val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
             val ens3 = vecsInSegment.map(ens2(_))
             implicit val vT: Type[Vec[A]] = Vec.bits[A](vecsInSegment.size)
-            (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, ens3.toSeq), vecsInSegment.toList, segment)
+            (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, locks, ens3.toSeq), vecsInSegment.toList, segment)
           }.toSeq
         } else {
           implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
-          Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), ens2), vecIds.toList, 0))
+          Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), locks, ens2), vecIds.toList, 0))
         }
 
         // hack for issue #90
@@ -499,9 +502,12 @@ trait MemoryUnrolling extends UnrollingBase {
     data:   Seq[Bits[A]],
     bank:   Seq[Seq[Idx]],
     ofs:    Seq[Idx],
+    lock:   Option[Seq[LockWithKeys[I32]]],
     enss:   Seq[Set[Bit]]
   )(implicit vT: Type[Vec[A]], ctx: SrcCtx): UnrolledAccess[A] = node match {
     case _:MergeBufferDeq[_] => UVecReadSym(stage(MergeBufferBankedDeq(mem.asInstanceOf[MergeBuffer[A]], enss)))
+    case _:LockSRAMWrite[_,_]     => UWrite[A](stage(LockSRAMBankedWrite(mem.asInstanceOf[LockSRAM1[A]], data, bank, ofs, lock, enss)))
+    case _:LockSRAMRead[_,_]     => UVecReadSym[A](stage(LockSRAMBankedRead(mem.asInstanceOf[LockSRAM1[A]], bank, ofs, lock, enss)))
     case _:FIFODeq[_]       => UVecReadSym(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
     case _:FIFOVecDeq[_]       => UVecReadVec(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], ArrayBuffer.fill(ofs.size)(enss.head))))
     case _:LIFOPop[_]       => UVecReadSym(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))

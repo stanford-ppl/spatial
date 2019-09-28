@@ -83,6 +83,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
     summarize(instances)
     finalize(instances)
+    pirCheck(instances)
   }
 
   protected def resetData(readers: Set[Sym[_]], writers: Set[Sym[_]]): Unit = {
@@ -163,30 +164,31 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       dbgs(s"  Unused access: ${stm(access)}")
     }
 
-    if (spatialConfig.enablePIR) {
-      instances.zipWithIndex.foreach { case (inst, dispatch) =>
-        def checkAccess(groups:Set[Set[AccessMatrix]]) = {
-          // Mapping of access matrix => group id
-          val groupMap = groups.zipWithIndex.flatMap { case (grp, gid) => grp.map { a => (a, gid) } }.toMap
-          groups.flatten.groupBy { _.access }.foreach { case (access, ams) =>
-            val gids = ams.map { a => groupMap(a) }
-            if (gids.size > 1) {
-              error(s"//TODO: Plasticine does not support unbanked unrolled access at the moment. ")
-              error(s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})")
-              error(s"access=$access (${access.ctx})")
-              error(s"AccessMatrix:")
-              ams.foreach { a => 
-                error(s"$a gid:${groupMap(a)}")
-              }
-              state.logError()
+  }
+
+  protected def pirCheck(instances: Seq[Instance]): Unit = {
+    if (!spatialConfig.enablePIR || mem.isLockSRAM) return
+    instances.zipWithIndex.foreach { case (inst, dispatch) =>
+      def checkAccess(groups:Set[Set[AccessMatrix]]) = {
+        // Mapping of access matrix => group id
+        val groupMap = groups.zipWithIndex.flatMap { case (grp, gid) => grp.map { a => (a, gid) } }.toMap
+        groups.flatten.groupBy { _.access }.foreach { case (access, ams) =>
+          val gids = ams.map { a => groupMap(a) }
+          if (gids.size > 1) {
+            error(s"//TODO: Plasticine does not support unbanked unrolled access at the moment. ")
+            error(s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})")
+            error(s"access=$access (${access.ctx})")
+            error(s"AccessMatrix:")
+            ams.foreach { a => 
+              error(s"$a gid:${groupMap(a)}")
             }
+            state.logError()
           }
         }
-        checkAccess(inst.reads)
-        checkAccess(inst.writes)
       }
+      checkAccess(inst.reads)
+      checkAccess(inst.writes)
     }
-
   }
 
   /** True if a and b always occur at the exact same time, or if are interface arg reads.

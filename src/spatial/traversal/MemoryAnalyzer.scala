@@ -15,6 +15,7 @@ import spatial.metadata.memory.LocalMemories
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator) extends Codegen { // Printing with Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()
+  private val fullyBanked: BankingStrategy = FullyBanked()
 
   override val ext: String = "html"
   override val lang: String = "banking"
@@ -121,14 +122,14 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
 
   protected def configurer[C[_]](mem: Sym[_]): MemoryConfigurer[C] = (mem match {
     case m:SRAM[_,_]    => new MemoryConfigurer(m, strategy)
-    case m:RegFile[_,_] => new MemoryConfigurer(m, strategy)
-    case m:LUT[_,_]     => new MemoryConfigurer(m, strategy)
+    case m:RegFile[_,_] => new MemoryConfigurer(m, fullyBanked)
+    case m:LUT[_,_]     => new MemoryConfigurer(m, fullyBanked)
+    case m:Reg[_]       => new MemoryConfigurer(m, fullyBanked)
+    case m:FIFOReg[_]       => new MemoryConfigurer(m, fullyBanked)
     case m:LineBuffer[_] => new MemoryConfigurer(m, strategy)
     case m:FIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
     case m:MergeBuffer[_] => new FIFOConfigurer(m, strategy)
     case m:LIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
-    case m:Reg[_]       => new MemoryConfigurer(m, strategy)
-    case m:FIFOReg[_]       => new MemoryConfigurer(m, strategy)
     case m:StreamIn[_]  => new MemoryConfigurer(m, strategy)
     case m:StreamOut[_] => new MemoryConfigurer(m, strategy)
     case _ => throw new Exception(s"Don't know how to bank memory of type ${mem.tp}")

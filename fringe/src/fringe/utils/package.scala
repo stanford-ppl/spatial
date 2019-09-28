@@ -1,7 +1,6 @@
 package fringe
 
 import chisel3._
-import chisel3.util.log2Ceil
 
 import emul.ResidualGenerator._
 
@@ -42,10 +41,6 @@ package object utils {
   def lanesThatCanSee(gens: List[(List[ResidualGenerator], Int)], target: List[Int], max: List[Int]): Seq[Int] = {
     gens.collect{case (x,i) if (x.zipWithIndex.map{case (r,j) => r.expand(max(j))}.zip(target).forall{case (inView, trgt) => inView.contains(trgt)}) => i}
   }
-
-  def log2Up(n: Int): Int = if (n < 0) 1 max log2Ceil(1 max (1 + scala.math.abs(n))) else 1 max log2Ceil(1 max n)
-  def log2Up(n: BigInt): Int = if (n < 0) log2Ceil((n.abs + 1) max 1) max 1 else log2Ceil(n max 1) max 1
-  def log2Up(n: Double): Int = log2Up(n.toInt)
 
   def roundUpDivide(num: Int, divisor: Int): Int = (num + divisor - 1) / divisor
 

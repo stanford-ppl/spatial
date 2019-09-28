@@ -2,9 +2,8 @@ package argon.node
 
 import argon._
 import argon.lang._
+import emul.{Bool, FALSE, FixedPoint, FloatPoint}
 import forge.tags._
-import emul.{FixedPoint,FloatPoint, Bool, FALSE}
-import utils.implicits.collections._
 
 @op case class DataAsBits[A](data: Bits[A])(implicit val tV: Vec[Bit]) extends Primitive[Vec[Bit]] {
   override val isTransient: Boolean = true

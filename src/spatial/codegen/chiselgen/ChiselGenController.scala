@@ -400,7 +400,7 @@ trait ChiselGenController extends ChiselGenCommon {
     emit("")
     emit("val me = this")
     emit(src"""val sm = Module(new ${lhs.level.toString}(${lhs.rawSchedule.toString}, ${constrArg.mkString} $stw $isPassthrough $ncases, latency = $lat.toInt, myName = "${lhs}_sm")); sm.io <> DontCare""")
-    emit(src"""val iiCtr = Module(new IICounter($ii.toInt, 2 + fringe.utils.log2Up($ii.toInt), "${lhs}_iiCtr"))""")
+    emit(src"""val iiCtr = Module(new IICounter($ii.toInt, 2 + _root_.utils.math.log2Up($ii.toInt), "${lhs}_iiCtr"))""")
     emit("")
   }
 

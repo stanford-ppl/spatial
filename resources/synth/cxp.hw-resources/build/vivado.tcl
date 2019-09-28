@@ -34,5 +34,5 @@ report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_
 report_ram_utilization -detail -file ./par_ram_utilization.rpt
 report_high_fanout_nets -ascending -timing -load_types -file ./par_high_fanout_nets.rpt
 
-# #Export bitstream
-# file copy -force ./project_1/project_1.runs/impl_1/design_1_wrapper.bit ./accel.bit
+#Export bitstream
+file copy -force ./07_vivado_project/CustomLogic.runs/impl_1/CustomLogicTop.bit ./accel.bit

@@ -33,7 +33,10 @@ case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[In
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
-  override def hiddenVolume: Int = B*P.map{_ % N}.min
+  override def hiddenVolume: Int = {
+    val hang = P.map{_ % N}.min
+    if (hang == 0) 0 else B*(N-P.map{_ % N}.min)
+  }
   override def numChecks: Int = checks  // Diagnostic for required number of ISL calls to verify scheme
   override def solutionVolume: Int = sv
 

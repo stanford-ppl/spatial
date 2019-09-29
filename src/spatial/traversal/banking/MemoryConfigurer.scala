@@ -220,7 +220,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = 
-    if (spatialConfig.groupUnrolledAccess) groupAccessUnroll(accesses)
+    if (spatialConfig.groupUnrolledAccess && !mem.isLockSRAM) groupAccessUnroll(accesses)
     else groupAccessesDefault(accesses)
 
   /** Group accesses on this memory.

@@ -12,7 +12,7 @@ import spatial.dsl._
       val lockSRAM = LockSRAM[I32](d).buffer // Buffer because w - w/r accesses in pipeline
       val lockSRAMUnit = Lock[I32](P)
 
-      Foreach(4 by 1 par 1) { i =>
+      Sequential.Foreach(4 by 1 par 1) { i =>
 
         Foreach(d by 1) { j => lockSRAM(j) = 0 }
         Foreach(N by 1 par P) { j =>
@@ -26,15 +26,12 @@ import spatial.dsl._
 
         }
 
-
       }
+      result(0::d) store lockSRAM
 
     }
-    val got = getMem(result)
     val gold = Array[I32](List.tabulate(N){j => j}.grouped(d).toList.map(_.sum).map(_.to[I32]):_*)
 
-    printArray(gold, "gold: ")
-    printArray(got, "got: ")
-    assert(result == gold)
+    assert(checkGold(result, gold))
   }
 }

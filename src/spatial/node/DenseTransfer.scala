@@ -281,37 +281,17 @@ object DenseTransfer {
             endBound := aligned.end
             length := aligned.size
           }
-          if (spatialConfig.enablePIR) {
-            val enFIFO = FIFO[Bit](16)
-            Foreach(length.value par p){i =>
-              val en = staticStart(dramAddr) match {
-                      case Left(x)  => i >= x && i < endBound
-                      case Right(_) => i >= startBound && i < endBound
-                    }
-              enFIFO.enq(en)
-            }
-            Foreach(length.value par p){i =>
-              val addr = staticStart(dramAddr) match {
-                    case Left(x)  => localAddr(i - x)
-                    case Right(_) => localAddr(i - startBound)
+          Foreach(length.value par p){i =>
+            val en = staticStart(dramAddr) match {
+                    case Left(x)  => i >= x && i < endBound
+                    case Right(_) => i >= startBound && i < endBound
                   }
-              val en = enFIFO.deq
-              val data = local.__read(addr, Set(en))
-              dataStream := pack(data,en)
-            }
-          } else {
-            Foreach(length.value par p){i =>
-              val en = staticStart(dramAddr) match {
-                      case Left(x)  => i >= x && i < endBound
-                      case Right(_) => i >= startBound && i < endBound
-                    }
-              val addr = staticStart(dramAddr) match {
-                    case Left(x)  => localAddr(i - x)
-                    case Right(_) => localAddr(i - startBound)
-                  }
-              val data = local.__read(addr, Set(en))
-              dataStream := pack(data,en)
-            }
+            val addr = staticStart(dramAddr) match {
+                  case Left(x)  => localAddr(i - x)
+                  case Right(_) => localAddr(i - startBound)
+                }
+            val data = local.__read(addr, Set(en))
+            dataStream := pack(data,en)
           }
         }
         // Fringe

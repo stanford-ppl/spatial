@@ -22,13 +22,13 @@ trait PIRGenLockSRAM extends PIRCodegen {
       stateAccess(lhs, sram, ens) {
         src"LockRead()" +
         src".addr(${assertOne(bank)})" + 
-        src".lock(${assertOne(lock)})"
+        src".lock(${lock.map { lock => assertOne(lock) }})"
       }
-    case op@LockSRAMBankedWrite(sram,data,bank,lock,ofs,ens) => 
+    case op@LockSRAMBankedWrite(sram,data,bank,ofs,lock,ens) => 
       stateAccess(lhs, sram, ens, data=Some(data)) {
         src"LockWrite()" +
         src".addr(${assertOne(bank)})" + 
-        src".lock(${assertOne(lock)})"
+        src".lock(${lock.map { lock => assertOne(lock) }})"
       }
     case _ => super.genAccel(lhs, rhs)
   }

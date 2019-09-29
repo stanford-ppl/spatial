@@ -8,6 +8,14 @@ import spatial.metadata.memory._
 trait PIRGenLockSRAM extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case LockNew(depth) => 
+      state(lhs)(
+        src"""Lock()"""
+      )
+    case LockOnKeys(lock, keys) =>
+      state(lhs) {
+        src"""LockOnKeys().key(${assertOne(keys)}).lock(${lock})"""
+      }
     case op: LockSRAMNew[_,_] => 
       stateMem(lhs, "LockSRAM()")
     case op@LockSRAMBankedRead(sram,bank,ofs,lock,ens)       => 

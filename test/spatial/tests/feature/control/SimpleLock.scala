@@ -6,7 +6,7 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
     val d = 14
     val N = 64
-    val P = 16
+    val P = 1
     val result = DRAM[I32](d)
     Accel{
       val lockSRAM = LockSRAM[I32](d).buffer // Buffer because w - w/r accesses in pipeline
@@ -14,7 +14,7 @@ import spatial.dsl._
 
       Sequential.Foreach(4 by 1 par 1) { i =>
 
-        Foreach(d by 1) { j => lockSRAM(j) = 0 }
+        Foreach(d by 1) { j => lockSRAM(j) = 1 }
         Foreach(N by 1 par P) { j =>
           val addr = j % d
           val id = addr // % 5

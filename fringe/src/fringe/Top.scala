@@ -9,7 +9,6 @@ abstract class TopInterface extends Bundle {
   var waddr = Input(UInt(1.W))
   var wdata = Input(Bits(1.W))
   var rdata = Output(Bits(1.W))
-  // val is_enabled = Output(Bool())
 }
 
 /** Top module including Fringe and Accel (see target specific for fringe <-> accel connections)
@@ -17,10 +16,10 @@ abstract class TopInterface extends Bundle {
   * @param accelGen Delayed creation of AccelTop
   */
 class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
-
   globals.target = targetName match {
     case "verilator" => new targets.verilator.Verilator
     case "vcs"  | "VCS"       => new targets.vcs.VCS
+    case "fringeless"        => new targets.FringelessTarget
     case "xsim"      => new targets.xsim.XSim
     case "aws"  | "AWS_F1"     => new targets.aws.AWS_F1
     case "cxp"  | "CXP"     => new targets.cxp.CXP

@@ -31,14 +31,14 @@ trait PIRGenMergeBuffers extends PIRCodegen {
       }
       withinCtrl(mem) {
         state(Lhs(lhs,"inputRead")) {
-          src"MemRead().setMem(${Lhs(lhs,"inputFIFO")}).en(${assertOne(ens)}).out(${mem}.inputs($way))"
+          src"MemRead().setMem(${Lhs(lhs,"inputFIFO")}).out(${mem}.inputs($way))"
         }
       }
     case op@MergeBufferBankedDeq(mem,ens) => 
       state(Lhs(lhs,"outputFIFO")) { src"FIFO().banks(List(${parOf(mem)})).tp(${mem.A})" }
       withinCtrl(mem) {
         state(Lhs(lhs,"write")) { 
-          src"MemWrite().setMem(${Lhs(lhs,"outputFIFO")}).en(${assertOne(ens)}).data(${mem}.out)"
+          src"MemWrite().setMem(${Lhs(lhs,"outputFIFO")}).data(${mem}.out)"
         }
       }
       state(lhs) {
@@ -53,7 +53,7 @@ trait PIRGenMergeBuffers extends PIRCodegen {
       }
       withinCtrl(mem) {
         state(Lhs(lhs,"boundRead")) {
-          src"MemRead().setMem(${Lhs(lhs,"boundFIFO")}).en(${assertOne(ens)}).out(${mem}.bounds($way))"
+          src"MemRead().setMem(${Lhs(lhs,"boundFIFO")}).out(${mem}.bounds($way))"
         }
       }
     case op@MergeBufferInit(mem, data, ens) =>
@@ -63,7 +63,7 @@ trait PIRGenMergeBuffers extends PIRCodegen {
       }
       withinCtrl(mem) {
         state(Lhs(lhs,"initRead")) {
-          src"MemRead().setMem(${Lhs(lhs,"initFIFO")}).en(${assertOne(ens)}).out(${mem}.init)"
+          src"MemRead().setMem(${Lhs(lhs,"initFIFO")}).out(${mem}.init)"
         }
       }
     case _ => super.genAccel(lhs, rhs)

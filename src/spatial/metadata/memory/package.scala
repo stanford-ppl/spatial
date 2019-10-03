@@ -133,7 +133,10 @@ package object memory {
     /** Post-unrolling duplicates (exactly one Memory instance per node) */
 
     def getInstance: Option[Memory] = getDuplicates.flatMap(_.headOption)
-    def instance: Memory = getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
+    @stateful def instance: Memory = {
+      if (s.isLockDRAM) Memory(Seq(),1,Seq(),AccumType.None) // Hack for LockDRAM accesses
+      else getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
+    }
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
 
     def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}

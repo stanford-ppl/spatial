@@ -245,6 +245,9 @@ case class Memory(
       }.sumTree
       ofschunk * b.product + intrablockofs
     }
+    else if (banking.lengthIs(0)) {
+      addr.head // Hack for LockDRAM, which has no banking so return addr as offset
+    }
     else {
       // TODO: Bank address for mixed dimension groups
       throw new Exception("Bank address calculation for arbitrary dim groupings unknown")

@@ -19,6 +19,8 @@ package object access {
     def getLockNode: Option[LockWithKeys[I32]] = op match {
       case x: LockSRAMRead[_,_] => x.lock
       case x: LockSRAMWrite[_,_] => x.lock
+      case x: LockDRAMRead[_,_] => x.lock
+      case x: LockDRAMWrite[_,_] => x.lock
 //      case x: LockSRAMBankedRead[_,_] => x.lock
 //      case x: LockSRAMBankedWrite[_,_] => x.lock
       case _ => None

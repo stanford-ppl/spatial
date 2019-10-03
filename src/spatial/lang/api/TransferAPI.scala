@@ -35,6 +35,16 @@ trait TransferAPI { this: Implicits with MathAPI =>
     array
   }
 
+  /** Transfers the given @Array of `data` from the host's memory to `dram`'s region of accelerator LockDRAM. **/
+  @api def setMem[A:Bits,C[T]](dram: LockDRAM[A,C], data: Tensor1[A]): Void = stage(SetLockMem(dram,data))
+
+  /** Transfers `dram`'s region of accelerator DRAM to the host's memory and returns the result as an Array. **/
+  @api def getMem[A:Bits,C[T]](dram: LockDRAM[A,C]): Tensor1[A] = {
+    val array = Tensor1.empty[A](dram.dims.prodTree)
+    stage(GetLockMem(dram, array))
+    array
+  }
+
   /** Transfers `dram`'s region of accelerator DRAM to the host's memory and returns the result as an Array. **/
   @api def getArray[A:Bits,C[T]](dram: DRAM[A,C]): Tensor1[A] = getMem(dram)
 

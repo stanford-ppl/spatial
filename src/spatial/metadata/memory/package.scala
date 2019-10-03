@@ -361,6 +361,7 @@ package object memory {
       case Op(LUTNew(_,_)) => true
       case _ => false
     }
+
   }
 
 

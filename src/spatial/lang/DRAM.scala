@@ -118,6 +118,12 @@ object DRAM {
   @api def store(local: SRAM1[A], len: I32): Void = {
     stage(DenseTransfer(this,local.apply(0::len),isLoad = false))
   }
+
+  /** Creates an aligned dense, burst transfer from the on-chip `local` to this DRAM's region of main memory. */
+  @api def alignstore[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = {
+    stage(DenseTransfer(this,local,isLoad = false, forceAlign=true))
+  }
+
 }
 
 object DRAM1 {
@@ -142,6 +148,12 @@ object DRAM1 {
   @api def store(data: RegFile2[A]): Void = {
     stage(DenseTransfer(this, data, isLoad = false))
   }
+
+  /** Creates an aligned dense, burst transfer from the SRAM2 `data` to this region of main memory. */
+  @api def alignstore(data: SRAM2[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false, forceAlign=true))
+  }
+
 }
 
 object DRAM2 {
@@ -163,6 +175,11 @@ object DRAM2 {
   @api def store(data: RegFile3[A]): Void = {
     stage(DenseTransfer(this, data, isLoad = false))
   }
+
+  /** Creates an aligned dense, burst transfer from the SRAM3 `data` to this region of main memory. */
+  @api def alignstore(data: SRAM3[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false, forceAlign=true))
+  }
 }
 
 object DRAM3 {
@@ -179,6 +196,10 @@ object DRAM3 {
   @api def store(data: SRAM4[A]): Void = {
     stage(DenseTransfer(this, data, isLoad = false))
   }
+  /** Creates an aligned dense, burst transfer from the SRAM4 `data` to this region of main memory. */
+  @api def alignstore(data: SRAM4[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false, forceAlign=true))
+  }
 }
 
 object DRAM4 {
@@ -194,6 +215,10 @@ object DRAM4 {
   /** Creates a dense, burst transfer from the SRAM5 `data` to this region of main memory. */
   @api def store(data: SRAM5[A]): Void = {
     stage(DenseTransfer(this, data, isLoad = false))
+  }
+  /** Creates an aligned dense, burst transfer from the SRAM5 `data` to this region of main memory. */
+  @api def alignstore(data: SRAM5[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false, forceAlign=true))
   }
 }
 

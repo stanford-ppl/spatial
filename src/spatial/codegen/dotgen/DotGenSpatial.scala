@@ -30,6 +30,7 @@ trait DotGenSpatial extends DotCodegen {
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = super.nodeAttr(lhs) ++ (lhs match {
     case _:SRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case _:LockSRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:MergeBuffer[_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case _:Lock[_]    => "color" -> "crimson" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case _:RegFile[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case _:LUT[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil

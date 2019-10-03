@@ -11,6 +11,9 @@ import spatial.node._
 import scala.collection.mutable
 
 case class Lhs(sym:Sym[_], postFix:Option[String]=None)
+object Lhs {
+  def apply(sym:Sym[_], postFix:String):Lhs = Lhs(sym,Some(postFix))
+}
 
 trait PIRFormatGen extends Codegen {
 

@@ -353,7 +353,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val samePort = requireConcurrentPortAccess(a, b)
       val conflict = if (samePort) {overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)} else false
       dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict")
-      samePort && !conflict
+      var canConflict = conflict
+      if (canConflict && mem.shouldIgnoreConflicts) {
+        warn(s"Detected potential conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${a.access.ctx} (uid: ${a.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+        warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+        canConflict = false
+      }
+      samePort && !canConflict
     })
 
     if (mem.parent == Ctrl.Host) return Set(accesses)

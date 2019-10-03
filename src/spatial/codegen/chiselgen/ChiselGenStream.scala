@@ -18,7 +18,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       // Emit code for streams that are unrelated to DRAM nodes
       bus match {
         case CXPPixelBus => forceEmit(src"val $lhs = top.io.asInstanceOf[CXPAccelInterface].AXIS_IN")
-        case BlackBoxBus(name) => blackBoxStreamWidth = bus.nbits; forceEmit(src"val $lhs = top.io.asInstanceOf[BlackBoxStreamInterface].STREAM_IN")
+        case BlackBoxBus(name) => blackBoxStreamInWidth = bus.nbits; forceEmit(src"val $lhs = top.io.asInstanceOf[BlackBoxStreamInterface].STREAM_IN")
         case _ =>
       }
 
@@ -27,7 +27,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       // Emit code for streams that are unrelated to DRAM nodes
       bus match {
         case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_OUT")
-        case BlackBoxBus(name) => blackBoxStreamWidth = bus.nbits; forceEmit(src"val $lhs = top.io.asInstanceOf[BlackBoxStreamInterface].STREAM_OUT")
+        case BlackBoxBus(name) => blackBoxStreamOutWidth = bus.nbits; forceEmit(src"val $lhs = top.io.asInstanceOf[BlackBoxStreamInterface].STREAM_OUT")
         case _ =>
       }
 
@@ -99,7 +99,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val parent = lhs.parent.s.get
       val sfx = if (parent.isBranch) "_obj" else ""
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) """)o
+      emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) """)
       val Op(StreamInNew(bus)) = strm
       bus match {
         case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")

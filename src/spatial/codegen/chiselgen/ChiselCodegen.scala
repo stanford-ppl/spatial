@@ -24,7 +24,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected var globalBlockID: Int = 0
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
   protected var boreMe = new scala.collection.mutable.ListBuffer[(String, String)]
-  var blackBoxStreamWidth = -1 // Experimental, for tracking width of BlackBoxStream
+  var blackBoxStreamInWidth = -1 // Experimental, for tracking width of BlackBoxStream
+  var blackBoxStreamOutWidth = -1 // Experimental, for tracking width of BlackBoxStream
   val controllerStack = scala.collection.mutable.Stack[Sym[_]]()
 
   // Buffer mappings from LCA to list of memories controlled by it
@@ -211,7 +212,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
       emit("val io = chisel3.core.dontTouch(globals.target match {")
       emit("""  case _:targets.cxp.CXP     => IO(new CXPAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))""")
-      if (blackBoxStreamWidth != -1) emit(s"  case _ => IO(new BlackBoxStreamInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts, $blackBoxStreamWidth))")
+      if (blackBoxStreamInWidth != -1 || blackBoxStreamOutWidth != -1) emit(s"  case _ => IO(new BlackBoxStreamInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts, $blackBoxStreamInWidth, $blackBoxStreamOutWidth))")
       else emit("  case _ => IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
       emit("})")
       emit ("var outStreamMuxMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map[String,Int]()")

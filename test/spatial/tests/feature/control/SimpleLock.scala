@@ -8,6 +8,8 @@ import spatial.dsl._
     val N = 64
     val P = 1
     val result = DRAM[I32](d)
+//    val lockDRAM = DRAM[I32](N)
+//    val lockDRAMUnit = Lock[I32](P)
     Accel{
       val lockSRAM = LockSRAM[I32](d).buffer // Buffer because w - w/r accesses in pipeline
       val lockSRAMUnit = Lock[I32](P)

@@ -128,6 +128,9 @@ object DenseTransfer {
     // struc.loweredTransfer = if (isLoad) DenseLoad else DenseStore
 
     def store(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = requestLength match {
+      case _ if forceAlign =>
+        dbg(s"$local => $dram: Using aligned store (forceAlign) requestLength:$requestLength")
+        alignedStore(dramAddr, localAddr)
       case Expect(c) if (c*A.nbits) % target.burstSize == 0 | forceAlign =>
         dbg(s"$local => $dram: Using aligned store ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         alignedStore(dramAddr, localAddr)
@@ -139,6 +142,9 @@ object DenseTransfer {
         unalignedStore(dramAddr, localAddr)
     }
     def load(dramAddr: () => I32, localAddr: I32 => Seq[I32]): Void = requestLength match {
+      case _ if forceAlign =>
+        dbg(s"$local => $dram: Using aligned load (forceAlign) requestLength:$requestLength")
+        alignedLoad(dramAddr, localAddr)
       case Expect(c) if (c.toInt*A.nbits) % target.burstSize == 0 | forceAlign =>
         dbg(s"$dram => $local: Using aligned load ($c * ${A.nbits} % ${target.burstSize} = ${c*A.nbits % target.burstSize})")
         alignedLoad(dramAddr, localAddr)

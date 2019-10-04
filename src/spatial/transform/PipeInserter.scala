@@ -216,7 +216,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
       // Transform
       boundStages.zipWithIndex.foreach{
         case (stgs,id) if stgs.size > 1 => 
-          implicit val ctx: SrcCtx = SrcCtx.empty
+          implicit val ctx: SrcCtx = stgs.head.nodes.headOption.map { _.ctx }.getOrElse(SrcCtx.empty)
           Pipe{wrapInner(stgs,id)}
         case (stgs,id) if stgs.size == 1 && stgs.head.inner => 
           wrapInner(stgs,id)

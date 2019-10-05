@@ -4,6 +4,7 @@ package xilinx
 import models._
 
 object KCU1500 extends XilinxDevice {
+  override def host: String = "surf"
   import XilinxDevice._
   val name = "KCU1500"
   def burstSize = 512

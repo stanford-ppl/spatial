@@ -6,6 +6,7 @@ import poly.{ConstraintMatrix, ISL}
 import models.AreaEstimator
 import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
+import spatial.codegen.surfgen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
@@ -113,6 +114,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val chiselCodegen = ChiselGen(state)
     lazy val resourceReporter = ResourceReporter(state)
     lazy val cppCodegen    = CppGen(state)
+    lazy val surfCodegen   = SurfGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
@@ -201,7 +203,8 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen) ==>
+        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
+        ((spatialConfig.target.host == "surf") ? surfCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         // (spatialConfig.useAreaModels ? areaModelReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>

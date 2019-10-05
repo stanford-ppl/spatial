@@ -53,7 +53,7 @@ class KCU1500 extends DeviceTarget {
     fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
-    fringe.reset := !reset.toBool
+    fringe.reset := reset.toBool
     accel.reset := fringe.io.reset
     // accel.reset := ~reset.toBool
     // io.is_enabled := ~accel.io.enable
@@ -63,9 +63,9 @@ class KCU1500 extends DeviceTarget {
 
   override val addrWidth: Int = 32
   override val dataWidth: Int = 32
-  override val external_w: Int = 512
-  override val external_v: Int = 1
-  override val wordsPerStream: Int = 8
+  override val external_w: Int = 32
+  override val external_v: Int = 16
+  override val wordsPerStream: Int = 16
   override val num_channels = 1
 
 }

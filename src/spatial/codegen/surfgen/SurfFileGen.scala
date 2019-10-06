@@ -10,8 +10,36 @@ trait SurfFileGen extends SurfCodegen {
 
   override def emitHeader(): Unit = {
     inGen(out, entryFile) {
+      emit("#!/usr/bin/env python3")
+      emit("import setupLibPaths")
+      emit("")
+      emit("import sys")
+      emit("import argparse")
+      emit("import rogue")
+      emit("import rogue.hardware.axi")
+      emit("import rogue.interfaces.stream")
+      emit("import rogue.interfaces.memory")
+      emit("")
+      emit("import pyrogue as pr")
+      emit("import pyrogue.gui")
+      emit("import pyrogue.utilities.prbs")
+      emit("import pyrogue.interfaces.simulation")
+      emit("")
+      emit("import axipcie  as pcie")
+      emit("import surf.axi as axi")
+      emit("")
+      emit("import time")
+      emit("import math")
+      emit("import random")
+      emit("import struct")
       emit("import numpy as np")
-      open("def execute():")
+      emit("")
+      open("def execute(accel, cliargs):")
+        emit("accel.Reset.set(1)")
+        emit("accel.Enable.set(0)")
+        emit("time.sleep(0.01)")
+        emit("accel.Reset.set(0)")
+        emit("print(\"Starting TopHost.py...\")")
     }
   }
 
@@ -20,6 +48,9 @@ trait SurfFileGen extends SurfCodegen {
   }
 
   override def emitFooter(): Unit = {
+    inGen(out, entryFile) {
+      close("")
+    }
     super.emitFooter()
   }
 

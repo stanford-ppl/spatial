@@ -6,9 +6,11 @@ import forge.tags._
 
 import spatial.lang._
 
-@op case class DRAMHostNew[A:Bits,C[T]](dims: Seq[I32], zero: A)(implicit tp: Type[C[A]]) extends MemAlloc[A,C]
+abstract class DRAMNew[A:Bits,C[T]](implicit C: Type[C[A]]) extends MemAlloc[A,C]
 
-@op case class DRAMAccelNew[A:Bits,C[T]](dim: Int)(implicit tp: Type[C[A]]) extends MemAlloc[A,C] {
+@op case class DRAMHostNew[A:Bits,C[T]](dims: Seq[I32], zero: A)(implicit tp: Type[C[A]]) extends DRAMNew[A,C]
+
+@op case class DRAMAccelNew[A:Bits,C[T]](dim: Int)(implicit tp: Type[C[A]]) extends DRAMNew[A,C] {
   def dims = Seq.fill(dim) { I32(0) }
 }
 
@@ -33,5 +35,11 @@ import spatial.lang._
   override def effects: Effects = Effects.Writes(dram)
 }
 @op case class GetMem[A:Bits,C[T]](dram: DRAM[A,C], data: Tensor1[A]) extends Op2[A,Void] {
+  override def effects: Effects = Effects.Writes(data)
+}
+@op case class SetLockMem[A:Bits,C[T]](dram: LockDRAM[A,C], data: Tensor1[A]) extends Op2[A,Void] {
+  override def effects: Effects = Effects.Writes(dram)
+}
+@op case class GetLockMem[A:Bits,C[T]](dram: LockDRAM[A,C], data: Tensor1[A]) extends Op2[A,Void] {
   override def effects: Effects = Effects.Writes(data)
 }

@@ -112,6 +112,8 @@ trait ExternalAliases extends InternalAliases {
 
   type LockSRAM[A,C[T]] = spatial.lang.LockSRAM[A,C]
   lazy val LockSRAM = spatial.lang.LockSRAM
+  type LockDRAM[A,C[T]] = spatial.lang.LockDRAM[A,C]
+  lazy val LockDRAM = spatial.lang.LockDRAM
   type Lock[A] = spatial.lang.Lock[A]
   lazy val Lock = spatial.lang.Lock
 

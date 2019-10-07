@@ -50,7 +50,89 @@ package object math {
     val degenerate = hist.map(_._2).max
     hist.map(_._2).map(degenerate - _).sum * paddedDims.zip(P).map{case(x,y) => x/y}.product 
   }
+  def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], errmsg: => Unit): Seq[Int] = {
+    /* Offset correction not mentioned in Wang et. al., FPGA '14
+       0. Equations in paper must be wrong.  Example
+           ex-     alpha = 1,2    N = 4     B = 1
 
+               banks:   0 2 0 2    ofs (bank0):   0 * 0 *
+                        1 3 1 3                   * * * *
+                        2 0 2 0                   * 2 * 2
+                        1 3 1 3                   * * * *
+
+          These offsets conflict!  They went wrong by assuming NB periodicity of 1 in leading dimension
+
+       1. Proposed correction: Add field P: Seq[Int] to ModBanking.  Divide memory into "offset chunks" by finding the
+          periodicity of the banking pattern and fencing off a portion that contains each bank exactly once
+           P_i = NB / gcd(N,alpha_i)
+               ** if alpha_i = 0, then P_i = infinity **
+
+
+           ex1-     alpha = 3,4    N = 6     B = 1
+                        _____
+               banks:  |0 4 2|0 4 2 0 4 2
+                       |3_1_5|3 1 5 3 1 5
+                        0 4 2 0 4 2 0 4 2
+                        3 1 5 3 1 5 3 1 5
+               banking pattern: 0 4 2
+                                3 1 5
+               P_raw = 2,3
+
+           ex2-     alpha = 3     N = 9     B = 4
+                       _______________________
+               banks: |0_0_1_2_3_3_4_5_6_6_7_8|0 0 1 2 3 3 4 5 6 6 7 8
+
+               banking pattern: 0 0* 1 2 3 3* 4 5 6 6* 7 8
+               P_raw = 12
+               * need to know that each field contains two 0s, 3s, and 6s
+
+       2. Create P_expanded: List[List[Int]], where P_i is a list containing P_raw, all divisors of P_raw, and dim_i
+       2. Find list, selecting one element from each list in P, whose product == N*B and whose ranges, (0 until p*a by a), touches each bank exactly once (at least once for B > 1), with
+          preference given to smallest volume after padding, and this will fence off a region that contains each bank
+          exactly once.
+            NOTE: If B > 1, then we are just going to assume that all banks have as many elements per yard as the most populous bank in that yard (some addresses end up being untouchable,
+                  but the addressing logic would be insane otherwise).  Distinguish the degenerate elements simply by taking pure address % # max degenerates (works because of magic,
+                  but may be wrong at some point)
+       3. Pad the memory so that P evenly divides its respective dim (Currently stored as .padding metadata)
+       --------------------------
+            # Address resolution steps in metadata/memory/BankingData.scala:
+       4. Compute offset chunk
+          ofsdim_i = floor(x_i/P_i)
+       5. Flatten these ofsdims (w_* is stagedDim_* + pad_*)
+          ofschunk = ... + (ofsdim_0 * ceil(w_1 / P_1)) + ofsdim_1
+       6. If B != 1, do extra math to compute index within the block
+          intrablockdim_i = x_i mod B
+       7. Flatten intrablockdims
+          intrablockofs = ... + intrablockdim_0 * B + intrablockdim_1
+       8. Combine ofschunk and intrablockofs
+          ofs = ofschunk * exp(B,D) + intrablockofs
+
+    */
+    try {
+      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
+      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1 && b == 1) List(stagedDims(i)) else List()}} // Force B == 1 for stagedDim P to make life easier
+      val options = combs(P_expanded.map(_.toList).toList)
+//            .collect{case p if p.product == n*b => p}
+            // Volume constraint
+            .collect{case p if p.length == 1 && p == P_raw => p
+                     case p if p.length > 1 && p.product == b*P_raw.map{pr => n - (pr % n)}.max => p
+                    }
+            // Census constraint
+            .collect{case p if spansAllBanks(p,alpha,n,b) => p}
+      val PandCostandBloat = options.map{option =>
+        // Extra elements per dimension so that yards cover entire memory
+        val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
+        val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
+        val volume = paddedDims.product
+        (option,volume)
+      }
+      PandCostandBloat.minBy(_._2)._1
+    }
+    catch { case t:Throwable =>
+      errmsg
+      throw t
+    }
+  }
 
   /** Cyclic banking helper functions */
   def log2Ceil(n: BigInt): Int = 1 max (scala.math.ceil(scala.math.log(1 max (1+n.toInt))/scala.math.log(2)).toInt)

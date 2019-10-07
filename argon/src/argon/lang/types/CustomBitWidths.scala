@@ -154,6 +154,10 @@ trait _125 extends INT[_125] { val v = 125 }
 trait _126 extends INT[_126] { val v = 126 }
 trait _127 extends INT[_127] { val v = 127 }
 trait _128 extends INT[_128] { val v = 128 }
+trait _160 extends INT[_160] { val v = 160 }
+trait _192 extends INT[_192] { val v = 192 }
+trait _200 extends INT[_200] { val v = 200 }
+trait _240 extends INT[_240] { val v = 240 }
 trait _256 extends INT[_256] { val v = 256 }
 
 /** Hack for working with customized bit widths, since Scala doesn't support integers as template parameters */
@@ -298,6 +302,10 @@ object INT {
   implicit lazy val INT126: INT[_126] = new _126 {}
   implicit lazy val INT127: INT[_127] = new _127 {}
   implicit lazy val INT128: INT[_128] = new _128 {}
+  implicit lazy val INT160: INT[_160] = new _160 {}
+  implicit lazy val INT192: INT[_192] = new _192 {}
+  implicit lazy val INT200: INT[_200] = new _200 {}
+  implicit lazy val INT240: INT[_240] = new _240 {}
   implicit lazy val INT256: INT[_256] = new _256 {}
 }
 
@@ -439,5 +447,9 @@ trait CustomBitWidths {
   type _126 = argon.lang.types._126
   type _127 = argon.lang.types._127
   type _128 = argon.lang.types._128
+  type _160 = argon.lang.types._160
+  type _192 = argon.lang.types._192
+  type _200 = argon.lang.types._200
+  type _240 = argon.lang.types._240
   type _256 = argon.lang.types._256
 }

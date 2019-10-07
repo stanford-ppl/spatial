@@ -267,6 +267,8 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
       spatialConfig.enableParallelBinding = false
+      //spatialConfig.unrollParallelOfMetapipes = true
+      //spatialConfig.unrollMetapipeOfParallels = false
     }.text("Enable codegen to PIR [false]")
 
     cli.opt[Unit]("tsth").action { (_,_) =>
@@ -282,6 +284,9 @@ trait Spatial extends Compiler with ParamLoader {
       //spatialConfig.enableDot = true
       spatialConfig.targetName = "Plasticine"
       spatialConfig.enableForceBanking = true
+      spatialConfig.enableParallelBinding = false
+      //spatialConfig.unrollParallelOfMetapipes = true
+      //spatialConfig.unrollMetapipeOfParallels = false
     }.text("Enable Tungsten Host Codegen [false]")
 
     cli.note("")

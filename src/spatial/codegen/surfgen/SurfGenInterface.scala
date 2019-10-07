@@ -5,7 +5,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.memory._
-
+import spatial.util.spatialConfig
 
 trait SurfGenInterface extends SurfGenCommon {
 
@@ -113,13 +113,15 @@ trait SurfGenInterface extends SurfGenCommon {
         emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(a)}_arg', description = 'argIn', offset = ${(argIOs.length+drams.length+argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
       }
       emit("\n##### Instrumentation Counters")
-      instrumentCounters.foreach{case (s,_) =>
-        val base = instrumentCounterIndex(s)
-        emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_cycles_arg', description = 'cycs', offset = ${(argIns.length+drams.length+argIOs.length+argOuts.length + base)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-        emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_iters_arg', description = 'numiters', offset = ${(argIns.length+drams.length+argIOs.length+argOuts.length + base + 1)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-        if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
-          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_stalled_arg', description = 'stalled', offset = ${(argIns.length+drams.length+argIOs.length+argOuts.length + base + 2)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_idle_arg', description = 'idle', offset = ${(argIns.length+drams.length+argIOs.length+argOuts.length + base + 3)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+      if (spatialConfig.enableInstrumentation) {
+        instrumentCounters.foreach { case (s, _) =>
+          val base = instrumentCounterIndex(s)
+          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_cycles_arg', description = 'cycs', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_iters_arg', description = 'numiters', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base + 1) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
+            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_stalled_arg', description = 'stalled', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base + 2) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_idle_arg', description = 'idle', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base + 3) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          }
         }
       }
       emit("\n##### Early Exits")

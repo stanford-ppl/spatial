@@ -390,7 +390,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableModular = false
-    }.text("Disables modular codegen and puts all logic in AccelTop")
+    }.text("Disables modular codegen and puts all logic in AccelUnit")
 
     cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableModular = true

@@ -64,18 +64,18 @@ aws-sim-hw:
 	rm -rf ${AWS_V_SIM_DIR}
 	# First use chisel to create the verilog
 	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
-	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/Top.v
-	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/Top.v
-	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/Top.v; \
-	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${AWS_V_DIR}/Top.v; \
-	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/Top.v; \
+	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/SpatialIP.v
+	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/SpatialIP.v
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
     fi; fi; fi;
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}
 	# Add all the static design files
 	cp -f aws.sw-resources/design/* $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
-	cp -f ${AWS_V_SIM_DIR}/Top.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
+	cp -f ${AWS_V_SIM_DIR}/SpatialIP.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
 	# Run a script to put design together
 	python aws.sw-resources/gen_aws_design.py $(AWS_HOME)/hdk/cl/examples/${app_name}
 	# ----------------------------------------------------------------------------
@@ -105,15 +105,15 @@ aws-F1-hw:
 	rm -rf ${AWS_V_DIR}
 	# First use chisel to create the verilog
 	sbt "runMain top.Instantiator --verilog --testArgs aws"
-	cat aws.hw-resources/SRAMVerilogAWS.v >> ${AWS_V_DIR}/Top.v
-	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_DIR}/Top.v
+	cat aws.hw-resources/SRAMVerilogAWS.v >> ${AWS_V_DIR}/SpatialIP.v
+	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_DIR}/SpatialIP.v
 	mv ${BIGIP_SCRIPT} ${AWS_V_DIR}/
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}
 	# Add all the static design files
 	cp -f aws.sw-resources/design/* $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
-	cp -f ${AWS_V_DIR}/Top.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
+	cp -f ${AWS_V_DIR}/SpatialIP.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
 	# Run a script to put design together
 	python aws.sw-resources/gen_aws_design.py $(AWS_HOME)/hdk/cl/examples/${app_name}
 

@@ -40,10 +40,10 @@ ifeq (,$(wildcard cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/))
 endif
 	#@[ "${CXP_EXAMPLE}" ] || ( echo ">> CXP_EXAMPLE is not set"; exit 1 )
 	mv ${BIGIP_SCRIPT} ${CXP_V_DIR}/
-	cat cxp.hw-resources/SRAMVerilogAWS.v >> ${CXP_V_DIR}/Top.v
-	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/Top.v; \
-	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${CXP_V_DIR}/Top.v; \
-	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/Top.v; \
+	cat cxp.hw-resources/SRAMVerilogAWS.v >> ${CXP_V_DIR}/SpatialIP.v
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/SpatialIP.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${CXP_V_DIR}/SpatialIP.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/SpatialIP.v; \
 	fi; fi; fi;
 	cp cxp.hw-resources/build/* ${CXP_V_DIR}
 	#cp -r ${CXP_EXAMPLE}/02_coaxlink ${CXP_V_DIR}

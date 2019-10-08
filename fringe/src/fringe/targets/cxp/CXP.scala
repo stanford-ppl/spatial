@@ -1,7 +1,7 @@
 package fringe.targets.cxp
 
 import chisel3._
-import fringe.{AbstractAccelTop, BigIP, TopInterface,CXPAccelInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface,CXPAccelInterface}
 import fringe.targets.DeviceTarget
 
 class CXP extends DeviceTarget {
@@ -14,7 +14,7 @@ class CXP extends DeviceTarget {
 
   override def regFileAddrWidth(n: Int): Int = 32
 
-  override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new CXPInterface)
     io <> DontCare
 

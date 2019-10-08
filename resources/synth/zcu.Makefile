@@ -34,10 +34,10 @@ hw:
 
 	sbt "runMain top.Instantiator --verilog --testArgs zcu"
 	mv ${BIGIP_SCRIPT} ${ZCU_V_DIR}/
-	cat zcu.hw-resources/SRAMVerilogAWS.v >> ${ZCU_V_DIR}/Top.v
-	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${ZCU_V_DIR}/Top.v; \
-	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${ZCU_V_DIR}/Top.v; \
-	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${ZCU_V_DIR}/Top.v; \
+	cat zcu.hw-resources/SRAMVerilogAWS.v >> ${ZCU_V_DIR}/SpatialIP.v
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${ZCU_V_DIR}/SpatialIP.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${ZCU_V_DIR}/SpatialIP.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${ZCU_V_DIR}/SpatialIP.v; \
 	fi; fi; fi;
 	cp zcu.hw-resources/build/* ${ZCU_V_DIR}
 	mv ${ZCU_V_DIR}/fsbl.elf._ ${ZCU_V_DIR}/fsbl.elf

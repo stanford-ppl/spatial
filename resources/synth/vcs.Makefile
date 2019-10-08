@@ -11,7 +11,7 @@ all: hw sw
 
 help:
 	@echo "------- INFO -------"
-	@echo "export FRINGELESS=1 # do not compile Fringe module into Top.v"
+	@echo "export FRINGELESS=1 # do not compile Fringe module into SpatialIP.v"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make             : VCS SW + HW build"
 	@echo "make hw          : Build Chisel for VCS"

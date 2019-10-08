@@ -1,4 +1,4 @@
-	component pr_region_default_Top_0 is
+	component pr_region_default_SpatialIP_0 is
 		port (
 			clock                  : in  std_logic                      := 'X';             -- clk
 			io_M_AXI_0_AWID        : out std_logic_vector(5 downto 0);                      -- awid
@@ -50,9 +50,9 @@
 			io_S_AVALON_writedata  : in  std_logic_vector(31 downto 0)  := (others => 'X'); -- writedata
 			reset                  : in  std_logic                      := 'X'              -- reset
 		);
-	end component pr_region_default_Top_0;
+	end component pr_region_default_SpatialIP_0;
 
-	u0 : component pr_region_default_Top_0
+	u0 : component pr_region_default_SpatialIP_0
 		port map (
 			clock                  => CONNECTED_TO_clock,                  --       clock.clk
 			io_M_AXI_0_AWID        => CONNECTED_TO_io_M_AXI_0_AWID,        --  io_M_AXI_0.awid

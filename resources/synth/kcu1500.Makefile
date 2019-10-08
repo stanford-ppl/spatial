@@ -24,14 +24,14 @@ hw:
 	test -d cpp || mkdir cpp # to make fringe happy...
 	sbt "runMain top.Instantiator --verilog --testArgs kcu1500"
 	mv ${BIGIP_SCRIPT} ${KCU1500_V_DIR}/
-	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/Top.v; \
-	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${KCU1500_V_DIR}/Top.v; \
-	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${KCU1500_V_DIR}/Top.v; \
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/SpatialIP.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${KCU1500_V_DIR}/SpatialIP.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${KCU1500_V_DIR}/SpatialIP.v; \
 	fi; fi; fi;
-	cat kcu1500.hw-resources/SRAMVerilogAWS.v >> ${KCU1500_V_DIR}/Top.v
+	cat kcu1500.hw-resources/SRAMVerilogAWS.v >> ${KCU1500_V_DIR}/SpatialIP.v
 	echo "$$(date +%s)" > end.log
 	echo "1) Run the following:"
-	echo "  cp ${KCU_1500_V_DIR}/Top.v $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp/hdl/Top.v"
+	echo "  cp ${KCU_1500_V_DIR}/SpatialIP.v $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp/hdl/SpatialIP.v"
 	echo "  cp python/TopHost.py $$TIMETOOL_HOME/software/scripts/TopHost.py"
 	echo "  cp python/_AccelTop.py $$TIMETOOL_HOME/software/scripts/_AccelTop.py"
 	echo "Then run the rest of the flow in the SURF framwork:"

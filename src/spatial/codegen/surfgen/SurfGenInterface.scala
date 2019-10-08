@@ -58,13 +58,13 @@ trait SurfGenInterface extends SurfGenCommon {
 
 
   override def emitFooter(): Unit = {
-    inGen(out,"_AccelTop.py") {
+    inGen(out,"_AccelUnit.py") {
       emit("#!/usr/bin/env python")
       emit("import pyrogue as pr")
       emit("")
-      emit("class AccelTop(pr.Device):")
+      emit("class AccelUnit(pr.Device):")
       emit("    def __init__(   self,")
-      emit("            name        = 'AccelTop',")
+      emit("            name        = 'AccelUnit',")
       emit("            description = 'Spatial Top Module SW',")
       emit("            **kwargs):")
       emit("        super().__init__(name=name, description=description, **kwargs)")

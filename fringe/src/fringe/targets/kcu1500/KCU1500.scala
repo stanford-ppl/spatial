@@ -2,7 +2,7 @@ package fringe.targets.kcu1500
 
 import chisel3._
 import fringe.BigIP
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.DeviceTarget
 import fringe.targets.zynq.FringeZynq
 
@@ -13,8 +13,8 @@ class KCU1500 extends DeviceTarget {
   override val magPipelineDepth: Int = 0
   override def regFileAddrWidth(n: Int): Int = 32
 
-  override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
-    val io = IO(new KCU1500Interface)
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
+    val io = IO(new KCU1500IPInterface)
 
     // Zynq Fringe
     val blockingDRAMIssue = false // Allow only one in-flight request, block until response comes back

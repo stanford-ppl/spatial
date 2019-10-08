@@ -119,7 +119,7 @@ trait ChiselGenStream extends ChiselGenCommon {
     val insList = List.fill(streamIns.length){ "StreamParInfo(32, 1)" }.mkString(",")
     val outsList = List.fill(streamOuts.length){ "StreamParInfo(32, 1)" }.mkString(",")
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit(src"// Non-memory Streams")
       emit(s"""val io_streamInsInfo = List(${insList})""")
       emit(s"""val io_streamOutsInfo = List(${outsList})""")

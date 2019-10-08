@@ -132,9 +132,9 @@
         <assignment_value text="QSYS_NAME pr_region_default_clock_in HAS_SOPCINFO 1 GENERATION_ID 0"/>
       </assignment_values>
     </sld_info>
-    <sld_info hpath="soc_inst|default_0|top_0" library="pr_region_default_Top_0" name="top_0">
+    <sld_info hpath="soc_inst|default_0|SpatialIP_0" library="pr_region_default_SpatialIP_0" name="SpatialIP_0">
       <assignment_values>
-        <assignment_value text="QSYS_NAME pr_region_default_Top_0 HAS_SOPCINFO 1 GENERATION_ID 0"/>
+        <assignment_value text="QSYS_NAME pr_region_default_SpatialIP_0 HAS_SOPCINFO 1 GENERATION_ID 0"/>
       </assignment_values>
     </sld_info>
     <sld_info hpath="soc_inst|default_0" library="pr_region_default" name="">

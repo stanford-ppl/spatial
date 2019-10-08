@@ -43,7 +43,7 @@ set_global_assignment -name ORIGINAL_QUARTUS_VERSION 17.1.0
 set_global_assignment -name PROJECT_CREATION_TIME_DATE "12:41:18  OCTOBER 26, 2017"
 set_global_assignment -name LAST_QUARTUS_VERSION "17.1.0 Pro Edition"
 set_global_assignment -name QIP_FILE ghrd_10as066n2/ghrd_10as066n2.qip
-set_global_assignment -name VERILOG_FILE ghrd_a10_top.v
+set_global_assignment -name VERILOG_FILE ghrd_a10_SpatialIP.v
 set_global_assignment -name VERILOG_FILE ip/debounce/debounce.v
 set_global_assignment -name VERILOG_FILE ip/edge_detect/altera_edge_detector.v
 set_global_assignment -name QSYS_FILE ghrd_10as066n2.qsys

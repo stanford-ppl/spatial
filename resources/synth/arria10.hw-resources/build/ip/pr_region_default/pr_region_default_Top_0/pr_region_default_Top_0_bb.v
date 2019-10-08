@@ -1,4 +1,4 @@
-module pr_region_default_Top_0 (
+module pr_region_default_SpatialIP_0 (
 		input  wire         clock,                  //       clock.clk
 		output wire [5:0]   io_M_AXI_0_AWID,        //  io_M_AXI_0.awid
 		output wire [31:0]  io_M_AXI_0_AWUSER,      //            .awuser

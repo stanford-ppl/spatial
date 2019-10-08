@@ -28,7 +28,7 @@ trait SurfGenAccel extends SurfGenCommon {
         emit("ctr = ctr + 1")
         emit("""if (ctr % 75 == 0): print("  Polled flag %d times..." % ctr)""")
       close("")
-      emit("print(\"Finished executing TopHost.py!\")")
+      emit(s"""print("Finished executing TopHost.py for ${spatialConfig.name}!""")
 
 
        if (earlyExits.nonEmpty) {

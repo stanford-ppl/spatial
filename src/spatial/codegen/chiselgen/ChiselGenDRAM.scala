@@ -69,7 +69,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
   override def emitPostMain(): Unit = {
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit("// Heap")
       emit(src"val io_numAllocators = scala.math.max(1, ${accelDrams.size})")
     }

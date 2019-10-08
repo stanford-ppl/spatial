@@ -1,7 +1,7 @@
 package fringe.targets.zynq
 
 import chisel3._
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.DeviceTarget
 
 abstract class ZynqLike extends DeviceTarget {
@@ -10,7 +10,7 @@ abstract class ZynqLike extends DeviceTarget {
   override val magPipelineDepth: Int = 0
   override def regFileAddrWidth(n: Int): Int = 32
 
-  override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new ZynqInterface)
 
     // Zynq Fringe

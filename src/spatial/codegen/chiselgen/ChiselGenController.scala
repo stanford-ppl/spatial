@@ -162,7 +162,7 @@ trait ChiselGenController extends ChiselGenCommon {
           else emit(src"list_${ins.head}: List[$typ],")
         }
         emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
-        // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
+        // emit(src"parent: ${if (controllerStack.size == 1) "AccelUnit" else "SMObject"}")
         // emit("rr: ")
       closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
 
@@ -542,7 +542,7 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, "Instrument.scala"){
       emitHeader()
       open("object Instrument {")
-        open("def connect(top: AccelTop, instrctrs: List[InstrCtr]): Unit = {")
+        open("def connect(top: AccelUnit, instrctrs: List[InstrCtr]): Unit = {")
           val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(
@@ -592,7 +592,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit ("""*/""")
     }
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit (src"// Root controller for app: ${config.name}")
       emit ("")
       emit (src"// Widths: ${widthStats.sorted}")

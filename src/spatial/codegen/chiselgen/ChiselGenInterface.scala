@@ -138,7 +138,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
       emit (src"""val numArgIns_mem = ${hostDrams.toList.length}""")
     }
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit ("// Scalars")
       emit (s"val io_numArgIns_reg = ${argIns.toList.length}")
       emit (s"val io_numArgOuts_reg = ${argOuts.toList.length}")

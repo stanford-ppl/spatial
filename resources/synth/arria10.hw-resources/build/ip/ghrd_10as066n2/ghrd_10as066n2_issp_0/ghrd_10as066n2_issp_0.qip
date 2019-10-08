@@ -46,7 +46,7 @@ set_global_assignment -entity "ghrd_10as066n2_issp_0" -library "ghrd_10as066n2_i
 set_global_assignment -entity "ghrd_10as066n2_issp_0" -library "ghrd_10as066n2_issp_0" -name IP_COMPONENT_PARAMETER "QVVUT19TT1VSQ0VfQ0xLX1JFU0VUX0RPTUFJTg==::LTE=::QXV0byBSRVNFVF9ET01BSU4="
 
 
-set_global_assignment -library "altera_in_system_sources_probes_171" -name VERILOG_FILE [file join $::quartus(qip_path) "altera_in_system_sources_probes_171/synth/altsource_probe_top.v"]
+set_global_assignment -library "altera_in_system_sources_probes_171" -name VERILOG_FILE [file join $::quartus(qip_path) "altera_in_system_sources_probes_171/synth/altsource_probe_SpatialIP.v"]
 set_global_assignment -library "ghrd_10as066n2_issp_0" -name VERILOG_FILE [file join $::quartus(qip_path) "synth/ghrd_10as066n2_issp_0.v"]
 
 

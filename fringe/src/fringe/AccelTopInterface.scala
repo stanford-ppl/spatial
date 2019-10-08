@@ -83,6 +83,6 @@ class BlackBoxStreamInterface( // Accel Interface for apps that have an input/ou
 }
 
 
-abstract class AbstractAccelTop extends Module {
+abstract class AbstractAccelUnit extends Module {
   val io: AccelInterface
 }

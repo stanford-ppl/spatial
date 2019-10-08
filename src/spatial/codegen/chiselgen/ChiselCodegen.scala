@@ -2,17 +2,15 @@ package spatial.codegen.chiselgen
 
 import argon._
 import argon.codegen.FileDependencies
-import emul.{Bool, FloatPoint, FixedPoint}
+import emul.Bool
 import spatial.codegen.naming._
 import spatial.lang._
-import spatial.node._
-import spatial.metadata.memory._
-import spatial.metadata.control._
 import spatial.metadata.access._
-import spatial.util.spatialConfig
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.node._
 import spatial.traversal.AccelTraversal
-
-import scala.collection.mutable
+import spatial.util.spatialConfig
 
 
 trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTraversal {
@@ -127,7 +125,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   def emitPreMain(): Unit = {
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit ("package accel")
       emit ("import chisel3._")
       emit ("import chisel3.util._")
@@ -139,7 +137,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("import fringe.templates.memory._")
       emit ("import fringe.templates.retiming._")
       
-      open("trait IOModule extends Module {")
+      open("trait AccelWrapper extends Module {")
      emit (s"""val io_w = if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 8 else 32 // TODO: How to generate these properly?""")
      emit (s"""val io_v = if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 64 else 16 // TODO: How to generate these properly?""")
     }
@@ -157,13 +155,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("import scala.collection.mutable.ListBuffer")
 
       emit("/**")
-      emit(" * Top test harness")
+      emit(" * SpatialIP test harness")
       emit(" */")
-      open("class TopUnitTester(c: Top)(implicit args: Array[String]) extends ArgsTester(c) {")
+      open("class SpatialIPUnitTester(c: SpatialIP)(implicit args: Array[String]) extends ArgsTester(c) {")
       close("}")
       emit("")
       open("object Instantiator extends CommonMain {")
-        emit("type DUTType = Top")
+        emit("type DUTType = SpatialIP")
         emit("")
         open("def dut = () => {")
 
@@ -191,7 +189,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
   def emitPostMain(): Unit = {
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit ("// Combine values")
       emit ("val io_numArgIns = scala.math.max(1, io_numArgIns_reg + io_numArgIns_mem + io_numArgIOs_reg)")
       emit ("val io_numArgOuts = scala.math.max(1, io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + io_numArgOuts_breakpts)")
@@ -242,13 +240,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("val numArgIOs = numArgIOs_reg")
       emit ("val numArgInstrs = numArgOuts_instr")
       emit ("val numArgBreakpts = numArgOuts_breakpts")
-      emit (s"""new Top(this.target, () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
-      // emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
+      emit (s"""new SpatialIP(this.target, () => Module(new AccelUnit(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
+      // emit ("new SpatialIP(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
       close("}")
-      emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
+      emit ("def tester = { c: DUTType => new SpatialIPUnitTester(c) }")
       close("}")
     }
-    inGen(out, "AccelTop.scala") {
+    inGen(out, "AccelUnit.scala") {
       emit(s"""package accel""")
       emit("import chisel3._")
       emit("import chisel3.util._")
@@ -259,7 +257,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("import fringe.templates.vector._")
       emit("import fringe.templates.memory._")
       emit("import fringe.templates.retiming._")
-      open("class AccelTop(")
+      open("class AccelUnit(")
         emit("val top_w: Int,")
         emit("val numArgIns: Int,")
         emit("val numArgOuts: Int,")
@@ -272,7 +270,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val scatterStreamInfo: List[StreamParInfo],")
         emit("val streamInsInfo: List[StreamParInfo],")
         emit("val streamOutsInfo: List[StreamParInfo]")
-      closeopen(s") extends AbstractAccelTop with IOModule { ")
+      closeopen(s") extends AbstractAccelUnit with AccelWrapper { ")
         emit("val retime_released_reg = RegInit(false.B)")
         emit("val accelReset = reset.toBool | io.reset")
         emit("Main.main(this)")
@@ -291,7 +289,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   override protected def emitEntry(block: Block[_]): Unit = {
     open(src"object Main {")
-      open(src"def main(top: AccelTop): Unit = {")
+      open(src"def main(top: AccelUnit): Unit = {")
         emit("top.io <> DontCare")
         emitPreMain()
         outsideAccel{gen(block)}

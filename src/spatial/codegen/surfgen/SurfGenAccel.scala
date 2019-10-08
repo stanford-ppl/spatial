@@ -26,7 +26,7 @@ trait SurfGenAccel extends SurfGenCommon {
         emit("done = accel.Done.get()")
         emit("time.sleep(0.01)")
         emit("ctr = ctr + 1")
-        emit("""if (ctr % 500 == 0): print("  Polled flag %d times..." % ctr)""")
+        emit("""if (ctr % 75 == 0): print("  Polled flag %d times..." % ctr)""")
       close("")
       emit("print(\"Finished executing TopHost.py!\")")
 

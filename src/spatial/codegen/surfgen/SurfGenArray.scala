@@ -11,83 +11,17 @@ trait SurfGenArray extends SurfGenCommon {
 
   var struct_list: List[String] = List()
 
-  protected def getSize(array: Sym[_], extractor:String = ""): String = {
-    src"(*${array})${extractor}.size()"
-  }
-
-  protected def emitNewArray(lhs: Sym[_], tp: Type[_], size: String): Unit = {
-    emit(src"${tp}* $lhs = new ${tp}($size);")
-  }
-
   private def getNestingLevel(tp: Type[_]): Int = tp match {
     case tp: Vec[_] => 1 + getNestingLevel(tp.typeArgs.head)
     case _ => 0
   }
 
-  private def zeroElement(tp: Type[_]): String = tp match {
-    case tp: Tup2[_,_] => src"*(new $tp(${zeroElement(tp.A)},${zeroElement(tp.B)}));"
-    case tp: Struct[_] => src"*(new $tp(${tp.fields.map{field => zeroElement(field._2)}.mkString(",")}));"
-    case _ => "0"
-  }
-
-  protected def ptr(tp: Type[_]): String = if (isArrayType(tp)) "*" else ""
-  protected def amp(tp: Type[_]): String = if (isArrayType(tp)) "&" else ""
   protected def isArrayType(tp: Type[_]): Boolean = tp match {
     case tp: Vec[_] => tp.typeArgs.head match {
       case tp: Vec[_] => println("EXCEPTION: Probably can't handle nested array types in ifthenelse"); true
       case _ => true
     }
     case _ => tp.typePrefix == "Array"
-  }
-
-  protected def emitUpdate(lhs: Sym[_], value: Sym[_], i: String, tp: Type[_]): Unit = {
-    if (isArrayType(tp)) {
-      if (getNestingLevel(tp) > 1) throw new Exception(s"ND Array exception on $lhs, $tp")
-
-      emit(src"(*$lhs)[$i].resize(${getSize(value)});")
-      open(src"for (int ${value}_copier = 0; ${value}_copier < ${getSize(value)}; ${value}_copier++) {")
-        emit(src"(*$lhs)[$i][${value}_copier] = (*${value})[${value}_copier];")
-      close("}")
-    }
-    else {
-      tp match {
-        case FixPtType(s,d,f) if (f == 0) =>
-          val intermediate_tp = if (d+f > 64) s"int128_t"
-                   else if (d+f > 32) s"int64_t"
-                   else if (d+f > 16) s"int32_t"
-                   else if (d+f > 8) s"int16_t"
-                   else if (d+f > 4) s"int8_t"
-                   else if (d+f > 2) s"int8_t"
-                   else if (d+f == 2) s"int8_t"
-                   else "bool"
-
-          emit(src"(*$lhs)[$i] = (${intermediate_tp}) ${value};") // Always convert to signed, then to unsigned if on the boards
-        case _ => emit(src"(*$lhs)[$i] = ${value};")
-      }
-    }
-  }
-
-  protected def emitApply(dst: Sym[_], array: Sym[_], i: String, isDef: Boolean = true): Unit = {
-    if (isArrayType(dst.tp)) {
-      val iterator = if ("^[0-9].*".r.findFirstIn(src"$i").isDefined) {src"${array}_applier"} else {src"$i"}
-      if (isDef) {
-        emit(src"""${dst.tp}* $dst = new ${dst.tp}(${getSize(array, src"[$i]")}); //cannot apply a vector from 2D vector, so make new vec and fill it, eventually copy the vector in the constructor here""")
-        emit(src"for (int ${iterator}_sub = 0; ${iterator}_sub < (*${array})[${i}].size(); ${iterator}_sub++) { (*$dst)[${iterator}_sub] = (*${array})[$i][${iterator}_sub]; }")
-      } else {
-        emit(src"for (int ${iterator}_sub = 0; ${iterator}_sub < (*${array})[${i}].size(); ${iterator}_sub++) { (*$dst)[${iterator}_sub] = (*${array})[$i][${iterator}_sub]; }")
-      }
-    } else {
-      if (isDef) {
-        emit(src"${dst.tp} $dst = (*${array})[$i];")
-      } else {
-        emit(src"$dst = (*${array})[$i];")
-      }
-    }
-  }
-
-  private def getPrimitiveType(tp: Type[_]): String = tp match {
-    case tp: Vec[_] => getPrimitiveType(tp.typeArgs.head)
-    case _ => remap(tp)
   }
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
@@ -110,7 +44,7 @@ trait SurfGenArray extends SurfGenCommon {
     case VecConcat(elems) => emit(src"$lhs = $lhs + $elems")
     case op @ MapIndices(size, func)   =>
       val isVoid = op.A.isVoid
-      if (!isVoid) emitNewArray(lhs, lhs.tp, src"$size")
+      if (!isVoid) emit(src"$lhs = [None for _ in range($size)]")
       open(src"for ${func.input} in range(0,$size):")
       visitBlock(func)
       if (!isVoid) emit(src"$lhs[${func.input}] = ${func.result}")
@@ -130,76 +64,59 @@ trait SurfGenArray extends SurfGenCommon {
 
 
     case ArrayMap(array,apply,func) =>
-      emit(src"$lhs = [None for _ in range(${getSize(array)})]")
-      open(src"for ${apply.inputB} in range(0,${getSize(array)}):")
+      emit(src"$lhs = [None for _ in range(len(${array}))]")
+      open(src"for ${apply.inputB} in range(0,len(${array})):")
       visitBlock(apply)
       visitBlock(func)
-      emit(src"${lhs}[${apply.inputB}] = ${func.result}")
+      emit(src"$lhs[${apply.inputB}] = ${func.result}")
       close("")
 
     case op @ IfThenElse(cond, thenp, elsep) =>
-      val star = lhs.tp match {case _: host.Array[_] => "*"; case _ => ""}
-      if (!op.R.isVoid) emit(src"${lhs.tp}${star} $lhs;")
-      open(src"if ($cond) { ")
+      open(src"if ($cond): ")
         visitBlock(thenp)
-        if (!op.R.isVoid) emit(src"${lhs} = ${thenp.result};")
-      close("}")
-      open("else {")
+        if (!op.R.isVoid) emit(src"$lhs = ${thenp.result}")
+      closeopen("else:")
         visitBlock(elsep)
-        if (!op.R.isVoid) emit(src"${lhs} = ${elsep.result};")
-      close("}")
+        if (!op.R.isVoid) emit(src"$lhs = ${elsep.result}")
+      close("")
 
     case ArrayFilter(array, apply, cond) =>
-      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
-      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+      emit(src"$lhs = []")
+      open(src"for ${apply.inputB} in range(len(${array}):")
       visitBlock(apply)
       visitBlock(cond)
-      emit(src"if (${cond.result}) (*${lhs}).push_back(${apply.result});")
-      close("}")
+      emit(src"if (${cond.result}): $lhs.append(${apply.result})")
+      close("")
 
     case ArrayFlatMap(array, apply, func) =>
-      emit(src"${lhs.tp}* $lhs = new ${lhs.tp};")
-      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) { ")
+      open(src"for ${apply.inputB} in range(len(${array})):")
         visitBlock(apply)
         visitBlock(func)
-        emit(src"for (int ${func.result}_idx = 0; ${func.result}_idx < (*${func.result}).size(); ${func.result}_idx++) {(*${lhs}).push_back((*${func.result})[${func.result}_idx]);}")
-      close("}")
+        emit(src"for ${func.result}_idx in range(len(${func.result})): $lhs.append(${func.result}[${func.result}_idx])")
+      close("")
 
     case op@ArrayFromSeq(seq)   =>
-      emitNewArray(lhs, lhs.tp, s"${seq.length}")
-      seq.zipWithIndex.foreach{case (s,i) =>
-        emit(src"(*${lhs})[$i] = $s;")
-      }
+      emit(src"$lhs = [${seq.mkString(",")}]")
 
     case ArrayForeach(array,apply,func) =>
-      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
+      open(src"for ${apply.inputB} in range(len(${array})):")
       visitBlock(apply)
       visitBlock(func)
-      close("}")
-
-
+      close("")
 
     case ArrayZip(a, b, applyA, applyB, func) =>
-      emitNewArray(lhs, lhs.tp, getSize(a))
-      open(src"for (int ${applyA.inputB} = 0; ${applyA.inputB} < ${getSize(a)}; ${applyA.inputB}++) { ")
+      emit(src"$lhs = [None for _ in range(len(${a}))]")
+      open(src"for ${applyA.inputB} in range(len(${a})):")
       visitBlock(applyA)
       visitBlock(applyB)
       visitBlock(func)
-      emitUpdate(lhs, func.result, src"${applyA.inputB}", func.result.tp)
-      close("}")
+      emit(src"$lhs[${applyA.inputB}] = ${func.result}")
+      close("")
 
-    case ArrayUpdate(arr, id, data) => emitUpdate(arr, data, src"${id}", data.tp)
+    case ArrayUpdate(arr, id, data) => emit(src"${arr}[$id] = $data")
 
     case UnrolledForeach(ens,cchain,func,iters,valids,_) if (!inHw) =>
-      val starts = cchain.counters.map(_.start)
-      val ends = cchain.counters.map(_.end)
-      val steps = cchain.counters.map(_.step)
-      iters.zipWithIndex.foreach{case (i,idx) =>
-        open(src"for (int $i = ${starts(idx)}; $i < ${ends(idx)}; $i = $i + ${steps(idx)}) {")
-        valids(idx).foreach{v => emit(src"${v.tp} ${v} = true; // TODO: Safe to assume this in cppgen?")}
-      }
-      visitBlock(func)
-      iters.foreach{_ => close("}")}
+      emit(s"raise Exception('no implementation for UnrolledForeach?!?')")
 
     case ArrayFold(array,init,apply,reduce) =>
       if (isArrayType(lhs.tp)) {
@@ -207,39 +124,37 @@ trait SurfGenArray extends SurfGenCommon {
       }
       emit(src"$lhs = $init;")
 
-      open(src"for (int ${apply.inputB} = 0; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
-        emitApply(reduce.inputA, array, src"${apply.inputB}")
-        emit(src"""${reduce.inputB.tp}${if (isArrayType(reduce.inputB.tp)) "*" else ""} ${reduce.inputB} = $lhs;""")
+      open(src"for ${apply.inputB} in range(len($array)):")
+        emit(src"${reduce.inputA} = $array[${apply.inputB}]")
+        emit(src"""${reduce.inputB} = $lhs;""")
         visitBlock(reduce)
         emit(src"$lhs = ${reduce.result};")
-      close("}")
+      close("")
 
     case ArrayReduce(array, apply, reduce) =>
       if (isArrayType(lhs.tp)) {
-        emit(src"""${lhs.tp}* $lhs = new ${lhs.tp}(${getSize(array, "[0]")});""")
+        emit(src"""$lhs = [None for _ in range(len($array))]""")
       } else {
-        emit(src"${lhs.tp} $lhs;")
+        emit(src"$lhs = 0")
       }
-      open(src"if (${getSize(array)} > 0) { // Hack to handle reductions on things of length 0")
-        emitApply(lhs, array, "0", false)
-      close("}")
-      open("else {")
-        emit(src"$lhs = ${zeroElement(lhs.tp)};")
-      close("}")
+      open("if (len(%s) > 0): # Hack to handle reductions on things of length 0".format(array))
+        emit(src"$lhs = $array[0]")
+      closeopen("else:")
+        emit(src"$lhs = 0")
+      close("")
 
-      open(src"for (int ${apply.inputB} = 1; ${apply.inputB} < ${getSize(array)}; ${apply.inputB}++) {")
-        emitApply(reduce.inputA, array, src"${apply.inputB}")
-        emit(src"""${reduce.inputB.tp}${if (isArrayType(reduce.inputB.tp)) "*" else ""} ${reduce.inputB} = $lhs;""")
+      open(src"for ${apply.inputB} in range(1,len($array)):")
+        emit(src"${reduce.inputA} = $array[${apply.inputB}]")
+        emit(src"""${reduce.inputB} = $lhs;""")
         visitBlock(reduce)
         emit(src"$lhs = ${reduce.result};")
-      close("}")
+      close("")
 
     case op@Switch(selects,block) if !inHw =>
 
-      emit(src"/** BEGIN SWITCH $lhs **/")
-      if (op.R.isBits) emit(src"${lhs.tp} $lhs;")
+      emit(src"## BEGIN SWITCH $lhs")
       selects.indices.foreach { i =>
-        open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}) {""")
+        open(src"""${if (i == 0) "if" else "else if"} (${selects(i)}):""")
           visitBlock(op.cases(i).body)
           if (op.R.isBits) emit(src"${lhs} = ${op.cases(i).body.result};")
         close("}")

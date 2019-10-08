@@ -3,6 +3,7 @@ package spatial.lang
 import argon._
 import forge.tags._
 import spatial.node._
+import spatial.metadata.memory._
 
 import scala.collection.mutable.Queue
 
@@ -24,5 +25,9 @@ import scala.collection.mutable.Queue
 }
 
 object MergeBuffer {
-  @api def apply[A:Bits](ways: I32, par: I32): MergeBuffer[A] = stage(MergeBufferNew(ways, par))
+  @api def apply[A:Bits](ways: I32, par: I32): MergeBuffer[A] = {
+    val x = stage(MergeBufferNew(ways, par))
+    x.isWriteBuffer = true
+    x
+  }
 }

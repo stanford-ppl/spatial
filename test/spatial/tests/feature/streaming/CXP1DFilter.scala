@@ -67,7 +67,7 @@ import spatial.tests.apps._
         Pipe {
           val raw: U256 = in.value
           input_fifo.zipWithIndex.foreach{case (f,i) =>
-            val raw_pack = raw.bits((i+1)*interleave_col_bits - 1 :: i*interleave_col_bits).as[I64] // U${256/interleave_col_bits}
+            val raw_pack: I64 = raw.bits((i+1)*interleave_col_bits - 1 :: i*interleave_col_bits).as[I64] // U${256/interleave_col_bits}
             f.enqVec(raw_pack.asVec[I16])
           }
         }

@@ -11,7 +11,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 
 import spatial.metadata.types._
-import spatial.util.IntLike._
+//import spatial.util.IntLike._
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -182,11 +182,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         val autoFullBank: Seq[ModBanking] = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1)))))
       }
-      // else if (mem.explicitBanking.isDefined) {
-      //   if (mem.forceExplicitBanking) {
-      //     Seq()
-      //   }
-      // }
+       else if (mem.explicitBanking.isDefined) {
+         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> mem.explicitScheme))
+       }
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(view, nStricts, aStricts, regroup) => 
           if (wantScheme(scheme)) {
@@ -304,90 +302,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     grps.forall{a => a.toList.lengthLessThan(banks+1)}
   }
 
-  private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Seq[Int] = {
-    /* Offset correction not mentioned in Wang et. al., FPGA '14
-       0. Equations in paper must be wrong.  Example 
-           ex-     alpha = 1,2    N = 4     B = 1
-                        
-               banks:   0 2 0 2    ofs (bank0):   0 * 0 *
-                        1 3 1 3                   * * * *
-                        2 0 2 0                   * 2 * 2 
-                        1 3 1 3                   * * * *
-
-          These offsets conflict!  They went wrong by assuming NB periodicity of 1 in leading dimension
-
-       1. Proposed correction: Add field P: Seq[Int] to ModBanking.  Divide memory into "offset chunks" by finding the 
-          periodicity of the banking pattern and fencing off a portion that contains each bank exactly once
-           P_i = NB / gcd(N,alpha_i)
-               ** if alpha_i = 0, then P_i = infinity **
-
-
-           ex1-     alpha = 3,4    N = 6     B = 1
-                        _____
-               banks:  |0 4 2|0 4 2 0 4 2
-                       |3_1_5|3 1 5 3 1 5
-                        0 4 2 0 4 2 0 4 2
-                        3 1 5 3 1 5 3 1 5
-               banking pattern: 0 4 2
-                                3 1 5
-               P_raw = 2,3
-        
-           ex2-     alpha = 3     N = 9     B = 4
-                       _______________________
-               banks: |0_0_1_2_3_3_4_5_6_6_7_8|0 0 1 2 3 3 4 5 6 6 7 8
-              
-               banking pattern: 0 0* 1 2 3 3* 4 5 6 6* 7 8
-               P_raw = 12
-               * need to know that each field contains two 0s, 3s, and 6s
-
-       2. Create P_expanded: List[List[Int]], where P_i is a list containing P_raw, all divisors of P_raw, and dim_i
-       2. Find list, selecting one element from each list in P, whose product == N*B and whose ranges, (0 until p*a by a), touches each bank exactly once (at least once for B > 1), with 
-          preference given to smallest volume after padding, and this will fence off a region that contains each bank
-          exactly once.
-            NOTE: If B > 1, then we are just going to assume that all banks have as many elements per yard as the most populous bank in that yard (some addresses end up being untouchable,
-                  but the addressing logic would be insane otherwise).  Distinguish the degenerate elements simply by taking pure address % # max degenerates (works because of magic, 
-                  but may be wrong at some point)
-       3. Pad the memory so that P evenly divides its respective dim (Currently stored as .padding metadata)
-       --------------------------
-            # Address resolution steps in metadata/memory/BankingData.scala:
-       4. Compute offset chunk
-          ofsdim_i = floor(x_i/P_i)
-       5. Flatten these ofsdims (w_* is stagedDim_* + pad_*)
-          ofschunk = ... + (ofsdim_0 * ceil(w_1 / P_1)) + ofsdim_1
-       6. If B != 1, do extra math to compute index within the block
-          intrablockdim_i = x_i mod B
-       7. Flatten intrablockdims
-          intrablockofs = ... + intrablockdim_0 * B + intrablockdim_1
-       8. Combine ofschunk and intrablockofs
-          ofs = ofschunk * exp(B,D) + intrablockofs
-
-    */
-    try {
-      val P_raw = alpha.indices.map{i => if (alpha(i) == 0) 1 else n*b/gcd(n*b,alpha(i))}
-      val P_expanded = Seq.tabulate(alpha.size){i => divisors(P_raw(i)) ++ {if (P_raw(i) != 1 && b == 1) List(stagedDims(i)) else List()}} // Force B == 1 for stagedDim P to make life easier
-      val options = combs(P_expanded.map(_.toList).toList)
-//            .collect{case p if p.product == n*b => p}
-            // Volume constraint
-            .collect{case p if p.length == 1 && p == P_raw => p
-                     case p if p.length > 1 && p.product == b*P_raw.map{pr => n - (pr % n)}.max => p
-                    }
-            // Census constraint
-            .collect{case p if spansAllBanks(p,alpha,n,b) => p}
-      val PandCostandBloat = options.map{option =>
-        // Extra elements per dimension so that yards cover entire memory
-        val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
-        val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
-        val volume = paddedDims.product
-        (option,volume)
-      }
-      PandCostandBloat.minBy(_._2)._1
-    }
-    catch { case t:Throwable =>
-      bug(s"Could not fence off a region for banking scheme N=$n, B=$b, alpha=$alpha (memory $mem ${mem.ctx})")
-      throw t
-    }
-  }
-
   protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Option[ModBanking] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
@@ -405,7 +319,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
-        val P = computeP(N,1,alpha,stagedDims,mem)
+        val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
         // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
         banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P))
       }
@@ -416,7 +330,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         attempts = attempts + 1
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
-          val P = computeP(N,1,alpha,stagedDims,mem)
+          val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
           banking = Some(ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks))
         }
         else if (!mem.noBlockCyclic) {
@@ -424,7 +338,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           val numBs = B.size
           banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-            val P = computeP(N, b, alpha, stagedDims,mem)
+            val P = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
             ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)
           }
         }

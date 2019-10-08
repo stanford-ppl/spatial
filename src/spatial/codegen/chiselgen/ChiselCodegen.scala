@@ -24,7 +24,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected var globalBlockID: Int = 0
   protected var ensigs = new scala.collection.mutable.ListBuffer[String]
   protected var boreMe = new scala.collection.mutable.ListBuffer[(String, String)]
-
+  var blackBoxStreamInWidth = -1 // Experimental, for tracking width of BlackBoxStream
+  var blackBoxStreamOutWidth = -1 // Experimental, for tracking width of BlackBoxStream
   val controllerStack = scala.collection.mutable.Stack[Sym[_]]()
 
   // Buffer mappings from LCA to list of memories controlled by it
@@ -209,10 +210,11 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("globals.streamOutsInfo = io_streamOutsInfo")
       emit ("globals.numAllocators = io_numAllocators")
 
-      emit("val io = globals.target match {")
+      emit("val io = chisel3.core.dontTouch(globals.target match {")
       emit("""  case _:targets.cxp.CXP     => IO(new CXPAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))""")
-      emit("  case _ => IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
-      emit("}")
+      if (blackBoxStreamInWidth != -1 || blackBoxStreamOutWidth != -1) emit(s"  case _ => IO(new BlackBoxStreamInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts, $blackBoxStreamInWidth, $blackBoxStreamOutWidth))")
+      else emit("  case _ => IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
+      emit("})")
       emit ("var outStreamMuxMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map[String,Int]()")
       open("def getStreamOutLane(id: String): Int = {")
         emit ("val lane = outStreamMuxMap.getOrElse(id, 0)")
@@ -418,7 +420,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
             s"Flipped(Decoupled(Vec(${par},UInt(${width}.W))))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
           case CXPPixelBus => "Flipped(Decoupled(new CXPStream()))"
-          case _ => super.remap(tp)
+          case _ => s"Flipped(Decoupled(UInt(${bus.nbits}.W)))"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
         bus match {
@@ -427,7 +429,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case GatherAddrBus => src"""Decoupled(new AppCommandSparse(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case _: ScatterCmdBus[_] => src"""Decoupled(new ScatterCmdStream(ModuleParams.getParams("${x}_p").asInstanceOf[StreamParInfo] ))"""
           case CXPPixelBus => "Decoupled(new CXPStream())"
-          case _ => super.remap(tp)
+          case _ => s"Decoupled(UInt(${bus.nbits}.W))"
         }
 
       case _ => super.remap(tp)

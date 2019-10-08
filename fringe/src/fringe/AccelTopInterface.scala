@@ -62,6 +62,27 @@ class CXPAccelInterface(
   override def cloneType = (new CXPAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts)).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
+class BlackBoxStreamInterface( // Accel Interface for apps that have an input/output BlackBoxStream, used for experimental purposes mostly
+  override val io_w: Int,
+  override val io_v: Int,
+  override val io_loadStreamInfo: List[StreamParInfo],
+  override val io_storeStreamInfo: List[StreamParInfo],
+  override val io_gatherStreamInfo: List[StreamParInfo],
+  override val io_scatterStreamInfo: List[StreamParInfo],
+  override val io_numAllocators: Int,
+  override val io_numArgIns: Int,
+  override val io_numArgOuts: Int,
+  val io_stream_in_width: Int,
+  val io_stream_out_width: Int,
+) extends CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts){
+  // Generic Stream
+  val STREAM_IN = Flipped(Decoupled(UInt(io_stream_in_width.W)))
+  val STREAM_OUT = Decoupled(UInt(io_stream_out_width.W))
+
+  override def cloneType = (new BlackBoxStreamInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts, io_stream_in_width, io_stream_out_width)).asInstanceOf[this.type] // See chisel3 bug 358
+}
+
+
 abstract class AbstractAccelTop extends Module {
   val io: AccelInterface
 }

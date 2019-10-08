@@ -7,6 +7,61 @@ import spatial.node._
 import spatial.lang.types._
 import spatial.metadata.memory._
 
+
+abstract class LockDRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockDRAM[A,C]) extends Top[C[A]] with RemoteMem[A,C] {
+  val A: Bits[A] = Bits[A]
+
+  protected def M1: Type[LockDRAM1[A]] = implicitly[Type[LockDRAM1[A]]]
+  def rank: Seq[Int]
+
+  /** Returns the total capacity (in elements) of this DRAM. */
+  @api def size: I32 = product(dims:_*)
+
+  /**
+    * Returns the dimensions of this DRAM as a Sequence.
+    */
+  @api def dims: Seq[I32] = Seq.tabulate(rank.length){d => stage(MemDim(this,rank(d))) }
+
+  /** Returns dim0 of this DRAM, or else 1 if DRAM is lower dimensional */
+  @api def dim0: I32 = dims.head
+
+  /** Returns the 64-bit address of this DRAM */
+  @api def address: I64 = stage(LockDRAMAddress(me))
+
+  @api override def neql(that: C[A]): Bit = {
+    error(this.ctx, "Native comparison of DRAMs is unsupported. Use getMem to extract data.")
+    error(this.ctx)
+    super.neql(that)
+  }
+  @api override def eql(that: C[A]): Bit = {
+    error(this.ctx, "Native comparision of DRAMs is unsupported. Use getMem to extract data.")
+    error(this.ctx)
+    super.eql(that)
+  }
+}
+object LockDRAM {
+  /** Allocates a 1-dimensional [[LockDRAM1]] with capacity of `length` elements of type A. */
+  @api def apply[A:Bits](length: I32): LockDRAM1[A] = stage(LockDRAMHostNew[A,LockDRAM1](Seq(length),zero[A]))
+}
+
+/** A 1-dimensional [[LockDRAM]] with elements of type A. */
+@ref class LockDRAM1[A:Bits] extends LockDRAM[A,LockDRAM1] with Ref[Array[Any],LockDRAM1[A]] with Mem1[A,LockDRAM1] {
+  def rank: Seq[Int] = Seq(0)
+  @api def length: I32 = dims.head
+  @api override def size: I32 = dims.head
+
+  /** Returns the value at `pos`. */
+  @api def apply(pos: I32): A = stage(LockDRAMRead(this,Seq(pos),None,Set.empty))
+  @api def apply(pos: I32, lock: LockWithKeys[I32]): A = stage(LockDRAMRead(this,Seq(pos),Some(lock),Set.empty))
+
+  /** Updates the value at `pos` to `data`. */
+  @api def update(pos: I32, data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos),None,Set.empty))
+  @api def update(pos: I32, lock: LockWithKeys[I32], data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos),Some(lock),Set.empty))
+
+  @api def store[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = throw new Exception(s"LockDRAM store needs to be implemented!")
+  @api def store(local: SRAM1[A], len: I32): Void = throw new Exception(s"LockDRAM store needs to be implemented!")
+}
+
 abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C]) extends LocalMem[A,C] {
   val A: Bits[A] = Bits[A]
   protected def M1: Type[LockSRAM1[A]] = implicitly[Type[LockSRAM1[A]]]
@@ -66,60 +121,15 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
   def buffer: C[A] = { this.isWriteBuffer = true; me }
   /** Do not buffer memory */
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
-  /** Only attempt to bank memory hierarchically */
-  def hierarchical: C[A] = { this.isNoFlatBank = true; me }
-  /** Only attempt to bank memory in a flattened manner */
-  def flat: C[A] = { this.isNoHierarchicalBank = true; me }
-  /** Guarantee that it is safe to merge different duplicates.
-    * Only use this if you know exactly what you are doing!
-    */
   def mustmerge: C[A] = { this.isMustMerge = true; me }
 
-  def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
-  def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}
-  def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .onlyduplicate instead")}
-
-  /** Do not attempt to bank memory at all, and only use bank-by-duplication for all lanes of all readers */
-  def fullfission: C[A] = { this.isFullFission = true; me }
-  /** Attempt to duplicate on the provided axes groups.
-    *   i.e. To try either no-duplication, full-duplication, or duplication
-    *   along the axes with dimensions 32 and 64 for LockSRAM(32,8,64), use the flag
-    *   .duplicateaxes( List( List(), List(0,2), List(0,1,2) ) )
-    */
-  @stateful def axesfission(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 3.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
-  /** Do not attempt to bank memory by duplication */
-  def nofission: C[A] = { this.isNoFission = true; me }
-  /** Only attempt to bank with N's from the "likely" category */
-  def nBest: C[A] = { this.nConstraints = this.nConstraints :+ NBestGuess; me }
-  /** Only attempt to bank with N's from the "pow2" category */
-  def nPow2: C[A] = { this.nConstraints = this.nConstraints :+ NPowersOf2; me }
-  /** Only attempt to bank with N's from the "relaxed" category */
-  def nRelaxed: C[A] = { this.nConstraints = this.nConstraints :+ NRelaxed; me }
-  /** Only attempt to bank with alphas from the "likely" category */
-  def alphaBest: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaBestGuess; me }
-  /** Only attempt to bank with alphas from the "pow2" category */
-  def alphaPow2: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaPowersOf2; me }
-  /** Only attempt to bank with alphas from the "relaxed" category */
-  def alphaRelaxed: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaRelaxed; me }
-  /** Do not attempt to bank memory with block-cyclic schemes */
-  def noblockcyclic: C[A] = { this.noBlockCyclic = true; me }
-  /** Only attempt to bank memory with block-cyclic schemes */
-  def onlyblockcyclic: C[A] = { this.onlyBlockCyclic = true; me }
-  /** Set search range bs to search for */
-  def blockcyclic_Bs(bs:Seq[Int]): C[A] = { this.blockCyclicBs = bs; me }
-  /** Specify banking search effort for this memory */
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
   /** Allow "unsafe" banking, where two writes can technically happen simultaneously and one will be dropped.
     * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
     * due to data-dependent control flow or that you don't care if one write gets dropped
     */
   def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
-  /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will crash. It will also assume only one duplicate */
-  def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): C[A] = { this.explicitBanking = (N, B, alpha); me }
-  /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will NOT crash. It will also assume only one duplicate */
-  def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): C[A] = { this.explicitBanking = (N, B, alpha); this.forceExplicitBanking = true; me }
 
-  def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, None, ens)

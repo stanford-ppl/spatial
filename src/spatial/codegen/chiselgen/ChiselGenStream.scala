@@ -16,17 +16,19 @@ trait ChiselGenStream extends ChiselGenCommon {
     case StreamInNew(bus) =>
       // val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
       // Emit code for streams that are unrelated to DRAM nodes
-      if (bus.isInstanceOf[TargetBus[_]]) bus match {
-        case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_IN")
-        case _ => 
+      bus match {
+        case CXPPixelBus => forceEmit(src"val $lhs = top.io.asInstanceOf[CXPAccelInterface].AXIS_IN")
+        case BlackBoxBus(name) => blackBoxStreamInWidth = bus.nbits; forceEmit(src"val $lhs = top.io.asInstanceOf[BlackBoxStreamInterface].STREAM_IN")
+        case _ =>
       }
 
     case StreamOutNew(bus) =>
       // val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
       // Emit code for streams that are unrelated to DRAM nodes
-      if (bus.isInstanceOf[TargetBus[_]]) bus match {
+      bus match {
         case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_OUT")
-        case _ => 
+        case BlackBoxBus(name) => blackBoxStreamOutWidth = bus.nbits; forceEmit(src"val $lhs = top.io.asInstanceOf[BlackBoxStreamInterface].STREAM_OUT")
+        case _ =>
       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
@@ -86,7 +88,7 @@ trait ChiselGenStream extends ChiselGenCommon {
 
         case _ =>
           data.zipWithIndex.foreach{case(d,i) =>
-            emit(src"""${stream}.bits := $d""")
+            emit(src"""${stream}.bits := ${d}.r""")
           }
       }
 

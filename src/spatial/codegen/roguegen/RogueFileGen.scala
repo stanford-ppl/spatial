@@ -1,10 +1,10 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 
 import spatial.metadata.CLIArgs
 
-trait SurfFileGen extends SurfCodegen {
+trait RogueFileGen extends RogueCodegen {
 
   backend = "python"
 
@@ -26,7 +26,7 @@ trait SurfFileGen extends SurfCodegen {
       emit("import pyrogue.interfaces.simulation")
       emit("")
       emit("import axipcie  as pcie")
-      emit("import surf.axi as axi")
+      emit("import rogue.axi as axi")
       emit("")
       emit("import time")
       emit("import math")

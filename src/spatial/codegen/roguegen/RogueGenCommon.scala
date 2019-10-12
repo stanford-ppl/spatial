@@ -1,4 +1,4 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import spatial.lang._
@@ -8,7 +8,7 @@ import utils.escapeString
 import emul.Bool
 import spatial.util.spatialConfig
 
-trait SurfGenCommon extends SurfCodegen {
+trait RogueGenCommon extends RogueCodegen {
 
   var instrumentCounters: List[(Sym[_], Int)] = List()
   var earlyExits: List[Sym[_]] = List()
@@ -31,7 +31,7 @@ trait SurfGenCommon extends SurfCodegen {
   var argOuts = scala.collection.mutable.ArrayBuffer[Sym[_]]()
   var argIOs = scala.collection.mutable.ArrayBuffer[Sym[_]]()
   var argIns = scala.collection.mutable.ArrayBuffer[Sym[_]]()
-  var drams = scala.collection.mutable.ArrayBuffer[Sym[_]]()
+  var frames = scala.collection.mutable.ArrayBuffer[Sym[_]]()
 
   def hasForwardPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getReadStreams(sym).nonEmpty
   def hasBackPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getWriteStreams(sym).nonEmpty

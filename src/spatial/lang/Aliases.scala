@@ -74,6 +74,11 @@ trait ExternalAliases extends InternalAliases {
   lazy val DRAM5 = spatial.lang.DRAM5
   lazy val DRAM = spatial.lang.DRAM
 
+  type Frame[A,C[T]] = spatial.lang.Frame[A,C]
+  type Frame1[A] = spatial.lang.Frame1[A]
+  lazy val FrameIn = spatial.lang.FrameIn
+  lazy val FrameOut = spatial.lang.FrameOut
+
   type SRAM[A,C[T]] = spatial.lang.SRAM[A,C]
   type SRAM1[A] = spatial.lang.SRAM1[A]
   type SRAM2[A] = spatial.lang.SRAM2[A]
@@ -131,7 +136,6 @@ trait ExternalAliases extends InternalAliases {
 
   // --- Primitives
 
-
   type Counter[F] = spatial.lang.Counter[F]
   lazy val Counter = spatial.lang.Counter
 
@@ -164,6 +168,10 @@ trait ShadowingAliases extends ExternalAliases {
   lazy val Matrix = spatial.lang.host.Matrix
 
   type Tuple2[A,B] = argon.lang.Tup2[A,B]
+
+  type AxiStream256 = spatial.lang.AxiStream256
+  lazy val AxiStream256Bus = spatial.lang.AxiStream256Bus
+  val AxiStream256Data = spatial.lang.AxiStream256Data
 
   type Unit = argon.lang.Void
 

@@ -1,4 +1,4 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import argon.node._
@@ -7,7 +7,7 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.types._
 
-trait SurfGenArray extends SurfGenCommon {
+trait RogueGenArray extends RogueGenCommon {
 
   var struct_list: List[String] = List()
 

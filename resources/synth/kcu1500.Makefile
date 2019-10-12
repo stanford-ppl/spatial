@@ -22,7 +22,7 @@ help:
 hw:
 	echo "$$(date +%s)" > start.log
 	test -d cpp || mkdir cpp # to make fringe happy...
-	sbt "runMain top.Instantiator --verilog --testArgs kcu1500"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs kcu1500"
 	mv ${BIGIP_SCRIPT} ${KCU1500_V_DIR}/
 	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${CXP_V_DIR}/SpatialIP.v; \
 	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${KCU1500_V_DIR}/SpatialIP.v; \
@@ -34,10 +34,10 @@ hw:
 	echo "  cp ${KCU_1500_V_DIR}/SpatialIP.v $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp/hdl/SpatialIP.v"
 	echo "  cp python/TopHost.py $$TIMETOOL_HOME/software/scripts/TopHost.py"
 	echo "  cp python/_AccelTop.py $$TIMETOOL_HOME/software/scripts/_AccelTop.py"
-	echo "Then run the rest of the flow in the SURF framwork:"
+	echo "Then run the rest of the flow in the ROGUE framwork:"
 	echo "  cd $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp"
 	echo "  make clean && make vcs"
-	echo "Follow the steps that SURF gives you and then run `$$TIMETOOL_HOME/software/scripts/HostWrapper.py --dev sim` after you start the FPGA simulator with `simv`"
+	echo "Follow the steps that ROGUE gives you and then run `$$TIMETOOL_HOME/software/scripts/HostWrapper.py --dev sim` after you start the FPGA simulator with `simv`"
 #ifeq (,$(wildcard $$TIMETOOL_HOME/firmware))
 #	$(error timetool-spatial repo not found.  Please clone from https://github.com/slaclab/timetool-spatial and export TIMETOOL_HOME to point to it.)
 #endif

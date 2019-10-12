@@ -1,4 +1,4 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import spatial.lang._
@@ -7,7 +7,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.spatialConfig
 
-trait SurfGenInterface extends SurfGenCommon {
+trait RogueGenInterface extends RogueGenCommon {
 
   // override protected def remap(tp: Type[_]): String = tp match {
   //   case tp: RegType[_] => src"${tp.typeArguments.head}"
@@ -29,12 +29,10 @@ trait SurfGenInterface extends SurfGenCommon {
       emit(src"$lhs = $reg;")
     case RegWrite(reg,v,en) =>
       emit(src"# $lhs $reg $v $en reg write")
-    case DRAMHostNew(dims, _) =>
-      drams += lhs
-      emit(src"""${lhs} = self._reqFrame(${dims.map(quote).mkString("*")}, True)""")
-      emit(src"set this ${argHandle(lhs)}_ptr")
-      emit(src"c1->setArg(${argHandle(lhs)}_ptr, $lhs, false);")
-      emit(src"""print("Allocate mem of size ${dims.map(quote).mkString("*")} at %p\n" % ${lhs}_ptr);""")
+    case DRAMHostNew(dims, _) => throw new Exception(s"DRAM nodes not currently supported in Rogue!")
+    case FrameHostNew(dim, _) =>
+      frames += lhs
+      emit(src"""# ${lhs} = new frame of size $dim, called ${argHandle(lhs)}_ptr""")
 
     case SetReg(reg, v) =>
       emit(src"accel.${argHandle(reg)}_arg.set($v)")
@@ -47,10 +45,13 @@ trait SurfGenInterface extends SurfGenCommon {
       emit(src"time.sleep(0.001)")
     case StreamInNew(stream) =>
     case StreamOutNew(stream) =>
-
     case SetMem(dram, data) =>
-
     case GetMem(dram, data) =>
+    case SetFrame(frame, data) =>
+      emit(src"""# $lhs in set $frame with $data""")
+
+    case GetFrame(frame, data) =>
+      emit(src"""# $lhs in get $frame to $data""")
 
     case _ => super.gen(lhs, rhs)
   }
@@ -101,26 +102,26 @@ trait SurfGenInterface extends SurfGenCommon {
         emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(a)}_arg', description = 'argIn', offset = ${id*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RW',))")
       }
       emit("\n##### DRAM Ptrs:")
-      drams.zipWithIndex.foreach {case (d, id) =>
+      frames.zipWithIndex.foreach {case (d, id) =>
         emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(d)}_ptr', description = 'dram ptr', offset = ${(argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RW',))")
       }
       emit("\n##### ArgIOs")
       argIOs.zipWithIndex.foreach{case (a, id) =>
-        emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(a)}_arg', description = 'argIn', offset = ${(drams.length+argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RW',))")
+        emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(a)}_arg', description = 'argIn', offset = ${(frames.length+argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RW',))")
       }
       emit("\n##### ArgOuts")
       argOuts.zipWithIndex.foreach { case (a, id) =>
-        emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(a)}_arg', description = 'argIn', offset = ${(argIOs.length+drams.length+argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+        emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(a)}_arg', description = 'argIn', offset = ${(argIOs.length+frames.length+argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
       }
       emit("\n##### Instrumentation Counters")
       if (spatialConfig.enableInstrumentation) {
         instrumentCounters.foreach { case (s, _) =>
           val base = instrumentCounterIndex(s)
-          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_cycles_arg', description = 'cycs', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_iters_arg', description = 'numiters', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base + 1) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_cycles_arg', description = 'cycs', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_iters_arg', description = 'numiters', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base + 1) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
           if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
-            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_stalled_arg', description = 'stalled', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base + 2) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_idle_arg', description = 'idle', offset = ${(argIns.length + drams.length + argIOs.length + argOuts.length + base + 3) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_stalled_arg', description = 'stalled', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base + 2) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_idle_arg', description = 'idle', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base + 3) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
           }
         }
       }

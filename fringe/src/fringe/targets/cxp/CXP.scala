@@ -1,7 +1,7 @@
 package fringe.targets.cxp
 
 import chisel3._
-import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface,CXPAccelInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.DeviceTarget
 
 class CXP extends DeviceTarget {
@@ -26,9 +26,9 @@ class CXP extends DeviceTarget {
     // Fringe <-> DRAM connections
     io.M_AXI <> fringe.io.M_AXI
 
-    // Fringe <-> CXP Bus connections
-    io.AXIS_IN <> accel.io.asInstanceOf[CXPAccelInterface].AXIS_IN
-    io.AXIS_OUT <> accel.io.asInstanceOf[CXPAccelInterface].AXIS_OUT
+    // SpatialIP <-> AXIStream connections (note they go directly from accel to spatial IP)
+    io.AXIS_IN <> accel.io.axiStreamsIn.head
+    io.AXIS_OUT <> accel.io.axiStreamsOut.head
 
     // Fringe <-> Host connections
     fringe.io.ctrl_addr := io.CUSTOMLOGIC_CTRL_ADDR

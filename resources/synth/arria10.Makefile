@@ -25,7 +25,7 @@ hw:
 	echo "$$(date +%s)" > start.log
 	@echo "alterad license: $(ALTERAD_LICENSE_FILE)"
 	@echo "quartus version: $(USING_THIS_QUARTUS)"
-	sbt "runMain top.Instantiator --verilog --testArgs arria10"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs arria10"
 	sed -i 's/SRFF/SRFF_sp/g' ${ARRIA10_V_DIR}/SpatialIP.v
 	sed -i 's/SRAMVerilogSim/SRAMVerilogAWS/g' ${ARRIA10_V_DIR}/SpatialIP.v
 	sed -i 's/module\ Top/module Top_DUT/g' ${ARRIA10_V_DIR}/SpatialIP.v

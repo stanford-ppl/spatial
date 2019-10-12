@@ -1,7 +1,6 @@
 package spatial.tests.feature.streaming
 
 import spatial.dsl._
-import spatial.lang.CXPPixelBus
 import spatial.tests.apps._
 
 @spatial class CXP1DFilter extends SpatialTest {
@@ -48,12 +47,12 @@ import spatial.tests.apps._
     // val output_composite_dram = DRAM[composite](LINES_TODO)
 
     /** BOARD TESTING */
-    val in = StreamIn[U256](CXPPixelBus)
+    val in = StreamIn[AxiStream256](AxiStream256Bus)
     val LINES_TODO = ArgIn[Int]
     setArg(LINES_TODO, rows)
     val COLS = interleave_cols;
 //    setArg(COLS, 1024)
-    val out = StreamOut[U256](CXPPixelBus)
+    val out = StreamOut[AxiStream256](AxiStream256Bus)
 
     // Create HW accelerator
     Accel {
@@ -65,7 +64,7 @@ import spatial.tests.apps._
 
         // Stage 1: consume cxp-like stream
         Pipe {
-          val raw: U256 = in.value
+          val raw: U256 = in.value.tdata
           input_fifo.zipWithIndex.foreach{case (f,i) =>
             val raw_pack: I64 = raw.bits((i+1)*interleave_col_bits - 1 :: i*interleave_col_bits).as[I64] // U${256/interleave_col_bits}
             f.enqVec(raw_pack.asVec[I16])
@@ -88,7 +87,7 @@ import spatial.tests.apps._
             // deriv store deriv_fifo
             // Store results
             Foreach(numel by 1){e =>
-              out := packed_results.deq().as[U256];
+              out := AxiStream256Data(packed_results.deq().as[U256])
             }
           }
         }

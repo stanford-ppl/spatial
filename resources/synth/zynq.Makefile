@@ -30,7 +30,7 @@ sw:
 
 hw:
 	echo "$$(date +%s)" > start.log
-	sbt "runMain top.Instantiator --verilog --testArgs zynq"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs zynq"
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zynq.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/SpatialIP.v
 	cp zynq.hw-resources/build/* ${ZYNQ_V_DIR}

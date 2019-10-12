@@ -1,4 +1,4 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import argon.codegen.FileDependencies
@@ -7,8 +7,8 @@ import spatial.traversal.AccelTraversal
 import spatial.targets._
 
 // SURF = SLAC Ultimate RTL Framework
-trait SurfCodegen extends FileDependencies with AccelTraversal  {
-  override val lang: String = "surf"
+trait RogueCodegen extends FileDependencies with AccelTraversal  {
+  override val lang: String = "rogue"
   override val ext: String = "py"
   override def entryFile: String = s"TopHost.$ext"
 

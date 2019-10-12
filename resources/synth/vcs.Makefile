@@ -36,10 +36,10 @@ hw:
 	echo "$$(date +%s)" > start.log
 	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
 ifeq ($(FRINGELESS),1)
-	sbt "runMain top.Instantiator --verilog --testArgs fringeless";
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs fringeless";
 	mv verilog-fringeless verilog-vcs
 else
-	sbt "runMain top.Instantiator --verilog --testArgs vcs"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs vcs"
 endif
 	cp -r vcs.hw-resources/* verilog-vcs
 	touch in.txt

@@ -29,7 +29,7 @@ sw:
 
 hw:
 	echo "$$(date +%s)" > start.log
-	sbt "runMain top.Instantiator --verilog --testArgs zedboard"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs zedboard"
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
 	cat zedboard.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/SpatialIP.v
 	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/SpatialIP.v; fi

@@ -2,7 +2,9 @@ package fringe
 
 import chisel3._
 import chisel3.util._
-import fringe.templates.euresys.{CXPStream}
+import fringe.templates.axi4.{AXI4BundleParameters, AXI4Stream}
+import fringe.templates.euresys.CXPStream
+import fringe.utils.HVec
 
 abstract class AccelInterface extends Bundle {
   val done:  Bool                     // Design done
@@ -12,6 +14,8 @@ abstract class AccelInterface extends Bundle {
   val argOuts: Vec[ArgOut] // Vec of 64b UInts for output arguments
 
   val memStreams: AppStreams      // TODO: Flipped: ???
+  val axiStreamsIn: HVec[AXI4Stream]
+  val axiStreamsOut: HVec[AXI4Stream]
   val heap: Vec[HeapIO]
 }
 
@@ -21,8 +25,10 @@ class CustomAccelInterface(
   val io_loadStreamInfo: List[StreamParInfo], 
   val io_storeStreamInfo: List[StreamParInfo], 
   val io_gatherStreamInfo: List[StreamParInfo], 
-  val io_scatterStreamInfo: List[StreamParInfo], 
-  val io_numAllocators: Int, 
+  val io_scatterStreamInfo: List[StreamParInfo],
+  val io_axiStreamsIn: List[AXI4BundleParameters],
+  val io_axiStreamsOut: List[AXI4BundleParameters],
+  val io_numAllocators: Int,
   val io_numArgIns: Int, 
   val io_numArgOuts: Int, 
 ) extends AccelInterface{
@@ -33,7 +39,15 @@ class CustomAccelInterface(
   
   // DRAM IO
   val memStreams = Flipped(new AppStreams(io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo))
-  
+
+  // AXISTREAM IO
+  val axiStreamsIn = {
+    HVec.tabulate(io_axiStreamsIn.size) { i => new AXI4Stream(io_axiStreamsIn(i)) }
+  }
+  val axiStreamsOut = {
+    HVec.tabulate(io_axiStreamsOut.size) { i => Flipped(new AXI4Stream(io_axiStreamsOut(i))) }
+  }
+
   // HEAP IO
   val heap = Flipped(Vec(io_numAllocators, new HeapIO()))
   
@@ -41,45 +55,7 @@ class CustomAccelInterface(
   val argIns = Input(Vec(io_numArgIns, UInt(64.W)))
   val argOuts = Vec(io_numArgOuts, new ArgOut())
   
-  override def cloneType = (new CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts)).asInstanceOf[this.type] // See chisel3 bug 358
-}
-
-class CXPAccelInterface(
-  override val io_w: Int, 
-  override val io_v: Int, 
-  override val io_loadStreamInfo: List[StreamParInfo], 
-  override val io_storeStreamInfo: List[StreamParInfo], 
-  override val io_gatherStreamInfo: List[StreamParInfo], 
-  override val io_scatterStreamInfo: List[StreamParInfo], 
-  override val io_numAllocators: Int, 
-  override val io_numArgIns: Int, 
-  override val io_numArgOuts: Int, 
-) extends CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts){
-  // Pixel Stream
-  val AXIS_IN = Flipped(Decoupled(new CXPStream()))
-  val AXIS_OUT = Decoupled(new CXPStream())
-  
-  override def cloneType = (new CXPAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts)).asInstanceOf[this.type] // See chisel3 bug 358
-}
-
-class BlackBoxStreamInterface( // Accel Interface for apps that have an input/output BlackBoxStream, used for experimental purposes mostly
-  override val io_w: Int,
-  override val io_v: Int,
-  override val io_loadStreamInfo: List[StreamParInfo],
-  override val io_storeStreamInfo: List[StreamParInfo],
-  override val io_gatherStreamInfo: List[StreamParInfo],
-  override val io_scatterStreamInfo: List[StreamParInfo],
-  override val io_numAllocators: Int,
-  override val io_numArgIns: Int,
-  override val io_numArgOuts: Int,
-  val io_stream_in_width: Int,
-  val io_stream_out_width: Int,
-) extends CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts){
-  // Generic Stream
-  val STREAM_IN = Flipped(Decoupled(UInt(io_stream_in_width.W)))
-  val STREAM_OUT = Decoupled(UInt(io_stream_out_width.W))
-
-  override def cloneType = (new BlackBoxStreamInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_numAllocators, io_numArgIns, io_numArgOuts, io_stream_in_width, io_stream_out_width)).asInstanceOf[this.type] // See chisel3 bug 358
+  override def cloneType = new CustomAccelInterface(io_w, io_v, io_loadStreamInfo, io_storeStreamInfo, io_gatherStreamInfo, io_scatterStreamInfo, io_axiStreamsIn, io_axiStreamsOut, io_numAllocators, io_numArgIns, io_numArgOuts).asInstanceOf[this.type] // See chisel3 bug 358
 }
 
 

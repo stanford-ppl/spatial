@@ -63,7 +63,7 @@ aws-sim-hw:
 	# ----------------------------------------------------------------------------
 	rm -rf ${AWS_V_SIM_DIR}
 	# First use chisel to create the verilog
-	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs aws-sim"
 	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/SpatialIP.v
 	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/SpatialIP.v
 	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
@@ -104,7 +104,7 @@ aws-F1-hw:
 	# ----------------------------------------------------------------------------
 	rm -rf ${AWS_V_DIR}
 	# First use chisel to create the verilog
-	sbt "runMain top.Instantiator --verilog --testArgs aws"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs aws"
 	cat aws.hw-resources/SRAMVerilogAWS.v >> ${AWS_V_DIR}/SpatialIP.v
 	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_DIR}/SpatialIP.v
 	mv ${BIGIP_SCRIPT} ${AWS_V_DIR}/

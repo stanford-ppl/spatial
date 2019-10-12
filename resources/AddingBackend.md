@@ -7,7 +7,7 @@ This guide will teach you how to add a new target to Spatial.  As of now (Oct 20
     * ZCU102
     * Amazon AWS F1 Instances
     * Euresys QuadCXP (~70% of the Kintex Ultrascale XCKU035 is available)
-    * KCU1500 (Depends on github.com/slaclab/timetool-spatial. i.e. SLAC Rogue/SURF/Ruckus framework)
+    * KCU1500 (Depends on github.com/slaclab/timetool-spatial. i.e. SLAC Rogue/ROGUE/Ruckus framework)
 * Altera Targets
     * DE1SoC (Terasic board using Cyclone V)
     * Arria10 SoC
@@ -26,7 +26,7 @@ To add a new backend for $TARGET, you need to touch the following places:
     * $TARGET_Area.csv - (Deprecated) Area models for Spatial IR nodes.  
 * spatial/src/spatial/targets/ - Code that assures the Spatial compiler that your target is a real thing
     * $VENDOR/$TARGET.scala - File that extends HardwareTarget and sets specific details about that target, such as DRAM burst width,
-    resource limits (for DSE), and details about the host system (i.e. cpp vs surf host)
+    resource limits (for DSE), and details about the host system (i.e. cpp vs rogue host)
     * package.scala - Just add a lazy val for your target
 * spatial/src/spatial/codegen/ - Codegen rules for various backends.  You may need to make edits in various 
 places here to emit target specific code

@@ -32,7 +32,7 @@ sw:
 
 chisel: 
 	echo "$$(date +%s)" > start.log
-	sbt "runMain top.Instantiator --verilog --testArgs cxp"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs cxp"
 
 hw:
 ifeq (,$(wildcard cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/))

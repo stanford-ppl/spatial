@@ -1,4 +1,4 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import argon.node._
@@ -7,7 +7,7 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.util.spatialConfig
 
-trait SurfGenAccel extends SurfGenCommon {
+trait RogueGenAccel extends RogueGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
@@ -28,8 +28,7 @@ trait SurfGenAccel extends SurfGenCommon {
         emit("ctr = ctr + 1")
         emit("""if (ctr % 75 == 0): print("  Polled flag %d times..." % ctr)""")
       close("")
-      emit(s"""print("Finished executing TopHost.py for ${spatialConfig.name}!""")
-
+      emit(s"""print("Finished executing TopHost.py for ${spatialConfig.name}!") """)
 
        if (earlyExits.nonEmpty) {
          emit("# Capture breakpoint-style exits")

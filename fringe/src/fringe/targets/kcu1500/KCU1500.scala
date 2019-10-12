@@ -23,6 +23,10 @@ class KCU1500 extends DeviceTarget {
     // Fringe <-> Host connections
     fringe.io.S_AXI <> io.S_AXI
 
+    // SpatialIP <-> AXIStream connections (note they go directly from accel to spatial IP)
+    io.AXIS_IN <> accel.io.axiStreamsIn.head
+    io.AXIS_OUT <> accel.io.axiStreamsOut.head
+
     // Fringe <-> DRAM connections
     io.M_AXI <> fringe.io.M_AXI
 

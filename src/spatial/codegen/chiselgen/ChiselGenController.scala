@@ -451,7 +451,7 @@ trait ChiselGenController extends ChiselGenCommon {
           emit(src"""done_latch.io.input.set := $lhs.done""")
         }
 
-        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(top, instrctrs)")
+        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(accelUnit, instrctrs)")
 
         emit("Ledger.finish()")
         exitCtrl(lhs)
@@ -542,7 +542,7 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, "Instrument.scala"){
       emitHeader()
       open("object Instrument {")
-        open("def connect(top: AccelUnit, instrctrs: List[InstrCtr]): Unit = {")
+        open("def connect(accelUnit: AccelUnit, instrctrs: List[InstrCtr]): Unit = {")
           val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(

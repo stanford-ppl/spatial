@@ -26,10 +26,10 @@ case class PinBus(valid: Pin, data: Seq[Pin]) extends Bus {
 }
 
 /* Type for AxiStream interface for a 256-bit datapath. TODO: tid tdest and tuser widths are made up */
-@struct case class AxiStream256(tdata: U256, tstrb: U32, tkeep: U32, tlast: Bit, tid: U8, tdest: U8)
+@struct case class AxiStream256(tdata: U256, tstrb: U32, tkeep: U32, tlast: Bit, tid: U8, tdest: U8, tuser: U32)
 object AxiStream256Data {
   /* Helper for those who don't care about the other fields of the axi stream */
-  @stateful def apply(tdata: U256): AxiStream256 = AxiStream256(tdata, Bits[U32].from(0), Bits[U32].from(0), Bit(false), Bits[U8].from(0), Bits[U8].from(0))
+  @stateful def apply(tdata: U256): AxiStream256 = AxiStream256(tdata, Bits[U32].from(0), Bits[U32].from(0), Bit(false), Bits[U8].from(0), Bits[U8].from(0), Bits[U32].from(0))
 }
 
 @struct case class BurstCmd(offset: I64, size: I32, isLoad: Bit)

@@ -131,6 +131,7 @@ class AXI4Stream(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   val TLAST = Input(Bool())
   val TID = Input(UInt(params.idBits.W))
   val TDEST = Input(UInt(params.idBits.W))
+  val TUSER = Input(UInt(32.W))
   def valid = TVALID
   def ready = TREADY
 }

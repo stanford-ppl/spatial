@@ -82,6 +82,7 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"$stream.TID.r := ${data.head}.TID.r }")
           emit(src"$stream.TDEST.r := ${data.head}.TDEST.r }")
           emit(src"$stream.TLAST := ${data.head}.TLAST }")
+          emit(src"$stream.TUSER := ${data.head}.TUSER }")
         case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"$stream.TDATA.r := ${data.head}.r")
           emit(src"$stream.TSTRB.r := DontCare")
@@ -89,6 +90,7 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"$stream.TID.r := DontCare")
           emit(src"$stream.TDEST.r := DontCare")
           emit(src"$stream.TLAST := DontCare")
+          emit(src"$stream.TUSER.r := DontCare")
 
         case _ =>
           data.zipWithIndex.foreach{case(d,i) =>
@@ -115,6 +117,7 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TID.r := ${strm}.TID.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
         case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
 

@@ -64,8 +64,8 @@ trait RogueGenCommon extends RogueCodegen {
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
-    case (FixPtType(s,d,f), _) => c.toString
-    case (FltPtType(g,e), _) => c.toString
+    case (FixPtType(s,d,f), c) => s"$c"
+    case (FltPtType(g,e), c) => s"$c"
     case (_:Text, cc: String) => "str(" + escapeString(cc) + ")"
     case (_:Bit, c:Bool) => s"${c.value}"
     case _ => super.quoteConst(tp,c)

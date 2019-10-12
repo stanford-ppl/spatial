@@ -26,7 +26,7 @@ trait RogueFileGen extends RogueCodegen {
       emit("import pyrogue.interfaces.simulation")
       emit("")
       emit("import axipcie  as pcie")
-      emit("import rogue.axi as axi")
+      emit("# import rogue.axi as axi")
       emit("")
       emit("import time")
       emit("import math")

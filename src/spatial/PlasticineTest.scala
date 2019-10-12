@@ -13,10 +13,9 @@ trait PlasticineTest extends DSLTest { test =>
 
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
 
-  protected def pirArgs:List[String] = 
-    "bash" ::
-    "run.sh" ::
-    Nil
+  protected def pirArgs:String = "bash run.sh"
+
+  protected def pirArgList:List[String] = pirArgs.split(" ").toList
 
   def timer = System.getProperty("os.name") match {
     case "Mac OS X" => s"""gtime -f Runtime:%E"""
@@ -92,14 +91,14 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def pirpass(pass:String, args:List[String]) = {
-      var cmd = pirArgs ++ args
+      var cmd = pirArgList ++ args
       cmd ++= cmdlnArgs
       val timeout = 100000
       scommand(pass, cmd, timeout, parsepir _, RunError.apply)
     }
 
     def runpir() = {
-      var cmd = pirArgs :+
+      var cmd = pirArgList :+
       "--load=false" :+
       "--mapping=false" :+
       "--codegen=false"
@@ -107,7 +106,7 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def mappir(args:String, fifo:Int=20) = {
-      var cmd = pirArgs :+
+      var cmd = pirArgList :+
       "--load=true" :+
       "--ckpt=1" :+
       "--mapping=true" :+
@@ -119,7 +118,7 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def genpsim(fifo:Int=20) = {
-      var gentracecmd = pirArgs :+
+      var gentracecmd = pirArgList :+
       "--load=true" :+
       "--ckpt=0" :+
       "--codegen=true" :+
@@ -129,7 +128,7 @@ trait PlasticineTest extends DSLTest { test =>
       "--run-psim=false"
       gentracecmd ++= args.split(" ").map(_.trim).toList
       gentracecmd ++= cmdlnArgs
-      var genpsimcmd = pirArgs :+
+      var genpsimcmd = pirArgList :+
       "--load=true" :+
       "--ckpt=2" :+
       "--codegen=true" :+
@@ -167,7 +166,7 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def genruntst(args:String="", fifo:Int=20) = {
-      var gentstcmd = pirArgs :+
+      var gentstcmd = pirArgList :+
       "--load=true" :+
       "--ckpt=2" :+
       "--codegen=true" :+
@@ -419,7 +418,7 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"idealroute", s"$timer python ../tungsten/bin/idealroute.py -l link.csv -p ideal.place -i ${if (module) "" else "/Top"}/idealnet".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") >>
       scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runp2p", timeout=1000000) >>
-      scommand(s"p2pstat", s"python bin/simstat.py".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"p2pstat", s"python3 bin/simstat.py".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       (if (runhybrid)
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>

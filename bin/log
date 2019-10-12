@@ -1,4 +1,4 @@
-#!pir/env/bin/python
+#!pir/env/bin/python3
 
 import sys
 sys.path.insert(0, 'pir/bin')

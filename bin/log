@@ -2,14 +2,14 @@
 
 import sys
 sys.path.insert(0, 'pir/bin')
-import logger
+from logger import Logger
 
 def main():
     cmd = "--logdir=pir/logs/"
     cmd += " --spatial_dir=./"
     cmd += " --pir_dir=./pir"
     args = sys.argv[1:] + (cmd.split(" "))
-    logger.main(args)
+    Logger(args)
 
 if __name__ == "__main__":
     main()

@@ -441,7 +441,7 @@ package object control {
     @stateful def iterSynchronizationInfo(leaf: Sym[_], iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
       import scala.collection.mutable.ArrayBuffer
       import spatial.util.modeling._
-      val map = scala.collection.mutable.HashMap[Idx,Int]()
+      val map = scala.collection.mutable.HashMap[Idx,Option[Int]]()
       // 1) Bundle iters/uids based on the depth of the counter chain they are part of
       val bundledIters = bundleLayers(leaf, iters, iters)
       val bundledUID = bundleLayers(leaf, iters, uid)
@@ -468,7 +468,7 @@ package object control {
         if (firstFork) {
           // 3.1) If first fork occurs at inner controller (including itersRed of OpMemReduce), then iterators are always synchronized
           if (ctrl.isInnerControl || liters.forall(ctrl.memReduceItersRed.contains)) {
-            liters.foreach{iter => map += (iter -> 0)}
+            liters.foreach{iter => map += (iter -> Some(0))}
           }
           // 3.2) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
           else if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
@@ -485,24 +485,31 @@ package object control {
           // 3.5) Otherwise assume we can mark synchronization because firstFork determined we are still synchronized
           liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
         } else {
-          liters.foreach{iter => map += (iter -> 0)}
+          liters.foreach{iter => map += (iter -> Some(0))}
         }
         firstFork = false
         layer = layer + 1
       }
-      map.toMap
+      map.collect{case (i, o) if o.isDefined => (i -> o.get)}.toMap
     }
 
     /** Computes the ofs between iter from uid to baseline if applicable, due to iter's cchain having a start value that depends on uid divergence */
-    @stateful def iterOfs(iter: Idx, itersAbove: Seq[Seq[Idx]], uid: Seq[Seq[Int]], base: Seq[Seq[Int]]): Int = {
+    @stateful def iterOfs(iter: Idx, itersAbove: Seq[Seq[Idx]], uid: Seq[Seq[Int]], base: Seq[Seq[Int]]): Option[Int] = {
+      import spatial.util.modeling._
       val startSym = iter.ctrStart
+      val stepSym = iter.ctrStep
       startSym match {
-        case Op(LaneStatic(dep, elems)) =>
+        case Op(LaneStatic(dep, elems)) => // If LaneStatic, just detect difference between startSyms
           val position = itersAbove.flatten.indexOf(dep)
           val upper = elems(uid.flatten.apply(position))
           val lower = elems(base.flatten.apply(position))
-          upper - lower
-        case _ => 0
+          Some(upper - lower)
+        case _ => // Otherwise, check if startSym or stepSym mutates with any diverging iters
+          val startDivergingLayer = itersAbove.zipWithIndex.collectFirst{case (is,j) if is.intersect(mutatingBounds(startSym)).nonEmpty => j}
+          val stepDivergingLayer = itersAbove.zipWithIndex.collectFirst{case (is,j) if is.intersect(mutatingBounds(stepSym)).nonEmpty => j}
+          val startDiverges = if (startDivergingLayer.isDefined) uid(startDivergingLayer.get) != base(startDivergingLayer.get) else false
+          val stepDiverges = if (stepDivergingLayer.isDefined) uid(stepDivergingLayer.get) != base(stepDivergingLayer.get) else false
+          if (startDiverges || stepDiverges) None else Some(0)
       }
     }
 

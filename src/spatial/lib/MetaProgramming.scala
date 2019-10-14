@@ -91,4 +91,21 @@ trait MetaProgramming extends SpatialApp {
     }
   }
 
+  //case class SRAMs[T:Num,C[_]](dup:scala.Int)(sramBlock: => SRAM[T,C]) {
+
+    //val srams:List[SRAM[T,C]] = List.fill(dup)(sramBlock)
+    //def apply(i:Int, addr:Int*) = {
+      //srams.zipWithIndex.map { case (sram,ii) =>
+        //val valid = i === ii
+        //val value = sram.read(addr,Set(valid))
+        //mux(valid, value, 0.to[T])
+      //}.reduce { _ + _ }
+    //}
+    //def update(i:Int, addr:Seq[Int], data:T) = {
+      //srams.zipWithIndex.foreach { case (sram,ii) =>
+        //sram.write(data,addr,Set(i==ii))
+      //}
+    //}
+  //}
+
 }

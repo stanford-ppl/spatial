@@ -176,9 +176,6 @@ import spatial.node._
 
 @spatial class SynchronizedButRandomOffset extends SpatialTest {
  def main(args: Array[String]): Unit = {
-     val N = ArgIn[Int]
-     setArg(N, 888)
-     val dram = DRAM[Int](N)
      Accel {
       val sram = SRAM[Int](32)
       Foreach(32 by 1) { i => sram(i) = i}

@@ -806,8 +806,17 @@ package object control {
 
     def unrollBy: Option[Int] = metadata[UnrollBy](s).map(_.par)
     def unrollBy_=(par: Int): Unit = metadata.add(s, UnrollBy(par))
+
+    def progorder: Option[Int] = metadata[ProgramOrder](s).map(_.id)
+    def progorder_=(id: Int): Unit = metadata.add(s, ProgramOrder(id))
   }
 
+  private var _progorder = 0
+  def setProgramOrder(lhs:Sym[_]) = {
+    lhs.progorder = _progorder
+    _progorder += 1
+  }
+  def resetProgramOrder = { _progorder = 0 }
 
   implicit class ScopeOperations(scp: Scope) extends ScopeHierarchyOps(scp.s) {
     def toCtrl: Ctrl = scp match {

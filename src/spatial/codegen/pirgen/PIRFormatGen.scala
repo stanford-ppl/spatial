@@ -6,6 +6,7 @@ import argon.codegen.{Codegen, FileDependencies}
 import spatial.metadata._
 import spatial.metadata.memory._
 import spatial.metadata.bounds._
+import spatial.metadata.control._
 import spatial.node._
 
 import scala.collection.mutable
@@ -41,6 +42,9 @@ trait PIRFormatGen extends Codegen {
     }
     lhs.sym.waitFors.foreach { ids =>
       rhsStr += src".waitFors($ids)"
+    }
+    lhs.sym.progorder.foreach { c =>
+      rhsStr += src".progorder($c)"
     }
     emitStm(lhs, tpStr, rhsStr)
   }

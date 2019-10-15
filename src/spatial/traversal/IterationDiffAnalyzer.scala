@@ -191,7 +191,9 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
  }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
-    case _:AccelScope => inAccel{ super.visit(lhs, rhs) }
+    case _:AccelScope => 
+      inAccel{ super.visit(lhs, rhs) }
+      resetProgramOrder
 
     case ctrl: Control[_] => 
       lhs match {
@@ -209,9 +211,12 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
         case _ =>
       }
       findCycles(lhs, ctrl)
+      setProgramOrder(lhs)
       super.visit(lhs,rhs)
       
-    case _ => super.visit(lhs, rhs)
+    case _ => 
+      if (inHw) setProgramOrder(lhs)
+      super.visit(lhs, rhs)
   }
 
 }

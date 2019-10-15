@@ -18,12 +18,14 @@ trait ChiselGenStream extends ChiselGenCommon {
     case StreamInNew(bus) =>
       bus match {
         case AxiStream256Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 256))
+        case AxiStream512Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 512))
         case _ =>
       }
 
     case StreamOutNew(bus) =>
       bus match {
         case AxiStream256Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 256))
+        case AxiStream512Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 512))
         case _ =>
       }
 
@@ -91,7 +93,22 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"$stream.TDEST.r := DontCare")
           emit(src"$stream.TLAST := DontCare")
           emit(src"$stream.TUSER.r := DontCare")
-
+        case AxiStream512Bus if lhs.tp.isInstanceOf[AxiStream512] =>
+          emit(src"$stream.TDATA.r := ${data.head}.TDATA.r }")
+          emit(src"$stream.TSTRB.r := ${data.head}.TSTRB.r }")
+          emit(src"$stream.TKEEP.r := ${data.head}.TKEEP.r }")
+          emit(src"$stream.TID.r := ${data.head}.TID.r }")
+          emit(src"$stream.TDEST.r := ${data.head}.TDEST.r }")
+          emit(src"$stream.TLAST := ${data.head}.TLAST }")
+          emit(src"$stream.TUSER := ${data.head}.TUSER }")
+        case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"$stream.TDATA.r := ${data.head}.r")
+          emit(src"$stream.TSTRB.r := DontCare")
+          emit(src"$stream.TKEEP.r := DontCare")
+          emit(src"$stream.TID.r := DontCare")
+          emit(src"$stream.TDEST.r := DontCare")
+          emit(src"$stream.TLAST := DontCare")
+          emit(src"$stream.TUSER.r := DontCare")
         case _ =>
           data.zipWithIndex.foreach{case(d,i) =>
             emit(src"""${stream}.bits := ${d}.r""")
@@ -120,6 +137,16 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
         case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
+        case AxiStream512Bus if lhs.tp.isInstanceOf[AxiStream512] =>
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TID.r := ${strm}.TID.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
+        case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
 
 
 
@@ -134,8 +161,8 @@ trait ChiselGenStream extends ChiselGenCommon {
   }
 
   override def emitPostMain(): Unit = {
-    val insList = axiStreamIns.map{case (s, (_,w)) => s"AXI4BundleParameters(32, $w, 8)" }.mkString(",")
-    val outsList = axiStreamOuts.map{case (s, (_,w)) => s"AXI4BundleParameters(32, $w, 8)" }.mkString(",")
+    val insList = axiStreamIns.map{case (s, (_,w)) => s"AXI4StreamParameters($w, 8, 32)" }.mkString(",")
+    val outsList = axiStreamOuts.map{case (s, (_,w)) => s"AXI4StreamParameters($w, 8, 32)" }.mkString(",")
 
     inGen(out, s"AccelWrapper.$ext") {
       emit(src"// Non-memory Streams")

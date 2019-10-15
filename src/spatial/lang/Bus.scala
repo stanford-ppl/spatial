@@ -32,11 +32,22 @@ object AxiStream256Data {
   @stateful def apply(tdata: U256): AxiStream256 = AxiStream256(tdata, Bits[U32].from(0), Bits[U32].from(0), Bit(false), Bits[U8].from(0), Bits[U8].from(0), Bits[U32].from(0))
 }
 
+/* Type for AxiStream interface for a 256-bit datapath. TODO: tid tdest and tuser widths are made up */
+@struct case class AxiStream512(tdata: U512, tstrb: U64, tkeep: U64, tlast: Bit, tid: U8, tdest: U8, tuser: U64)
+object AxiStream512Data {
+  /* Helper for those who don't care about the other fields of the axi stream */
+  @stateful def apply(tdata: U512): AxiStream512 = AxiStream512(tdata, Bits[U64].from(0), Bits[U64].from(0), Bit(false), Bits[U8].from(0), Bits[U8].from(0), Bits[U64].from(0))
+}
+
 @struct case class BurstCmd(offset: I64, size: I32, isLoad: Bit)
 @struct case class IssuedCmd(size: I32, start: I32, end: I32)
 
 case object AxiStream256Bus extends Bus {
   @rig def nbits: Int = 256
+}
+
+case object AxiStream512Bus extends Bus {
+  @rig def nbits: Int = 512
 }
 
 abstract class DRAMBus[A:Bits] extends Bus { @rig def nbits: Int = Bits[A].nbits }

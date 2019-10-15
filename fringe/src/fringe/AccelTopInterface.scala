@@ -2,7 +2,7 @@ package fringe
 
 import chisel3._
 import chisel3.util._
-import fringe.templates.axi4.{AXI4BundleParameters, AXI4Stream}
+import fringe.templates.axi4.{AXI4BundleParameters, AXI4Stream, AXI4StreamParameters}
 import fringe.templates.euresys.CXPStream
 import fringe.utils.HVec
 
@@ -26,8 +26,8 @@ class CustomAccelInterface(
   val io_storeStreamInfo: List[StreamParInfo], 
   val io_gatherStreamInfo: List[StreamParInfo], 
   val io_scatterStreamInfo: List[StreamParInfo],
-  val io_axiStreamsIn: List[AXI4BundleParameters],
-  val io_axiStreamsOut: List[AXI4BundleParameters],
+  val io_axiStreamsIn: List[AXI4StreamParameters],
+  val io_axiStreamsOut: List[AXI4StreamParameters],
   val io_numAllocators: Int,
   val io_numArgIns: Int, 
   val io_numArgOuts: Int, 

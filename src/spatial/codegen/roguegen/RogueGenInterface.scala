@@ -32,7 +32,7 @@ trait RogueGenInterface extends RogueGenCommon {
     case DRAMHostNew(dims, _) => throw new Exception(s"DRAM nodes not currently supported in Rogue!")
     case FrameHostNew(dim, _) =>
       frames += lhs
-      emit(src"""# ${lhs} = new frame of size $dim, called ${argHandle(lhs)}_ptr""")
+      emit(src"$lhs = base._reqFrame($dim * ${bitWidth(lhs.tp)/8}, False);")
 
     case SetReg(reg, v) =>
       emit(src"accel.${argHandle(reg)}_arg.set($v)")
@@ -48,7 +48,8 @@ trait RogueGenInterface extends RogueGenCommon {
     case SetMem(dram, data) =>
     case GetMem(dram, data) =>
     case SetFrame(frame, data) =>
-      emit(src"""# $lhs in set $frame with $data""")
+      emit(src"$frame.write(${data}.tobytes(),0)")
+      emit(src"base._sendFrame($frame)")
 
     case GetFrame(frame, data) =>
       emit(src"""# $lhs in get $frame to $data""")

@@ -270,8 +270,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val storeStreamInfo: List[StreamParInfo],")
         emit("val gatherStreamInfo: List[StreamParInfo],")
         emit("val scatterStreamInfo: List[StreamParInfo],")
-        emit("val streamInsInfo: List[AXI4BundleParameters],")
-        emit("val streamOutsInfo: List[AXI4BundleParameters]")
+        emit("val streamInsInfo: List[AXI4StreamParameters],")
+        emit("val streamOutsInfo: List[AXI4StreamParameters]")
       closeopen(s") extends AbstractAccelUnit with AccelWrapper { ")
         emit("val retime_released_reg = RegInit(false.B)")
         emit("val accelReset = reset.toBool | io.reset")
@@ -364,6 +364,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
           case ScatterAckBus => "DecoupledIO[Bool]"
           case AxiStream256Bus => "AXI4Stream"
+          case AxiStream512Bus => "AXI4Stream"
           case _ => s"DecoupledIO[UInt]"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
@@ -373,6 +374,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
           case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
           case AxiStream256Bus => "AXI4Stream"
+          case AxiStream512Bus => "AXI4Stream"
           case _ => s"DecoupledIO[UInt]"
         }
 
@@ -419,7 +421,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
             val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => (ens.length, bitWidth(e.A.tp)) }
             s"Flipped(Decoupled(Vec(${par},UInt(${width}.W))))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
-          case AxiStream256Bus => "new AXI4Stream(AXI4BundleParameters(32, 256, 8))"
+          case AxiStream256Bus => "new AXI4Stream(AXI4StreamParameters(256, 8, 32))"
+          case AxiStream512Bus => "new AXI4Stream(AXI4StreamParameters(512, 8, 32))"
           case _ => s"Flipped(Decoupled(UInt(${bus.nbits}.W)))"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
@@ -428,7 +431,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: BurstFullDataBus[_] => src"""Decoupled(new AppStoreData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case GatherAddrBus => src"""Decoupled(new AppCommandSparse(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case _: ScatterCmdBus[_] => src"""Decoupled(new ScatterCmdStream(ModuleParams.getParams("${x}_p").asInstanceOf[StreamParInfo] ))"""
-          case AxiStream256Bus => "Flipped(new AXI4Stream(AXI4BundleParameters(32, 256, 8)))"
+          case AxiStream256Bus => "Flipped(new AXI4Stream(AXI4StreamParameters(256, 8, 32)))"
+          case AxiStream512Bus => "Flipped(new AXI4Stream(AXI4StreamParameters(512, 8, 32)))"
           case _ => s"Decoupled(UInt(${bus.nbits}.W))"
         }
 

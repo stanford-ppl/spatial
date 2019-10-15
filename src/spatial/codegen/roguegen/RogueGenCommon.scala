@@ -56,7 +56,29 @@ trait RogueGenCommon extends RogueCodegen {
   }
 
   override protected def remap(tp: Type[_]): String = tp match {
-    case _ => ""
+    case FixPtType(s,d,f) =>
+      val u = if (!s) "u" else ""
+      if (f == 0) {
+        if (d > 64) s"${u}int128"
+        else if (d > 32) s"${u}int64"
+        else if (d > 16) s"${u}int32"
+        else if (d > 8) s"${u}int16"
+        else if (d > 4) s"${u}int8"
+        else if (d > 2) s"${u}int8"
+        else if (d == 2) s"${u}int8"
+        else "bool"
+      }
+      else { "double" } //s"numeric::Fixed<$d, $f>"
+    case FloatType()  => "float"
+    case DoubleType() => "double"
+    case FltPtType(g,e) => "float"
+    case _: Bit => "bool"
+    case _: Text => "string"
+//    case ai: Reg[_] => remap(ai.typeArgs.head)
+//    case _: Vec[_] => "vector<" + remap(tp.typeArgs.head) + ">"
+//    case t: Tup2[_,_] => s"${super.remap(tp)}".replaceAll("\\[","").replaceAll("\\]","").replaceAll(",","")
+//    case _: host.Array[_] => "vector<" + remap(tp.typeArgs.head) + ">"
+    case _ => super.remap(tp)
   }
 
   protected def conv(tp: Type[_]): String = tp match {
@@ -64,8 +86,8 @@ trait RogueGenCommon extends RogueCodegen {
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = (tp,c) match {
-    case (FixPtType(s,d,f), c) => s"$c"
-    case (FltPtType(g,e), c) => s"$c"
+    case (FixPtType(s,d,f), _) => c.toString.replace("Const(","").replace(")","")
+    case (FltPtType(g,e), _) => c.toString.replace("Const(","").replace(")","")
     case (_:Text, cc: String) => "str(" + escapeString(cc) + ")"
     case (_:Bit, c:Bool) => s"${c.value}"
     case _ => super.quoteConst(tp,c)

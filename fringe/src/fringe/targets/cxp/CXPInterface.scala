@@ -25,6 +25,6 @@ class CXPInterface extends SpatialIPInterface {
   val CUSTOMLOGIC_CTRL_DATA_OUT = Output(UInt(32.W))
 
   val PIPELINECLEAR = Input(Bool())
-  val AXIS_IN = new AXI4Stream(AXI4BundleParameters(32,256,4))
-  val AXIS_OUT = Flipped(new AXI4Stream(AXI4BundleParameters(32,256,4)))
+  val AXIS_IN = new AXI4Stream(AXI4StreamParameters(256,4,32))
+  val AXIS_OUT = Flipped(new AXI4Stream(AXI4StreamParameters(256,4,32)))
 }

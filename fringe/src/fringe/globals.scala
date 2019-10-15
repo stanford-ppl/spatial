@@ -2,7 +2,7 @@ package fringe
 import java.io.{File, PrintWriter}
 
 import fringe.targets.DeviceTarget
-import fringe.templates.axi4.AXI4BundleParameters
+import fringe.templates.axi4.{AXI4BundleParameters, AXI4StreamParameters}
 
 /** Fringe global constants. **/
 object globals {
@@ -53,8 +53,8 @@ object globals {
   var storeStreamInfo: List[StreamParInfo] = Nil
   var gatherStreamInfo: List[StreamParInfo] = Nil
   var scatterStreamInfo: List[StreamParInfo] = Nil
-  var axiStreamInsInfo: List[AXI4BundleParameters] = Nil
-  var axiStreamOutsInfo: List[AXI4BundleParameters] = Nil
+  var axiStreamInsInfo: List[AXI4StreamParameters] = Nil
+  var axiStreamOutsInfo: List[AXI4StreamParameters] = Nil
 
   var numAllocators: Int = 0
 
@@ -63,8 +63,8 @@ object globals {
   def GATHER_STREAMS: List[StreamParInfo] = if (gatherStreamInfo.isEmpty) List(StreamParInfo(DATA_WIDTH, WORDS_PER_STREAM, 0)) else gatherStreamInfo
   def SCATTER_STREAMS: List[StreamParInfo] = if (scatterStreamInfo.isEmpty) List(StreamParInfo(DATA_WIDTH, WORDS_PER_STREAM, 0)) else scatterStreamInfo
 
-  def AXI_STREAMS_IN: List[AXI4BundleParameters] = if (axiStreamInsInfo.isEmpty) List(AXI4BundleParameters(32,256,8)) else axiStreamInsInfo
-  def AXI_STREAMS_OUT: List[AXI4BundleParameters] = if (axiStreamOutsInfo.isEmpty) List(AXI4BundleParameters(32,256,8)) else axiStreamOutsInfo
+  def AXI_STREAMS_IN: List[AXI4StreamParameters] = if (axiStreamInsInfo.isEmpty) List(AXI4StreamParameters(256,8,32)) else axiStreamInsInfo
+  def AXI_STREAMS_OUT: List[AXI4StreamParameters] = if (axiStreamOutsInfo.isEmpty) List(AXI4StreamParameters(256,8,32)) else axiStreamOutsInfo
 
   def NUM_LOAD_STREAMS: Int = LOAD_STREAMS.size
   def NUM_STORE_STREAMS: Int = STORE_STREAMS.size

@@ -32,7 +32,8 @@ trait RogueGenInterface extends RogueGenCommon {
     case DRAMHostNew(dims, _) => throw new Exception(s"DRAM nodes not currently supported in Rogue!")
     case FrameHostNew(dim, _) =>
       frames += lhs
-      emit(src"$lhs = base._reqFrame($dim * ${bitWidth(lhs.tp)/8}, False);")
+      if (lhs.interfaceStream.get.isInstanceOf[StreamOut[AxiStream512]]) emit(src"$lhs = base.frameOut")
+      else emit(src"$lhs = base.frameIn")
 
     case SetReg(reg, v) =>
       emit(src"accel.${argHandle(reg)}_arg.set($v)")
@@ -42,17 +43,17 @@ trait RogueGenInterface extends RogueGenCommon {
     case _: CounterChainNew =>
     case GetReg(reg)    =>
       emit(src"$lhs = accel.${argHandle(reg)}_arg.get()")
-      emit(src"time.sleep(0.001)")
+      emit(src"time.sleep(0.0001)")
     case StreamInNew(stream) =>
     case StreamOutNew(stream) =>
     case SetMem(dram, data) =>
     case GetMem(dram, data) =>
     case SetFrame(frame, data) =>
-      emit(src"$frame.write(${data}.tobytes(),0)")
-      emit(src"base._sendFrame($frame)")
+      emit(src"base.frameIn.sendFrame($data)")
 
     case GetFrame(frame, data) =>
-      emit(src"""# $lhs in get $frame to $data""")
+      emit(src"""$lhs = base.frameOut.getFrame()""")
+      emit(src"""$data = np.frombuffer($lhs, dtype='${data.tp.typeArgs.head}')""")
 
     case _ => super.gen(lhs, rhs)
   }
@@ -63,12 +64,16 @@ trait RogueGenInterface extends RogueGenCommon {
     inGen(out,"_AccelUnit.py") {
       emit("#!/usr/bin/env python")
       emit("import pyrogue as pr")
+      emit("import rogue.protocols")
+      emit("import numpy as np")
       emit("")
-      emit("class AccelUnit(pr.Device):")
+
+      emit("class AccelUnit(pr.Device,rogue.interfaces.stream.Slave):")
       emit("    def __init__(   self,")
       emit("            name        = 'AccelUnit',")
       emit("            description = 'Spatial Top Module SW',")
       emit("            **kwargs):")
+      emit("        rogue.interfaces.stream.Slave.__init__(self)")
       emit("        super().__init__(name=name, description=description, **kwargs)")
       emit("        self.add(pr.RemoteVariable(")
       emit("            name         = 'Enable',")
@@ -130,6 +135,21 @@ trait RogueGenInterface extends RogueGenCommon {
       earlyExits.foreach{x =>
         emit(src"        self.add(pr.RemoteVariable(name = '${quote(x).toUpperCase}_exit_arg', description = 'early exit', offset = ${(argOuts.toList.length + argIOs.toList.length + instrumentCounterArgs())*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
       }
+      emit("    # Unused code for testing how to receive a frame in SW")
+      emit("    def _acceptFrame(self,frame):")
+      emit("        p = bytearray(frame.getPayload())")
+      emit("        frame.read(p,0)")
+      emit("        print(len(p))")
+      emit("        my_mask = np.arange(36)")
+      emit("        if(len(p)>100):")
+      emit("              my_mask = np.append(my_mask,np.arange(int(len(p)/2),int(len(p)/2)+36))")
+      emit("              my_mask = np.append(my_mask,np.arange(len(p)-36,len(p)))")
+      emit("")
+      emit("        to_print = np.array(p)[-1:]")
+      emit("        #print(np.array(p)[:96],to_print) #comment out for long term test")
+      emit("        print(np.array(p)[my_mask])")
+      emit("        print('--------------------------')")
+
 
     }
     super.emitFooter()

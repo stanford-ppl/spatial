@@ -59,6 +59,7 @@ class KCU1500 extends DeviceTarget {
     fringe.io.done := accel.io.done
     fringe.reset := reset.toBool
     accel.reset := fringe.io.reset
+//    accel.clock := io.ACCEL_CLK // TODO: Temporary hack where accel is wired to DMAClock of the Rogue wrapper to avoid having to use an AXI4ClkConverter for now
     // accel.reset := ~reset.toBool
     // io.is_enabled := ~accel.io.enable
 

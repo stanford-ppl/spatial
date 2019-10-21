@@ -40,7 +40,6 @@ trait ChiselGenStream extends ChiselGenCommon {
         emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
       val Op(StreamOutNew(bus)) = stream
-    
       bus match {
         case BurstCmdBus => 
           val (addrMSB, addrLSB)  = getField(stream.tp.typeArgs.head, "offset")
@@ -77,38 +76,38 @@ trait ChiselGenStream extends ChiselGenCommon {
             emit(src"$stream.bits.wdata($i) := $d($dataMSB, $dataLSB)")
           }
 
-        case AxiStream256Bus if lhs.tp.isInstanceOf[AxiStream256] =>
-          emit(src"$stream.TDATA.r := ${data.head}.TDATA.r }")
-          emit(src"$stream.TSTRB.r := ${data.head}.TSTRB.r }")
-          emit(src"$stream.TKEEP.r := ${data.head}.TKEEP.r }")
-          emit(src"$stream.TID.r := ${data.head}.TID.r }")
-          emit(src"$stream.TDEST.r := ${data.head}.TDEST.r }")
-          emit(src"$stream.TLAST := ${data.head}.TLAST }")
-          emit(src"$stream.TUSER := ${data.head}.TUSER }")
+        case AxiStream256Bus if data.head.tp.isInstanceOf[AxiStream256] =>
+          emit(src"$stream.TDATA.r := ${data.head}.TDATA.r")
+          emit(src"$stream.TSTRB.r := ${data.head}.TSTRB.r")
+          emit(src"$stream.TKEEP.r := ${data.head}.TKEEP.r")
+          emit(src"$stream.TID.r := ${data.head}.TID.r")
+          emit(src"$stream.TDEST.r := ${data.head}.TDEST.r")
+          emit(src"$stream.TLAST := ${data.head}.TLAST")
+          emit(src"$stream.TUSER := ${data.head}.TUSER")
         case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"$stream.TDATA.r := ${data.head}.r")
-          emit(src"$stream.TSTRB.r := DontCare")
-          emit(src"$stream.TKEEP.r := DontCare")
-          emit(src"$stream.TID.r := DontCare")
-          emit(src"$stream.TDEST.r := DontCare")
-          emit(src"$stream.TLAST := DontCare")
-          emit(src"$stream.TUSER.r := DontCare")
-        case AxiStream512Bus if lhs.tp.isInstanceOf[AxiStream512] =>
-          emit(src"$stream.TDATA.r := ${data.head}.TDATA.r }")
-          emit(src"$stream.TSTRB.r := ${data.head}.TSTRB.r }")
-          emit(src"$stream.TKEEP.r := ${data.head}.TKEEP.r }")
-          emit(src"$stream.TID.r := ${data.head}.TID.r }")
-          emit(src"$stream.TDEST.r := ${data.head}.TDEST.r }")
-          emit(src"$stream.TLAST := ${data.head}.TLAST }")
-          emit(src"$stream.TUSER := ${data.head}.TUSER }")
+          emit(src"$stream.TSTRB.r := ~0.U(32.W)")
+          emit(src"$stream.TKEEP.r := ~0.U(32.W)")
+          emit(src"$stream.TID.r := 0.U")
+          emit(src"$stream.TDEST.r := 0.U")
+          emit(src"$stream.TLAST := 0.U")
+          emit(src"$stream.TUSER.r := 4.U")
+        case AxiStream512Bus if data.head.tp.isInstanceOf[AxiStream512] =>
+          emit(src"$stream.TDATA.r := ${data.head}.r(511,0)")
+          emit(src"$stream.TSTRB.r := ${data.head}.r(575,512)")
+          emit(src"$stream.TKEEP.r := ${data.head}.r(639,576)")
+          emit(src"$stream.TID.r := ${data.head}.r(648,641)")
+          emit(src"$stream.TDEST.r := ${data.head}.r(657,649)")
+          emit(src"$stream.TLAST := ${data.head}.r(640)")
+          emit(src"$stream.TUSER := ${data.head}.r(720,658)")
         case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"$stream.TDATA.r := ${data.head}.r")
-          emit(src"$stream.TSTRB.r := DontCare")
-          emit(src"$stream.TKEEP.r := DontCare")
-          emit(src"$stream.TID.r := DontCare")
-          emit(src"$stream.TDEST.r := DontCare")
-          emit(src"$stream.TLAST := DontCare")
-          emit(src"$stream.TUSER.r := DontCare")
+          emit(src"$stream.TSTRB.r := ~0.U(64.W)")
+          emit(src"$stream.TKEEP.r := ~0.U(64.W)")
+          emit(src"$stream.TID.r := 0.U")
+          emit(src"$stream.TDEST.r := 0.U")
+          emit(src"$stream.TLAST := 0.U")
+          emit(src"$stream.TUSER.r := 4.U")
         case _ =>
           data.zipWithIndex.foreach{case(d,i) =>
             emit(src"""${stream}.bits := ${d}.r""")

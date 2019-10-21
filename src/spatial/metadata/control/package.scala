@@ -490,6 +490,7 @@ package object control {
         firstFork = false
         layer = layer + 1
       }
+      dbgs(s"itersynch info for $leaf $iters $baseUID $uid = $map")
       map.collect{case (i, o) if o.isDefined => (i -> o.get)}.toMap
     }
 

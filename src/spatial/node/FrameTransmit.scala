@@ -80,10 +80,13 @@ object FrameTransmit {
         }
       }
       else {
-        val dataStream = frame.asInstanceOf[Sym[_]].interfaceStream.get.asInstanceOf[StreamOut[A]]
+        val dataStream = frame.asInstanceOf[Sym[_]].interfaceStream.get.asInstanceOf[StreamOut[AxiStream512]]
 
         Stream.Foreach(len.head by 1){i =>
-          dataStream := local.__read(Seq(localAddr(i)), Set.empty)
+          val tuser = mux(i === 0, 2.to[U64], 0.to[U64])
+          val data = local.__read(Seq(localAddr(i)), Set.empty)
+          val last = i === (len.head-1)
+          dataStream := AxiStream512(data.as[U512], /*~*/0.to[U64], /*~*/0.to[U64], last, 0.to[U8], 1.to[U8], tuser)
         }
       }
     }

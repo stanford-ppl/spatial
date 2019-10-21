@@ -17,6 +17,8 @@ class KCU1500IPInterface extends SpatialIPInterface {
 
   val AXIS_IN = new AXI4Stream(AXI4StreamParameters(512,8,512))
   val AXIS_OUT = Flipped(new AXI4Stream(AXI4StreamParameters(512,8,512)))
+
+//  val ACCEL_CLK = Input(new Clock)
   // // AXI debugging loopbacks
   // val TOP_AXI = new AXI4Probe(axiLiteParams)
   // val DWIDTH_AXI = new AXI4Probe(axiLiteParams)

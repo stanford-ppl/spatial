@@ -1,5 +1,7 @@
 package spatial.tests.feature.transfers
 
+
+import argon.static.Sym
 import spatial.dsl._
 
 @spatial class FrameLoadTest extends SpatialTest {
@@ -44,6 +46,40 @@ import spatial.dsl._
   }
 }
 
+
+@spatial class FrameLoadStoreTest extends SpatialTest {
+  def main(args: Array[String]): Unit = {
+    val in = FrameIn[U32](64)
+    val data = Array.tabulate[U32](64){i => i.to[U32]}
+    setFrame(in, data)
+    val out = FrameOut[U32](64)
+    Accel {
+      Stream {
+        val a = FIFO[U32](8)
+        a load in
+        val b = FIFO[U32](depth=8)
+        Foreach(64 by 1){_ => b.enq(a.deq() + 5)}
+        out store b
+      }
+//      Stream.Foreach(64 by 1) { _ =>
+//        import spatial.lang._
+//        import spatial.metadata.memory._
+//        val a = FIFO[U32](8)
+//        val strmIn = in.asInstanceOf[Sym[_]].interfaceStream
+//        a.enq(strmIn.value)
+//        val b = FIFO[U32](depth=8)
+//        b.enq(a.deq() + 5)
+//        val strmOut = out.asInstanceOf[Sym[_]].interfaceStream
+//        strmOut := b.deq()
+//      }
+    }
+    val got = getFrame(out)
+    val gold = data.map(_+5)
+    printArray(gold, "Wanted:")
+    printArray(got, "Got:")
+    assert(got == gold)
+  }
+}
 
 //
 //@spatial class FrameFilter1D extends SpatialTest {

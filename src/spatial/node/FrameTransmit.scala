@@ -3,11 +3,7 @@ package spatial.node
 import argon._
 import forge.tags._
 import spatial.lang._
-import spatial.metadata.bounds._
-import spatial.metadata.control._
 import spatial.metadata.memory._
-import spatial.util.memops._
-import spatial.util.modeling.target
 
 
 /** A dense transfer between on-chip and off-chip memory

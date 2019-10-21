@@ -44,7 +44,7 @@ trait RogueGenArray extends RogueGenCommon {
     case VecConcat(elems) => emit(src"$lhs = $lhs + $elems")
     case op @ MapIndices(size, func)   =>
       val isVoid = op.A.isVoid
-      if (!isVoid) emit(src"$lhs = np.zeros($size, dtype='${lhs.tp}')")
+      if (!isVoid) emit(src"$lhs = np.zeros($size, dtype='${lhs.tp.typeArgs.head}')")
       open(src"for ${func.input} in range(0,$size):")
       visitBlock(func)
       if (!isVoid) emit(src"$lhs[${func.input}] = ${func.result}")

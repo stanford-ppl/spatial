@@ -49,11 +49,11 @@ trait RogueGenInterface extends RogueGenCommon {
     case SetMem(dram, data) =>
     case GetMem(dram, data) =>
     case SetFrame(frame, data) =>
-      emit(src"base.frameIn.sendFrame($data)")
+      emit(src"base.frameIn.sendFrame($data.astype(dtype='uint64'))")
 
     case GetFrame(frame, data) =>
       emit(src"""$lhs = base.frameOut.getFrame()""")
-      emit(src"""$data = np.frombuffer($lhs, dtype='${data.tp.typeArgs.head}')""")
+      emit(src"""$data = np.frombuffer($lhs, dtype='uint64').astype(dtype='${data.tp.typeArgs.head}')""")
 
     case _ => super.gen(lhs, rhs)
   }
@@ -109,7 +109,7 @@ trait RogueGenInterface extends RogueGenCommon {
       }
       emit("\n##### DRAM Ptrs:")
       frames.zipWithIndex.foreach {case (d, id) =>
-        emit(src"        self.add(pr.RemoteVariable(name = '${argHandle(d)}_ptr', description = 'dram ptr', offset = ${(argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RW',))")
+        emit(src"#        self.add(pr.RemoteVariable(name = '${argHandle(d)}_ptr', description = 'dram ptr', offset = ${(argIns.length+id)*4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RW',))")
       }
       emit("\n##### ArgIOs")
       argIOs.zipWithIndex.foreach{case (a, id) =>
@@ -123,11 +123,11 @@ trait RogueGenInterface extends RogueGenCommon {
       if (spatialConfig.enableInstrumentation) {
         instrumentCounters.foreach { case (s, _) =>
           val base = instrumentCounterIndex(s)
-          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_cycles_arg', description = 'cycs', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_iters_arg', description = 'numiters', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base + 1) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_cycles_arg', description = 'cycs', offset = ${((1 max (argIns.length + argIOs.length + argOuts.length)) + base) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+          emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_iters_arg', description = 'numiters', offset = ${((1 max (argIns.length + argIOs.length + argOuts.length)) + base + 1) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
           if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) {
-            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_stalled_arg', description = 'stalled', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base + 2) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
-            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_idle_arg', description = 'idle', offset = ${(argIns.length + frames.length + argIOs.length + argOuts.length + base + 3) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_stalled_arg', description = 'stalled', offset = ${((1 max (argIns.length + argIOs.length + argOuts.length)) + base + 2) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
+            emit(src"        self.add(pr.RemoteVariable(name = '${quote(s).toUpperCase}_idle_arg', description = 'idle', offset = ${((1 max (argIns.length + argIOs.length + argOuts.length)) + base + 3) * 4 + 8}, bitSize = 32, bitOffset = 0, mode = 'RO',))")
           }
         }
       }

@@ -16,16 +16,16 @@ ICLAXS4[Jk9Vfe0`47C3D53
 Z1 VDg1SIo80bB@j0V0VzS_@n1
 Z2 d/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation
 Z3 w1490778310
-Z4 8/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v
-Z5 F/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v
+Z4 8/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/SpatialIP.v
+Z5 F/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/SpatialIP.v
 L0 496
 Z6 OV;L;10.5b;63
 r1
 !s85 0
 31
 Z7 !s108 1490780097.000000
-Z8 !s107 /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v|
-Z9 !s90 -reportprogress|300|-work|work|-stats=none|/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v|
+Z8 !s107 /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/SpatialIP.v|
+Z9 !s90 -reportprogress|300|-work|work|-stats=none|/local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/SpatialIP.v|
 !i113 1
 Z10 o-work work
 Z11 tCvgOpt 0

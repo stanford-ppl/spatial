@@ -19,7 +19,9 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       connectDRAMStreams(lhs)
       forceEmit(src"// scoped in dram is ${scoped.mkString(",")} ")
       forceEmit(src"val $lhs = Wire(new FixedPoint(true, 64, 0))")
-      forceEmit(src"$lhs.r := top.io.argIns(api.${argHandle(lhs)}_ptr)")
+      forceEmit(src"$lhs.r := accelUnit.io.argIns(api.${argHandle(lhs)}_ptr)")
+
+    case FrameHostNew(size,_) =>
 
     case DRAMAccelNew(dim) =>
 
@@ -69,7 +71,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
   override def emitPostMain(): Unit = {
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit("// Heap")
       emit(src"val io_numAllocators = scala.math.max(1, ${accelDrams.size})")
     }

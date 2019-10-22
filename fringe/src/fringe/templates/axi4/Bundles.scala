@@ -122,6 +122,21 @@ class AXI4Inlined(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   val BREADY  = Output(Bool())
 }
 
+class AXI4Stream(params: AXI4StreamParameters) extends AXI4BundleBase(params.asDummyAXI4Bundle) {
+  val TVALID = Input(Bool())
+  val TREADY = Output(Bool())
+  val TDATA = Input(UInt(params.dataBits.W))
+  val TSTRB = Input(UInt((params.dataBits/8).W))
+  val TKEEP = Input(UInt((params.dataBits/8).W))
+  val TLAST = Input(Bool())
+  val TID = Input(UInt(params.idBits.W))
+  val TDEST = Input(UInt(params.idBits.W))
+  val TUSER = Input(UInt(params.userBits.W))
+  def valid = TVALID
+  def ready = TREADY
+  override def cloneType(): this.type = new AXI4Stream(params).asInstanceOf[this.type]
+}
+
 class AXI4Lite(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   // aw
   val AWADDR   = Output(UInt(params.addrBits.W))

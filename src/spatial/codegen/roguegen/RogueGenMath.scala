@@ -1,11 +1,11 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import argon.node._
 import spatial.lang._
 import spatial.node._
 
-trait SurfGenMath extends SurfGenCommon {
+trait RogueGenMath extends RogueGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case FixInv(x)   => emit(src"$lhs = ~$x")

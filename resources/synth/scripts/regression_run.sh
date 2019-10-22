@@ -55,14 +55,14 @@ if [[ $GDOCS -eq 1 ]]; then
 	branchname=`cat ${basepath}/branchname`
 	#appname=`basename \`pwd\``
 	if [[ -d chisel ]]; then
-		fullname=`cat chisel/IOModule*.scala | grep "Root controller for app" | sed "s/.*: //g"`
+		fullname=`cat chisel/AccelWrapper*.scala | grep "Root controller for app" | sed "s/.*: //g"`
 		testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 		testdirsarray=($testdirs)
 		for t in "${testdirsarray[@]}"; do
 			fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"`
 		done
 		appname=$fullname
-		properties=`cat chisel/IOModule*.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
+		properties=`cat chisel/AccelWrapper*.scala | grep "App Characteristics" | sed "s/^.*App Characteristics: //g" | sed "s/ //g"`
 	else 
 		appname=$(basename `pwd`)
 		properties="NA"

@@ -1,13 +1,13 @@
 package fringe.targets.arria10
 
 import chisel3._
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.DeviceTarget
 
 class Arria10 extends DeviceTarget {
   def makeBigIP: BigIP = new fringe.targets.arria10.BigIPArria10
 
-  override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new Arria10Interface)
 
     val blockingDRAMIssue = false

@@ -1,4 +1,4 @@
-package spatial.codegen.surfgen
+package spatial.codegen.roguegen
 
 import argon._
 import argon.node._
@@ -7,7 +7,7 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.types._
 
-trait SurfGenArray extends SurfGenCommon {
+trait RogueGenArray extends RogueGenCommon {
 
   var struct_list: List[String] = List()
 
@@ -30,7 +30,7 @@ trait SurfGenArray extends SurfGenCommon {
     case ArrayApply(array @ Def(InputArguments()), i) => emit(src"$lhs = $array[$i]")
 
     case ArrayApply(array, i)   => emit(src"$lhs = $array[$i]")
-    case op@ArrayNew(size)      => emit(src"$lhs = [None for _ in range($size)]")
+    case op@ArrayNew(size)      => emit(src"$lhs = np.zeros($size, dtype='${lhs.tp.typeArgs.head}')")
     case ArrayLength(array)     => emit(src"$lhs = len($array)")
     case DataAsBits(bits)       => emit(src"$lhs = bin($bits)[2:]")
     case BitsAsData(v,mT) => emit(src"$lhs = int($v, 2)")
@@ -44,7 +44,7 @@ trait SurfGenArray extends SurfGenCommon {
     case VecConcat(elems) => emit(src"$lhs = $lhs + $elems")
     case op @ MapIndices(size, func)   =>
       val isVoid = op.A.isVoid
-      if (!isVoid) emit(src"$lhs = [None for _ in range($size)]")
+      if (!isVoid) emit(src"$lhs = np.zeros($size, dtype='${lhs.tp.typeArgs.head}')")
       open(src"for ${func.input} in range(0,$size):")
       visitBlock(func)
       if (!isVoid) emit(src"$lhs[${func.input}] = ${func.result}")
@@ -64,7 +64,7 @@ trait SurfGenArray extends SurfGenCommon {
 
 
     case ArrayMap(array,apply,func) =>
-      emit(src"$lhs = [None for _ in range(len(${array}))]")
+      emit(src"$lhs = np.zeros(len(${array}),dtype='${lhs.tp.typeArgs.head}')")
       open(src"for ${apply.inputB} in range(0,len(${array})):")
       visitBlock(apply)
       visitBlock(func)
@@ -96,7 +96,7 @@ trait SurfGenArray extends SurfGenCommon {
       close("")
 
     case op@ArrayFromSeq(seq)   =>
-      emit(src"$lhs = [${seq.mkString(",")}]")
+      emit(src"$lhs = np.array([${seq.map(quote).mkString(",")}], dtype='${lhs.tp.typeArgs.head}')")
 
     case ArrayForeach(array,apply,func) =>
       open(src"for ${apply.inputB} in range(len(${array})):")
@@ -105,7 +105,7 @@ trait SurfGenArray extends SurfGenCommon {
       close("")
 
     case ArrayZip(a, b, applyA, applyB, func) =>
-      emit(src"$lhs = [None for _ in range(len(${a}))]")
+      emit(src"$lhs = np.zeros(len(${a}), dtype=${lhs.tp.typeArgs.head})")
       open(src"for ${applyA.inputB} in range(len(${a})):")
       visitBlock(applyA)
       visitBlock(applyB)
@@ -133,7 +133,7 @@ trait SurfGenArray extends SurfGenCommon {
 
     case ArrayReduce(array, apply, reduce) =>
       if (isArrayType(lhs.tp)) {
-        emit(src"""$lhs = [None for _ in range(len($array))]""")
+        emit(src"""$lhs = np.zeros(len($array), dtype='${lhs.tp.typeArgs.head}')""")
       } else {
         emit(src"$lhs = 0")
       }

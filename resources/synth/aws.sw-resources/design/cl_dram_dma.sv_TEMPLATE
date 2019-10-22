@@ -24,7 +24,7 @@ module cl_dram_dma #(parameter NUM_DDR=4)
 
 // /*
     initial begin
-        $dumpfile("Top.vcd");
+        $dumpfile("SpatialIP.vcd");
         $dumpvars(0, Top_inst);
         // $dumpvars(1, SH_DDR);
         $dumpvars(1, cl_dram_dma);
@@ -445,7 +445,7 @@ logic         Top_Out_io_M_AXI_0_BREADY_q;
 //logic         Top_In_io_M_AXI_3_BVALID;
 //logic         Top_Out_io_M_AXI_3_BREADY;
 
-Top Top_inst (
+SpatialIP SpatialIP_inst (
   .clock(clk),
   .reset(SCALAR_reset[0]),
   .io_enable(SCALAR_en),

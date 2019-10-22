@@ -2,17 +2,15 @@ package spatial.codegen.chiselgen
 
 import argon._
 import argon.codegen.FileDependencies
-import emul.{Bool, FloatPoint, FixedPoint}
+import emul.Bool
 import spatial.codegen.naming._
 import spatial.lang._
-import spatial.node._
-import spatial.metadata.memory._
-import spatial.metadata.control._
 import spatial.metadata.access._
-import spatial.util.spatialConfig
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.node._
 import spatial.traversal.AccelTraversal
-
-import scala.collection.mutable
+import spatial.util.spatialConfig
 
 
 trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTraversal {
@@ -73,6 +71,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     emit("import fringe.templates.math._")
     emit("import fringe.templates.counters._")
     emit("import fringe.templates.vector._")
+    emit("import fringe.templates.axi4._")
     emit("import fringe.SpatialBlocks._")
     emit("import fringe.templates.memory._")
     emit("import fringe.templates.memory.implicits._")
@@ -127,7 +126,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
 
   def emitPreMain(): Unit = {
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit ("package accel")
       emit ("import chisel3._")
       emit ("import chisel3.util._")
@@ -137,15 +136,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("import fringe.templates.counters._")
       emit("import fringe.templates.vector._")
       emit ("import fringe.templates.memory._")
+      emit ("import fringe.templates.axi4._")
       emit ("import fringe.templates.retiming._")
       
-      open("trait IOModule extends Module {")
+      open("trait AccelWrapper extends Module {")
      emit (s"""val io_w = if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 8 else 32 // TODO: How to generate these properly?""")
      emit (s"""val io_v = if ("${spatialConfig.target.name}" == "VCS" || "${spatialConfig.target.name}" == "ASIC") 64 else 16 // TODO: How to generate these properly?""")
     }
 
     inGen(out, "Instantiator.scala") {
-      emit("package top")
+      emit("package spatialIP")
       emit("")
       emit("import accel._")
       emit("import fringe._")
@@ -153,17 +153,18 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("import chisel3._")
       emit("import chisel3.util._")
       emit("import chisel3.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}")
+      emit("import fringe.templates.axi4._")
       emit("")
       emit("import scala.collection.mutable.ListBuffer")
 
       emit("/**")
-      emit(" * Top test harness")
+      emit(" * SpatialIP test harness")
       emit(" */")
-      open("class TopUnitTester(c: Top)(implicit args: Array[String]) extends ArgsTester(c) {")
+      open("class SpatialIPUnitTester(c: SpatialIP)(implicit args: Array[String]) extends ArgsTester(c) {")
       close("}")
       emit("")
       open("object Instantiator extends CommonMain {")
-        emit("type DUTType = Top")
+        emit("type DUTType = SpatialIP")
         emit("")
         open("def dut = () => {")
 
@@ -191,7 +192,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   }
   def emitPostMain(): Unit = {
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit ("// Combine values")
       emit ("val io_numArgIns = scala.math.max(1, io_numArgIns_reg + io_numArgIns_mem + io_numArgIOs_reg)")
       emit ("val io_numArgOuts = scala.math.max(1, io_numArgOuts_reg + io_numArgIOs_reg + io_numArgOuts_instr + io_numArgOuts_breakpts)")
@@ -206,15 +207,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("globals.storeStreamInfo = io_storeStreamInfo")
       emit ("globals.gatherStreamInfo = io_gatherStreamInfo")
       emit ("globals.scatterStreamInfo = io_scatterStreamInfo")
-      emit ("globals.streamInsInfo = io_streamInsInfo")
-      emit ("globals.streamOutsInfo = io_streamOutsInfo")
+      emit ("globals.axiStreamInsInfo = io_axiStreamInsInfo")
+      emit ("globals.axiStreamOutsInfo = io_axiStreamOutsInfo")
       emit ("globals.numAllocators = io_numAllocators")
 
-      emit("val io = chisel3.core.dontTouch(globals.target match {")
-      emit("""  case _:targets.cxp.CXP     => IO(new CXPAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))""")
-      if (blackBoxStreamInWidth != -1 || blackBoxStreamOutWidth != -1) emit(s"  case _ => IO(new BlackBoxStreamInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts, $blackBoxStreamInWidth, $blackBoxStreamOutWidth))")
-      else emit("  case _ => IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.numAllocators, io_numArgIns, io_numArgOuts))")
-      emit("})")
+      emit("val io = chisel3.core.dontTouch(")
+      emit("  IO(new CustomAccelInterface(io_w, io_v, globals.LOAD_STREAMS, globals.STORE_STREAMS, globals.GATHER_STREAMS, globals.SCATTER_STREAMS, globals.AXI_STREAMS_IN, globals.AXI_STREAMS_OUT, globals.numAllocators, io_numArgIns, io_numArgOuts))")
+      emit(")")
       emit ("var outStreamMuxMap: scala.collection.mutable.Map[String, Int] = scala.collection.mutable.Map[String,Int]()")
       open("def getStreamOutLane(id: String): Int = {")
         emit ("val lane = outStreamMuxMap.getOrElse(id, 0)")
@@ -242,13 +241,13 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit ("val numArgIOs = numArgIOs_reg")
       emit ("val numArgInstrs = numArgOuts_instr")
       emit ("val numArgBreakpts = numArgOuts_breakpts")
-      emit (s"""new Top(this.target, () => Module(new AccelTop(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, streamInsInfo, streamOutsInfo)))""")
-      // emit ("new Top(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
+      emit (s"""new SpatialIP(this.target, () => Module(new AccelUnit(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, numAllocators, loadStreamInfo, storeStreamInfo, gatherStreamInfo, scatterStreamInfo, axiStreamInsInfo, axiStreamOutsInfo)))""")
+      // emit ("new SpatialIP(w, numArgIns, numArgOuts, numArgIOs, numArgOuts_instr + numArgBreakpts, loadStreamInfo, storeStreamInfo, streamInsInfo, streamOutsInfo, globals.target)")
       close("}")
-      emit ("def tester = { c: DUTType => new TopUnitTester(c) }")
+      emit ("def tester = { c: DUTType => new SpatialIPUnitTester(c) }")
       close("}")
     }
-    inGen(out, "AccelTop.scala") {
+    inGen(out, "AccelUnit.scala") {
       emit(s"""package accel""")
       emit("import chisel3._")
       emit("import chisel3.util._")
@@ -257,9 +256,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       emit("import fringe.templates.math._")
       emit("import fringe.templates.counters._")
       emit("import fringe.templates.vector._")
+      emit("import fringe.templates.axi4._")
       emit("import fringe.templates.memory._")
       emit("import fringe.templates.retiming._")
-      open("class AccelTop(")
+      open("class AccelUnit(")
         emit("val top_w: Int,")
         emit("val numArgIns: Int,")
         emit("val numArgOuts: Int,")
@@ -270,9 +270,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         emit("val storeStreamInfo: List[StreamParInfo],")
         emit("val gatherStreamInfo: List[StreamParInfo],")
         emit("val scatterStreamInfo: List[StreamParInfo],")
-        emit("val streamInsInfo: List[StreamParInfo],")
-        emit("val streamOutsInfo: List[StreamParInfo]")
-      closeopen(s") extends AbstractAccelTop with IOModule { ")
+        emit("val streamInsInfo: List[AXI4StreamParameters],")
+        emit("val streamOutsInfo: List[AXI4StreamParameters]")
+      closeopen(s") extends AbstractAccelUnit with AccelWrapper { ")
         emit("val retime_released_reg = RegInit(false.B)")
         emit("val accelReset = reset.toBool | io.reset")
         emit("Main.main(this)")
@@ -291,8 +291,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   override protected def emitEntry(block: Block[_]): Unit = {
     open(src"object Main {")
-      open(src"def main(top: AccelTop): Unit = {")
-        emit("top.io <> DontCare")
+      open(src"def main(accelUnit: AccelUnit): Unit = {")
+        emit("accelUnit.io <> DontCare")
         emitPreMain()
         outsideAccel{gen(block)}
         emitPostMain()
@@ -363,7 +363,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case BurstAckBus => "DecoupledIO[Bool]"
           case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
           case ScatterAckBus => "DecoupledIO[Bool]"
-          case CXPPixelBus => "DecoupledIO[CXPStream]"
+          case AxiStream256Bus => "AXI4Stream"
+          case AxiStream512Bus => "AXI4Stream"
           case _ => s"DecoupledIO[UInt]"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
@@ -372,7 +373,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: BurstFullDataBus[_] => "DecoupledIO[AppStoreData]"
           case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
           case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
-          case CXPPixelBus => "DecoupledIO[CXPStream]"
+          case AxiStream256Bus => "AXI4Stream"
+          case AxiStream512Bus => "AXI4Stream"
           case _ => s"DecoupledIO[UInt]"
         }
 
@@ -419,7 +421,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
             val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => (ens.length, bitWidth(e.A.tp)) }
             s"Flipped(Decoupled(Vec(${par},UInt(${width}.W))))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
-          case CXPPixelBus => "Flipped(Decoupled(new CXPStream()))"
+          case AxiStream256Bus => "new AXI4Stream(AXI4StreamParameters(256, 8, 32))"
+          case AxiStream512Bus => "new AXI4Stream(AXI4StreamParameters(512, 8, 32))"
           case _ => s"Flipped(Decoupled(UInt(${bus.nbits}.W)))"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
@@ -428,7 +431,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: BurstFullDataBus[_] => src"""Decoupled(new AppStoreData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case GatherAddrBus => src"""Decoupled(new AppCommandSparse(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case _: ScatterCmdBus[_] => src"""Decoupled(new ScatterCmdStream(ModuleParams.getParams("${x}_p").asInstanceOf[StreamParInfo] ))"""
-          case CXPPixelBus => "Decoupled(new CXPStream())"
+          case AxiStream256Bus => "Flipped(new AXI4Stream(AXI4StreamParameters(256, 8, 32)))"
+          case AxiStream512Bus => "Flipped(new AXI4Stream(AXI4StreamParameters(512, 8, 32)))"
           case _ => s"Decoupled(UInt(${bus.nbits}.W))"
         }
 

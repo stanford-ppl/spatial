@@ -106,6 +106,30 @@ object AXI4BundleParameters {
   )
 }
 
+
+case class AXI4StreamParameters(
+    dataBits: Int,
+    idBits:   Int,
+    userBits: Int)
+{
+  require(dataBits >= 8)
+  require(idBits >= 1)
+  require(userBits >= 1)
+  require(isPow2(dataBits))
+
+  // Bring the globals into scope
+  val lenBits   = AXI4Parameters.lenBits
+  val sizeBits  = AXI4Parameters.sizeBits
+  val burstBits = AXI4Parameters.burstBits
+  val lockBits  = AXI4Parameters.lockBits
+  val cacheBits = AXI4Parameters.cacheBits
+  val protBits  = AXI4Parameters.protBits
+  val qosBits   = AXI4Parameters.qosBits
+  val respBits  = AXI4Parameters.respBits
+
+  def asDummyAXI4Bundle: AXI4BundleParameters = AXI4BundleParameters(32, dataBits, idBits)
+}
+
 //case class AXI4EdgeParameters(
 //  master: AXI4MasterPortParameters,
 //  slave:  AXI4SlavePortParameters)

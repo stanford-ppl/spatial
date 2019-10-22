@@ -285,7 +285,7 @@ module test;
 //  wire        io_genericStreamOut_bits_last;
 
   /*** DUT instantiation ***/
-  Top Top(
+  SpatialIP SpatialIP(
     .clock(clock),
     .reset(reset),
     .io_raddr(io_raddr),
@@ -910,14 +910,14 @@ module test;
 
     /*** VCD & VPD dump ***/
     if (vpdon) begin
-      $vcdplusfile("Top.vpd");
-      $vcdpluson (0, Top);
+      $vcdplusfile("SpatialIP.vpd");
+      $vcdpluson (0, SpatialIP);
       $vcdplusmemon ();
     end
 
     if (vcdon) begin
-      $dumpfile("Top.vcd");
-      $dumpvars(0, Top);
+      $dumpfile("SpatialIP.vcd");
+      $dumpvars(0, SpatialIP);
     end
 
     io_dram_0_cmd_ready = 0;

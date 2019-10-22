@@ -8,7 +8,7 @@ source bigIP.tcl
 
 # Add Spatial Top verilog module
 set origin_dir [file dirname [file normalize [info script]]]
-add_files -norecurse "$origin_dir/Top.v"
+add_files -norecurse "$origin_dir/SpatialIP.v"
 add_files -norecurse "$origin_dir/RetimeShiftRegister.sv"
 add_files -norecurse "$origin_dir/AXI4LiteToRFBridgeVerilog.v"
 

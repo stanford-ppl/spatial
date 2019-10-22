@@ -19,7 +19,7 @@ if [[ $GDOCS -eq 1 && $2 = "final" ]]; then
 	branchname=`cat ${basepath}/branchname`
 	#appname=`basename \`pwd\``
 	if [[ -d chisel ]]; then
-		fullname=`cat chisel/IOModule*.scala | grep "Root controller for app" | sed "s/.*: //g"`
+		fullname=`cat chisel/AccelWrapper*.scala | grep "Root controller for app" | sed "s/.*: //g"`
 		testdirs=`find ${basepath}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 		testdirsarray=($testdirs)
 		for t in "${testdirsarray[@]}"; do

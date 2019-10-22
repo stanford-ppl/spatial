@@ -1,9 +1,9 @@
 #!bin/bash
 
-widths=`grep -r "Widths" chisel/IOModule.scala | sed "s/^.*: //g" | sed "s/ //g"`
-depths=`grep -r "Depths" chisel/IOModule.scala | sed "s/^.*: //g" | sed "s/ //g"`
-widest=`grep -r "Widest" chisel/IOModule.scala | sed "s/^.*: //g" | sed "s/ //g"`
-deepest=`grep -r "Deepest" chisel/IOModule.scala | sed "s/^.*: //g" | sed "s/ //g"`
+widths=`grep -r "Widths" chisel/AccelWrapper.scala | sed "s/^.*: //g" | sed "s/ //g"`
+depths=`grep -r "Depths" chisel/AccelWrapper.scala | sed "s/^.*: //g" | sed "s/ //g"`
+widest=`grep -r "Widest" chisel/AccelWrapper.scala | sed "s/^.*: //g" | sed "s/ //g"`
+deepest=`grep -r "Deepest" chisel/AccelWrapper.scala | sed "s/^.*: //g" | sed "s/ //g"`
 
 # echo $widths
 # echo $depths

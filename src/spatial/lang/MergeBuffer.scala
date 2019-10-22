@@ -28,6 +28,7 @@ object MergeBuffer {
   @api def apply[A:Bits](ways: I32, par: I32): MergeBuffer[A] = {
     val x = stage(MergeBufferNew(ways, par))
     x.isWriteBuffer = true
+    x.isMustMerge = true
     x
   }
 }

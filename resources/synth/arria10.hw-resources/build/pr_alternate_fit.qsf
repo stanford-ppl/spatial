@@ -296,7 +296,7 @@ set_instance_assignment -name REGION_NAME pr_region -to soc_inst|default_0
 set_instance_assignment -name ROUTE_REGION "X0 Y0 X131 Y211" -to soc_inst|default_0
 set_global_assignment -name VERILOG_FILE SRAMVerilogAWS.v
 set_global_assignment -name SYSTEMVERILOG_FILE RetimeShiftRegister.sv
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_Top_0.ip
+set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_SpatialIP_0.ip
 set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_sysid_qsys_0.ip
 set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_reset_in.ip
 set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_onchip_memory2_0.ip
@@ -310,9 +310,9 @@ set_global_assignment -name SDC_FILE hps_sgmii.sdc
 set_global_assignment -name SDC_FILE fpga_niosii.sdc
 set_global_assignment -name SDC_FILE fpga_pr.sdc
 set_global_assignment -name SDC_FILE fpga_dp.sdc
-set_global_assignment -name VERILOG_FILE Top.v
+set_global_assignment -name VERILOG_FILE SpatialIP.v
 set_global_assignment -name QIP_FILE ghrd_10as066n2/ghrd_10as066n2.qip
-set_global_assignment -name VERILOG_FILE ghrd_a10_top.v
+set_global_assignment -name VERILOG_FILE ghrd_a10_SpatialIP.v
 set_global_assignment -name VERILOG_FILE ip/debounce/debounce.v
 set_global_assignment -name VERILOG_FILE ip/edge_detect/altera_edge_detector.v
 set_global_assignment -name QSYS_FILE ghrd_10as066n2.qsys

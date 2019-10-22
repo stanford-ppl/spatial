@@ -1,7 +1,7 @@
 package fringe.targets.zedboard
 
 import chisel3._
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.DeviceTarget
 import fringe.targets.zynq._
 

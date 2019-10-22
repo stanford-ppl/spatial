@@ -21,7 +21,7 @@ refer to the applicable agreement for further details.
 (header "symbol" (version "1.1"))
 (symbol
 	(rect 0 0 448 744)
-	(text "pr_region_default_Top_0" (rect 150 -1 251 11)(font "Arial" (font_size 10)))
+	(text "pr_region_default_SpatialIP_0" (rect 150 -1 251 11)(font "Arial" (font_size 10)))
 	(text "inst" (rect 8 728 20 740)(font "Arial" ))
 	(port
 		(pt 0 72)
@@ -420,7 +420,7 @@ refer to the applicable agreement for further details.
 		(text "writedata" (rect 181 187 416 384)(font "Arial" (color 0 0 0)))
 		(text "reset" (rect 147 203 324 419)(font "Arial" (color 128 0 0)(font_size 9)))
 		(text "reset" (rect 181 227 392 464)(font "Arial" (color 0 0 0)))
-		(text " pr_region_default_Top_0 " (rect 336 728 822 1466)(font "Arial" ))
+		(text " pr_region_default_SpatialIP_0 " (rect 336 728 822 1466)(font "Arial" ))
 		(line (pt 176 32)(pt 272 32)(line_width 1))
 		(line (pt 272 32)(pt 272 728)(line_width 1))
 		(line (pt 176 728)(pt 272 728)(line_width 1))

@@ -162,7 +162,7 @@ trait ChiselGenController extends ChiselGenCommon {
           else emit(src"list_${ins.head}: List[$typ],")
         }
         emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
-        // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
+        // emit(src"parent: ${if (controllerStack.size == 1) "AccelUnit" else "SMObject"}")
         // emit("rr: ")
       closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
 
@@ -415,27 +415,27 @@ trait ChiselGenController extends ChiselGenCommon {
         }.size
         connectDRAMStreams(x)
         forceEmit(src"""val $x = Module(new DRAMAllocator($dim, $reqCount)).io; $x <> DontCare""")
-        forceEmit(src"top.io.heap($id).req := $x.output.heapReq")
+        forceEmit(src"accelUnit.io.heap($id).req := $x.output.heapReq")
         if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${x}_p", ${param(x).get})  """)
-        forceEmit(src"$x.heapResp := top.io.heap($id).resp")
+        forceEmit(src"$x.heapResp := accelUnit.io.heap($id).resp")
       }
       inAccel{
-        emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-        emit(src"""retime_counter.io.setup.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
+        emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(accelUnit.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+        emit(src"""retime_counter.io.setup.saturate := true.B; retime_counter.io.input.reset := accelUnit.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
-        emit(src"""val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
+        emit(src"""val breakpoints = Wire(Vec(accelUnit.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
         if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List.fill[InstrCtr](api.numCtrls)(Wire(new InstrCtr()))""")
         emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
-          emit(src"""$lhs.baseEn := top.io.enable && rr && ~done_latch.io.output""")
-          emit(src"""$lhs.resetMe := getRetimed(top.accelReset, 1)""")
+          emit(src"""$lhs.baseEn := accelUnit.io.enable && rr && ~done_latch.io.output""")
+          emit(src"""$lhs.resetMe := getRetimed(accelUnit.accelReset, 1)""")
           emit(src"""$lhs.mask := true.B""")
-          emit(src"""$lhs.sm.io.parentAck := top.io.done""")
-          emit(src"""$lhs.sm.io.enable := $lhs.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
+          emit(src"""$lhs.sm.io.parentAck := accelUnit.io.done""")
+          emit(src"""$lhs.sm.io.enable := $lhs.baseEn & !accelUnit.io.done & ${getForwardPressure(lhs.toCtrl)}""")
           emit(src"""done_latch.io.input.reset := $lhs.resetMe""")
           emit(src"""done_latch.io.input.asyn_reset := $lhs.resetMe""")
-          emit(src"""top.io.done := done_latch.io.output""")
+          emit(src"""accelUnit.io.done := done_latch.io.output""")
         }
         writeKernelClass(lhs, Set(), func){
           gen(func)
@@ -443,15 +443,15 @@ trait ChiselGenController extends ChiselGenCommon {
         if (earlyExits.nonEmpty) {
           appPropertyStats += HasBreakpoint
           earlyExits.zipWithIndex.foreach{case (e, i) => 
-            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
-            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
+            emit(src"accelUnit.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
+            emit(src"accelUnit.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
           }
           emit(src"""done_latch.io.input.set := $lhs.done | breakpoints.reduce{_|_}""")
         } else {
           emit(src"""done_latch.io.input.set := $lhs.done""")
         }
 
-        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(top, instrctrs)")
+        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(accelUnit, instrctrs)")
 
         emit("Ledger.finish()")
         exitCtrl(lhs)
@@ -542,19 +542,19 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, "Instrument.scala"){
       emitHeader()
       open("object Instrument {")
-        open("def connect(top: AccelTop, instrctrs: List[InstrCtr]): Unit = {")
+        open("def connect(accelUnit: AccelUnit, instrctrs: List[InstrCtr]): Unit = {")
           val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).cycs""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.valid := top.io.enable""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).iters""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.valid := top.io.enable""",1,Seq[String]())
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).cycs""",1,Seq[String]()),
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.valid := accelUnit.io.enable""",1,Seq[String]()),
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).iters""",1,Seq[String]()),
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.valid := accelUnit.io.enable""",1,Seq[String]())
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).stalls""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.valid := top.io.enable""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).idles""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.valid := top.io.enable""",1,Seq[String]())
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).stalls""",1,Seq[String]()),
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.valid := accelUnit.io.enable""",1,Seq[String]()),
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).idles""",1,Seq[String]()),
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.valid := accelUnit.io.enable""",1,Seq[String]())
               )} else Nil}
 
           }
@@ -592,7 +592,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit ("""*/""")
     }
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit (src"// Root controller for app: ${config.name}")
       emit ("")
       emit (src"// Widths: ${widthStats.sorted}")

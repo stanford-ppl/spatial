@@ -44,7 +44,7 @@ trait MetaProgramming extends SpatialApp {
 
 
   @virtualize
-  def MForeach(series:argon.lang.Series[I32])(block: (Int,Int,Int,Bit) => Void) = {
+  def MForeach(series:argon.lang.Series[I32])(block: (Int,Int,Bit) => Void) = {
     val start = series.start
     val end = series.end
     val step = series.step
@@ -54,13 +54,13 @@ trait MetaProgramming extends SpatialApp {
       val iter = i + p * step
       val valid = iter < end
       withEns(valid) {
-        block(iter, i, p, valid)
+        block(iter, p, valid)
       }
     }
   }
 
   @virtualize
-  def MReduce[T:Bits](reg:Reg[T])(series:argon.lang.Series[I32])(block: (Int,Int,Int,Bit) => T)(reduceFunc: (T,T) => T) = {
+  def MReduce[T:Bits](reg:Reg[T])(series:argon.lang.Series[I32])(block: (Int,Int,Bit) => T)(reduceFunc: (T,T) => T) = {
     val start = series.start
     val end = series.end
     val step = series.step
@@ -70,7 +70,7 @@ trait MetaProgramming extends SpatialApp {
       val iter = i + p * step
       val valid = iter < end
       withEns(valid) {
-        block(iter, i, p, valid)
+        block(iter, p, valid)
       }
     } { reduceFunc }
   }

@@ -75,6 +75,32 @@ trait MetaProgramming extends SpatialApp {
     } { reduceFunc }
   }
 
+  @virtualize
+  def ForeachWithLane(series:argon.lang.Series[I32])(block: (Int,Int) => Void) = {
+    val start = series.start
+    val end = series.end
+    val step = series.step
+    val parFactor = series.par
+    val stride = step*parFactor
+    Foreach(start until end by step par parFactor) { i =>
+      val lane = ((i-start) / step) % parFactor
+      block(i, lane)
+    }
+  }
+
+  @virtualize
+  def ReduceWithLane[T:Bits](reg:Reg[T])(series:argon.lang.Series[I32])(block: (Int,Int) => T)(reduceFunc: (T,T) => T) = {
+    val start = series.start
+    val end = series.end
+    val step = series.step
+    val parFactor = series.par
+    val stride = step*parFactor
+    Reduce[T](reg)(start until end by step par parFactor) { i =>
+      val lane = ((i-start) / step) % parFactor
+      block(i, lane)
+    } { reduceFunc }
+  }
+
   case class FIFOs[T:Num](dup:scala.Int,depth:scala.Int) {
     val fifos = List.fill(dup) { FIFO[T](depth) }
     def deq(i:Int, ens:Bit*) = {

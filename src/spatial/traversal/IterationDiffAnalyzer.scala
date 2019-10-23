@@ -190,6 +190,13 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
  }
 
+  private var _progorder = 0
+  def setProgramOrder(lhs:Sym[_]) = {
+    lhs.progorder = _progorder
+    _progorder += 1
+  }
+  def resetProgramOrder = { _progorder = 0 }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => 
       inAccel{ super.visit(lhs, rhs) }

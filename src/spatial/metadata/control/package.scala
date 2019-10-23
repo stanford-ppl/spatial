@@ -811,13 +811,6 @@ package object control {
     def progorder_=(id: Int): Unit = metadata.add(s, ProgramOrder(id))
   }
 
-  private var _progorder = 0
-  def setProgramOrder(lhs:Sym[_]) = {
-    lhs.progorder = _progorder
-    _progorder += 1
-  }
-  def resetProgramOrder = { _progorder = 0 }
-
   implicit class ScopeOperations(scp: Scope) extends ScopeHierarchyOps(scp.s) {
     def toCtrl: Ctrl = scp match {
       case Scope.Node(sym,id,_) => Ctrl.Node(sym,id)

@@ -30,11 +30,19 @@ trait RogueGenInterface extends RogueGenCommon {
     case RegWrite(reg,v,en) =>
       emit(src"# $lhs $reg $v $en reg write")
     case DRAMHostNew(dims, _) => throw new Exception(s"DRAM nodes not currently supported in Rogue!")
-    case FrameHostNew(dim, _) =>
+    case FrameHostNew(dim, _, stream) =>
       frames += lhs
-      if (lhs.interfaceStream.get.isInstanceOf[StreamOut[AxiStream512]]) emit(src"$lhs = base.frameOut")
-      else emit(src"$lhs = base.frameIn")
+      // TODO: Need to check stream.isInstanceOf[StreamOut[_]] to make directioned container??
+      inGen(out, "ConnectStreams.py") {
+        if (stream.isInstanceOf[StreamIn[_]]) {
+          emit(src"base.${lhs}_frame = FrameMaster()")
+          emit(src"pyrogue.streamConnect(base.${lhs}_frame, base.${stream}_port)")
+        } else {
+          emit(src"base.${lhs}_frame = FrameSlave()")
+          emit(src"pyrogue.streamConnect(base.${stream}_port, base.${lhs}_frame)")
+        }
 
+      }
     case SetReg(reg, v) =>
       emit(src"accel.${argHandle(reg)}_arg.set($v)")
       emit(src"""print("Wrote %d to $reg!" % $v)""")
@@ -44,16 +52,32 @@ trait RogueGenInterface extends RogueGenCommon {
     case GetReg(reg)    =>
       emit(src"$lhs = accel.${argHandle(reg)}_arg.get()")
       emit(src"time.sleep(0.0001)")
-    case StreamInNew(stream) =>
-    case StreamOutNew(stream) =>
+    case StreamInNew(bus) =>
+      inGen(out, "ConnectStreams.py") {
+        bus match {
+          case AxiStream64Bus(tid, tdest) => emit(src"base.${lhs}_port = rogue.interfaces.stream.TcpClient('localhost', 8000 + ($tdest+1)*2 + $tid * 512)")
+          case AxiStream256Bus(tid, tdest) => emit(src"base.${lhs}_port = rogue.interfaces.stream.TcpClient('localhost', 8000 + ($tdest+1)*2 + $tid * 512)")
+          case AxiStream512Bus(tid, tdest) => emit(src"base.${lhs}_port = rogue.interfaces.stream.TcpClient('localhost', 8000 + ($tdest+1)*2 + $tid * 512)")
+          case _ =>
+        }
+      }
+    case StreamOutNew(bus) =>
+      inGen(out, "ConnectStreams.py") {
+        bus match {
+          case AxiStream64Bus(tid, tdest) => emit(src"base.${lhs}_port = rogue.interfaces.stream.TcpClient('localhost', 8000 + ($tdest+1)*2 + $tid * 512)")
+          case AxiStream256Bus(tid, tdest) => emit(src"base.${lhs}_port = rogue.interfaces.stream.TcpClient('localhost', 8000 + ($tdest+1)*2 + $tid * 512)")
+          case AxiStream512Bus(tid, tdest) => emit(src"base.${lhs}_port = rogue.interfaces.stream.TcpClient('localhost', 8000 + ($tdest+1)*2 + $tid * 512)")
+          case _ =>
+        }
+      }
     case SetMem(dram, data) =>
     case GetMem(dram, data) =>
     case SetFrame(frame, data) =>
-      emit(src"base.frameIn.sendFrame($data.astype(dtype='uint64'))")
+      emit(src"base.${frame}_frame.sendFrame($data.astype(dtype='uint64'))")
 
     case GetFrame(frame, data) =>
-      emit(src"""$lhs = base.frameOut.getFrame()""")
-      emit(src"""$data = np.frombuffer($lhs, dtype='uint64').astype(dtype='${data.tp.typeArgs.head}')""")
+      emit(src"""$lhs = base.${frame}_frame.getFrame()""")
+      emit(src"""$data = np.frombuffer($lhs, dtype='uint8').astype(dtype='${data.tp.typeArgs.head}')""")
 
     case _ => super.gen(lhs, rhs)
   }

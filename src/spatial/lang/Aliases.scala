@@ -76,8 +76,7 @@ trait ExternalAliases extends InternalAliases {
 
   type Frame[A,C[T]] = spatial.lang.Frame[A,C]
   type Frame1[A] = spatial.lang.Frame1[A]
-  lazy val FrameIn = spatial.lang.FrameIn
-  lazy val FrameOut = spatial.lang.FrameOut
+  lazy val Frame = spatial.lang.Frame
 
   type SRAM[A,C[T]] = spatial.lang.SRAM[A,C]
   type SRAM1[A] = spatial.lang.SRAM1[A]

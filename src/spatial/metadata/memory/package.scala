@@ -413,9 +413,6 @@ package object memory {
     def originalSym: Option[Sym[_]] = metadata[OriginalSym](s).map(_.forbiddenFruit).headOption
     def originalSym_=(forbiddenFruit: Sym[_]): Unit = metadata.add(s, OriginalSym(forbiddenFruit))
 
-    def interfaceStream: Option[Sym[_]] = metadata[InterfaceStream](s).map(_.stream).headOption
-    def interfaceStream_=(stream: Sym[_]): Unit = metadata.add(s, InterfaceStream(stream))
-
     def dephasedAccesses: Set[Sym[_]] = metadata[DephasedAccess](s).map(_.accesses).getOrElse(Set.empty)
     def addDephasedAccess(access: Sym[_]): Unit = metadata.add(s, DephasedAccess(Set(access) ++ s.dephasedAccesses))
 

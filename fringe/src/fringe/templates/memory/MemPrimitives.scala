@@ -238,7 +238,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   tailCtr.io.input.reset := reset
   headCtr.io.input.dir := true.B
   tailCtr.io.input.dir := true.B
-  chisel3.core.dontTouch(io)
+//  chisel3.core.dontTouch(io)
 
   // Create numel counter
   val elements = Module(new CompactingIncDincCtr(p.WMapping.map(_.par).sum, p.RMapping.map(_.par).sum, p.widestW, p.widestR, p.volume, p.elsWidth))
@@ -270,7 +270,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Create dequeue compacting network
-  val deqCompactor = Module(new CompactingDeqNetwork(p.RMapping.map(_.par).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  val deqCompactor = Module(new CompactingDeqNetwork(p.RMapping.map(_.par), p.numBanks, p.elsWidth, p.bitWidth))
   deqCompactor.io <> DontCare
   deqCompactor.io.tailCnt := tailCtr.io.output.count
   val active_r_bank = Math.singleCycleModulo(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
@@ -280,12 +280,10 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
     m(i).io.r.ofs.head := addr.asUInt
     deqCompactor.io.input.data(i) := m(i).io.output
   }
-  (0 until p.RMapping.size).foreach{i =>
-    deqCompactor.io.input.deq.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}
-  }
-  io.rPort.foreach{p => 
-    p.output.zip(deqCompactor.io.output).foreach{case (a,b) => a := b}
-  }
+  deqCompactor.io.input.deq.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}
+  io.rPort.flatMap(_.output).zip(deqCompactor.io.output).foreach{case (o,d) => o := d}
+//    p.output.zip(deqCompactor.io.output).foreach{case (a,b) => a := b}
+//  }
 
   // Check if there is data
   io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
@@ -600,35 +598,23 @@ class enqPort(val w: Int) extends Bundle {
 }
 
 class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
-  val num_compactors = if (ports.size == 0) 1 else ports.max
   val io = IO( new Bundle {
       val numEnabled =Input(UInt(width.W))
       val in = Vec(1 max ports.sum, Input(new enqPort(bitWidth)))
-      val out = Vec(1 max num_compactors, Output(new enqPort(bitWidth)))
+      val out = Vec(1 max banks, Output(new enqPort(bitWidth)))
     })
 
-    val compacted = (0 until num_compactors).map{i => 
-      val num_inputs_per_bundle = ports.map{p => if (i < p) p-i else 0}
-      val mux_selects = num_inputs_per_bundle.zipWithIndex.flatMap{case(j, id) =>
-        val in_start_id = ports.take(id).sum
-        val connect_start_id = num_inputs_per_bundle.take(id).sum
-        val num_holes = if ((ports(id)-j) > 0) {
-          (0 until (ports(id)-j)).map{ k => Mux(!io.in(in_start_id + k).en, 1.U(width.W), 0.U(width.W)) }.reduce{_+_} // number of 0's in this bundle that precede current
-        } else {
-          0.U(width.W)          
-        }
-        (0 until j).map{k => 
-          val ens_below = if (k > 0) {(0 until k).map{l => Mux(io.in(in_start_id + (ports(id) - j + l)).en, 1.U(width.W), 0.U(width.W)) }.reduce{_+_}} else {0.U(width.W)}
-          io.in(in_start_id + (ports(id) - j + k)).en & ens_below >= num_holes
+    val enBelow = List.tabulate[UInt](ports.sum){j => (0 until j).map{ k => Mux(io.in(k).en, 1.U(16.W), 0.U(16.W)) }.foldLeft(0.U(16.W)){_+_}}
+    (0 until banks).foreach{i =>
+      // Identify first lane between i and ports.sum that is enabled
+      val takeThisLane = List.tabulate(ports.sum){j =>
+        if (j < i) false.B
+        else {
+          io.in(j).en && enBelow(j) === i.U
         }
       }
-      val mux_datas = num_inputs_per_bundle.zipWithIndex.map{case(j, id) => 
-        val in_start_id = ports.take(id).sum
-        val connect_start_id = num_inputs_per_bundle.take(id).sum
-        (0 until j).map{k => io.in(in_start_id + (ports(id) - j + k)).data}
-      }.flatten
-      if (mux_selects.size == 0) io.out(i).data := 0.U else io.out(i).data := chisel3.util.PriorityMux(mux_selects, mux_datas)
-      io.out(i).en := i.U(width.W) < io.numEnabled
+      io.out(i).data := chisel3.util.PriorityMux(takeThisLane, io.in.map(_.data))
+      io.out(i).en := takeThisLane.foldLeft(false.B){_||_}
     }
 }
 
@@ -646,7 +632,7 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
     })
 
   val numEnabled = io.in.map{i => Mux(i.en, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
-  val num_compactors = if (ports.size == 0) 1 else ports.max
+  val num_compactors = if (ports.size == 0) 1 else ports.sum
 
   // Compactor
   val compactor = Module(new Compactor(ports, banks, width, bitWidth))
@@ -661,7 +647,7 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val outs = (0 until banks).map{ i =>
     val lane_enable = Mux(i.S(width.W) < num_straddling | (i.S(width.W) >= current_base_bank & i.S(width.W) < current_base_bank + numEnabled.asSInt), true.B, false.B)
     val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, i.S(width.W) - current_base_bank)
-    val port_vals = (0 until num_compactors).map{ i => 
+    val port_vals = (0 until banks).map{ i =>
       (i.U(width.W) -> compactor.io.out(i).data)
     }
     val lane_data = chisel3.util.MuxLookup(id_from_base.asUInt, 0.U(bitWidth.W), port_vals)
@@ -681,12 +667,10 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
         val data = Vec(1 max banks, Input(UInt(bitWidth.W)))
         val deq = Vec(1 max ports.sum, Input(Bool()))
       }
-      val output = Vec({if (ports.size == 0) 1 else ports.max}, Output(UInt(bitWidth.W)))
+      val output = Vec({if (ports.size == 0) 1 else ports.sum}, Output(UInt(bitWidth.W)))
     })
   io.output := DontCare
   // Compactor
-  val num_compactors = if (ports.size == 0) 1 else ports.max
-  // val numPort_width = 1 + Utils.log2Up(ports.max)
   val numEnabled = io.input.deq.map{i => Mux(i, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
 
   // Router
@@ -695,7 +679,7 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val num_straddling = Mux(upper < 0.S(width.W), 0.S(width.W), upper)
   val num_straight = (numEnabled.asSInt) - num_straddling
   // TODO: Probably has a bug if you have more than one dequeuer
-  (0 until {if (ports.size == 0) 1 else ports.max}).foreach{ i =>
+  (0 until {if (ports.size == 0) 1 else ports.sum}).foreach{ i =>
     val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, Math.singleCycleModulo((i.S(width.W) + current_base_bank), banks.S(width.W)))
     val ens_below = if (i>0) (0 until i).map{j => Mux(io.input.deq(j), 1.U(width.W), 0.U(width.W)) }.reduce{_+_} else 0.U(width.W)
     val proper_bank = Math.singleCycleModulo((current_base_bank.asUInt + ens_below), banks.U(width.W))

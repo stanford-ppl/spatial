@@ -442,6 +442,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
           } 
         }
       } else {
+        if (spatialConfig.enablePIR) {
+          error(s"TODO: Plasticine doesn't support POM yet")
+          IR.logError()
+        }
         List.tabulate(P){p => 
           val uid = parAddr(p)
           uid.zipWithIndex.map{case (q,i) => 

@@ -83,6 +83,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
     summarize(instances)
     finalize(instances)
+    pirCheck(instances)
   }
 
   protected def resetData(readers: Set[Sym[_]], writers: Set[Sym[_]]): Unit = {
@@ -163,30 +164,31 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       dbgs(s"  Unused access: ${stm(access)}")
     }
 
-    if (spatialConfig.enablePIR) {
-      instances.zipWithIndex.foreach { case (inst, dispatch) =>
-        def checkAccess(groups:Set[Set[AccessMatrix]]) = {
-          // Mapping of access matrix => group id
-          val groupMap = groups.zipWithIndex.flatMap { case (grp, gid) => grp.map { a => (a, gid) } }.toMap
-          groups.flatten.groupBy { _.access }.foreach { case (access, ams) =>
-            val gids = ams.map { a => groupMap(a) }
-            if (gids.size > 1) {
-              error(s"//TODO: Plasticine does not support unbanked unrolled access at the moment. ")
-              error(s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})")
-              error(s"access=$access (${access.ctx})")
-              error(s"AccessMatrix:")
-              ams.foreach { a => 
-                error(s"$a gid:${groupMap(a)}")
-              }
-              state.logError()
+  }
+
+  protected def pirCheck(instances: Seq[Instance]): Unit = {
+    if (!spatialConfig.enablePIR || mem.isLockSRAM) return
+    instances.zipWithIndex.foreach { case (inst, dispatch) =>
+      def checkAccess(groups:Set[Set[AccessMatrix]]) = {
+        // Mapping of access matrix => group id
+        val groupMap = groups.zipWithIndex.flatMap { case (grp, gid) => grp.map { a => (a, gid) } }.toMap
+        groups.flatten.groupBy { _.access }.foreach { case (access, ams) =>
+          val gids = ams.map { a => groupMap(a) }
+          if (gids.size > 1) {
+            error(s"//TODO: Plasticine does not support unbanked unrolled access at the moment. ")
+            error(s"mem=$mem (${mem.ctx} ${mem.name.getOrElse("")})")
+            error(s"access=$access (${access.ctx})")
+            error(s"AccessMatrix:")
+            ams.foreach { a => 
+              error(s"$a gid:${groupMap(a)}")
             }
+            state.logError()
           }
         }
-        checkAccess(inst.reads)
-        checkAccess(inst.writes)
       }
+      checkAccess(inst.reads)
+      checkAccess(inst.writes)
     }
-
   }
 
   /** True if a and b always occur at the exact same time, or if are interface arg reads.
@@ -218,7 +220,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   protected def groupAccesses(accesses: Set[AccessMatrix]): Set[Set[AccessMatrix]] = 
-    if (spatialConfig.groupUnrolledAccess) groupAccessUnroll(accesses)
+    if (spatialConfig.groupUnrolledAccess && !mem.isLockSRAM) groupAccessUnroll(accesses)
     else groupAccessesDefault(accesses)
 
   /** Group accesses on this memory.
@@ -257,7 +259,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           // A conflict occurs if there are accesses on the same port with overlapping addresses
           // for which we can cannot create a broadcaster read
           // (either because they are not lockstep, not reads, or because broadcasting is disabled)
-          val conflicts = samePort.filter{b => overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)}
+          val conflicts = samePort.filter{b => !mem.isLockSRAM && overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)}
           if (conflicts.nonEmpty) dbg(s"      Group #$i conflicts: <${conflicts.size} accesses>")
           else                    dbg(s"      Group #$i conflicts: <none>")
           if (config.enLog) conflicts.foreach{b => logs(s"        ${b.short} [${b.parent}]")  }
@@ -351,7 +353,13 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val samePort = requireConcurrentPortAccess(a, b)
       val conflict = if (samePort) {overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)} else false
       dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict")
-      samePort && !conflict
+      var canConflict = conflict
+      if (canConflict && mem.shouldIgnoreConflicts) {
+        warn(s"Detected potential conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${a.access.ctx} (uid: ${a.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+        warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+        canConflict = false
+      }
+      samePort && !canConflict
     })
 
     if (mem.parent == Ctrl.Host) return Set(accesses)
@@ -419,6 +427,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
     val controllerLCA = lca.ancestors.collectFirst{case x if (x.isInnerControl && !x.isSwitch) => x} // Outermost controller that is inner controller
+    dbgs(s"require conc port acc?" +
+      s"\n ${a.access == b.access && a.unroll != b.unroll}" +
+      s"\n ${lca.isInnerPipeLoop}" +
+      s"\n ${(lca.isInnerSeqControl && lca.isFullyUnrolledLoop)}" +
+      s"\n ${(lca.isOuterPipeLoop && !isWrittenIn(lca))}" +
+      s"\n ${(a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay)}" +
+      s"\n ${((a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay != b.access.fullDelay) && (controllerLCA.isDefined && controllerLCA.get.isLoopControl))}" +
+      s"\n ${(lca.isParallel || (a.access.parent == b.access.parent && (Seq(lca) ++ lca.ancestors).exists(_.willUnroll))) || (lca.isOuterControl && lca.isStreamControl) }")
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
@@ -671,7 +687,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
     val conflicting = (overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
-    val trueConflict = concurrent && conflicting && !mem.isReg
+    val trueConflict = concurrent && conflicting && !mem.isReg && !mem.isLockSRAM
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict
   }
@@ -721,7 +737,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def getMergeError(i1: Instance, i2: Instance, i3: Instance): Option[String] = {
     if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
       Some("Buffer conflict")
-    else if (i3.cost > (i1.cost + i2.cost) && !mem.hasDestructiveReads && !mem.isReg)
+    else if (i3.cost > (i1.cost + i2.cost) && !mem.hasDestructiveReads && !mem.isReg && !mem.isLockSRAM)
       Some(s"Too expensive to merge addressable instances: ${i3.cost} > ${i1.cost + i2.cost}")
     else if (mem.hasDestructiveReads && mem.consumers.exists{x => x match {case Op(x:OpMemReduce[_,_]) => x.accum == mem; case _ => false}})
       Some(s"Cannot merge instances when reads are destructive and mem is used as an accumulator")

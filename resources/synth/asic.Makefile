@@ -37,7 +37,7 @@ sw:
 	ln -sf cpp/Top .
 
 hw:
-	sbt "runMain top.Instantiator --verilog --testArgs asic"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs asic"
 	cp -r asic.hw-resources/* verilog-asic
 	cp -r asic.hw-resources/build/* verilog-asic
 	touch in.txt

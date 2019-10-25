@@ -15,6 +15,17 @@ package object access {
 
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
+
+    def getLockNode: Option[LockWithKeys[I32]] = op match {
+      case x: LockSRAMRead[_,_] => x.lock
+      case x: LockSRAMWrite[_,_] => x.lock
+      case x: LockDRAMRead[_,_] => x.lock
+      case x: LockDRAMWrite[_,_] => x.lock
+//      case x: LockSRAMBankedRead[_,_] => x.lock
+//      case x: LockSRAMBankedWrite[_,_] => x.lock
+      case _ => None
+    }
+
     def isParEnq: Boolean = op match {
       // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true

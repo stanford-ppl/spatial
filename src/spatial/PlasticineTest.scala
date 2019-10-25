@@ -409,7 +409,7 @@ trait PlasticineTest extends DSLTest { test =>
     override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
     override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
     override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
-    val runhybrid = property("hybrid").map { _ == "true" }.getOrElse(false)
+    val runhybrid = checkFlag("hybrid")
     def runPasses():Result = {
       val runArg = runtimeArgs.cmds.headOption.getOrElse("")
       genpir() >>

@@ -2,10 +2,10 @@ package fringe.targets.verilator
 
 import chisel3._
 import fringe.globals._
-import fringe.{DRAMStream, globals, TopInterface}
+import fringe.{DRAMStream, globals, SpatialIPInterface}
 import fringe.templates.axi4.AXI4BundleParameters
 
-class VerilatorInterface extends TopInterface {
+class VerilatorInterface extends SpatialIPInterface {
   // Host scalar interface
   raddr = Input(UInt(ADDR_WIDTH.W))
   wen   = Input(Bool())

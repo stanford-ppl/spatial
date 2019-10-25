@@ -62,5 +62,5 @@ trait DeviceTarget {
   final def IO[T<:Data](io: T): T = makeIO(io).asInstanceOf[T]
 
   /** Creates the Top IO and Fringe modules for this target. Should be called only from within Top. */
-  def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface
+  def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface
 }

@@ -1,7 +1,7 @@
 package fringe.targets.aws
 
 import chisel3._
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.DeviceTarget
 import fringe.utils.getFF
 import fringe.targets.zynq.FringeZynq
@@ -12,7 +12,7 @@ class AWS_F1 extends DeviceTarget {
   override val addrWidth: Int = 64
   override val num_channels: Int = 4
 
-  override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new AWSInterface)
     io <> DontCare
 

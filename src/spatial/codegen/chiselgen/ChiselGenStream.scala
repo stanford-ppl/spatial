@@ -8,25 +8,25 @@ import spatial.metadata.memory._
 import spatial.metadata.control._
 import spatial.metadata.retiming._
 
+import scala.collection.mutable
+
 trait ChiselGenStream extends ChiselGenCommon {
-  var streamIns: List[Sym[Reg[_]]] = List()
-  var streamOuts: List[Sym[Reg[_]]] = List()
+  var axiStreamIns = mutable.HashMap[Sym[_], (Int,Int)]()
+  var axiStreamOuts = mutable.HashMap[Sym[_], (Int,Int)]()
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
-      // val ens = lhs.readers.head match {case Op(StreamInBankedRead(_, ens)) => ens.length; case _ => 0} // Assume same par for all writers
-      // Emit code for streams that are unrelated to DRAM nodes
-      if (bus.isInstanceOf[TargetBus[_]]) bus match {
-        case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_IN")
-        case _ => 
+      bus match {
+        case AxiStream256Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 256))
+        case AxiStream512Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 512))
+        case _ =>
       }
 
     case StreamOutNew(bus) =>
-      // val ens = lhs.writers.head match {case Op(StreamOutBankedWrite(_, data, _)) => data.size; case _ => 0} // Assume same par for all writers
-      // Emit code for streams that are unrelated to DRAM nodes
-      if (bus.isInstanceOf[TargetBus[_]]) bus match {
-        case CXPPixelBus => forceEmit(src"val ${lhs} = top.io.asInstanceOf[CXPAccelInterface].AXIS_OUT")
-        case _ => 
+      bus match {
+        case AxiStream256Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 256))
+        case AxiStream512Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 512))
+        case _ =>
       }
 
     case StreamOutBankedWrite(stream, data, ens) =>
@@ -40,7 +40,6 @@ trait ChiselGenStream extends ChiselGenCommon {
         emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
       val Op(StreamOutNew(bus)) = stream
-    
       bus match {
         case BurstCmdBus => 
           val (addrMSB, addrLSB)  = getField(stream.tp.typeArgs.head, "offset")
@@ -77,16 +76,41 @@ trait ChiselGenStream extends ChiselGenCommon {
             emit(src"$stream.bits.wdata($i) := $d($dataMSB, $dataLSB)")
           }
 
-
-        case CXPPixelBus =>
-          data.zipWithIndex.foreach{case(d,i) =>
-            emit(src"""${stream}.bits.TDATA.r := $d.r""")
-            emit(src"""${stream}.bits.TUSER.r := 0.U //FIXME""")
-          }
-
+        case AxiStream256Bus if data.head.tp.isInstanceOf[AxiStream256] =>
+          emit(src"$stream.TDATA.r := ${data.head}.TDATA.r")
+          emit(src"$stream.TSTRB.r := ${data.head}.TSTRB.r")
+          emit(src"$stream.TKEEP.r := ${data.head}.TKEEP.r")
+          emit(src"$stream.TID.r := ${data.head}.TID.r")
+          emit(src"$stream.TDEST.r := ${data.head}.TDEST.r")
+          emit(src"$stream.TLAST := ${data.head}.TLAST")
+          emit(src"$stream.TUSER := ${data.head}.TUSER")
+        case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"$stream.TDATA.r := ${data.head}.r")
+          emit(src"$stream.TSTRB.r := ~0.U(32.W)")
+          emit(src"$stream.TKEEP.r := ~0.U(32.W)")
+          emit(src"$stream.TID.r := 0.U")
+          emit(src"$stream.TDEST.r := 0.U")
+          emit(src"$stream.TLAST := 0.U")
+          emit(src"$stream.TUSER.r := 4.U")
+        case AxiStream512Bus if data.head.tp.isInstanceOf[AxiStream512] =>
+          emit(src"$stream.TDATA.r := ${data.head}.r(511,0)")
+          emit(src"$stream.TSTRB.r := ${data.head}.r(575,512)")
+          emit(src"$stream.TKEEP.r := ${data.head}.r(639,576)")
+          emit(src"$stream.TID.r := ${data.head}.r(648,641)")
+          emit(src"$stream.TDEST.r := ${data.head}.r(657,649)")
+          emit(src"$stream.TLAST := ${data.head}.r(640)")
+          emit(src"$stream.TUSER := ${data.head}.r(720,658)")
+        case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"$stream.TDATA.r := ${data.head}.r")
+          emit(src"$stream.TSTRB.r := ~0.U(64.W)")
+          emit(src"$stream.TKEEP.r := ~0.U(64.W)")
+          emit(src"$stream.TID.r := 0.U")
+          emit(src"$stream.TDEST.r := 0.U")
+          emit(src"$stream.TLAST := 0.U")
+          emit(src"$stream.TUSER.r := 4.U")
         case _ =>
           data.zipWithIndex.foreach{case(d,i) =>
-            emit(src"""${stream}.bits := $d""")
+            emit(src"""${stream}.bits := ${d}.r""")
           }
       }
 
@@ -102,9 +126,31 @@ trait ChiselGenStream extends ChiselGenCommon {
       bus match {
         case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")
         case _: GatherDataBus[_] => emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits(i).r }")
+        case AxiStream256Bus if lhs.tp.isInstanceOf[AxiStream256] =>
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TID.r := ${strm}.TID.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
+        case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
+        case AxiStream512Bus if lhs.tp.isInstanceOf[AxiStream512] =>
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TID.r := ${strm}.TID.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
+        case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
+
+
+
         // case ScatterAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
         // case BurstAckBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
-        case CXPPixelBus => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.TDATA.r }""")
         case _ => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i) := ${strm}.bits }""")
 
       }
@@ -114,19 +160,19 @@ trait ChiselGenStream extends ChiselGenCommon {
   }
 
   override def emitPostMain(): Unit = {
-    val insList = List.fill(streamIns.length){ "StreamParInfo(32, 1)" }.mkString(",")
-    val outsList = List.fill(streamOuts.length){ "StreamParInfo(32, 1)" }.mkString(",")
+    val insList = axiStreamIns.map{case (s, (_,w)) => s"AXI4StreamParameters($w, 8, 32)" }.mkString(",")
+    val outsList = axiStreamOuts.map{case (s, (_,w)) => s"AXI4StreamParameters($w, 8, 32)" }.mkString(",")
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit(src"// Non-memory Streams")
-      emit(s"""val io_streamInsInfo = List(${insList})""")
-      emit(s"""val io_streamOutsInfo = List(${outsList})""")
+      emit(s"""val io_axiStreamInsInfo = List(${insList})""")
+      emit(s"""val io_axiStreamOutsInfo = List(${outsList})""")
     }
 
     inGen(out, "Instantiator.scala") {
       emit(src"// Non-memory Streams")
-      emit(s"""val streamInsInfo = List(${insList})""")
-      emit(s"""val streamOutsInfo = List(${outsList})""")
+      emit(s"""val axiStreamInsInfo = List(${insList})""")
+      emit(s"""val axiStreamOutsInfo = List(${outsList})""")
     }
     super.emitPostMain()
   }

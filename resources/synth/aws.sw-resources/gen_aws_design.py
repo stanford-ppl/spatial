@@ -16,7 +16,7 @@ aws_dir = sys.argv[1]
 # Design
 # ------------------------------------------------------------------------------
 
-# Step 1: Parse Top.v until we get to module Top and extract # args
+# Step 1: Parse SpatialIP.v until we get to module Top and extract # args
 # We care about the following:
 #  input   clock,
 #  input   reset,
@@ -26,7 +26,7 @@ aws_dir = sys.argv[1]
 #  output [31:0] io_scalarOuts_0,
 # The first 4 are always the same, the last 2 can occur multiple times (_0, _1, _2, ..) and need to be counted
 design_dir = aws_dir + '/design/'
-top_src = open(design_dir + 'Top.v')
+top_src = open(design_dir + 'SpatialIP.v')
 state = 0
 num_scalar_in = 0
 num_scalar_out = 0
@@ -105,8 +105,8 @@ src.close()
 dst.close()
 
 # Step 3: Temporary hack: Add 2 defines and replace {1{$random}} with 0
-#src = open(design_dir + 'Top.v')
-#dst = open(design_dir + 'Top.v_copy', 'w')
+#src = open(design_dir + 'SpatialIP.v')
+#dst = open(design_dir + 'SpatialIP.v_copy', 'w')
 #dst.write('''// Temporary hack:
 #`define RANDOMIZE_INVALID_ASSIGN
 #`define RANDOMIZE_REG_INIT
@@ -119,5 +119,5 @@ dst.close()
 #    dst.write(line)
 #src.close()
 #dst.close()
-#os.system('mv -f ' + design_dir + 'Top.v_copy ' + design_dir + 'Top.v')
+#os.system('mv -f ' + design_dir + 'SpatialIP.v_copy ' + design_dir + 'SpatialIP.v')
 

@@ -24,19 +24,27 @@ trait PIRGenFIFO extends PIRCodegen {
     case FIFONumel(fifo,_)   => error(s"Cannot perform FIFO.nueml on Plasticine")
 
     case op@FIFOBankedDeq(fifo, ens) =>
-      stateRead(lhs, fifo, None, None, ens)
+      stateAccess(lhs, fifo, ens) {
+        src"MemRead()"
+      }
 
     case FIFOBankedEnq(fifo, data, ens) =>
-      stateWrite(lhs, fifo, None, None, data, ens)
+      stateAccess(lhs, fifo, ens, data=Some(data)) {
+        src"MemWrite()"
+      }
 
     case op@FIFORegNew(Const(init))    =>
       stateMem(lhs, "FIFO()", Some(init))
 
     case op@FIFORegDeq(fifo, ens) =>
-      stateRead(lhs, fifo, None, None, Seq(ens))
+      stateAccess(lhs, fifo, Seq(ens)) {
+        src"MemRead()"
+      }
 
     case FIFORegEnq(fifo, data, ens) =>
-      stateWrite(lhs, fifo, None, None, Seq(data), Seq(ens))
+      stateAccess(lhs, fifo, Seq(ens), data=Some(Seq(data))) {
+        src"MemWrite()"
+      }
 
     case _ => super.genAccel(lhs, rhs)
   }

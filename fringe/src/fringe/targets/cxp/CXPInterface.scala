@@ -4,12 +4,12 @@ import chisel3._
 import chisel3.util.Decoupled
 import fringe.globals._
 import fringe._
-import fringe.TopInterface
+import fringe.SpatialIPInterface
 import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Lite, AXI4Probe}
 import fringe.templates.axi4._
 import fringe.templates.euresys.{CXPStream}
 
-class CXPInterface extends TopInterface {
+class CXPInterface extends SpatialIPInterface {
   val axiParams = new AXI4BundleParameters(32, 256, 32)
 
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
@@ -25,6 +25,6 @@ class CXPInterface extends TopInterface {
   val CUSTOMLOGIC_CTRL_DATA_OUT = Output(UInt(32.W))
 
   val PIPELINECLEAR = Input(Bool())
-  val AXIS_IN = Flipped(Decoupled(new CXPStream()))
-  val AXIS_OUT = Decoupled(new CXPStream())
+  val AXIS_IN = new AXI4Stream(AXI4StreamParameters(256,4,32))
+  val AXIS_OUT = Flipped(new AXI4Stream(AXI4StreamParameters(256,4,32)))
 }

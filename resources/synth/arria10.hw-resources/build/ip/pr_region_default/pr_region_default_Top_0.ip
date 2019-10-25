@@ -1,8 +1,8 @@
 <?xml version="1.0" ?>
 <spirit:component xmlns:altera="http://www.altera.com/XMLSchema/IPXact/extensions" xmlns:spirit="http://www.spiritconsortium.org/XMLSchema/SPIRIT/1685-2009">
   <spirit:vendor>Altera Corporation</spirit:vendor>
-  <spirit:library>pr_region_default_Top_0</spirit:library>
-  <spirit:name>Top_0</spirit:name>
+  <spirit:library>pr_region_default_SpatialIP_0</spirit:library>
+  <spirit:name>SpatialIP_0</spirit:name>
   <spirit:version>1.0</spirit:version>
   <spirit:busInterfaces>
     <spirit:busInterface>
@@ -1471,7 +1471,7 @@
   <spirit:vendorExtensions>
     <altera:entity_info>
       <spirit:vendor>Altera Corporation</spirit:vendor>
-      <spirit:library>pr_region_default_Top_0</spirit:library>
+      <spirit:library>pr_region_default_SpatialIP_0</spirit:library>
       <spirit:name>Top</spirit:name>
       <spirit:version>1.0</spirit:version>
     </altera:entity_info>
@@ -2248,10 +2248,10 @@
       </spirit:parameters>
     </altera:altera_system_parameters>
     <altera:altera_interface_boundary>
-      <altera:interface_mapping altera:name="clock" altera:internal="Top_0.clock" altera:type="clock" altera:dir="end">
+      <altera:interface_mapping altera:name="clock" altera:internal="SpatialIP_0.clock" altera:type="clock" altera:dir="end">
         <altera:port_mapping altera:name="clock" altera:internal="clock"></altera:port_mapping>
       </altera:interface_mapping>
-      <altera:interface_mapping altera:name="io_M_AXI_0" altera:internal="Top_0.io_M_AXI_0" altera:type="axi4" altera:dir="start">
+      <altera:interface_mapping altera:name="io_M_AXI_0" altera:internal="SpatialIP_0.io_M_AXI_0" altera:type="axi4" altera:dir="start">
         <altera:port_mapping altera:name="io_M_AXI_0_ARADDR" altera:internal="io_M_AXI_0_ARADDR"></altera:port_mapping>
         <altera:port_mapping altera:name="io_M_AXI_0_ARBURST" altera:internal="io_M_AXI_0_ARBURST"></altera:port_mapping>
         <altera:port_mapping altera:name="io_M_AXI_0_ARCACHE" altera:internal="io_M_AXI_0_ARCACHE"></altera:port_mapping>
@@ -2294,7 +2294,7 @@
         <altera:port_mapping altera:name="io_M_AXI_0_WSTRB" altera:internal="io_M_AXI_0_WSTRB"></altera:port_mapping>
         <altera:port_mapping altera:name="io_M_AXI_0_WVALID" altera:internal="io_M_AXI_0_WVALID"></altera:port_mapping>
       </altera:interface_mapping>
-      <altera:interface_mapping altera:name="io_S_AVALON" altera:internal="Top_0.io_S_AVALON" altera:type="avalon" altera:dir="end">
+      <altera:interface_mapping altera:name="io_S_AVALON" altera:internal="SpatialIP_0.io_S_AVALON" altera:type="avalon" altera:dir="end">
         <altera:port_mapping altera:name="io_S_AVALON_address" altera:internal="io_S_AVALON_address"></altera:port_mapping>
         <altera:port_mapping altera:name="io_S_AVALON_chipselect" altera:internal="io_S_AVALON_chipselect"></altera:port_mapping>
         <altera:port_mapping altera:name="io_S_AVALON_read" altera:internal="io_S_AVALON_read"></altera:port_mapping>
@@ -2302,7 +2302,7 @@
         <altera:port_mapping altera:name="io_S_AVALON_write" altera:internal="io_S_AVALON_write"></altera:port_mapping>
         <altera:port_mapping altera:name="io_S_AVALON_writedata" altera:internal="io_S_AVALON_writedata"></altera:port_mapping>
       </altera:interface_mapping>
-      <altera:interface_mapping altera:name="reset" altera:internal="Top_0.reset" altera:type="reset" altera:dir="end">
+      <altera:interface_mapping altera:name="reset" altera:internal="SpatialIP_0.reset" altera:type="reset" altera:dir="end">
         <altera:port_mapping altera:name="reset" altera:internal="reset"></altera:port_mapping>
       </altera:interface_mapping>
     </altera:altera_interface_boundary>

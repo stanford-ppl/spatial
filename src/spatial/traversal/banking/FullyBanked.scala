@@ -81,36 +81,13 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
       grpViews.zipWithIndex.foreach{case (current,i) =>
         if (regrp.isEmpty) regrp += ArrayBuffer(current)
         else {
-          // Find first group where current access may interfere with ANY of the complementary dimensions
+          // Messy way of skipping the repackaging logic, for FullyBanked cases only
           var grpId = 0
           var placed = false
           while (grpId < regrp.size & !placed) {
-            val canConflict = regrp(grpId).exists{other =>
-              val diff = current.complementAccess - other.complementAccess
-              val conflictingMatrix = diff.rows.zipWithIndex.forall{case (row, dim) =>
-                val patternForDim = (Seq(1)*SparseMatrix[Idx](Seq(row)) === 0)
-                val conflictingRow = !patternForDim.andDomain.isEmpty
-                // dbgs(s"Row $dim: \n  ISL problem:\n${patternForDim.andDomain}")
-                if (!conflictingRow) {
-                  // dbgs(s"Found nonconflicting complementary dimension: $dim")
-                }
-                conflictingRow
-              }
-              conflictingMatrix
-            }
-            if (canConflict) {
-              // dbgs(s"Placing in group $grpId")
-              regrp(grpId) = regrp(grpId) ++ ArrayBuffer(current)
-              placed = true
-            }
-            else if (grpId < regrp.size - 1) {
-              // dbgs(s"Cannot place in group $grpId because it has no conflicts in dim $dims")
-              grpId += 1
-            } else {
-              // dbgs(s"Making new group")
-              regrp += ArrayBuffer(current)
-              placed = true
-            }
+            // dbgs(s"Placing in group $grpId")
+            regrp(grpId) = regrp(grpId) ++ ArrayBuffer(current)
+            placed = true
           }
         }
       }

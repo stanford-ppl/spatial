@@ -6,6 +6,7 @@ import poly.{ConstraintMatrix, ISL}
 import models.AreaEstimator
 import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
+import spatial.codegen.roguegen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
@@ -113,6 +114,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val chiselCodegen = ChiselGen(state)
     lazy val resourceReporter = ResourceReporter(state)
     lazy val cppCodegen    = CppGen(state)
+    lazy val rogueCodegen   = RogueGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
@@ -196,16 +198,17 @@ trait Spatial extends Compiler with ParamLoader {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        irCodegen           ==>
         //(spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen) ==>
+        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
+        ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         // (spatialConfig.useAreaModels ? areaModelReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
-        (spatialConfig.enableTsth ? tsthCodegen) ==>
-        irCodegen           
+        (spatialConfig.enableTsth ? tsthCodegen)
     }
 
     isl.shutdown(100)
@@ -387,7 +390,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableModular = false
-    }.text("Disables modular codegen and puts all logic in AccelTop")
+    }.text("Disables modular codegen and puts all logic in AccelUnit")
 
     cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableModular = true

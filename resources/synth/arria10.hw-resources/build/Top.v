@@ -1,4 +1,4 @@
-// Top.v
+// SpatialIP.v
 
 // This file was auto-generated as a prototype implementation of a module
 // created in component editor.  It ties off all outputs to ground and

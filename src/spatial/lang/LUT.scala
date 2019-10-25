@@ -163,6 +163,33 @@ object LUT {
 
 }
 
+object FileLUT {
+  /** Allocates a 1-dimensional [[LUT1]] with capacity of `length` elements of type A. */
+  @api def apply[A:Bits](length: Int)(filename: String): LUT1[A] = {
+    stage(FileLUTNew[A,LUT1](Seq(length),filename))
+  }
+
+  /** Allocates a 2-dimensional [[LUT2]] with `rows` x `cols` elements of type A. */
+  @api def apply[A:Bits](rows: Int, cols: Int)(filename: String): LUT2[A] = {
+    stage(FileLUTNew[A,LUT2](Seq(rows,cols),filename))
+  }
+
+  /** Allocates a 3-dimensional [[LUT3]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: Int, d1: Int, d2: Int)(filename: String): LUT3[A] = {
+    stage(FileLUTNew[A,LUT3](Seq(d0,d1,d2),filename))
+  }
+
+  /** Allocates a 4-dimensional [[LUT4]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int)(filename: String): LUT4[A] = {
+    stage(FileLUTNew[A,LUT4](Seq(d0,d1,d2,d3),filename))
+  }
+
+  /** Allocates a 5-dimensional [[LUT5]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int, d4: Int)(filename: String): LUT5[A] = {
+    stage(FileLUTNew[A,LUT5](Seq(d0,d1,d2,d3,d4),filename))
+  }
+}
+
 /** A 1-dimensional LUT with elements of type A. */
 @ref class LUT1[A:Bits]
   extends LUT[A,LUT1]

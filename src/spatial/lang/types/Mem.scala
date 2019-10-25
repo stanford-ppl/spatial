@@ -3,7 +3,7 @@ package spatial.lang.types
 import argon._
 import forge.tags._
 import spatial.lang._
-import spatial.node.{DenseTransfer, MemDenseAlias, SparseTransfer}
+import spatial.node.{DenseTransfer, FrameTransmit, MemDenseAlias, SparseTransfer}
 
 trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   val evMem: C[A] <:< Mem[A,C]
@@ -34,6 +34,16 @@ trait LocalMem1[A,C[T]<:LocalMem1[T,C]] extends LocalMem[A,C] {
     stage(DenseTransfer(dram,me,isLoad = true))
   }
 
+  /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def load(frame: Frame1[A]): Void = {
+    stage(FrameTransmit(frame,me,isLoad = true))
+  }
+
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM1[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign = true))
+  }
+
   /** Creates a sparse gather from the given region of DRAM to this on-chip memory. */
   @api def gather(dram: DRAMSparseTile[A]): Void = {
     stage(SparseTransfer(dram,me,isGather=true))
@@ -46,6 +56,11 @@ trait LocalMem2[A,C[T]<:LocalMem2[T,C]] extends LocalMem[A,C] {
   @api def load(dram: DRAM2[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
   }
+
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM2[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
+  }
 }
 trait LocalMem3[A,C[T]<:LocalMem3[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
@@ -53,6 +68,10 @@ trait LocalMem3[A,C[T]<:LocalMem3[T,C]] extends LocalMem[A,C] {
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
   @api def load(dram: DRAM3[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
+  }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM3[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
   }
 }
 trait LocalMem4[A,C[T]<:LocalMem4[T,C]] extends LocalMem[A,C] {
@@ -62,6 +81,10 @@ trait LocalMem4[A,C[T]<:LocalMem4[T,C]] extends LocalMem[A,C] {
   @api def load(dram: DRAM4[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
   }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM4[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
+  }
 }
 trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
@@ -69,6 +92,10 @@ trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
   @api def load(dram: DRAM5[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
+  }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM5[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
   }
 }
 

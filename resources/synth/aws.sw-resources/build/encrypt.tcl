@@ -27,7 +27,9 @@ set UNUSED_TEMPLATES_DIR $HDK_SHELL_DESIGN_DIR/interfaces
 
 
 # Remove any previously encrypted files, that may no longer be used
-exec rm -f $TARGET_DIR/*
+if {[llength [glob -nocomplain -dir $TARGET_DIR *]] != 0} {
+  eval file delete -force [glob $TARGET_DIR/*]
+}
 
 #---- Developr would replace this section with design files ----
 
@@ -44,13 +46,13 @@ file copy -force $CL_DIR/design/mem_scrb.sv                        $TARGET_DIR
 file copy -force $CL_DIR/design/cl_tst_scrb.sv                     $TARGET_DIR
 file copy -force $CL_DIR/design/axil_slave.sv                      $TARGET_DIR
 file copy -force $CL_DIR/design/cl_int_slv.sv                      $TARGET_DIR
-file copy -force $CL_DIR/design/cl_mstr_axi_tst.sv                 $TARGET_DIR
 file copy -force $CL_DIR/design/cl_pcim_mstr.sv                    $TARGET_DIR
 file copy -force $CL_DIR/design/cl_vio.sv                          $TARGET_DIR
 file copy -force $CL_DIR/design/cl_dma_pcis_slv.sv                 $TARGET_DIR
 file copy -force $CL_DIR/design/cl_ila.sv                          $TARGET_DIR
-file copy -force $CL_DIR/design/cl_ocl_slv.sv                      $TARGET_DIR 
+file copy -force $CL_DIR/design/cl_ocl_slv.sv                      $TARGET_DIR
 file copy -force $CL_DIR/design/cl_sda_slv.sv                      $TARGET_DIR
+file copy -force $CL_DIR/design/cl_dram_dma_axi_mstr.sv            $TARGET_DIR
 file copy -force $UNUSED_TEMPLATES_DIR/unused_sh_bar1_template.inc $TARGET_DIR
 
 #---- End of section replaced by Developr ---
@@ -61,8 +63,12 @@ file copy -force $UNUSED_TEMPLATES_DIR/unused_sh_bar1_template.inc $TARGET_DIR
 
 exec chmod +w {*}[glob $TARGET_DIR/*]
 
-# encrypt .v/.sv/.vh/inc as verilog files
-encrypt -k $HDK_SHELL_DIR/build/scripts/vivado_keyfile.txt -lang verilog  [glob -nocomplain -- $TARGET_DIR/*.{v,sv}] [glob -nocomplain -- $TARGET_DIR/*.vh] [glob -nocomplain -- $TARGET_DIR/*.inc]
+set TOOL_VERSION $::env(VIVADO_TOOL_VERSION)
+set vivado_version [string range [version -short] 0 5]
+puts "AWS FPGA: VIVADO_TOOL_VERSION $TOOL_VERSION"
+puts "vivado_version $vivado_version"
 
+# encrypt .v/.sv/.vh/inc as verilog files
+encrypt -k $HDK_SHELL_DIR/build/scripts/vivado_keyfile_2017_4.txt -lang verilog  [glob -nocomplain -- $TARGET_DIR/*.{v,sv}] [glob -nocomplain -- $TARGET_DIR/*.vh] [glob -nocomplain -- $TARGET_DIR/*.inc]
 # encrypt *vhdl files
-encrypt -k $HDK_SHELL_DIR/build/scripts/vivado_vhdl_keyfile.txt -lang vhdl -quiet [ glob -nocomplain -- $TARGET_DIR/*.vhd? ]
+encrypt -k $HDK_SHELL_DIR/build/scripts/vivado_vhdl_keyfile_2017_4.txt -lang vhdl -quiet [ glob -nocomplain -- $TARGET_DIR/*.vhd? ]

@@ -31,7 +31,7 @@ state = 0
 num_scalar_in = 0
 num_scalar_out = 0
 for line in top_src:
-  if 'module Top(' in line:
+  if 'module SpatialIP(' in line:
     assert state == 0
     state = 1
     continue
@@ -104,20 +104,27 @@ for line in src:
 src.close()
 dst.close()
 
-# Step 3: Temporary hack: Add 2 defines and replace {1{$random}} with 0
-#src = open(design_dir + 'SpatialIP.v')
-#dst = open(design_dir + 'SpatialIP.v_copy', 'w')
-#dst.write('''// Temporary hack:
-#`define RANDOMIZE_INVALID_ASSIGN
-#`define RANDOMIZE_REG_INIT
-#
-#''')
-#for line in src:
-#  if '{1{$random}}' in line:
-#    dst.write(line.replace('{1{$random}}', '0'))
-#  else:
-#    dst.write(line)
-#src.close()
-#dst.close()
-#os.system('mv -f ' + design_dir + 'SpatialIP.v_copy ' + design_dir + 'SpatialIP.v')
+ Step 3: Use URAMs for SRAM size > 1024
+import re
+p = re.compile(r'WORDS\((\d+)\)') # Pattern to match WORDS(#)
+src = open(design_dir + 'SpatialIP.v')
+dst = open(design_dir + 'SpatialIP.v_copy', 'w')
+for line in src:
+  if 'SRAMVerilogAWS #' in line:
+    # This instantiates an SRAM, so check its size
+    m = p.search(line)
+    assert m
+    num_words = int(m.group(1))
+    assert num_words > 0
+    if num_words > 1024:#3136:
+      dst.write(line.replace('SRAMVerilogAWS #', 'SRAMVerilogAWS_U #'))
+    else:
+      dst.write(line)
+  else:
+    dst.write(line)
+src.close()
+dst.close()
+os.system('cp -f ' + design_dir + 'SpatialIP.v ' + design_dir + 'SpatialIP.v.orig')
+os.system('mv -f ' + design_dir + 'SpatialIP.v_copy ' + design_dir + 'SpatialIP.v')
+>>>>>>> origin/multiverse
 

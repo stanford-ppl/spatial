@@ -43,6 +43,8 @@ using namespace std;
     close("}")
 
     open("int main(int argc, char **argv) {");
+      emit("REPL* repl = GetREPL();")
+      emit("""repl->Command("source script_init");""")
       emit("vector<string> *args = new vector<string>(argc-1);")
       open("for (int i=1; i<argc; i++) {")
         emit("(*args)[i-1] = std::string(argv[i]);")

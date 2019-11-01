@@ -49,7 +49,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     val scope = block.stms
 
     // Treat user-injected delay lines as real delay lines now
-    scope.collect{case x if x.isDelayLine => x.userInjectedDelay = false}
+//    scope.collect{case x if x.isDelayLine => x.userInjectedDelay = false}
     val lines = findDelayLines(scope)
     lines.foreach{case (reader, line) => addDelayLine(reader, line) }
 

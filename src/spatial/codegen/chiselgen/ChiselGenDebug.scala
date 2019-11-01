@@ -24,6 +24,8 @@ trait ChiselGenDebug extends ChiselGenCommon {
 	    emit(s"Ledger.tieBreakpoint(breakpoints,${earlyExits.length}, ${ens} & ($datapathEn).D(${lhs.fullDelay}))")
 	    earlyExits = earlyExits :+ lhs
 
+    case RetimeGate() =>
+      emit("// RETIME GATE ----------------")
     case AssertIf(en,cond,_) => 
     	if (inHw) {
 	    	val ens = and(en)

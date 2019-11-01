@@ -341,6 +341,30 @@ object modeling {
       }
     }
 
+    // TODO: Segmentation pushing and break pushing can all be implemented by injecting RetimeGate nodes
+    def pushRetimeGates(): Unit = {
+      val gateNodes = schedule.collect{case x if x.isRetimeGate => x}
+      if (gateNodes.size > 1) error(s"Currently only one retimeGate() is allowed per block!")
+      if (gateNodes.nonEmpty) {
+        val orderedNodes = gateNodes.head.parent.innerBlocks.flatMap(_._2.stms)
+        val gates = Seq(0) ++ orderedNodes.zipWithIndex.collect { case (x, i) if x.isRetimeGate => i } ++ Seq(orderedNodes.length)
+        dbgs(s"Found gate nodes at indices $gates")
+        gates.drop(1).dropRight(1).zipWithIndex.foreach { case (gatePos, idx) =>
+          val gateStart = gates(idx)
+          val gateStop = gates(idx + 2)
+          val prevNodes = orderedNodes.take(gatePos).drop(gateStart)
+          val aftNodes = orderedNodes.take(gateStop).drop(gatePos + 1)
+          val latestPrev = prevNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.lastOption.getOrElse(0.0)
+          val earliestAft = aftNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.headOption.getOrElse(1.0)
+          dbgs(s"Latest node between $gateStart - $gatePos = $latestPrev, Earliest node between $gatePos - $gateStop = $earliestAft")
+          if (latestPrev >= earliestAft) {
+            val push = latestPrev - earliestAft + 1
+            aftNodes.collect { case x if paths.contains(x) => dbgs(s" - Pushing $x from ${paths(x)} by $push"); paths(x) = paths(x) + push }
+          }
+        }
+      }
+    }
+
     def pushSegmentationAccesses(): Unit = {
       accums.foreach{case AccumTriple(mem, reader, writer) => 
         if (reader.segmentMapping.nonEmpty && reader.segmentMapping.values.head > 0 && paths.contains(reader)) {
@@ -454,6 +478,7 @@ object modeling {
     }
 
     pushSegmentationAccesses()
+    pushRetimeGates()
 
     (paths.toMap, allCycles)
   }

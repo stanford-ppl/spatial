@@ -9,6 +9,7 @@ import spatial.util.spatialConfig
 import spatial.metadata.control._
 import spatial.metadata.types._
 import spatial.metadata.memory._
+import spatial.metadata.retiming._
 import scala.math.log
 
 trait NodeParams {
@@ -35,6 +36,8 @@ trait NodeParams {
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 
     case op:FltOp[_,_,_]   => (op.name, Nil)
+
+    case _@DelayLine(d,_) => ("DelayLine", Seq("d" -> {if (s.userInjectedDelay) d else 0}))
 
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
 

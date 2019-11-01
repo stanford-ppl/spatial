@@ -2,6 +2,8 @@ package spatial.lang.api
 
 import argon._
 import forge.tags._
+import spatial.metadata.retiming._
+import spatial.node.{DelayLine, RetimeGate}
 
 trait MiscAPI {
   def void: Void = Void.c
@@ -14,4 +16,13 @@ trait MiscAPI {
     @api def toCharArray: Tensor1[U8] = t.map{c => c}
   }
 
+  @api def retimeGate(): Void = {
+    stage(RetimeGate())
+  }
+
+  @api def retime[T:Bits](delay: scala.Int, payload: Bits[T]): T = {
+    val x = stage(DelayLine(delay, payload))
+    x.asInstanceOf[Sym[_]].userInjectedDelay = true
+    x
+  }
 }

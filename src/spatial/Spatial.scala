@@ -373,6 +373,11 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("insanity").action{(_,_) => spatialConfig.allowInsanity = true }.text("Disable sanity checks, allows insanity to happen.  Not recommended!")
 
     cli.opt[Unit]("prioritizeFlat").action{(_,_) => spatialConfig.prioritizeFlat = true }.text("Prioritize flat banking schemes over hierarchical ones when searching. Not recommended!")
+    cli.opt[Unit]("legacyBanking").action{(_,_) =>
+      spatialConfig.prioritizeFlat = true
+      spatialConfig.findThreeSchemes = true
+      spatialConfig.useAreaModels = false
+    }.text("Prioritize flat banking schemes over hierarchical ones when searching. Not recommended!")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true

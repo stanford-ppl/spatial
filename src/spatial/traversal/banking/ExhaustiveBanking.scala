@@ -9,6 +9,7 @@ import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 import spatial.metadata.types._
 //import spatial.util.IntLike._
@@ -313,7 +314,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     var banking: Option[ModBanking] = None
 
     var attempts = 0
-    while(Ns.hasNext && banking.isEmpty) {
+
+    // Experiment hack
+    var validSchemesFound = 0
+    val validSchemesWanted = if (spatialConfig.findThreeSchemes) 3 else 1
+    while(Ns.hasNext && banking.isEmpty && validSchemesFound < validSchemesWanted) {
       val N = Ns.next()
       val As = aStricts.expand(rank, N, stagedDims, axes)
       val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
@@ -331,20 +336,22 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
-          banking = Some(ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks))
+          if (validSchemesFound == 0) banking = Some(ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks))
+          validSchemesFound = validSchemesFound + 1
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           val numBs = B.size
-          banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
+          if (validSchemesFound == 0) banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
             ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)
           }
+          validSchemesFound = validSchemesFound + 1
         }
       }
-      if (banking.isDefined) dbgs(s"       $mem: Found solution after $attempts attempts to find solution for $nStricts $aStricts $axes")
-      else                   dbgs(s"       $mem: No solution after $attempts attempts to find solution for $nStricts $aStricts $axes")
+      if (banking.isDefined) dbgs(s"       $mem: Found solution after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
+      else                   dbgs(s"       $mem: No solution after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
     }
 
     banking

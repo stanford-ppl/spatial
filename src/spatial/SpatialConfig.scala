@@ -30,6 +30,7 @@ class SpatialConfig extends Config {
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
   var prioritizeFlat: Boolean = false
+  var findThreeSchemes: Boolean = false
   var enableOptimizedReduce: Boolean = true
   var distributeStreamCtr: Boolean = true
   var useAreaModels: Boolean = true

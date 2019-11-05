@@ -427,14 +427,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
     val controllerLCA = lca.ancestors.collectFirst{case x if (x.isInnerControl && !x.isSwitch) => x} // Outermost controller that is inner controller
-    dbgs(s"require conc port acc?" +
-      s"\n ${a.access == b.access && a.unroll != b.unroll}" +
-      s"\n ${lca.isInnerPipeLoop}" +
-      s"\n ${(lca.isInnerSeqControl && lca.isFullyUnrolledLoop)}" +
-      s"\n ${(lca.isOuterPipeLoop && !isWrittenIn(lca))}" +
-      s"\n ${(a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay == b.access.fullDelay)}" +
-      s"\n ${((a.access.delayDefined && b.access.delayDefined && a.access.parent == b.access.parent && a.access.fullDelay != b.access.fullDelay) && (controllerLCA.isDefined && controllerLCA.get.isLoopControl))}" +
-      s"\n ${(lca.isParallel || (a.access.parent == b.access.parent && (Seq(lca) ++ lca.ancestors).exists(_.willUnroll))) || (lca.isOuterControl && lca.isStreamControl) }")
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||

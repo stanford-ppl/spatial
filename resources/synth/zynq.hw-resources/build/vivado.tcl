@@ -25,16 +25,8 @@ add_files -norecurse [glob *.sv]
 #import_ip -files [glob *.xci]
 
 switch $TARGET {
-  "ZCU102" {
-    import_ip -files [list \
-      ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_zynq_ultra_ps_e_0_0/design_1_zynq_ultra_ps_e_0_0.xci                  \
-      ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_rst_ps8_0_${RST_FREQ}M_0/design_1_rst_ps8_0_${RST_FREQ}M_0.xci  \
-      ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_auto_pc_0/design_1_auto_pc_0.xci                                            \
-      ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_axi_dwidth_converter_0_0/design_1_axi_dwidth_converter_0_0.xci              \
-      ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_axi_dwidth_converter_1_0/design_1_axi_dwidth_converter_1_0.xci              \
-      ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_auto_ds_0/design_1_auto_ds_0.xci
-    #  ./bd_project/bd_project.srcs/sources_1/bd/design_1/ip/design_1_axi_data_fifo_0_0/design_1_axi_data_fifo_0_0.xci
-    ]
+  "Virtex7" {
+    synth_design -mode out_of_context -top SpatialIP_v1_0
   }
   default {
     import_ip -files [list \

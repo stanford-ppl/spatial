@@ -344,7 +344,7 @@ object modeling {
     // TODO: Segmentation pushing and break pushing can all be implemented by injecting RetimeGate nodes
     def pushRetimeGates(): Unit = {
       val gateNodes = schedule.collect{case x if x.isRetimeGate => x}
-      if (gateNodes.size > 1) error(s"Currently only one retimeGate() is allowed per block!")
+//      if (gateNodes.size > 1) error(s"Currently only one retimeGate() is allowed per block!")
       if (gateNodes.nonEmpty) {
         val orderedNodes = gateNodes.head.parent.innerBlocks.flatMap(_._2.stms)
         val gates = Seq(0) ++ orderedNodes.zipWithIndex.collect { case (x, i) if x.isRetimeGate => i } ++ Seq(orderedNodes.length)

@@ -499,12 +499,12 @@ sealed trait BankingView extends SearchPriority {
   def complementView: Seq[Int]
 } 
 case class Flat(rank: Int) extends BankingView {
-  val P = 0
+  val P = if (spatialConfig.prioritizeFlat) 1 else 0
   def expand(): Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
   def complementView: Seq[Int] = List()
 }
 case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends BankingView {
-  val P = 1
+  val P = if (spatialConfig.prioritizeFlat) 0 else 1
   def expand(): Seq[List[Int]] = {
     if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if view.get.contains(i) => List(i)}
     else Seq.tabulate(rank){i => List(i)}
@@ -547,7 +547,7 @@ case object NBestGuess extends NStrictness {
 case object NRelaxed extends NStrictness {
   val P = 2
   def isRelaxed = true
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(!isPow2(_)).toList
+  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
 }
 
 /** Enumeration of how to search for possible alpha vectors
@@ -610,7 +610,7 @@ case object AlphaRelaxed extends AlphaStrictness {
   def isRelaxed = true
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank).filterNot(_.forall(x => isPow2(x) || x == 1))
+    selectAs(possibleAs, 1, Nil, rank)
   }
 }
 

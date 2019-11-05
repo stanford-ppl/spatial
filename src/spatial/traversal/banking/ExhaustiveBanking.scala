@@ -330,6 +330,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         attempts = attempts + 1
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
+          dbgs(s"       $mem: It took $attempts attempts to find solution for $nStricts $aStricts $axes ")
           val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
           banking = Some(ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks))
         }
@@ -338,6 +339,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           val numBs = B.size
           banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
+            dbgs(s"       $mem: It took $attempts attempts to find solution for $nStricts $aStricts $axes ")
             val P = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
             ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)
           }

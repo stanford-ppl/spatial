@@ -32,6 +32,11 @@ hw:
 	echo "$$(date +%s)" > start.log
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs zynq"
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
+
+	## experimental stuff for v7
+	#rm -rf zynq.hw-resources
+	#cp -r ../resources/synth/virtex7.hw-resources/ zynq.hw-resources/
+
 	cat zynq.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/SpatialIP.v
 	cp zynq.hw-resources/build/* ${ZYNQ_V_DIR}
 	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${ZYNQ_V_DIR}/SpatialIP.v; \

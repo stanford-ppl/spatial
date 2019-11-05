@@ -29,6 +29,7 @@ class SpatialConfig extends Config {
   var enableModular: Boolean = true
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
+  var prioritizeFlat: Boolean = false
   var enableOptimizedReduce: Boolean = true
   var distributeStreamCtr: Boolean = true
   var useAreaModels: Boolean = true

@@ -470,7 +470,7 @@ case class BankingEffort(effort: Int) extends Data[BankingEffort](SetBy.User)
 
 /** Class for holding the priority of a particular banking option (lower is better) */
 abstract trait SearchPriority {
-  val P: Int
+  @stateful def P: Int
 }
 
 /** Container for describing a set of banking options */
@@ -487,7 +487,7 @@ object RegroupHelper {
   def regroupNone: List[RegroupDims] = List(RegroupDims(List()))
 }
 case class RegroupDims(dims: List[Int]) extends SearchPriority {
-  val P = dims.size
+  @stateful def P = dims.size
 }
 
 /** Enumeration of banking views.  Hierarchical means each dimension gets its own bank address.  Flat means all
@@ -498,13 +498,13 @@ sealed trait BankingView extends SearchPriority {
   def rank: Int
   def complementView: Seq[Int]
 } 
-case class Flat(rank: Int)(implicit state: State) extends BankingView {
-  val P = if (spatialConfig.prioritizeFlat) 1 else 0
+case class Flat(rank: Int) extends BankingView {
+  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 1 else 0
   def expand(): Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
   def complementView: Seq[Int] = List()
 }
-case class Hierarchical(rank: Int, view: Option[List[Int]] = None)(implicit state: State) extends BankingView {
-  val P = if (spatialConfig.prioritizeFlat) 0 else 1
+case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends BankingView {
+  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 0 else 1
   def expand(): Seq[List[Int]] = {
     if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if view.get.contains(i) => List(i)}
     else Seq.tabulate(rank){i => List(i)}
@@ -518,17 +518,17 @@ sealed trait NStrictness extends SearchPriority {
   def isRelaxed: Boolean
 }
 case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
-  val P = 9
+  @stateful def P = 9
   def isRelaxed = false
   def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
-  val P = 1
+  @stateful def P = 1
   def isRelaxed = false
   def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
 }
 case object NBestGuess extends NStrictness {
-  val P = 0
+  @stateful def P = 0
   def isRelaxed = false
   private def factorize(number: Int): List[Int] = {
     List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
@@ -545,7 +545,7 @@ case object NBestGuess extends NStrictness {
   }
 }
 case object NRelaxed extends NStrictness {
-  val P = 2
+  @stateful def P = 2
   def isRelaxed = true
   def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
 }
@@ -573,12 +573,12 @@ sealed trait AlphaStrictness extends SearchPriority {
   def isRelaxed: Boolean
 }
 case class UserDefinedAlpha(alphas: Seq[Int]) extends AlphaStrictness {
-  val P = 9
+  @stateful def P = 9
   def isRelaxed = false
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = Iterator(axes.map(alphas))
 }
 case object AlphaPowersOf2 extends AlphaStrictness {
-  val P = 1
+  @stateful def P = 1
   def isRelaxed = false
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0 || x == N).uniqueModN(N).filter{x => x >= 0 && x <= N}
@@ -586,7 +586,7 @@ case object AlphaPowersOf2 extends AlphaStrictness {
   }
 }
 case object AlphaBestGuess extends AlphaStrictness {
-  val P = 0
+  @stateful def P = 0
   def isRelaxed = false
   private def factorize(number: Int): List[Int] = {
     List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
@@ -606,7 +606,7 @@ case object AlphaBestGuess extends AlphaStrictness {
   }
 }
 case object AlphaRelaxed extends AlphaStrictness {
-  val P = 2
+  @stateful def P = 2
   def isRelaxed = true
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}

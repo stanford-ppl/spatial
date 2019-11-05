@@ -499,12 +499,12 @@ sealed trait BankingView extends SearchPriority {
   def complementView: Seq[Int]
 } 
 case class Flat(rank: Int) extends BankingView {
-  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 1 else 0
+  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 0 else 1
   def expand(): Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
   def complementView: Seq[Int] = List()
 }
 case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends BankingView {
-  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 0 else 1
+  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 1 else 0
   def expand(): Seq[List[Int]] = {
     if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if view.get.contains(i) => List(i)}
     else Seq.tabulate(rank){i => List(i)}

@@ -352,10 +352,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           validSchemesFound = validSchemesFound + 1
         }
       }
-      if (banking.isDefined) dbgs(s"       $mem: Found solution after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
-      else                   dbgs(s"       $mem: No solution after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
     }
 
+    if (banking.isDefined) dbgs(s"       $mem: Found solution after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
+    else                   dbgs(s"       $mem: No solution after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
     banking
   }
 

@@ -331,7 +331,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P))
       }
       dbgs(s" Solution space: ${numAs} * ${possibleNs.size} * ${mem.blockCyclicBs.size} (B), check complexity: ${numChecks}")
-      while (As.hasNext && banking.isEmpty) {
+      while (As.hasNext && banking.isEmpty && validSchemesFound < validSchemesWanted) {
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1

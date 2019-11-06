@@ -308,6 +308,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
     val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)
+    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)}")
     val Ns = possibleNs.iterator
     val numChecks = grps.map{x => nCr(x.size, 2)}.sum
     val rank = axes.length
@@ -322,6 +323,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val N = Ns.next()
       val As = aStricts.expand(rank, N, stagedDims, axes)
       val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
+      dbgs(s"possible as ${aStricts.expand(rank, N, stagedDims, axes).toList}")
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
         val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))

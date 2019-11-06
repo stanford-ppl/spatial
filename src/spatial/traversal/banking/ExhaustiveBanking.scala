@@ -319,7 +319,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     // Experiment hack
     var validSchemesFound = 0
     val validSchemesWanted = if (spatialConfig.findThreeSchemes) 3 else 1
-    while(Ns.hasNext && banking.isEmpty && validSchemesFound < validSchemesWanted) {
+    while(Ns.hasNext && (banking.isEmpty || validSchemesFound < validSchemesWanted)) {
       val N = Ns.next()
       val As = aStricts.expand(rank, N, stagedDims, axes)
       val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
@@ -331,7 +331,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         banking = Some(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P))
       }
       dbgs(s" Solution space: ${numAs} * ${possibleNs.size} * ${mem.blockCyclicBs.size} (B), check complexity: ${numChecks}")
-      while (As.hasNext && banking.isEmpty && validSchemesFound < validSchemesWanted) {
+      while (As.hasNext && (banking.isEmpty || validSchemesFound < validSchemesWanted)) {
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1
@@ -347,9 +347,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           if (validSchemesFound == 0) banking = B.collect{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val P = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
+            validSchemesFound = validSchemesFound + 1
             ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)
           }
-          validSchemesFound = validSchemesFound + 1
         }
       }
     }

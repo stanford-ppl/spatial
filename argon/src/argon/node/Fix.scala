@@ -112,6 +112,8 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
     case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case (Const(q), _) => stage(FixMul(b,a))
+    case (_, Const(q)) if (q-1).isPow2 && q > 0 => stage(FixAdd(a << Type[Fix[TRUE,_16,_0]].from(Number.log2(q-1)), a))
+    case (_, Const(q)) if (q+1).isPow2 && q > 0 => stage(FixSub(a << Type[Fix[TRUE,_16,_0]].from(Number.log2(q+1)), a))
     case _ => super.rewrite
   }
 

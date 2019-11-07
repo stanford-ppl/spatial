@@ -73,6 +73,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
     case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
     case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
+    case (Const(q), x) => stage(FixAdd(b,a))
     case _ => super.rewrite
   }
 }
@@ -94,6 +95,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixSub(Type[Fix[S,I,F]].from(q - r), x))
     case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(Type[Fix[S,I,F]].from(q + r), x))
 
+
     case _ => super.rewrite
   }
 }
@@ -109,6 +111,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Const(r)) if r.isPow2 && r < 0 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
     case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (Const(q), _) => stage(FixMul(b,a))
     case _ => super.rewrite
   }
 

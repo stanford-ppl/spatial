@@ -2,9 +2,10 @@ package utils
 import utils.implicits.collections._
 
 package object math {
-  def log2(x: Double): Double = Math.log10(x)/Math.log10(2)
-  def isPow2(x: Int): Boolean = (x & (x-1)) == 0
-  
+  def log2(x: Double): Double = Math.log10(x) / Math.log10(2)
+
+  def isPow2(x: Int): Boolean = (x & (x - 1)) == 0
+
   // TODO: fix scaladoc here
   /* Find all combinations out of list of lists.  i.e.
     *   combs(List( List(a,b),
@@ -16,19 +17,43 @@ package object math {
     *         List( List(a,x,m), List(a,x,n), List(a,y,m), List(a,y,n), ...)
     */
   def combs[T](lol: List[List[T]]): List[List[T]] = lol match {
-      case Nil => List(Nil)
-      case l::rs => for(x <- l;cs <- combs(rs)) yield x::cs
-    }
-
-  def gcd(a: Int,b: Int): Int = if(b ==0) a else gcd(b, a%b)
-  def coprime(x: Seq[Int]): Boolean = {
-    x.size == 1 || !x.forallPairs(gcd(_,_) > 1)
+    case Nil => List(Nil)
+    case l :: rs => for (x <- l; cs <- combs(rs)) yield x :: cs
   }
+
+  def gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
+
+  def coprime(x: Seq[Int]): Boolean = {
+    x.size == 1 || !x.forallPairs(gcd(_, _) > 1)
+  }
+
   def nCr(n: Int, r: Int): Int = {
-    if (n > r) ({n-r+1} to n).map{i => i}.product/(1 to r).map{i => i}.product
+    if (n > r) ({
+      n - r + 1
+    } to n).map { i => i }.product / (1 to r).map { i => i }.product
     else 1
   }
-  def divisors(x: Int): Seq[Int] = (1 to x).collect{case i if x % i == 0 => i}
+
+  def divisors(x: Int): Seq[Int] = (1 to x).collect { case i if x % i == 0 => i }
+
+  /** Check if int can be expressed as the sum or subtraction of two powers of 2, to be used for multiplication optimizations */
+  def isSumOfPow2(x: Int): Boolean = {
+    (x.toBinaryString.count(_ == '1') == 2) || (x.toBinaryString.indexOf("01") == -1)
+  }
+
+  /** Check if int can be expressed as the sum or subtraction of two powers of 2, to be used for multiplication optimizations */
+  def asSumOfPow2(x: Int): (Int, Int, String) = {
+    import scala.math.pow
+    if (x.toBinaryString.count(_ == '1') == 2) {
+      val maxbit = x.toBinaryString.length-1 // Assume msb is a 1 for toBinaryString method
+      val minbit = x.toBinaryString.reverse.indexOf("1")
+      (pow(2,maxbit).toInt, pow(2,minbit).toInt, "add")
+    } else {//if (x.toBinaryString.indexOf("01") == -1) {
+      val maxbit = x.toBinaryString.length // Assume msb is a 1 for toBinaryString method
+      val minbit = x.toBinaryString.reverse.indexOf("1")
+      (pow(2,maxbit).toInt, pow(2,minbit).toInt, "sub")
+    }
+  }
 
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),
     * determine what elements are possible via the equation: (address * a) / B.  This is used to figure out what banks

@@ -105,7 +105,7 @@ object ML extends HostML {
     val O = dims(1)
 
     def InnerNN(o:Int) = {
-      val dot = dp_tiled(I,ip,mp,ip) { i => 
+      val dot = dp_tiled(N=I,ts=ip,op=mp,ip=ip) { i => 
         (in(i), w(i,o))
       }
       val lo = dot + b(o)

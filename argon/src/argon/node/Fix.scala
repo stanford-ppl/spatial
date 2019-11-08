@@ -120,7 +120,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
         case "sub" => stage(FixSub(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
         case _ => super.rewrite
       }
-    case (_, Const(q)) if isSumOfPow2(q.toInt) && q < 0 =>
+    case (_, Const(q)) if isSumOfPow2(-q.toInt) && q < 0 =>
       val (mul1, mul2, dir) = asSumOfPow2(-q.toInt)
       dir match {
         case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(-mul2)))))

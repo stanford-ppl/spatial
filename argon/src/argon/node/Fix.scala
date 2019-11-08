@@ -4,6 +4,7 @@ import argon._
 import argon.lang._
 
 import emul.{FixedPoint,Number}
+import utils.math.{asSumOfPow2, isSumOfPow2}
 import forge.tags._
 
 abstract class FixOp[S:BOOL,I:INT,F:INT,R:Type] extends Primitive[R] {
@@ -112,6 +113,21 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
     case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case (Const(q), _) => stage(FixMul(b,a))
+    case (_, Const(q)) if isSumOfPow2(q.toInt) && q > 0 =>
+      val (mul1, mul2, dir) = asSumOfPow2(q.toInt)
+      dir match {
+        case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
+        case "sub" => stage(FixSub(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
+        case _ => super.rewrite
+      }
+    case (_, Const(q)) if isSumOfPow2(q.toInt) && q < 0 =>
+      val (mul1, mul2, dir) = asSumOfPow2(-q.toInt)
+      dir match {
+        case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(-mul2)))))
+        case "sub" => stage(FixSub(stage(FixMul(a,Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(-mul2)))))
+        case _ => super.rewrite
+      }
+
     case _ => super.rewrite
   }
 

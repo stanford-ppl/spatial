@@ -74,7 +74,8 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
     case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
     case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
-    case (Const(q), x) => stage(FixAdd(b,a))
+    case (Const(r), Const(q)) => Type[Fix[S,I,F]].from(r+q)
+    case (Const(r), _) => stage(FixAdd(b,a))
     case _ => super.rewrite
   }
 }

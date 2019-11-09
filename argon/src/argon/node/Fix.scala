@@ -74,7 +74,12 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
     case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r + q)))
     case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(x, Type[Fix[S,I,F]].from(q - r)))
+<<<<<<< HEAD
     case (Const(q), x) => stage(FixAdd(b,a))
+=======
+    case (Const(r), Const(q)) => Type[Fix[S,I,F]].from(r+q)
+    case (Const(r), _) => stage(FixAdd(b,a))
+>>>>>>> origin/develop
     case _ => super.rewrite
   }
 }
@@ -108,19 +113,19 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   override def isAssociative: Boolean = true
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(q), Const(r)) => R.from(q*r)
-    case (_, Const(r)) if r.isPow2 && r > 0 => a << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
-    case (_, Const(r)) if r.isPow2 && r < 0 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
-    case (Const(r), _) if r.isPow2 && r > 0 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
-    case (Const(r), _) if r.isPow2 && r < 0 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (_, Const(r)) if r > 0 && r.isPow2 => a << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (_, Const(r)) if r < 0 && (-r).isPow2 => -a << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (Const(r), _) if r > 0 && r.isPow2 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
+    case (Const(r), _) if r < 0 && (-r).isPow2 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case (Const(q), _) => stage(FixMul(b,a))
-    case (_, Const(q)) if isSumOfPow2(q.toInt) && q > 0 =>
+    case (_, Const(q)) if (q.toDouble % 1.0 == 0.0) && isSumOfPow2(q.toInt) && q > 0 =>
       val (mul1, mul2, dir) = asSumOfPow2(q.toInt)
       dir match {
         case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
         case "sub" => stage(FixSub(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
         case _ => super.rewrite
       }
-    case (_, Const(q)) if isSumOfPow2(-q.toInt) && q < 0 =>
+    case (_, Const(q)) if (q.toDouble % 1.0 == 0.0) && isSumOfPow2(-q.toInt) && q < 0 =>
       val (mul1, mul2, dir) = asSumOfPow2(-q.toInt)
       dir match {
         case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(-mul2)))))

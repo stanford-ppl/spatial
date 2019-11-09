@@ -138,6 +138,12 @@ object modeling {
       case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
     }
 
+    def brokenByRetimeGate(x1: Sym[_], x2: Sym[_], schedule: Seq[Sym[_]]): Boolean = {
+      ((schedule.indexOf(x1) < schedule.indexOf(x2)) && (schedule.take(schedule.indexOf(x2)).drop(schedule.indexOf(x1)).exists(_.isRetimeGate))) ||
+      ((schedule.indexOf(x2) < schedule.indexOf(x1)) && (schedule.take(schedule.indexOf(x1)).drop(schedule.indexOf(x2)).exists(_.isRetimeGate))      )
+    }
+
+
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val memories = (readersByMem.keySet intersect writersByMem.keySet).filter(!_.isLockSRAM)
@@ -145,11 +151,11 @@ object modeling {
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
-      rds.cross(wrs).flatMap{case (rd, wr) =>
+      rds.cross(wrs).collect{case (rd, wr) if (!brokenByRetimeGate(rd,wr,schedule)) =>
+      // rds.cross(wrs).flatMap{case (rd, wr) =>
         lazy val triple = AccumTriple(mem, rd, wr)
         val path = getAllNodesBetween(rd, wr, scope.toSet)
         path.foreach{sym => addCycle(sym, triple) }
-
         if (verbose && path.nonEmpty) {
           dbgs("Found cycle between: ")
           dbgs(s"  ${stm(wr)}")
@@ -158,8 +164,9 @@ object modeling {
         }
 
         if (path.nonEmpty) Some(triple) else None
-      }
+      }.flatten
     }.toSortedSeq
+    dbgs(s"Done finding cycles")
 
     ScopeAccumInfo(readersByMem, writersByMem, accums, cycles)
   }
@@ -358,7 +365,7 @@ object modeling {
           val earliestAft = aftNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.headOption.getOrElse(1.0)
           dbgs(s"Latest node between $gateStart - $gatePos = $latestPrev, Earliest node between $gatePos - $gateStop = $earliestAft")
           if (latestPrev >= earliestAft) {
-            val push = latestPrev - earliestAft + 1
+            val push = latestPrev - earliestAft + 2
             aftNodes.collect { case x if paths.contains(x) => dbgs(s" - Pushing $x from ${paths(x)} by $push"); paths(x) = paths(x) + push }
           }
         }

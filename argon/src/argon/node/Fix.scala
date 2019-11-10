@@ -114,21 +114,6 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (Const(r), _) if r > 0 && r.isPow2 => b << Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
     case (Const(r), _) if r < 0 && (-r).isPow2 => -b << Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
     case (Const(q), _) => stage(FixMul(b,a))
-    case (_, Const(q)) if (q.toDouble % 1.0 == 0.0) && isSumOfPow2(q.toInt) && q > 0 =>
-      val (mul1, mul2, dir) = asSumOfPow2(q.toInt)
-      dir match {
-        case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
-        case "sub" => stage(FixSub(stage(FixMul(a,Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(mul2)))))
-        case _ => super.rewrite
-      }
-    case (_, Const(q)) if (q.toDouble % 1.0 == 0.0) && isSumOfPow2(-q.toInt) && q < 0 =>
-      val (mul1, mul2, dir) = asSumOfPow2(-q.toInt)
-      dir match {
-        case "add" => stage(FixAdd(stage(FixMul(a,Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(-mul2)))))
-        case "sub" => stage(FixSub(stage(FixMul(a,Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a,Type[Fix[S,I,F]].from(-mul2)))))
-        case _ => super.rewrite
-      }
-
     case _ => super.rewrite
   }
 

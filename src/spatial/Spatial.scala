@@ -374,6 +374,9 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c) [false]")
     cli.opt[Unit]("forceFuseFMA").action{(_,_) => spatialConfig.forceFuseFMA = true}.text("Force all Add(Mul(a,b),c) patterns to become FMA(a,b,c), even if they increase initiation interval.  --noFuseFMA takes priority [false]")
 
+    cli.opt[Unit]("noOptimizeMul").action{(_,_) => spatialConfig.optimizeMul = false}.text("Do not optimize multiplications if they can be rewritten as sum/subtraction of two pow2 multiplies")
+    cli.opt[Unit]("noOptimizeMod").action{(_,_) => spatialConfig.optimizeMod = false}.text("Do not optimize modulo if they can be rewritten shifts and adds using Mersenne numbers")
+
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")

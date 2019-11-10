@@ -36,6 +36,15 @@ package object math {
 
   def divisors(x: Int): Seq[Int] = (1 to x).collect { case i if x % i == 0 => i }
 
+  /** Check if this is a Mersenne number */
+  def isMersenne(x: Int): Boolean = {
+    ((scala.math.log(x + 1) / scala.math.log(2)) % 1.0 == 0) && ((scala.math.log(x + 1) / scala.math.log(2)) <= 16) && (x > 2)
+  }
+  /** Returns y such that y = x*k, where y is Mersenne and k <= N */
+  def withinNOfMersenne(N: Int, x: Int): Option[Int] = {
+    List.tabulate(N){i => x*i}.collectFirst{case i if isMersenne(i) => i}
+  }
+
   /** Check if int can be expressed as the sum or subtraction of two powers of 2, to be used for multiplication optimizations */
   def isSumOfPow2(x: Int): Boolean = {
     (x.toBinaryString.count(_ == '1') == 2) || (x.toBinaryString.indexOf("01") == -1)

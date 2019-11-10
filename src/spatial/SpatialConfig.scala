@@ -50,6 +50,8 @@ class SpatialConfig extends Config {
   var enableAsyncMem = false
   var enableRetiming = true
   var enableLooseIterDiffs = false
+  var optimizeMul = true
+  var optimizeMod = true
   var fuseAsFMA = true
   var forceFuseFMA = false
 

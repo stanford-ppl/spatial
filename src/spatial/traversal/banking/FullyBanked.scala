@@ -164,7 +164,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
               *
               *   To convert to "banking," we want to take one entry from each Map and call it a new duplicate
               */
-            val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))} else Seq()
+            val autoFullBank: Seq[Seq[ModBanking]] = if (view.complementView.nonEmpty) Seq(view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))}) else Seq()
             val rawBanking: Seq[Map[AccessGroups, Option[PartialBankingChoices]]] = view.expand().map{axes =>
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
@@ -179,11 +179,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
               val axisBankingScheme: Option[PartialBankingChoices] = {
                 if (solutionCache.contains((selGrps, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${selGrps.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job! (scheme ${solutionCache.get((selGrps, nStricts, aStricts, axes))})")
                 solutionCache.getOrElseUpdate((selGrps, nStricts, aStricts, axes), {
-                  if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(Seq(ModBanking.Unit(1, axes)))
-                  else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(Seq(ModBanking.Unit(rank, axes)))
-                  else {
-                    findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
-                  }
+                  findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
                 })}
               if (axes.forall(regroup.dims.contains)) {
                 selRdGrps.flatMap { x => x.map { a => Set(reverseAM(a)) -> axisBankingScheme } }.toMap
@@ -193,6 +189,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
             }
             if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {
               val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
+              dbgs(s"aoeu bankingIds are $bankingIds")
               val banking: Map[AccessGroups, FullBankingChoices] = bankingIds
                 .map{addr: List[Int] => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}
                 .map{dup =>
@@ -202,10 +199,13 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
                     val others: Seq[AccessGroups] = accs.patch(i, Nil, 1)
                     dimGrp.map{ grp:SingleAccessGroup => if (others.isEmpty) grp else others.map{allDimGrps => allDimGrps.flatten}.reduce(_.intersect(_)).intersect(grp)}//.map{otherDimGrp => otherDimGrp.intersect(grp)}}} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
                   }.reduce{_++_}.filter(_.nonEmpty)
-                  inViewAccs -> (Seq(autoFullBank) ++ dup.map(_._2.get))
+                  dbgs(s"aoeu inspecting dup $dup, pointing $inViewAccs to ${Seq(autoFullBank) ++ dup.map(_._2.get)}")
+                  inViewAccs -> (autoFullBank ++ dup.map(_._2.get))
                 }.toMap
               val dimsInStrategy = view.expand().flatten.distinct
+              dbgs(s"banking is $banking")
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
+                dbgs(s"looking at all opts of $fullOpts")
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
                 val(validOpts, rejectedOpts) = fullOpts.partition { case opt => isValidBanking(opt, prunedGrps) }
                 validOpts.foreach{opt =>

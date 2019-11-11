@@ -245,7 +245,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               val dimsInStrategy = view.expand().flatten.distinct
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
-                val(validOpts, rejectedOpts) = fullOpts.partition { case opt => isValidBanking(opt, prunedGrps) }
+                val(validOpts, rejectedOpts) = fullOpts.distinct.partition { case opt => isValidBanking(opt, prunedGrps) }
                 validOpts.foreach{opt =>
                   dbgs(s"Banking scheme $opt accepted!")
                   markFound(scheme)

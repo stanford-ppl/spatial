@@ -603,7 +603,7 @@ case object AlphaBestGuess extends AlphaStrictness {
     val coprimes = Seq.tabulate(N){i => i}.collect{case i if coprime(Seq(i,N)) => i}
     val pow2OrEasy = Seq.tabulate(N){i => i}.collect{case i if isPow2(i) || isSumOfPow2(i) => i}
     val possibleAs = (List(0,1) ++ pow2OrEasy ++ accessBased ++ dimBased ++ coprimes).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank)
+    selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.toIterator // Should find a better way to get distinct
   }
 }
 case object AlphaRelaxed extends AlphaStrictness {
@@ -611,7 +611,7 @@ case object AlphaRelaxed extends AlphaStrictness {
   def isRelaxed = true
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank)
+    selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.toIterator
   }
 }
 

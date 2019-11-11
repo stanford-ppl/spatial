@@ -393,6 +393,7 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("legacyBanking").action{(_,_) =>
       spatialConfig.prioritizeFlat = true
       spatialConfig.useAreaModels = false
+      spatialConfig.numSchemesPerRegion = 1
     }.text("Prioritize flat banking schemes over hierarchical ones when searching. Not recommended!")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming

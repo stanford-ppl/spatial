@@ -85,7 +85,18 @@ package object math {
     val degenerate = hist.map(_._2).max
     hist.map(_._2).map(degenerate - _).sum * paddedDims.zip(P).map{case(x,y) => x/y}.product 
   }
-  def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], errmsg: => Unit): Seq[Int] = {
+  def bestPByVolume(options: Seq[Seq[Int]], stagedDims: Seq[Int]): Seq[Int] = {
+      val PandCostandBloat = options.map{option =>
+        // Extra elements per dimension so that yards cover entire memory
+        val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
+        val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
+        val volume = paddedDims.product
+        (option,volume)
+      }
+      PandCostandBloat.minBy(_._2)._1
+  }
+
+  def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], errmsg: => Unit): Seq[Seq[Int]] = {
     /* Offset correction not mentioned in Wang et. al., FPGA '14
        0. Equations in paper must be wrong.  Example
            ex-     alpha = 1,2    N = 4     B = 1
@@ -154,14 +165,7 @@ package object math {
                     }
             // Census constraint
             .collect{case p if spansAllBanks(p,alpha,n,b) => p}
-      val PandCostandBloat = options.map{option =>
-        // Extra elements per dimension so that yards cover entire memory
-        val padding = stagedDims.zip(option).map{case(d,p) => (p - d%p) % p}
-        val paddedDims = stagedDims.zip(padding).map{case(x,y)=>x+y}
-        val volume = paddedDims.product
-        (option,volume)
-      }
-      PandCostandBloat.minBy(_._2)._1
+      options
     }
     catch { case t:Throwable =>
       errmsg

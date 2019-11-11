@@ -315,7 +315,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val Nmin: Int = grps.map(_.size).maxOrElse(1)
     val Ncap = filteredStagedDims.product max Nmin
     val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)
-    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)}")
+//    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)}")
     val Ns = possibleNs.iterator
     val numChecks = grps.map{x => nCr(x.size, 2)}.sum
     val rank = axes.length
@@ -331,12 +331,13 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val N = Ns.next()
       val As = aStricts.expand(rank, N, stagedDims, axes)
       val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
-      dbgs(s"possible as ${aStricts.expand(rank, N, stagedDims, axes).toList}")
+//      dbgs(s"possible as ${aStricts.expand(rank, N, stagedDims, axes).toList}")
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
-        val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
+        val allP = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
+        val forEachP = allP.map{P => ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P)}
         // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
-        banking = Some(banking.getOrElse(Seq()) ++ Seq(ModBanking(N, axes.map(mem.explicitBs).head,alpha,axes,P)))
+          banking = Some(banking.getOrElse(Seq()) ++ forEachP)
       }
       dbgs(s" Solution space: ${numAs} * ${possibleNs.size} * ${mem.blockCyclicBs.size} (B), check complexity: ${numChecks}")
       while (As.hasNext && validSchemesFound < validSchemesWanted && attempts < searchTimeout) {
@@ -345,24 +346,26 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         attempts = attempts + 1
         if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
-          val P = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
-          banking = Some(banking.getOrElse(Seq[ModBanking]()) ++ Seq((ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks))))
+          val allP = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
+          val forEachP = allP.map{P => ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks)}
+          banking = Some(banking.getOrElse(Seq[ModBanking]()) ++ forEachP)
           validSchemesFound = validSchemesFound + 1
         }
         else if (!mem.noBlockCyclic) {
           val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
           val numBs = B.size
-          val scheme: Option[ModBanking] = B.collectFirst{case b if (coprime(Seq(b) ++ alpha)) =>
+          val scheme: Option[Seq[ModBanking]] = B.collectFirst{case b if (coprime(Seq(b) ++ alpha)) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
-            val P = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
+            val allP = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
+            val forEachP = allP.map{P => ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)}
             validSchemesFound = validSchemesFound + 1
-            ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)
+            forEachP
           }
-          if (scheme.isDefined) banking = Some(banking.getOrElse(Seq[ModBanking]()) ++ Seq(scheme.get))
+          if (scheme.isDefined) banking = Some(banking.getOrElse(Seq[ModBanking]()) ++ scheme.get)
         }
       }
     }
-
+    if (attempts >= searchTimeout - 2) dbgs(s"Timeout while searching!")
     dbgs(s"       $mem: Found $validSchemesFound solutions after ${attempts * numChecks} (= $attempts * $numChecks) attempts to find solution for $nStricts $aStricts $axes")
     banking
   }

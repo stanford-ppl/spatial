@@ -137,8 +137,8 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
       transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }
 
-    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(16,q.toInt).isDefined =>
-      transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(16,q.toInt).get).asInstanceOf[A] }
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).isDefined =>
+      transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).get).asInstanceOf[A] }
 
 
     case RegWrite(F(reg), F(data), F(en)) => data match {

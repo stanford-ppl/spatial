@@ -303,18 +303,24 @@ trait Spatial extends Compiler with ParamLoader {
     }.text("""Size of code window for Java-style chunking, which breaks down large IR blocks into multiple levels of Java objects.  Increasing can sometimes solve the GC issue during Chisel compilation (default: 50)""")
 
     cli.opt[Int]("bankingEffort").action{ (t,_) =>
+      assert(t == 0 || t == 1 || t == 2, "Only efforts of 0, 1, or 2 are supported.  See --numSchemesPerRegion or --bankingTimeout for more fine-grained controls")
       spatialConfig.bankingEffort = t
+      if (t == 0) spatialConfig.numSchemesPerRegion = 1
     }.text("""Specify the level of effort to put into banking local memories.  i.e:
       0: Quit banking analyzer after first banking scheme is found
       1: (default) Allow banking analyzer to search 4 regions (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
       2: Allow banking analyzer to search each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
-      4: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
 """)
 
     cli.opt[Int]("numSchemesPerRegion").action{ (t,_) =>
       spatialConfig.numSchemesPerRegion = t
-    }.text("""Specify how many valid schemes to looko for in each region""")
+    }.text("""Specify how many valid schemes to look for in each region [Default: 2]""")
 
+    cli.opt[Int]("mersenneRadius").action{ (t,_) =>
+      spatialConfig.mersenneRadius = t
+    }.text(
+      """Specify how many multiples of modulus to search when trying to optimize FixMod as a PriorityMux + MersenneMod
+        | (i.e. x % 5 requires mersenneRadius >= 3 in order to express it as a 3-way Priority mux on x % 15, since 15 is the closest Mersenne number [Default: 16]""".stripMargin)
 
     cli.opt[Int]("bankingTimeout").action{ (t,_) =>
       spatialConfig.bankingTimeout = t

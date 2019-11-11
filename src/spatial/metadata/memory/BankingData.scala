@@ -513,18 +513,18 @@ case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends Banki
 
 /** Enumeration of how to search for possible number of banks */
 sealed trait NStrictness extends SearchPriority {
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
   def isRelaxed: Boolean
 }
 case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
   @stateful def P = 9
   def isRelaxed = false
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
   @stateful def P = 1
   def isRelaxed = false
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
 }
 case object NBestGuess extends NStrictness {
   @stateful def P = 0
@@ -539,15 +539,15 @@ case object NBestGuess extends NStrictness {
     list
   }
 
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = {
-    val pow2 = Seq.tabulate(max-min){i => i}.collect{case i if isPow2(i) => i}
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = {
+    val pow2 = Seq.tabulate(max-min){i => i}.collect{case i if isPow2(i) || isMersenne(i) || withinNOfMersenne(spatialConfig.mersenneRadius, i).isDefined => i}
     (numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product) ++ pow2).filter{x => x <= max && x >= min}.distinct.sorted
   }
 }
 case object NRelaxed extends NStrictness {
   @stateful def P = 2
   def isRelaxed = true
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
 }
 
 /** Enumeration of how to search for possible alpha vectors

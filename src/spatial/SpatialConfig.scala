@@ -32,6 +32,7 @@ class SpatialConfig extends Config {
   var prioritizeFlat: Boolean = false
   var numSchemesPerRegion: Int = 2
   var bankingTimeout: Int = 50000
+  var mersenneRadius: Int = 16
   var enableOptimizedReduce: Boolean = true
   var distributeStreamCtr: Boolean = true
   var useAreaModels: Boolean = true

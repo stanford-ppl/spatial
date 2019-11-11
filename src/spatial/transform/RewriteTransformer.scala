@@ -73,8 +73,13 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   def rewriteMod[S,I,F](a: Fix[S,I,F], mod: Int, closestMersenne: Int): Fix[S,I,F] = {
-    // TDB
-    a
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    val bigmod = rewriteModWithMersenne(a, closestMersenne)
+    dbgs(s"Rewriting $a mod $mod as a function of $closestMersenne")
+    val boundaries = Seq.tabulate(closestMersenne / mod){i => mod*(i+1)}
+    stage(PriorityMux(boundaries.map{b => bigmod < Type[Fix[S,I,F]].from(b)}, boundaries.map{b => bigmod - Type[Fix[S,I,F]].from(b - mod)}))
   }
 
   def writeReg[A](lhs: Sym[_], reg: Reg[_], data: Bits[A], ens: Set[Bit]): Void = {
@@ -125,16 +130,15 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
 
-    case FixMul(a: Fix[s,i,f], Const(q)) if spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
+    case FixMul(a: Fix[s,i,f], Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
       val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))
-      println(s"Rewrote $a * $q")
       transferDataToAllNew(lhs){ rewriteMul(a,q.toInt,mul1,mul2,dir).asInstanceOf[A] }
 
-    case FixMod(a: Fix[s, i, f], Const(q)) if spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
+    case FixMod(a: Fix[s, i, f], Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
       transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }
 
-//    case FixMod(a: Fix[s, i, f], Const(q)) if spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(4,q.toInt).isDefined =>
-//      transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(4,q.toInt).get).asInstanceOf[A] }
+    case FixMod(a: Fix[s, i, f], Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(16,q.toInt).isDefined =>
+      transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(16,q.toInt).get).asInstanceOf[A] }
 
 
     case RegWrite(F(reg), F(data), F(en)) => data match {

@@ -42,7 +42,8 @@ package object math {
   }
   /** Returns y such that y = x*k, where y is Mersenne and k <= N */
   def withinNOfMersenne(N: Int, x: Int): Option[Int] = {
-    List.tabulate(N){i => x*i}.collectFirst{case i if isMersenne(i) => i}
+    if (!isMersenne(x) && x > 3) List.tabulate(N-2){i => x*(i+2)}.collectFirst{case i if isMersenne(i) => i}
+    else None
   }
 
   /** Check if int can be expressed as the sum or subtraction of two powers of 2, to be used for multiplication optimizations */

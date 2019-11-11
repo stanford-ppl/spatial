@@ -147,6 +147,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
       warn(ctx)
       null
     case (Literal(0), _) => a
+    case (_, Literal(1)) => Type[Fix[S,I,F]].from(0)
     case _ => super.rewrite
   }
 }

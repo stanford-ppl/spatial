@@ -130,14 +130,14 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
 
-    case FixMul(a: Fix[s,i,f], Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
+    case FixMul(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
       val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))
       transferDataToAllNew(lhs){ rewriteMul(a,q.toInt,mul1,mul2,dir).asInstanceOf[A] }
 
-    case FixMod(a: Fix[s, i, f], Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
       transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }
 
-    case FixMod(a: Fix[s, i, f], Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(16,q.toInt).isDefined =>
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(16,q.toInt).isDefined =>
       transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(16,q.toInt).get).asInstanceOf[A] }
 
 

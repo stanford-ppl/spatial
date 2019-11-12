@@ -603,7 +603,8 @@ case object AlphaBestGuess extends AlphaStrictness {
     val coprimes = Seq.tabulate(N){i => i}.collect{case i if coprime(Seq(i,N)) => i}
     val pow2OrEasy = Seq.tabulate(N){i => i}.collect{case i if isPow2(i) || isSumOfPow2(i) => i}
     val possibleAs = (List(0,1) ++ pow2OrEasy ++ accessBased ++ dimBased ++ coprimes).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.toIterator // Should find a better way to get distinct
+    val combos = selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.sortBy(_.sum).toIterator // Should find a better way to get distinct
+    combos
   }
 }
 case object AlphaRelaxed extends AlphaStrictness {

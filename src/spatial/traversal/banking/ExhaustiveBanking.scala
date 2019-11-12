@@ -69,7 +69,13 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       accs.map { grp =>
         grp.map { a =>
           val aIters = accessIterators(a.access, mem)
-          val keyRules: scala.collection.immutable.Map[Idx, (Idx, Int)] = aIters.zipWithIndex.collect { case (iter, i) if (rules.contains((iter, getDephasedUID(aIters, a.unroll, i)))) => (iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))) }.toMap
+          val keyRules: scala.collection.immutable.Map[Idx, (Idx, Int)] = aIters.zipWithIndex.collect {
+            // TODO: Figure out why this getDephasedUID is necessary?  Its logic is hard to follow but it seems like it may be doing-
+            //       some kind of lookup for a uid fork point up to that point and no deeper, but I'm not sure the synch logic
+            //       needs this anymore
+            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
+              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
+          }.toMap
           if (keyRules.nonEmpty) {
             mem.addDephasedAccess(a.access);
             dbgs(s"Substituting due to dephasing: $keyRules")

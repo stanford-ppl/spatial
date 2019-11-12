@@ -22,8 +22,8 @@ trait PlasticineTest extends DSLTest { test =>
     case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
   }
 
-  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
-    override val makeTimeout: Long = 6000 // Timeout for compiling, in seconds
+  abstract class PIRBackend(args:String="--pir") extends Backend(name, args=args, "", "", "") {
+    override val makeTimeout: Long = 12000 // Timeout for compiling, in seconds
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
     def compileOnly = checkFlag(s"test.compileOnly")

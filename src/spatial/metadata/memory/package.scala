@@ -66,17 +66,20 @@ package object memory {
     @stateful def bankingEffort: Int = metadata[BankingEffort](s).map(_.effort).getOrElse(spatialConfig.bankingEffort)
     def bankingEffort_=(effort: Int): Unit = metadata.add(s, BankingEffort(effort))
 
-    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int])] = metadata[ExplicitBanking](s).map(_.scheme)
-    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])] = metadata[ExplicitBanking](s).map(_.scheme)
+    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])): Unit = metadata.add(s, ExplicitBanking(scheme))
     def explicitNs: Seq[Int] = explicitBanking.get._1
     def explicitBs: Seq[Int] = explicitBanking.get._2
     def explicitAlphas: Seq[Int] = explicitBanking.get._3
+    def explicitPs: Option[Seq[Int]] = explicitBanking.get._4
     @stateful def explicitScheme: Seq[ModBanking] = {
       import spatial.metadata.types._
       import utils.math.{computeP, bestPByVolume}
       if (explicitNs.size == 1) {
-        val allP = computeP(explicitNs.head, explicitBs.head, explicitAlphas, s.stagedDims.map(_.toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
-        val P = bestPByVolume(allP, s.stagedDims.map(_.toInt))
+        val P = explicitPs.getOrElse({
+          val allP = computeP(explicitNs.head, explicitBs.head, explicitAlphas, s.stagedDims.map(_.toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
+          bestPByVolume(allP, s.stagedDims.map(_.toInt))
+        })
         Seq(ModBanking(explicitNs.head, explicitBs.head, explicitAlphas, Seq.tabulate(explicitNs.size) { i => i }, P, 1, 0))
       }
       else {
@@ -84,8 +87,10 @@ package object memory {
           val n = explicitNs(i)
           val b = explicitBs(i)
           val a = explicitAlphas(i)
-          val allP = computeP(n,b,Seq(a), Seq(s.stagedDims(i).toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
-          val P = bestPByVolume(allP, s.stagedDims.map(_.toInt))
+          val P = explicitPs.getOrElse({
+            val allP = computeP(n,b,Seq(a), Seq(s.stagedDims(i).toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
+            bestPByVolume(allP, s.stagedDims.map(_.toInt))
+          })
           ModBanking(n,b,Seq(a),Seq(i),P,1,0)
         }
       }

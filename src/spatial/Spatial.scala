@@ -394,6 +394,7 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.prioritizeFlat = true
       spatialConfig.useAreaModels = false
       spatialConfig.numSchemesPerRegion = 1
+      spatialConfig.bankingEffort = 0
       spatialConfig.optimizeMod = false
       spatialConfig.optimizeMul = false
     }.text("Prioritize flat banking schemes over hierarchical ones when searching. Not recommended!")

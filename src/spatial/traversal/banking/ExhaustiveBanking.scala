@@ -238,10 +238,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                     val others: Seq[AccessGroups] = accs.patch(i, Nil, 1)
                     dimGrp.map{ grp:SingleAccessGroup => if (others.isEmpty) grp else others.map{allDimGrps => allDimGrps.flatten}.reduce(_.intersect(_)).intersect(grp)}//.map{otherDimGrp => otherDimGrp.intersect(grp)}}} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
                   }.reduce{_++_}.filter(_.nonEmpty)
-                  inViewAccs -> (dup.map(_._2.get).distinct)
+                  inViewAccs -> dup.map(_._2.get).distinct
                 }.toMap
               // All-to-all combinations for hierarchical
-              val banking = bankingRepackaged.map{case (grps, schms) => (grps -> combs(schms.map(_.toList).toList))}.toMap
+              val banking = bankingRepackaged.map{case (grps, schms) => grps -> combs(autoFullBank.map(List(_)).toList ++ schms.map(_.toList).toList) }.toMap
               val dimsInStrategy = view.expand().flatten.distinct
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }

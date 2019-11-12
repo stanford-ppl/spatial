@@ -9,7 +9,7 @@ abstract class BankingStrategy {
   type FullBanking = Seq[Banking]
   // A collection of valid banking schemes which may only be applied to one dimension if hierarchical
   type PartialBankingChoices = Seq[Banking]
-  // A collection of potential FullBanking schemes that are valid
+  // A collection of potential FullBanking schemes that are valid, i.e. a Seq where each element is for different dimensions of the mem
   type FullBankingChoices = Seq[FullBanking]
   // A collection of AccessMatrix representing a "group" of accesses
   type SingleAccessGroup = Set[AccessMatrix]

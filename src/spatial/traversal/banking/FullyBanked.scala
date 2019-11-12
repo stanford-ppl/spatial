@@ -189,8 +189,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
             }
             if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {
               val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
-              dbgs(s"aoeu bankingIds are $bankingIds")
-              val banking: Map[AccessGroups, FullBankingChoices] = bankingIds
+              val bankingRepackaged: Map[AccessGroups, FullBankingChoices] = bankingIds
                 .map{addr: List[Int] => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}
                 .map{dup =>
                   // When repackaging rawBanking, make sure to only keep read groups whose accesses can be found in read groups of ALL other dimensions
@@ -199,15 +198,14 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
                     val others: Seq[AccessGroups] = accs.patch(i, Nil, 1)
                     dimGrp.map{ grp:SingleAccessGroup => if (others.isEmpty) grp else others.map{allDimGrps => allDimGrps.flatten}.reduce(_.intersect(_)).intersect(grp)}//.map{otherDimGrp => otherDimGrp.intersect(grp)}}} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
                   }.reduce{_++_}.filter(_.nonEmpty)
-                  dbgs(s"aoeu inspecting dup $dup, pointing $inViewAccs to ${Seq(autoFullBank) ++ dup.map(_._2.get)}")
                   inViewAccs -> (autoFullBank ++ dup.map(_._2.get))
                 }.toMap
+              // All-to-all combinations for hierarchical
+              val banking = bankingRepackaged.map{case (grps, schms) => (grps -> combs(schms.map(_.toList).toList))}.toMap
               val dimsInStrategy = view.expand().flatten.distinct
-              dbgs(s"banking is $banking")
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
-                dbgs(s"looking at all opts of $fullOpts")
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
-                val(validOpts, rejectedOpts) = fullOpts.partition { case opt => isValidBanking(opt, prunedGrps) }
+                val(validOpts, rejectedOpts) = fullOpts.partition(opt => isValidBanking(opt, prunedGrps))
                 validOpts.foreach{opt =>
                   dbgs(s"Banking scheme $opt accepted!")
                   markFound(scheme)

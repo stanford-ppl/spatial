@@ -621,7 +621,7 @@ case object AlphaRelaxed extends AlphaStrictness {
   * Setter:  sym.explicitBanking = (Seq[Int], Seq[Int], Seq[Int])
   * Default: None
   */
-case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int])) extends Data[ExplicitBanking](SetBy.User)
+case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])) extends Data[ExplicitBanking](SetBy.User)
 
 /** Flag set by the user to specify that a banking scheme must be used even if it is unsafe
   *

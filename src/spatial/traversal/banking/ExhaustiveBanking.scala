@@ -73,8 +73,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             // TODO: Figure out why this getDephasedUID is necessary?  Its logic is hard to follow but it seems like it may be doing-
             //       some kind of lookup for a uid fork point up to that point and no deeper, but I'm not sure the synch logic
             //       needs this anymore
-            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
-              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
+//            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
+//              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
+            case (iter, i) if rules.contains((iter, a.unroll)) =>
+              iter -> rules((iter, a.unroll))
           }.toMap
           if (keyRules.nonEmpty) {
             mem.addDephasedAccess(a.access);
@@ -88,7 +90,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
     def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): ArrayBuffer[Seq[SparseMatrix[Idx]]] = {
       val fullStrategy = Seq.tabulate(rank){i => i}
-      // For hierarchical views, regroup accesses based on whether their "complements" are non-interfering
+      // For hierarchical views, regroup accesses based on whether their "complements" are non-interfering AND their projection is not unique
       val grpViews = grp.map{mat => 
         val t = AccessView(dims, fullStrategy, mat)
         if (isRd) lowRankMapping += (t.activeAccess -> {lowRankMapping.getOrElse(t.activeAccess, Set()) ++ Set(mat)}) 
@@ -102,6 +104,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           var grpId = 0
           var placed = false
           while (grpId < regrp.size & !placed) {
+            val newProjection = !regrp(grpId).contains(current.activeDims)
             val canConflict = regrp(grpId).exists{other => 
               val diff = current.complementAccess - other.complementAccess
               val conflictingMatrix = diff.rows.zipWithIndex.forall{case (row, dim) => 
@@ -115,7 +118,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               }
               conflictingMatrix
             }
-            if (canConflict) {
+            if (canConflict || newProjection) {
               // dbgs(s"Placing in group $grpId")
               regrp(grpId) = regrp(grpId) ++ ArrayBuffer(current)
               placed = true
@@ -251,7 +254,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               val dimsInStrategy = view.expand().flatten.distinct
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
-                val(validOpts, rejectedOpts) = fullOpts.distinct.partition { case opt => isValidBanking(opt, prunedGrps) }
+                // TODO: Should we actually reject based on group sizes at this point?  Presumably we only landed on ones that are valid
+                //       prunedGrps also doesn't maintain projection filtering the same way selGrps did up above so it rejects valid schemes now for Gibbs
+                val(validOpts, rejectedOpts) = fullOpts.distinct.partition { case opt => true } //isValidBanking(opt, prunedGrps) }
                 validOpts.foreach{opt =>
                   dbgs(s"Banking scheme $opt accepted!")
                   markFound(scheme)

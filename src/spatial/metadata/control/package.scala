@@ -441,7 +441,6 @@ package object control {
     @stateful def iterSynchronizationInfo(leaf: Sym[_], iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
       import scala.collection.mutable.ArrayBuffer
       import spatial.util.modeling._
-      dbgs(s"synch info for $leaf $iters $baseUID $uid")
       val map = scala.collection.mutable.HashMap[Idx,Option[Int]]()
       // 1) Bundle iters/uids based on the depth of the counter chain they are part of
       val bundledIters = bundleLayers(leaf, iters, iters)

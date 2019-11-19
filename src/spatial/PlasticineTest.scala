@@ -423,7 +423,7 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"cpp2p", s"cp script_p2p script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runp2p", timeout=1000000) >>
       scommand(s"p2pstat", s"python3 bin/simstat.py".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"p2panot", s"python3 bin/annotate.py".split(" "), timeout=30, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
+      //scommand(s"p2panot", s"python3 bin/annotate.py".split(" "), timeout=30, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       (if (runhybrid)
       runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit, prefix=if(module)"" else "Top") >>
       scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>

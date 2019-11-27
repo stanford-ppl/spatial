@@ -37,6 +37,8 @@ connect_bd_net [get_bd_ports reset] [get_bd_pins SpatialIP_0/reset]
 validate_bd_design
 save_bd_design
 
+source bigIP.tcl
+
 #synth_design -mode out_of_context -top SpatialIP_v1_0
 launch_runs synth_1 -jobs 4
 wait_on_run synth_1

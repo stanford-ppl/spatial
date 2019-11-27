@@ -72,11 +72,14 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       val dimensionDuplication: Seq[RegroupDims] = RegroupHelper.regroupNone
       val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
       val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds.map{ addr => BankingOptions(Flat(rank), nStricts(addr(0)), aStricts(addr(1)), dimensionDuplication(addr(2))) }
-    
-      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
+
+      val bankings: Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
+      val oneBanking = bankings.map{case(acgrps, opts) => (acgrps -> opts.head)}
+
       if (bankings.nonEmpty) {
-        val banking = bankings.head._2
-        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)._4.head
+        val banking = bankings.head._2.head
+
+        val bankingCosts = cost(oneBanking.head._2, depth = 1, rdGroups, wrGroups)._4.head
         val ports = computePorts(rdGroups) ++ computePorts(wrGroups)
 
         Right(Seq(Instance(

@@ -17,8 +17,8 @@ case class CustomBanked()(implicit IR: State, isl: ISL) extends BankingStrategy 
     writes: Set[Set[AccessMatrix]],
     attemptDirectives: Seq[BankingOptions],
     depth: Int
-  ): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
-    Map(attemptDirectives.head -> Map(reads ++ writes -> Seq(UnspecifiedBanking(Seq.tabulate(rank){i => i}))))
+  ):  Map[BankingOptions, Map[AccessGroups, FullBankingChoices]] = {
+    Map(attemptDirectives.head -> Map(reads ++ writes -> Seq(Seq(UnspecifiedBanking(Seq.tabulate(rank){i => i})))))
   }
 
 }

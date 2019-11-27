@@ -38,11 +38,11 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   lazy val nStricts: Seq[NStrictness] = if (strategy.isInstanceOf[FullyBanked]) Seq(NRelaxed)
                                         else if (mem.explicitBanking.isDefined) Seq(UserDefinedN(mem.explicitNs))
-                                        else if (mem.nConstraints.isEmpty) Seq(NPowersOf2, NBestGuess, NRelaxed)
+                                        else if (mem.nConstraints.isEmpty) Seq(NBestGuess, NRelaxed)
                                         else mem.nConstraints
   lazy val aStricts: Seq[AlphaStrictness] = if (strategy.isInstanceOf[FullyBanked]) Seq(AlphaRelaxed)
                                             else if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas))
-                                            else if (mem.alphaConstraints.isEmpty) Seq(AlphaPowersOf2, AlphaBestGuess, AlphaRelaxed)
+                                            else if (mem.alphaConstraints.isEmpty) Seq(AlphaBestGuess, AlphaRelaxed)
                                             else mem.alphaConstraints
   lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
                                                     else if (mem.isNoFission) RegroupHelper.regroupNone
@@ -53,8 +53,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
   // Mapping from BankingOptions to its "duplicates."  Each "duplicate" contains a histogram (Seq[Int]), a Seq of auxilliary nodes (Seq[String]), and a 7-element Seq of its cost components (total, mem luts/ffs/brams, aux luts/ffs/brams) (Seq[Int])
   type DUPLICATE = (Seq[Banking], Seq[Int], Seq[String], Seq[Double])
-  val schemesInfo = scala.collection.mutable.HashMap[Int,scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]]()
-  private val latestSchemesInfo = scala.collection.mutable.HashMap[BankingOptions, Seq[DUPLICATE]]()
+  val schemesInfo = scala.collection.mutable.HashMap[Int,scala.collection.mutable.HashMap[(BankingOptions, Int), Seq[DUPLICATE]]]()
+  private val latestSchemesInfo = scala.collection.mutable.HashMap[(BankingOptions,Int), Seq[DUPLICATE]]()
 
   def configure(): Unit = {
     dbg(s"---------------------------------------------------------------------")
@@ -630,28 +630,33 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val attemptDirectives = goodSameDirectives ++ goodDiffDirectives ++ badDirectives
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
-    val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
+    val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
         latestSchemesInfo.clear()
         ctrlTree((reads ++ writes).map(_.access)).foreach{x => dbgs(x) }
         dbgs(s"**************************************************************************************")
-        dbgs(s"Analyzing costs for ${bankings.toList.size} banking schemes found for ${mem.fullname}")
-        val costs: Map[BankingOptions, Double] = bankings.map{case (scheme, banking) => 
-          dbgs(s"Scheme $scheme:")
-          val c = banking.toList.zipWithIndex.map{case ((rds, b),i) => 
-            dbgs(s"  - ${rds.map(_.size).sum} readers connect to duplicate #$i (${b})")
-            val dup = cost(b,depth,rds,reachingWrGroups)
-            latestSchemesInfo += (scheme -> {latestSchemesInfo.getOrElse(scheme, Seq()) ++ Seq(dup)})
-            dup._4.head
-          }.sum
-          scheme -> c
+        dbgs(s"Analyzing costs for banking schemes found for ${mem.fullname}")
+        val costs: Map[(BankingOptions,Int), Double] = bankings.flatMap{case (scheme, banking) =>
+          val expanded_costs: List[List[Double]] = banking.toList.zipWithIndex.map { case ((rds, opts), inst) => // Cost for each option over all dups
+            opts.zipWithIndex.map { case (opt, optId) => // Cost for each option in this dup
+              dbgs(s"Scheme $scheme option $optId instance $inst:")
+              dbgs(s"  - ${rds.map(_.size).sum} readers connect to duplicate #$inst (${opt})")
+              val dup = cost(opt, depth, rds,  reachingWrGroups)
+              latestSchemesInfo += ((scheme,optId)-> {
+                latestSchemesInfo.getOrElse((scheme,optId), Seq()) ++ Seq(dup)
+              })
+              dup._4.head
+            }.toList
+          }
+          val costs_per_option: List[Double] = expanded_costs.reduce[List[Double]]{case (a: List[Double],b: List[Double]) => a.zip(b).map{case (a,b) => a+b}}
+          costs_per_option.zipWithIndex.map{case (c, j) => ((scheme,j) -> c)}.toMap
         }
         dbgs(s"***** Cost summary *****")
-        bankings.foreach{case (scheme,banking) => dbgs(s"Cost: ${costs(scheme)} for $scheme")}
+        bankings.foreach{case (scheme,banking) => banking.head._2.zipWithIndex.foreach{ case (b,optId) => dbgs(s"Cost: ${costs((scheme,optId))} for version $optId of $scheme")}}
         dbgs(s"**************************************************************************************")
-        val winningScheme = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
-        val winner = bankings(winningScheme._1)
+        val winningScheme: ((BankingOptions, Int), Double) = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
+        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map{case (acgrp, opts) => (acgrp -> opts(winningScheme._1._2))}.toMap
         Right(
           winner.map{case (winningRdGrps, winningBanking) => 
             val padding = mem.stagedDims.map(_.toInt).zip(winningBanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}

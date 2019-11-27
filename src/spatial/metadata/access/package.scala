@@ -247,7 +247,7 @@ package object access {
 
   @stateful def getDephasedUID(iters: Iterable[Idx], fullUID: Seq[Int], position: Int): Seq[Int] = {
     val pomMask = iters.map{i => i.parent.s.get.willUnrollAsPOM}.toSeq
-    pomMask.zipWithIndex.collect{case (take,i) if (i < position || take) => fullUID(i)}
+    pomMask.zipWithIndex.collect{case (take,i) if i < position || take => fullUID(i)}
   }
 
   /** Generate replacement rules for access a relative to access b */

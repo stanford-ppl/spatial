@@ -73,7 +73,6 @@ object ModBanking {
   def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
 }
 
-
 /** Helper structure for holding metadata for buffer ports
   * The mux port is the time multiplexed slot the associated access has in reference to all other accesses
   * on the same port occurring at the same time.
@@ -514,18 +513,18 @@ case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends Banki
 
 /** Enumeration of how to search for possible number of banks */
 sealed trait NStrictness extends SearchPriority {
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
   def isRelaxed: Boolean
 }
 case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
   @stateful def P = 9
   def isRelaxed = false
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
   @stateful def P = 1
   def isRelaxed = false
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
 }
 case object NBestGuess extends NStrictness {
   @stateful def P = 0
@@ -540,14 +539,15 @@ case object NBestGuess extends NStrictness {
     list
   }
 
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = { 
-    (numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product)).filter{x => x <= max && x >= min}.distinct.sorted
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = {
+    val pow2 = Seq.tabulate(max-min){i => i}.collect{case i if isPow2(i) || isMersenne(i) || withinNOfMersenne(spatialConfig.mersenneRadius, i).isDefined => i}
+    (numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product) ++ pow2).filter{x => x <= max && x >= min}.distinct.sorted
   }
 }
 case object NRelaxed extends NStrictness {
   @stateful def P = 2
   def isRelaxed = true
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
 }
 
 /** Enumeration of how to search for possible alpha vectors
@@ -601,8 +601,10 @@ case object AlphaBestGuess extends AlphaStrictness {
     val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product).uniqueModN(N)
     val dimBased = Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N).uniqueModN(N)
     val coprimes = Seq.tabulate(N){i => i}.collect{case i if coprime(Seq(i,N)) => i}
-    val possibleAs = (List(0,1) ++ accessBased ++ dimBased ++ coprimes).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank)
+    val pow2OrEasy = Seq.tabulate(N){i => i}.collect{case i if isPow2(i) || isSumOfPow2(i) => i}
+    val possibleAs = (List(0,1) ++ pow2OrEasy ++ accessBased ++ dimBased ++ coprimes).filter{x => x >= 0 && x <= N}
+    val combos = selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.sortBy(_.sum).toIterator // Should find a better way to get distinct
+    combos
   }
 }
 case object AlphaRelaxed extends AlphaStrictness {
@@ -610,7 +612,7 @@ case object AlphaRelaxed extends AlphaStrictness {
   def isRelaxed = true
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank)
+    selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.toIterator
   }
 }
 
@@ -620,7 +622,7 @@ case object AlphaRelaxed extends AlphaStrictness {
   * Setter:  sym.explicitBanking = (Seq[Int], Seq[Int], Seq[Int])
   * Default: None
   */
-case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int])) extends Data[ExplicitBanking](SetBy.User)
+case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])) extends Data[ExplicitBanking](SetBy.User)
 
 /** Flag set by the user to specify that a banking scheme must be used even if it is unsafe
   *

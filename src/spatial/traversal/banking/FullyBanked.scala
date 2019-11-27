@@ -24,13 +24,13 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
   // Mapping to keep track of which AccessMatrix is rewritten as which
   private val accMatrixMapping = scala.collection.mutable.HashMap[AccessMatrix, AccessMatrix]()
   // Mapping te keep track of which rewritten AccessMatrix corresponds to which SparseMatrix for proper re-bundling after computing banking
-  private val sparseMatrixMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], Set[AccessMatrix]]()
+  private val sparseMatrixMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], SingleAccessGroup]()
   // Mapping te keep track of which read SparseMatrix slices rewritten as low rank corresponds to which original full-rank read SparseMatrix
   private val lowRankMapping = scala.collection.mutable.HashMap[SparseMatrix[Idx], Set[SparseMatrix[Idx]]]()
   // Helper for replacing sparse matrix with its original access matrix
-  private def reverseAM(a: SparseMatrix[Idx]): Set[AccessMatrix] = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
+  private def reverseAM(a: SparseMatrix[Idx]): SingleAccessGroup = lowRankMapping(a).map(sparseMatrixMapping).flatten.map(accMatrixMapping)
   // Cache for skipping ahead to correct banking solution for patterns/axes that have already been solved
-  private val solutionCache = scala.collection.mutable.HashMap[(Set[Set[SparseMatrix[Idx]]], NStrictness, AlphaStrictness, Seq[Int]), Option[ModBanking]]()
+  private val solutionCache = scala.collection.mutable.HashMap[(Set[Set[SparseMatrix[Idx]]], NStrictness, AlphaStrictness, Seq[Int]), Option[FullBanking]]()
   // Map for tracking which kinds of schemes already have a solution, used depending on what the banking effort is set to.  Tracks BankingView and RegroupDims
   private val schemesFoundCount = scala.collection.mutable.HashMap[(BankingView,RegroupDims), Int]()
 
@@ -46,14 +46,14 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
     writes: Set[Set[AccessMatrix]],
     attemptDirectives: Seq[BankingOptions],
     depth: Int
-  ): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
+  ):  Map[BankingOptions, Map[AccessGroups, FullBankingChoices]] = {
 
     // Generate substitution rules for each iter for each uid.  Given iter and its uid, generate a rule to replace it with a new iter and an offset to include in the access patterns c column
-    def generateSubstRules(accs: Set[Set[AccessMatrix]]): scala.collection.immutable.Map[(Idx,Seq[Int]),(Idx,Int)] = {
-      val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.map{a => dephasingIters(a,Seq.fill(a.unroll.size)(0),mem)}.flatten.toMap
+    def generateSubstRules(accs: AccessGroups): scala.collection.immutable.Map[(Idx,Seq[Int]),(Idx,Int)] = {
+      val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.flatMap { a => dephasingIters(a, Seq.fill(a.unroll.size)(0), mem) }.toMap
       toRewrite.map {
-        case ((i, addr), ofs) if (ofs.isDefined) => ((i, addr) -> (i, ofs.get))
-        case ((i, addr), ofs) if (!ofs.isDefined) => ((i, addr) -> (boundVar[I32], 0))
+        case ((i, addr), ofs) if ofs.isDefined => (i, addr) -> (i, ofs.get)
+        case ((i, addr), ofs) if !ofs.isDefined => (i, addr) -> (boundVar[I32], 0)
       }.toMap
     }
     def rewriteAccesses(accs: Set[Set[AccessMatrix]], rules: Map[(Idx,Seq[Int]),(Idx,Int)]): Set[Set[AccessMatrix]] = accs.map { grp =>
@@ -120,7 +120,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
       }
     }
 
-    def findSchemes(myReads: Set[Seq[SparseMatrix[Idx]]], myWrites: Set[Seq[SparseMatrix[Idx]]], hostReads: Set[AccessMatrix]): Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Banking]]] = {
+    def findSchemes(myReads: Set[Seq[SparseMatrix[Idx]]], myWrites: Set[Seq[SparseMatrix[Idx]]], hostReads: Set[AccessMatrix]): Map[BankingOptions, Map[AccessGroups, FullBankingChoices]] = {
       val effort = mem.bankingEffort
       schemesFoundCount.clear()
       def markFound(scheme: BankingOptions): Unit = {
@@ -148,7 +148,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
       if (mem.isSingleton) {
         if (myWrites.exists(_.size > 1) && !mem.shouldIgnoreConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
-        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i}))))
+        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i})))))
       }
       else {
         attemptDirectives.flatMap{case scheme@BankingOptions(view, nStricts, aStricts, regroup) =>
@@ -164,8 +164,8 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
               *
               *   To convert to "banking," we want to take one entry from each Map and call it a new duplicate
               */
-            val autoFullBank: Seq[ModBanking] = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))} else Seq()
-            val rawBanking: Seq[Map[Set[Set[AccessMatrix]], Option[ModBanking]]] = view.expand().map{axes =>
+            val autoFullBank: Seq[Seq[ModBanking]] = if (view.complementView.nonEmpty) Seq(view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))}) else Seq()
+            val rawBanking: Seq[Map[AccessGroups, Option[PartialBankingChoices]]] = view.expand().map{axes =>
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
               val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else myWrites.map(_.toSet)
@@ -176,7 +176,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
                 grp.foreach{matrix => dbgss("    ", matrix.toString) }
               }
               // If only 1 acc left per group, Unit banking, otherwise search
-              val axisBankingScheme: Option[ModBanking] = {
+              val axisBankingScheme: Option[PartialBankingChoices] = {
                 if (solutionCache.contains((selGrps, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${selGrps.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job! (scheme ${solutionCache.get((selGrps, nStricts, aStricts, axes))})")
                 solutionCache.getOrElseUpdate((selGrps, nStricts, aStricts, axes), {
                   findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
@@ -189,32 +189,35 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
             }
             if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {
               val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
-              val banking: Map[Set[Set[AccessMatrix]], Seq[ModBanking]] = bankingIds
-                .map{addr => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}
+              val bankingRepackaged: Map[AccessGroups, FullBankingChoices] = bankingIds
+                .map{addr: List[Int] => addr.zipWithIndex.map{case (i,j) => rawBanking(j).toList(i)}}
                 .map{dup =>
                   // When repackaging rawBanking, make sure to only keep read groups whose accesses can be found in read groups of ALL other dimensions
-                  val accs: Seq[Set[Set[AccessMatrix]]] = dup.map(_._1.filter(_.nonEmpty)).toSeq
-                  val inViewAccs: Set[Set[AccessMatrix]] = accs.zipWithIndex.map{ case (dimGrp:Set[Set[AccessMatrix]],i:Int) =>
-                    val others: Seq[Set[Set[AccessMatrix]]] = accs.patch(i, Nil, 1)
-                    dimGrp.map{ grp:Set[AccessMatrix] => if (others.isEmpty) grp else others.map{allDimGrps => allDimGrps.flatten}.reduce(_.intersect(_)).intersect(grp)}//.map{otherDimGrp => otherDimGrp.intersect(grp)}}} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
+                  val accs: Seq[AccessGroups] = dup.map(_._1.filter(_.nonEmpty))
+                  val inViewAccs: AccessGroups = accs.zipWithIndex.map{ case (dimGrp:AccessGroups,i:Int) =>
+                    val others: Seq[AccessGroups] = accs.patch(i, Nil, 1)
+                    dimGrp.map{ grp:SingleAccessGroup => if (others.isEmpty) grp else others.map{allDimGrps => allDimGrps.flatten}.reduce(_.intersect(_)).intersect(grp)}//.map{otherDimGrp => otherDimGrp.intersect(grp)}}} //if grp.forall{ac => others.forall{dg => dg.flatten.contains(ac)}} => grp}
                   }.reduce{_++_}.filter(_.nonEmpty)
-                  (inViewAccs -> (autoFullBank ++ dup.map(_._2.get)))
+                  inViewAccs -> (autoFullBank ++ dup.map(_._2.get))
                 }.toMap
+              // All-to-all combinations for hierarchical
+              val banking = bankingRepackaged.map{case (grps, schms) => (grps -> combs(schms.map(_.toList).toList))}.toMap
               val dimsInStrategy = view.expand().flatten.distinct
-              if (banking.forall{case (accs, banks) =>
-                          val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map{grp => grp.map{mat => mat.sliceDims(dimsInStrategy)}.toSeq.distinct}
-                          isValidBanking(banks, prunedGrps)
-                        }) {
-                // dbgs(s"Dim-based (raw) banking $rawBanking")
-                // dbgs(s"Duplicate-based (assembled) banking $banking")
-                dbgs(s"Banking scheme ${banking.map(_._2)} accepted!")
-                markFound(scheme)
-                Some((scheme -> banking))
+              val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
+                val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
+                val(validOpts, rejectedOpts) = fullOpts.partition(opt => isValidBanking(opt, prunedGrps))
+                validOpts.foreach{opt =>
+                  dbgs(s"Banking scheme $opt accepted!")
+                  markFound(scheme)
+                }
+                rejectedOpts.foreach { opt =>
+                  dbgs(s"Banking scheme $opt rejected because it was deemed invalid!")
+                }
+                if (validOpts.nonEmpty) { Some(accs -> validOpts) }
+                else { None }
               }
-              else {
-                dbgs(s"Computed banking for $scheme is invalid!")
-                None
-              }
+              if (validBanking.nonEmpty) { Some(scheme -> validBanking) }
+              else None
             } else {
               dbgs(s"Could not find valid solution for $scheme!")
               None
@@ -257,11 +260,11 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
     }
 
     // Step 2: Find schemes for these grps
-    findSchemes(newReads, newWrites, hostReads.toSet)
+    findSchemes(newReads, newWrites, hostReads.toSet.asInstanceOf[SingleAccessGroup])
   }
 
   /** True if this is a valid banking strategy for the given sets of access matrices. */
-  def isValidBanking(banking: Seq[ModBanking], grps: Set[Seq[SparseMatrix[Idx]]]): Boolean = {
+  def isValidBanking(banking: FullBanking, grps: Set[Seq[SparseMatrix[Idx]]]): Boolean = {
     // TODO[2]: This may not be correct in all cases, need to verify!
     val banks = banking.map(_.nBanks).product
     grps.forall{a => a.toList.lengthLessThan(banks+1)}
@@ -269,12 +272,12 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
 
   private def computeP(n: Int, b: Int, alpha: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Seq[Int] = stagedDims
 
-  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Option[ModBanking] = {
+  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Option[PartialBankingChoices] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
     val N = filteredStagedDims.head // Should only have this strategy if banking hierarchically
     val numChecks = 1
     val rank = axes.length
-    if (checkCyclic(N, Seq(1), grps)) Option(ModBanking.Simple(N, axes, 1))
+    if (checkCyclic(N, Seq(1), grps)) Option(Seq(ModBanking.Simple(N, axes, 1)))
     else None
   }
 

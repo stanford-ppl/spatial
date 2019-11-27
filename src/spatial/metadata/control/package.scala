@@ -457,7 +457,7 @@ package object control {
       // 2) For each layer, determine iterOfs based on the uids of this layer and forking of parent layers
       while (layer < bundledIters.size && !foundRandomLayer) {
         val ctrl = controlChain(layer)
-        val liters = bundledIters(layer)
+        val liters = bundledIters(layer) // Iterators in the same layer as this fork (i.e. same cchain)
         val luid = bundledUID(layer)
         val lbase = bundledBase(layer)
         // Mark forked flags when we reach first fork, meaning every descendent from now on comes from different ancestry
@@ -478,7 +478,7 @@ package object control {
           }
           // 3.3) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
           else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
-            if ((layer + 1 < controlChain.size) && controlChain(layer+1).synchronizedStart(forkedIters ++ liters, entry = true)) liters.foreach{ iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+            if ((layer + 1 < controlChain.size) && controlChain(layer+1).synchronizedStart((forkedIters ++ liters).distinct, entry = true)) liters.foreach{ iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
             else foundRandomLayer = true
           }
         } else if (forked) {
@@ -490,7 +490,7 @@ package object control {
         firstFork = false
         layer = layer + 1
       }
-      dbgs(s"itersynch info for $leaf $iters $baseUID $uid = $map")
+      // dbgs(s"itersynch info for $leaf $iters $baseUID $uid = $map")
       map.collect{case (i, o) if o.isDefined => (i -> o.get)}.toMap
     }
 
@@ -527,12 +527,11 @@ package object control {
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], entry: Boolean): Boolean = {
       import spatial.util.modeling._
       if (isFSM || isStreamControl) false
-      else if (isSwitch) {
+      else if (isSwitch && isOuterControl) {
         val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
         val condMutators = conditions.flatMap(mutatingBounds(_))
         condMutators.intersect(forkedIters).isEmpty
       } else {
-        // TODO: Actually check if cchains vary with forkedIters
         val ctrsToDrop = if (entry) 1 else 0
         cchains.forall{cchain =>
           cchain.counters.drop(ctrsToDrop).forall{ctr => ctr.isFixed(forkedIters)}

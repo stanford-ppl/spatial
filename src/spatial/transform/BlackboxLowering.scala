@@ -6,6 +6,8 @@ import argon.transform.MutateTransformer
 import spatial.node._
 import spatial.lang._
 import spatial.traversal.AccelTraversal
+import spatial.metadata.memory._
+import spatial.util.spatialConfig
 
 case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTransformer with AccelTraversal {
 
@@ -17,6 +19,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
   }
   def expandSLA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F], b:Fix[TRUE,_16,_0]): Fix[S,I,F] = (a,b) match {
     case (_, Const(y)) => f(a) << f(b)
+    case _ if spatialConfig.enablePIR => f(a) << f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
       Foreach(abs(b.to[I32]) by 1){i =>
@@ -34,6 +37,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
   }
   def expandSRA[S:BOOL,I:INT,F:INT](a:Fix[S,I,F], b:Fix[TRUE,_16,_0]): Fix[S,I,F] = (a,b) match {
     case (_, Const(y)) => f(a) >> f(b)
+    case _ if spatialConfig.enablePIR => f(a) >> f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
       Foreach(abs(b.to[I32]) by 1){i =>
@@ -52,6 +56,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
   }
   def expandSRU[S:BOOL,I:INT,F:INT](a:Fix[S,I,F], b:Fix[TRUE,_16,_0]): Fix[S,I,F] = (a,b) match {
     case (_, Const(y)) => f(a) >>> f(b)
+    case _ if spatialConfig.enablePIR => f(a) >>> f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
       Foreach(abs(b.to[I32]) by 1){i =>
@@ -65,6 +70,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
     case op: DenseTransfer[_,_,_] if lowerTransfers => op.lower(lhs)
     case op: SparseTransfer[_,_] if lowerTransfers => op.lower(lhs)
+    case op: FrameTransmit[_,_,_] if lowerTransfers => op.lower(lhs)
     case op: FixSLA[_,_,_] if inHw => lowerSLA(op)
     case op: FixSRA[_,_,_] if inHw => lowerSRA(op)
     case op: FixSRU[_,_,_] if inHw => lowerSRU(op)

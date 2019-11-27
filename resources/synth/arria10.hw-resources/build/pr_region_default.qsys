@@ -10,7 +10,7 @@
    tool="QsysPro" />
  <parameter name="bonusData"><![CDATA[bonusData 
 {
-   element Top_0
+   element SpatialIP_0
    {
       datum _sortIndex
       {
@@ -18,7 +18,7 @@
          type = "int";
       }
    }
-   element Top_0.io_S_AVALON
+   element SpatialIP_0.io_S_AVALON
    {
       datum baseAddress
       {
@@ -121,7 +121,7 @@
                 <consumedSystemInfos>
                     <entry>
                         <key>ADDRESS_MAP</key>
-                        <value>&lt;address-map&gt;&lt;slave name='sysid.control_slave' start='0x0' end='0x8' datawidth='32' /&gt;&lt;slave name='Top_0.io_S_AVALON' start='0x200' end='0x400' datawidth='32' /&gt;&lt;/address-map&gt;</value>
+                        <value>&lt;address-map&gt;&lt;slave name='sysid.control_slave' start='0x0' end='0x8' datawidth='32' /&gt;&lt;slave name='SpatialIP_0.io_S_AVALON' start='0x200' end='0x400' datawidth='32' /&gt;&lt;/address-map&gt;</value>
                     </entry>
                     <entry>
                         <key>ADDRESS_WIDTH</key>
@@ -142,11 +142,11 @@
  <parameter name="useTestBenchNamingPattern" value="false" />
  <instanceScript></instanceScript>
  <interface name="clk" internal="clock_in.in_clk" type="clock" dir="end" />
- <interface name="io_m_axi_0" internal="Top_0.io_M_AXI_0" type="axi4" dir="start" />
+ <interface name="io_m_axi_0" internal="SpatialIP_0.io_M_AXI_0" type="axi4" dir="start" />
  <interface name="reset" internal="reset_in.in_reset" type="reset" dir="end" />
  <interface name="s0" internal="mm_bridge_0.s0" type="avalon" dir="end" />
  <module
-   name="Top_0"
+   name="SpatialIP_0"
    kind="altera_generic_component"
    version="1.0"
    enabled="1">
@@ -885,30 +885,30 @@
     </systemInfos>
 </componentDefinition>]]></parameter>
   <parameter name="generationInfoDefinition"><![CDATA[<generationInfoDefinition>
-    <hdlLibraryName>pr_region_default_Top_0</hdlLibraryName>
+    <hdlLibraryName>pr_region_default_SpatialIP_0</hdlLibraryName>
     <fileSets>
         <fileSet>
-            <fileSetName>pr_region_default_Top_0</fileSetName>
-            <fileSetFixedName>pr_region_default_Top_0</fileSetFixedName>
+            <fileSetName>pr_region_default_SpatialIP_0</fileSetName>
+            <fileSetFixedName>pr_region_default_SpatialIP_0</fileSetFixedName>
             <fileSetKind>QUARTUS_SYNTH</fileSetKind>
             <fileSetFiles/>
         </fileSet>
         <fileSet>
-            <fileSetName>pr_region_default_Top_0</fileSetName>
-            <fileSetFixedName>pr_region_default_Top_0</fileSetFixedName>
+            <fileSetName>pr_region_default_SpatialIP_0</fileSetName>
+            <fileSetFixedName>pr_region_default_SpatialIP_0</fileSetFixedName>
             <fileSetKind>SIM_VERILOG</fileSetKind>
             <fileSetFiles/>
         </fileSet>
         <fileSet>
-            <fileSetName>pr_region_default_Top_0</fileSetName>
-            <fileSetFixedName>pr_region_default_Top_0</fileSetFixedName>
+            <fileSetName>pr_region_default_SpatialIP_0</fileSetName>
+            <fileSetFixedName>pr_region_default_SpatialIP_0</fileSetFixedName>
             <fileSetKind>SIM_VHDL</fileSetKind>
             <fileSetFiles/>
         </fileSet>
     </fileSets>
 </generationInfoDefinition>]]></parameter>
   <parameter name="hlsFile" value="" />
-  <parameter name="logicalView">ip/pr_region_default/pr_region_default_Top_0.ip</parameter>
+  <parameter name="logicalView">ip/pr_region_default/pr_region_default_SpatialIP_0.ip</parameter>
   <parameter name="moduleAssignmentDefinition"><![CDATA[<assignmentDefinition>
     <assignmentValueMap/>
 </assignmentDefinition>]]></parameter>
@@ -2880,7 +2880,7 @@
    kind="avalon"
    version="17.1"
    start="mm_bridge_0.m0"
-   end="Top_0.io_S_AVALON">
+   end="SpatialIP_0.io_S_AVALON">
   <parameter name="baseAddress" value="0x0200" />
  </connection>
  <connection
@@ -2910,7 +2910,7 @@
    kind="clock"
    version="17.1"
    start="clock_in.out_clk"
-   end="Top_0.clock" />
+   end="SpatialIP_0.clock" />
  <connection
    kind="reset"
    version="17.1"
@@ -2925,7 +2925,7 @@
    kind="reset"
    version="17.1"
    start="reset_in.out_reset"
-   end="Top_0.reset" />
+   end="SpatialIP_0.reset" />
  <connection
    kind="reset"
    version="17.1"

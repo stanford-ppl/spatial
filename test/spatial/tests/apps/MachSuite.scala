@@ -866,7 +866,7 @@ import utils.io.files._
       Foreach(length+1 by 1 par row_par){ r =>
 
         // If running multiple rows in parallel, ensure a later row does not scan an element until previous row has populated it
-        val this_body = r % row_par
+        val this_body = (r % row_par)*2
 
         // Compute cost for each element in row
         Sequential.Foreach(-this_body until length+1 by 1) { c =>
@@ -1896,6 +1896,7 @@ import utils.io.files._
           shifted := s(a_indx) // TODO: Allow just s(a_indx) >> exp syntax
           // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
           Foreach(exp by 1) { k => shifted := shifted.value >> 1}
+          // val shifted = s(a_indx) >> exp
           val bucket_indx = (shifted.value & 0x03)*NUM_BLOCKS + blockID + 1
           // println(" hist bucket(" + bucket_indx + ") = " + bucket_sram(bucket_indx) + " + 1")
           // println(r"shifted started with ${s(a_indx)} (from ${a_indx}), now is ${shifted.value}, + $blockID")

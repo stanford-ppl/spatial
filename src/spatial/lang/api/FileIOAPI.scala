@@ -69,19 +69,27 @@ trait FileIOAPI { this: Implicits =>
   /** Writes the given Array to the file at `filename` using the given `delimiter`.
     * If no delimiter is given, defaults to comma.
     **/
-  @api def writeCSV1D[T:Type](array: Tensor1[T], filename: Text, delim: Text = Text(",")): Void = {
+  @api def writeCSV1D[T:Type](array: Tensor1[T], filename: Text, delim: Text = Text(","), format:Option[String]=None): Void = {
     val file = openCSV(filename, write = true)
-    writeTokens(file, delim, array.length){i => array(i).toText }
+    writeTokens(file, delim, array.length){i => array(i) match {
+      case e:Fix[_,_,_] => e.toText(format)
+      case e:Flt[_,_] => e.toText(format)
+      case e => e.toText
+    } }
     closeCSV(file)
   }
 
   /** Writes the given Tensor2 to the file at `filename` using the given element delimiter.
     * If no element delimiter is given, defaults to comma.
     **/
-  @api def writeCSV2D[T:Type](matrix: Tensor2[T], filename: Text, delim1: Text = Text(","), delim2: Text = Text("\n")): Void = {
+  @api def writeCSV2D[T:Type](matrix: Tensor2[T], filename: Text, delim1: Text = Text(","), delim2: Text = Text("\n"), format:Option[String]=None): Void = {
     val file = openCSV(filename, write = true)
     Foreach(0 until matrix.rows){ i =>
-      writeTokens(file, delim1, matrix.cols){j => matrix(i,j).toText }
+      writeTokens(file, delim1, matrix.cols){j => matrix(i,j) match {
+        case e:Fix[_,_,_] => e.toText(format)
+        case e:Flt[_,_] => e.toText(format)
+        case e => e.toText
+      } }
       writeTokens(file, delim2, 1){_ => Text("") }
     }
     closeCSV(file)

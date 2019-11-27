@@ -10,6 +10,8 @@ all: hw sw
 	tar -czf TopVCS.tar.gz -C verilog-vcs accel.bit.bin -C ../cpp Top
 
 help:
+	@echo "------- INFO -------"
+	@echo "export FRINGELESS=1 # do not compile Fringe module into SpatialIP.v"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make             : VCS SW + HW build"
 	@echo "make hw          : Build Chisel for VCS"
@@ -32,8 +34,13 @@ sw:
 
 hw:
 	echo "$$(date +%s)" > start.log
-	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi 
-	sbt "runMain top.Instantiator --verilog --testArgs vcs"
+	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
+ifeq ($(FRINGELESS),1)
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs fringeless";
+	mv verilog-fringeless verilog-vcs
+else
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs vcs"
+endif
 	cp -r vcs.hw-resources/* verilog-vcs
 	touch in.txt
 	make -C verilog-vcs

@@ -63,19 +63,19 @@ aws-sim-hw:
 	# ----------------------------------------------------------------------------
 	rm -rf ${AWS_V_SIM_DIR}
 	# First use chisel to create the verilog
-	sbt "runMain top.Instantiator --verilog --testArgs aws-sim"
-	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/Top.v
-	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/Top.v
-	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/Top.v; \
-	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${AWS_V_DIR}/Top.v; \
-	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/Top.v; \
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs aws-sim"
+	cat aws.hw-resources/SRAMVerilogSim.v >> ${AWS_V_SIM_DIR}/SpatialIP.v
+	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_SIM_DIR}/SpatialIP.v
+	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
+	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
+	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
     fi; fi; fi;
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}
 	# Add all the static design files
 	cp -f aws.sw-resources/design/* $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
-	cp -f ${AWS_V_SIM_DIR}/Top.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
+	cp -f ${AWS_V_SIM_DIR}/SpatialIP.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
 	# Run a script to put design together
 	python aws.sw-resources/gen_aws_design.py $(AWS_HOME)/hdk/cl/examples/${app_name}
 	# ----------------------------------------------------------------------------
@@ -104,16 +104,16 @@ aws-F1-hw:
 	# ----------------------------------------------------------------------------
 	rm -rf ${AWS_V_DIR}
 	# First use chisel to create the verilog
-	sbt "runMain top.Instantiator --verilog --testArgs aws"
-	cat aws.hw-resources/SRAMVerilogAWS.v >> ${AWS_V_DIR}/Top.v
-	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_DIR}/Top.v
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs aws"
+	cat aws.hw-resources/SRAMVerilogAWS.v >> ${AWS_V_DIR}/SpatialIP.v
+	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_DIR}/SpatialIP.v
 	mv ${BIGIP_SCRIPT} ${AWS_V_DIR}/
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}
 	# Add all the static design files
 	cp -f aws.sw-resources/design/* $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
-	cp -f ${AWS_V_DIR}/Top.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
+	cp -f ${AWS_V_DIR}/SpatialIP.v $(AWS_HOME)/hdk/cl/examples/${app_name}/design/
 	# Run a script to put design together
 	python aws.sw-resources/gen_aws_design.py $(AWS_HOME)/hdk/cl/examples/${app_name}
 
@@ -135,11 +135,11 @@ aws-F1-afi:   aws-F1-hw
 	ln -s ${AWS_HOME}/hdk/cl/examples/${app_name}/ aws_dir
 	# NOTE: Clock recipes can be found here: https://github.com/aws/aws-fpga/blob/b4b9d74415a70f0470b02635604a34710cc1bb22/hdk/docs/clock_recipes.csv
 ifeq ($(CLOCK_FREQ_MHZ),125)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A0 -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A0 -strategy TIMING -uram_option 3 ${FOREGROUND}
 else ifeq ($(CLOCK_FREQ_MHZ),250)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A1 -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A1 -uram_option 3 ${FOREGROUND}
 else ifeq ($(CLOCK_FREQ_MHZ),5.625)
-	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A2 -uram_option 4 ${FOREGROUND}
+	cd $(AWS_HOME)/hdk/cl/examples/${app_name}/build/scripts && CL_DIR=$(AWS_HOME)/hdk/cl/examples/${app_name} bash aws_build_dcp_from_cl.sh -clock_recipe_a A2 -uram_option 3 ${FOREGROUND}
 else
 	$(error Invalid CLOCK_FREQ_MHZ ${CLOCK_FREQ_MHZ})
 endif
@@ -152,16 +152,16 @@ endif
 	echo "#!/bin/bash"												                                                 > create_spatial_AFI_instructions.sh
 	echo "# Instructions to upload bitstream to S3 and create AFI"                                                  >> create_spatial_AFI_instructions.sh
 	echo "cd $(AWS_HOME)/hdk/cl/examples/${app_name}"                                                               >> create_spatial_AFI_instructions.sh
-	echo "aws s3 mb s3://${app_name}_$(timestamp)_bucket  --region us-east-1"                                       >> create_spatial_AFI_instructions.sh
-	echo "aws s3 mb s3://${app_name}_$(timestamp)_bucket/dcp 2>&1 | tee log"                                             >> create_spatial_AFI_instructions.sh
+	echo "aws s3 mb s3://${app_name}-$(timestamp)-bucket  --region us-east-1"                                       >> create_spatial_AFI_instructions.sh
+	echo "aws s3 mb s3://${app_name}-$(timestamp)-bucket/dcp 2>&1 | tee log"                                             >> create_spatial_AFI_instructions.sh
 	echo "too_many_buckets=\`cat log | grep TooManyBuckets | wc -l\`"							                        >> create_spatial_AFI_instructions.sh                 								
 	echo "if [[ \$${too_many_buckets} -ne 0 ]]; then echo \"Too many buckets error.  Delete some in S3\"; exit 1; fi" >> create_spatial_AFI_instructions.sh 
-	echo "aws s3 cp build/checkpoints/to_aws/*.Developer_CL.tar s3://${app_name}_$(timestamp)_bucket/dcp/ | tee log" >> create_spatial_AFI_instructions.sh
+	echo "aws s3 cp build/checkpoints/to_aws/*.Developer_CL.tar s3://${app_name}-$(timestamp)-bucket/dcp/ | tee log" >> create_spatial_AFI_instructions.sh
 	echo "tarname=\`cat log | grep \"Developer_CL.tar\" -m 1 | rev | cut -d/ -f1 | rev\`"                             >> create_spatial_AFI_instructions.sh
 	echo "if [[ -z \$$tarname ]]; then echo \"No tarname found!\"; exit 1; fi"                                          >> create_spatial_AFI_instructions.sh
-	echo "aws s3 mb s3://${app_name}_$(timestamp)_bucket/logs | tee log"                                            >> create_spatial_AFI_instructions.sh
+	echo "aws s3 mb s3://${app_name}-$(timestamp)-bucket/logs | tee log"                                            >> create_spatial_AFI_instructions.sh
 	echo "touch LOGS_FILES_GO_HERE.txt"                                                                             >> create_spatial_AFI_instructions.sh
-	echo "aws s3 cp LOGS_FILES_GO_HERE.txt s3://${app_name}_$(timestamp)_bucket/logs/ 2>&1 | tee log"                    >> create_spatial_AFI_instructions.sh
+	echo "aws s3 cp LOGS_FILES_GO_HERE.txt s3://${app_name}-$(timestamp)-bucket/logs/ 2>&1 | tee log"                    >> create_spatial_AFI_instructions.sh
 	echo ""                                                                                                         >> create_spatial_AFI_instructions.sh
 	echo "# Create the FPGA Image."                                                                                 >> create_spatial_AFI_instructions.sh
 	echo "# If this command fails, you may need a different awscli version. We tested with version 1.11.78."        >> create_spatial_AFI_instructions.sh
@@ -169,8 +169,8 @@ endif
 	echo "#            e.g. replace <tarball-name> with 17_10_06-######.Developer_CL.tar."                          >> create_spatial_AFI_instructions.sh
 	echo "aws ec2 create-fpga-image \\"                                                                             >> create_spatial_AFI_instructions.sh
 	echo "--name ${app_name} \\"                                                                                    >> create_spatial_AFI_instructions.sh
-	echo "--input-storage-location Bucket=${app_name}_$(timestamp)_bucket,Key=dcp/\$$tarname \\"                     >> create_spatial_AFI_instructions.sh
-	echo "--logs-storage-location Bucket=${app_name}_$(timestamp)_bucket,Key=logs/ | tee fpgaIds"                   >> create_spatial_AFI_instructions.sh
+	echo "--input-storage-location Bucket=${app_name}-$(timestamp)-bucket,Key=dcp/\$$tarname \\"                     >> create_spatial_AFI_instructions.sh
+	echo "--logs-storage-location Bucket=${app_name}-$(timestamp)-bucket,Key=logs/ | tee fpgaIds"                   >> create_spatial_AFI_instructions.sh
 	echo ""                                                                                                         >> create_spatial_AFI_instructions.sh
 	echo "# Keep a record of the afi and agfi IDs returned above."                                                  >> create_spatial_AFI_instructions.sh
 	echo "# Now wait for the logs to be created in S3. The State file should indicate that the AFI is available"    >> create_spatial_AFI_instructions.sh

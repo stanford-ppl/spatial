@@ -23,7 +23,7 @@ import spatial.node._
       def fillSRAM(s: SRAM1[Int]): Unit = Foreach(s.size by 1){i => s(i) = i}
 
       // All controllers are synchronized and happy
-      val sram1 = SRAM[Int](16*16)
+      val sram1 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram1)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -34,7 +34,7 @@ import spatial.node._
       }
 
       // LAYERC_STAGE0 causes c0 to be non-synchronized (even if STAGE0 and STAGE1 were swapped, since LAYERB is a loop)
-      val sram2 = SRAM[Int](16*16)  // Must duplicate for each lane of LAYERA (P1 duplicates)
+      val sram2 = SRAM[Int](16*16).axesfission(Seq(Seq()))  // Must duplicate for each lane of LAYERA (P1 duplicates)
       fillSRAM(sram2)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -45,7 +45,7 @@ import spatial.node._
       }
 
       // All controllers are synchronized.  Even though LAYERB has uid-variant runtime, LAYERA unrolls it as MoP and variance is in outermost iter
-      val sram3 = SRAM[Int](16*16)
+      val sram3 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram3)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -56,7 +56,7 @@ import spatial.node._
       }
 
       // No controllers are synchronized, because LAYERA unrolls as PoM and LAYERB causes uid-variant runtime
-      val sram4 = SRAM[Int](16*16) // Must duplicate for each lane of LAYERA and LAYERC_STAGE1 (P1*P2 duplicates)
+      val sram4 = SRAM[Int](16*16).axesfission(Seq(Seq())) // Must duplicate for each lane of LAYERA and LAYERC_STAGE1 (P1*P2 duplicates)
       fillSRAM(sram4)
       'LAYERA.Pipe.POM.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -67,7 +67,7 @@ import spatial.node._
       }
 
       // All controllers are synchronized, but LAYERC_STAGE1 iters of uid(a0)=1 are offset by 1 (mop unrolling of LAYERA)
-      val sram5 = SRAM[Int](16*16)
+      val sram5 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram5)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -76,7 +76,7 @@ import spatial.node._
       }
 
       // No controllers are synchronized, because of unknow Fork injected into the hierarchy
-      val sram6 = SRAM[Int](16*16)
+      val sram6 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram6) // Must duplicate for each lane of LAYERA (P1 duplicates), but LAYERC_STAGE1 is synchronized for each unrolled body
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -87,7 +87,7 @@ import spatial.node._
       }
 
       // All controllers are synchronized, even though there is a branch, because it is forked-iter invariant
-      val sram7 = SRAM[Int](16*16)
+      val sram7 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram7)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -98,7 +98,7 @@ import spatial.node._
       }
 
       // No controllers are synchronized, because of unknow Fork injected into the hierarchy
-      val sram8 = SRAM[Int](16*16)
+      val sram8 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram8) // Must duplicate for each lane of LAYERA (P1 duplicates), but LAYERC_STAGE1 is synchronized for each unrolled body
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -110,7 +110,7 @@ import spatial.node._
       }
 
       // No controllers are synchronized, because of unknow Fork injected into the hierarchy
-      val sram9 = SRAM[Int](16*16)
+      val sram9 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram9) // Must duplicate for each lane of LAYERA and LAYERC_STAGE1 (P1*P2 duplicates)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -125,7 +125,7 @@ import spatial.node._
       }
 
       // Controllers branching from LAYERC_STAGE1 are unsynchronized, because of unknow Fork injected into the hierarchy
-      val sram10 = SRAM[Int](16*16)
+      val sram10 = SRAM[Int](16*16).axesfission(Seq(Seq()))
       fillSRAM(sram10) // Must duplicate for each lane of LAYERC_STAGE1 (P2 duplicates)
       'LAYERA.Foreach(16 by 1 par P1, 4 by 1){(a0, a1) => 
         val start = a0 % P1
@@ -144,7 +144,6 @@ import spatial.node._
 
     assert(true)
   }
-
 
   override def checkIR(block: Block[_]): Result = {
     val sram1_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram1_")  => sram }.size
@@ -172,4 +171,31 @@ import spatial.node._
     super.checkIR(block)
   }
 
+}
+
+
+@spatial class SynchronizedButRandomOffset extends SpatialTest {
+ def main(args: Array[String]): Unit = {
+     Accel {
+      val sram = SRAM[Int](32)
+      Foreach(32 by 1) { i => sram(i) = i}
+      Foreach ( 32 by 1 par 2) { i =>
+        val start = mux(i > 16, 0, 8)
+        val end = mux(i > 16, 16, 24)
+        Foreach ( start until end par 4) { j => // This is synchronized but the offset for j between lanes 0 and 1 of i is random
+          println(sram(j))
+        }
+      }
+     }
+     println("This app only needs to check the IR for two SRAMNews")
+     assert(true)
+  }
+
+  override def checkIR(block: Block[_]): Result = {
+    val sram1_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) => sram }.size
+
+    require(sram1_count ==  2, "Should only have 2 duplicate of sram")
+
+    super.checkIR(block)
+  }
 }

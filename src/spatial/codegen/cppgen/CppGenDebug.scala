@@ -8,8 +8,16 @@ import spatial.node._
 trait CppGenDebug extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case FixToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
-    case FltToText(x) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
+    case FixToText(x, None) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
+    case FltToText(x, None) => emit(src"${lhs.tp} $lhs = std::to_string($x);")
+    case FixToText(x, Some(format)) => 
+      emit(src"char ${lhs}_char[100];")
+      emit(src"""sprintf(${lhs}_char, "${format}", $x);""")
+      emit(src"${lhs.tp} $lhs(${lhs}_char);")
+    case FltToText(x, Some(format)) => 
+      emit(src"char ${lhs}_char[100];")
+      emit(src"""sprintf(${lhs}_char, "${format}", $x);""")
+      emit(src"${lhs.tp} $lhs(${lhs}_char);")
     case CharArrayToText(array) => 
         emit(src"""${lhs.tp} $lhs;""")
         open(src"""for (int ${lhs}_i = 0; ${lhs}_i < (*${array}).size(); ${lhs}_i ++){""")

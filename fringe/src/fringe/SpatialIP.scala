@@ -2,25 +2,24 @@ package fringe
 
 import chisel3._
 
-abstract class TopInterface extends Bundle {
-  // Host scalar interface
+/** Host scalar interface.  Other targets extend this interface and add relevent ports to the external fabric */
+abstract class SpatialIPInterface extends Bundle {
   var raddr = Input(UInt(1.W))
   var wen  = Input(Bool())
   var waddr = Input(UInt(1.W))
   var wdata = Input(Bits(1.W))
   var rdata = Output(Bits(1.W))
-  // val is_enabled = Output(Bool())
 }
 
 /** Top module including Fringe and Accel (see target specific for fringe <-> accel connections)
   * @param targetName The name of the target architecture
-  * @param accelGen Delayed creation of AccelTop
+  * @param accelGen Delayed creation of AccelUnit
   */
-class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
-
+class SpatialIP(targetName: String, accelGen: () => AbstractAccelUnit) extends Module {
   globals.target = targetName match {
     case "verilator" => new targets.verilator.Verilator
     case "vcs"  | "VCS"       => new targets.vcs.VCS
+    case "fringeless"        => new targets.FringelessTarget
     case "xsim"      => new targets.xsim.XSim
     case "aws"  | "AWS_F1"     => new targets.aws.AWS_F1
     case "cxp"  | "CXP"     => new targets.cxp.CXP
@@ -37,6 +36,6 @@ class Top(targetName: String, accelGen: () => AbstractAccelTop) extends Module {
   globals.target.makeIO = { x: Data => IO(x) }
   val accel = accelGen()
   accel.io <> DontCare
-  val io = globals.target.topInterface(reset, accel)
+  val io = globals.target.addFringeAndCreateIP(reset, accel)
 
 }

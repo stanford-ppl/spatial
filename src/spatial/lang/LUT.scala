@@ -163,10 +163,38 @@ object LUT {
 
 }
 
+object FileLUT {
+  /** Allocates a 1-dimensional [[LUT1]] with capacity of `length` elements of type A. */
+  @api def apply[A:Bits](length: Int)(filename: String): LUT1[A] = {
+    stage(FileLUTNew[A,LUT1](Seq(length),filename))
+  }
+
+  /** Allocates a 2-dimensional [[LUT2]] with `rows` x `cols` elements of type A. */
+  @api def apply[A:Bits](rows: Int, cols: Int)(filename: String): LUT2[A] = {
+    stage(FileLUTNew[A,LUT2](Seq(rows,cols),filename))
+  }
+
+  /** Allocates a 3-dimensional [[LUT3]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: Int, d1: Int, d2: Int)(filename: String): LUT3[A] = {
+    stage(FileLUTNew[A,LUT3](Seq(d0,d1,d2),filename))
+  }
+
+  /** Allocates a 4-dimensional [[LUT4]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int)(filename: String): LUT4[A] = {
+    stage(FileLUTNew[A,LUT4](Seq(d0,d1,d2,d3),filename))
+  }
+
+  /** Allocates a 5-dimensional [[LUT5]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: Int, d1: Int, d2: Int, d3: Int, d4: Int)(filename: String): LUT5[A] = {
+    stage(FileLUTNew[A,LUT5](Seq(d0,d1,d2,d3,d4),filename))
+  }
+}
+
 /** A 1-dimensional LUT with elements of type A. */
 @ref class LUT1[A:Bits]
   extends LUT[A,LUT1]
     with LocalMem1[A,LUT1]
+    with ReadMem1[A]
     with Mem1[A,LUT1]
     with Ref[Array[Any],LUT1[A]] {
 
@@ -182,6 +210,7 @@ object LUT {
 @ref class LUT2[A:Bits]
   extends LUT[A,LUT2]
     with LocalMem2[A,LUT2]
+    with ReadMem2[A]
     with Mem2[A,LUT1,LUT2]
     with Ref[Array[Any],LUT2[A]] {
   def rank: Int = 2
@@ -195,6 +224,7 @@ object LUT {
 /** A 3-dimensional LUT with elements of type A. */
 @ref class LUT3[A:Bits]
   extends LUT[A,LUT3]
+    with ReadMem3[A]
     with LocalMem3[A,LUT3]
     with Mem3[A,LUT1,LUT2,LUT3]
     with Ref[Array[Any],LUT3[A]] {
@@ -209,6 +239,7 @@ object LUT {
 @ref class LUT4[A:Bits]
   extends LUT[A,LUT4]
     with LocalMem4[A,LUT4]
+    with ReadMem4[A]
     with Mem4[A,LUT1,LUT2,LUT3,LUT4]
     with Ref[Array[Any],LUT4[A]] {
 
@@ -224,6 +255,7 @@ object LUT {
 @ref class LUT5[A:Bits]
   extends LUT[A,LUT5]
     with LocalMem5[A,LUT5]
+    with ReadMem5[A]
     with Mem5[A,LUT1,LUT2,LUT3,LUT4,LUT5]
     with Ref[Array[Any],LUT5[A]] {
 

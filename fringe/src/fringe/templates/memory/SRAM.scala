@@ -6,6 +6,7 @@ import chisel3.util._
 import fringe.globals
 import fringe.targets.arria10.Arria10
 import fringe.targets.aws.AWS_F1
+import fringe.targets.kcu1500.KCU1500
 import fringe.targets.zcu.ZCU
 import fringe.targets.zynq.Zynq
 
@@ -115,7 +116,7 @@ class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: St
   // Customize SRAM here
   // TODO: Still needs some cleanup
   globals.target match {
-    case _:AWS_F1 | _:Zynq | _:ZCU | _:Arria10 =>
+    case _:AWS_F1 | _:Zynq | _:ZCU | _:Arria10 | _:KCU1500 =>
 
       val mem = resourceType match {
         case "URAM" => Module(new SRAMVerilogAWS_URAM(t, d))

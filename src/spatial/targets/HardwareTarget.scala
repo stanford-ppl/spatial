@@ -7,6 +7,7 @@ import spatial.dse._
 abstract class HardwareTarget {
   import HardwareTarget._
   
+  def host: String = "cpp"   // Target backend for host code, which is either cpp or Rogue
   def name: String    // FPGA name
   def burstSize: Int  // Size of DRAM burst (in bits)
 

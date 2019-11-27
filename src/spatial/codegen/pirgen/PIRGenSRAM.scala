@@ -11,9 +11,17 @@ trait PIRGenSRAM extends PIRCodegen {
     case op: SRAMNew[_,_] => 
       stateMem(lhs, "SRAM()")
     case op@SRAMBankedRead(sram,bank,ofs,ens)       => 
-      stateRead(lhs, sram, Some(bank), Some(ofs), ens)
+      stateAccess(lhs, sram, ens) {
+        src"BankedRead()" +
+        src".bank(${assertOne(bank)})" + 
+        src".offset(${assertOne(ofs)})"
+      }
     case op@SRAMBankedWrite(sram,data,bank,ofs,ens) => 
-      stateWrite(lhs, sram, Some(bank), Some(ofs), data, ens)
+      stateAccess(lhs, sram, ens, data=Some(data)) {
+        src"BankedWrite()" +
+        src".bank(${assertOne(bank)})" + 
+        src".offset(${assertOne(ofs)})"
+      }
     case _ => super.genAccel(lhs, rhs)
   }
 }

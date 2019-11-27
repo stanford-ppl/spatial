@@ -109,21 +109,29 @@ architecture behav of CustomLogic is
 	-- Components
 	----------------------------------------------------------------------------
 
-    component Top
+    component SpatialIP
       port (
         clock           : in std_logic;
         reset           : in std_logic;
         io_PIPELINECLEAR                 : in  std_logic;  -- Asserted after a DSStopAcquisition
-            -- AXI Stream Input Interface
-        io_AXIS_IN_valid                : in  std_logic;
-        io_AXIS_IN_ready                : out std_logic;
-        io_AXIS_IN_bits_TDATA                 : in  std_logic_vector(DATA_WIDTH - 1 downto 0);
-        io_AXIS_IN_bits_TUSER                 : in  std_logic_vector(  3 downto 0);
-            -- AXI Stream Output Interface
-        io_AXIS_OUT_valid               : out std_logic;
-        io_AXIS_OUT_ready               : in  std_logic;
-        io_AXIS_OUT_bits_TDATA                : out std_logic_vector(DATA_WIDTH - 1 downto 0);
-        io_AXIS_OUT_bits_TUSER                : out std_logic_vector(  3 downto 0);
+	 	io_AXIS_IN_TVALID				: in std_logic;
+	 	io_AXIS_IN_TREADY				: out std_logic;
+	 	io_AXIS_IN_TDATA					: in std_logic_vector(255 downto 0);
+	 	io_AXIS_IN_TSTRB					: in std_logic_vector(31 downto 0);
+	 	io_AXIS_IN_TKEEP					: in std_logic_vector(31 downto 0);
+	 	io_AXIS_IN_TLAST					: in std_logic;
+	 	io_AXIS_IN_TUSER					: in std_logic_vector(31 downto 0);
+	 	io_AXIS_IN_TID					: in std_logic_vector(3 downto 0);
+	 	io_AXIS_IN_TDEST					: in std_logic_vector(3 downto 0);
+	 	io_AXIS_OUT_TVALID				: out std_logic;
+	 	io_AXIS_OUT_TREADY				: in std_logic;
+	 	io_AXIS_OUT_TDATA				: out std_logic_vector(255 downto 0);
+	 	io_AXIS_OUT_TSTRB				: out std_logic_vector(31 downto 0);
+	 	io_AXIS_OUT_TKEEP				: out std_logic_vector(31 downto 0);
+	 	io_AXIS_OUT_TLAST				: out std_logic;
+	 	io_AXIS_OUT_TID					: out std_logic_vector(3 downto 0);
+	 	io_AXIS_OUT_TDEST				: out std_logic_vector(3 downto 0);
+	 	io_AXIS_OUT_TUSER				: out std_logic_vector(31 downto 0);
         --    -- Image Header and Metadata
         --io_METADATA_IN                   : in  Metadata_rec;
         --    -- Image Header and Metadata
@@ -226,7 +234,7 @@ architecture behav of CustomLogic is
 
 begin
 
-   U_Top :  Top
+   U_SpatialIP :  SpatialIP
       port map (
          -- AXI-Lite Interface
          clock         => clk250,
@@ -241,15 +249,24 @@ begin
          io_CUSTOMLOGIC_CTRL_DATA_IN_CE => CustomLogic_ctrl_data_in_ce,
          io_CUSTOMLOGIC_CTRL_DATA_IN => CustomLogic_ctrl_data_in,
          io_CUSTOMLOGIC_CTRL_DATA_OUT => CustomLogic_ctrl_data_out,
-         io_AXIS_IN_valid => axis_tvalid_in,
-         io_AXIS_IN_ready => axis_tready_in,
-         io_AXIS_IN_bits_TDATA => axis_tdata_in,
-         io_AXIS_IN_bits_TUSER => axis_tuser_in,
-         io_AXIS_OUT_valid => axis_tvalid_out,
-         io_AXIS_OUT_ready => axis_tready_out,
-         io_AXIS_OUT_bits_TDATA => axis_tdata_out,
-         io_AXIS_OUT_bits_TUSER => axis_tuser_out,
-
+         io_AXIS_IN_TVALID    => axis_tvalid_in,
+	 io_AXIS_IN_TREADY    => axis_tready_in,
+	 io_AXIS_IN_TDATA    => axis_tdata_in,
+	 io_AXIS_IN_TSTRB    => (others => '1'),
+	 io_AXIS_IN_TKEEP    => (others => '1'),
+	 io_AXIS_IN_TUSER    => (others => '0'),
+	 io_AXIS_IN_TLAST    => '0',
+	 io_AXIS_IN_TID    => axis_tuser_in,
+	 io_AXIS_IN_TDEST    => (others => '0'),
+	 io_AXIS_OUT_TVALID    => axis_tvalid_out,
+	 io_AXIS_OUT_TREADY    => axis_tready_out,
+	 io_AXIS_OUT_TDATA    => axis_tdata_out,
+	 io_AXIS_OUT_TSTRB    => open,
+	 io_AXIS_OUT_TKEEP    => open,
+	 io_AXIS_OUT_TLAST    => open,
+	 io_AXIS_OUT_TID    => axis_tuser_out,
+	 io_AXIS_OUT_TDEST    => open,
+	 io_AXIS_OUT_TUSER    => open,
          -- no connection
          io_M_AXI_0_AWID => open,
          io_M_AXI_0_AWUSER => open,

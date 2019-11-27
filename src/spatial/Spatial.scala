@@ -6,6 +6,7 @@ import poly.{ConstraintMatrix, ISL}
 import models.AreaEstimator
 import spatial.codegen.chiselgen._
 import spatial.codegen.cppgen._
+import spatial.codegen.roguegen._
 import spatial.codegen.scalagen._
 import spatial.codegen.treegen._
 import spatial.codegen.pirgen._
@@ -113,6 +114,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val chiselCodegen = ChiselGen(state)
     lazy val resourceReporter = ResourceReporter(state)
     lazy val cppCodegen    = CppGen(state)
+    lazy val rogueCodegen   = RogueGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
@@ -196,16 +198,17 @@ trait Spatial extends Compiler with ParamLoader {
         finalSanityChecks   ==>
         /** Code generation */
         treeCodegen         ==>
+        irCodegen           ==>
         //(spatialConfig.enableDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
-        (spatialConfig.enableSynth ? cppCodegen) ==>
+        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
+        ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         // (spatialConfig.useAreaModels ? areaModelReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
-        (spatialConfig.enableTsth ? tsthCodegen) ==>
-        irCodegen           
+        (spatialConfig.enableTsth ? tsthCodegen)
     }
 
     isl.shutdown(100)
@@ -300,16 +303,30 @@ trait Spatial extends Compiler with ParamLoader {
     }.text("""Size of code window for Java-style chunking, which breaks down large IR blocks into multiple levels of Java objects.  Increasing can sometimes solve the GC issue during Chisel compilation (default: 50)""")
 
     cli.opt[Int]("bankingEffort").action{ (t,_) =>
+      assert(t == 0 || t == 1 || t == 2, "Only efforts of 0, 1, or 2 are supported.  See --numSchemesPerRegion or --bankingTimeout for more fine-grained controls")
       spatialConfig.bankingEffort = t
+      if (t == 0) spatialConfig.numSchemesPerRegion = 1
     }.text("""Specify the level of effort to put into banking local memories.  i.e:
       0: Quit banking analyzer after first banking scheme is found
-      1: Allow banking analyzer to find AT MOST 4 valid schemes (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
-      2: (default) Allow banking analyzer to find AT MOST 8 valid schemes (same as 1 except it searches for Pow2 N/Alpha schemes as well as Likely)
-      3: Allow banking analyzer to find AT MOST 1 valid scheme for each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
-      4: Allow banking analyzer to find banking scheme for every set of banking directives.  May take a really long time and be unnecessary.
+      1: (default) Allow banking analyzer to search 4 regions (flat, hierarchical, flat+full_duplication, hierarchical+full_duplication)
+      2: Allow banking analyzer to search each BankingView/RegroupDims combination.  Good enough for most cases (i.e. flat+full_duplication, flat+duplicateAxis(0), flat+duplicateAxes(0,1), etc)
 """)
 
-    cli.opt[Unit]("mop").action{ (_,_) => 
+    cli.opt[Int]("numSchemesPerRegion").action{ (t,_) =>
+      spatialConfig.numSchemesPerRegion = t
+    }.text("""Specify how many valid schemes to look for in each region [Default: 2]""")
+
+    cli.opt[Int]("mersenneRadius").action{ (t,_) =>
+      spatialConfig.mersenneRadius = t
+    }.text(
+      """Specify how many multiples of modulus to search when trying to optimize FixMod as a PriorityMux + MersenneMod
+        | (i.e. x % 5 requires mersenneRadius >= 3 in order to express it as a 3-way Priority mux on x % 15, since 15 is the closest Mersenne number [Default: 16]""".stripMargin)
+
+    cli.opt[Int]("bankingTimeout").action{ (t,_) =>
+      spatialConfig.bankingTimeout = t
+    }.text("""Specify how many schemes to attempt before quitting the banking analyzer. (default: 50000)""")
+
+    cli.opt[Unit]("mop").action{ (_,_) =>
       spatialConfig.unrollMetapipeOfParallels = true
       spatialConfig.unrollParallelOfMetapipes = false
     }.text("""
@@ -363,11 +380,24 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c) [false]")
     cli.opt[Unit]("forceFuseFMA").action{(_,_) => spatialConfig.forceFuseFMA = true}.text("Force all Add(Mul(a,b),c) patterns to become FMA(a,b,c), even if they increase initiation interval.  --noFuseFMA takes priority [false]")
 
+    cli.opt[Unit]("noOptimizeMul").action{(_,_) => spatialConfig.optimizeMul = false}.text("Do not optimize multiplications if they can be rewritten as sum/subtraction of two pow2 multiplies")
+    cli.opt[Unit]("noOptimizeMod").action{(_,_) => spatialConfig.optimizeMod = false}.text("Do not optimize modulo if they can be rewritten shifts and adds using Mersenne numbers")
+
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 
     cli.opt[Unit]("asyncMem").action{(_,_) => spatialConfig.enableAsyncMem = true }.text("Enable asynchronous memories")
 
     cli.opt[Unit]("insanity").action{(_,_) => spatialConfig.allowInsanity = true }.text("Disable sanity checks, allows insanity to happen.  Not recommended!")
+
+    cli.opt[Unit]("prioritizeFlat").action{(_,_) => spatialConfig.prioritizeFlat = true }.text("Prioritize flat banking schemes over hierarchical ones when searching. Not recommended!")
+    cli.opt[Unit]("legacyBanking").action{(_,_) =>
+      spatialConfig.prioritizeFlat = true
+      spatialConfig.useAreaModels = false
+      spatialConfig.numSchemesPerRegion = 1
+      spatialConfig.bankingEffort = 0
+      spatialConfig.optimizeMod = false
+      spatialConfig.optimizeMul = false
+    }.text("Prioritize flat banking schemes over hierarchical ones when searching. Not recommended!")
 
     cli.opt[Unit]("instrumentation").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true
@@ -387,7 +417,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("nomodular").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableModular = false
-    }.text("Disables modular codegen and puts all logic in AccelTop")
+    }.text("Disables modular codegen and puts all logic in AccelUnit")
 
     cli.opt[Unit]("modular").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableModular = true

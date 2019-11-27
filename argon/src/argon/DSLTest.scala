@@ -173,11 +173,13 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       Console.out.println(cmdStr)
       cmdFile.println(s"${cmdStr}")
       cmdFile.close()
+      val printOutput = checkFlag(s"test.tee")
       val cmd = new Subprocess(args:_*)({case (lline,_) =>
         val line = lline.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt","")
         val err = parse(line)
         cause = cause.orElse(err)
         cmdLog.println(line)
+        if (printOutput) println(line)
         prev = line
         None
       })

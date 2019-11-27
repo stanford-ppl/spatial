@@ -93,6 +93,32 @@ class AXI4LiteToRFBridgeZCU(val addrWidth: Int, val dataWidth: Int) extends Modu
 }
 
 
+class AXI4LiteToRFBridgeKCU1500(val addrWidth: Int, val dataWidth: Int) extends Module {
+  val idBits = 1 // AXI-Lite does not have ID field
+  val p = new AXI4BundleParameters(addrWidth, dataWidth, idBits)
+
+  val io = IO(new Bundle {
+    val S_AXI = Flipped(new AXI4Lite(p))
+    val raddr = Output(UInt(addrWidth.W))
+    val wen   = Output(Bool())
+    val waddr = Output(UInt(addrWidth.W))
+    val wdata = Output(Bits(dataWidth.W))
+    val rdata = Input(Bits(dataWidth.W))
+  })
+
+  val d = Module(new AXI4LiteToRFBridgeVerilog(addrWidth, dataWidth))
+
+  d.io.S_AXI <> io.S_AXI
+  d.io.S_AXI_ACLK := clock
+  d.io.S_AXI_ARESETN := ~reset.toBool
+
+  io.raddr := d.io.rf_raddr
+  io.waddr := d.io.rf_waddr
+  io.wdata := d.io.rf_wdata
+  io.wen   := d.io.rf_wen
+  d.io.rf_rdata := io.rdata
+}
+
 
 
 //class AXI4LiteToRFBridge(val addrWidth: Int, val dataWidth: Int) extends BlackBox {

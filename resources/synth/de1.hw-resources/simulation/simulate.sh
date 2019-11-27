@@ -1,6 +1,6 @@
-cp ../Top.v ./
-echo "refreshed Top.v"
+cp ../SpatialIP.v ./
+echo "refreshed SpatialIP.v"
 rm test.vcd
-iverilog -o topTest Top.v Top_tb.v
+iverilog -o topTest SpatialIP.v Top_tb.v
 vvp topTest
 echo "regenerated"

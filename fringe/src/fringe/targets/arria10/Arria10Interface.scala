@@ -1,11 +1,11 @@
 package fringe.targets.arria10
 
 import chisel3._
-import fringe.TopInterface
+import fringe.SpatialIPInterface
 import fringe.globals._
 import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AvalonSlave}
 
-class Arria10Interface extends TopInterface {
+class Arria10Interface extends SpatialIPInterface {
   // To fit the sysid interface, we only want to have 7 bits for 0x0000 ~ 0x01ff
   val axiLiteParams = new AXI4BundleParameters(7, DATA_WIDTH, 1)
   // TODO: This group of params is for memory

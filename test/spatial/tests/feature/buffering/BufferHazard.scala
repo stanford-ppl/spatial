@@ -45,7 +45,7 @@ import spatial.dsl._
     val got = getMatrix(result_dram)
     printMatrix(got, "Got: ")
     val cksum = got.flatten.map{x => x == 224}.reduce{_&&_}
-    println("PASS: " + cksum + " (MultiWriteBuffer)")
+    println("PASS: " + cksum + " (BufferHazard)")
     assert(cksum)
   }
 }

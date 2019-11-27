@@ -13,6 +13,15 @@ import spatial.lang._
 )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 
+/** An allocation of a subclass C of LUT with elements of type A.
+  * @param dims The dimensions of the memory
+  */
+@op case class FileLUTNew[A:Bits,C[T]](
+  dims:  Seq[I32],
+  path: String 
+)(implicit val tp: Type[C[A]])
+  extends MemAlloc[A,C]
+
 /** Read of a single element from an LUT.
   * @param mem The memory instance being read
   * @param addr The N-dimensional address

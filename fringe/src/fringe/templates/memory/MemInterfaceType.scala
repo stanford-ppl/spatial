@@ -120,8 +120,8 @@ object StandardInterfaceType extends MemInterfaceType
 
 
 class ShiftRegFileInterface(p: MemParams) extends MemInterface(p) {
-  val dump_out = Vec(p.depth, Output(UInt(p.bitWidth.W)))
-  val dump_in = Vec(p.depth, Input(UInt(p.bitWidth.W)))
+  val dump_out = Vec(p.volume, Output(UInt(p.bitWidth.W)))
+  val dump_in = Vec(p.volume, Input(UInt(p.bitWidth.W)))
   val dump_en = Input(Bool())
 
   def connectLedger(op: ShiftRegFileInterface)(implicit stack: List[KernelHash]): Unit = {

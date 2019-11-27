@@ -8,12 +8,14 @@ import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.node.LaneStatic
 
 import scala.collection.mutable
 
 trait AccessExpansion {
   implicit def __IR: State
   private val unrolls = mutable.HashMap[(Idx,Seq[Int]),Idx]()
+  lazy val dummyIter = boundVar[I32] // Make all LaneStatics take a random dummy iterator
 
   private def nextRand(): Idx = boundVar[I32]
   private def nextRand(x: Idx): Idx = {
@@ -21,7 +23,12 @@ trait AccessExpansion {
     x.getDomain.foreach{d => x2.domain = d }
     x2
   }
-  private def unrolled(x: Idx, id: Seq[Int]): Idx = unrolls.getOrElseUpdate((x,id), nextRand(x))
+  private def unrolled(x: Idx, id: Seq[(Idx,Int)]): Either[Idx,Int] = {
+    x.asInstanceOf[Sym[_]] match {
+      case Op(LaneStatic(iter, resolutions)) if (id.map(_._1).contains(iter)) => Right(resolutions(id.collectFirst { case (i, u) if (i == iter) => u }.get))
+      case _ => Left(unrolls.getOrElseUpdate((x,id.map(_._2)), nextRand(x)))
+    }
+  }
 
   /** If the access pattern is representable as an affine access for bound, returns
     * a min or max constraint for x based on this bound. Otherwise returns None.
@@ -91,7 +98,7 @@ trait AccessExpansion {
             // Drop any iterator who is NOT used in indexing
             // NOTE: Non-lockstepness for "random" syms will be handled during memory unrolling
             val uidWithIters = is.zip(uid)
-            val xid = uidWithIters.collect{case iu if (requiredIters.contains(iu._1)) => iu._2 }
+            val xid = uidWithIters.collect{case iu if (requiredIters.contains(iu._1)) => (iu._1,iu._2) }
             val a = vec(x)
             val b = 0
             val x2 = unrolled(x, xid)
@@ -100,7 +107,10 @@ trait AccessExpansion {
             dbgs(s"    All used iterators: $requiredIters")
             dbgs(s"    Full UID: {${uid.mkString(",")}}")
             dbgs(s"    Unrolling $x {${xid.mkString(",")}} -> $x2")
-            (a,x2,b,requiredIters)
+            x2 match {
+              case Right(x3) => (0, dummyIter, x3, requiredIters)
+              case Left(x3) => (a,x3,b,requiredIters)
+            }
           }
         }
         val as  = components.map(_._1)

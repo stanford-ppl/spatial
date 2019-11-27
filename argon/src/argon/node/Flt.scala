@@ -79,7 +79,7 @@ abstract class FltOp1[M:INT,E:INT] extends FltOp[M,E,Flt[M,E]]
 @op case class TextToFlt[M:INT,E:INT](t: Text, fm: FltFmt[M,E]) extends FltOp1[M,E] {
   override val canAccel: Boolean = true
 }
-@op case class FltToText[M:INT,E:INT](a: Flt[M,E]) extends FltOp[M,E,Text] {
+@op case class FltToText[M:INT,E:INT](a: Flt[M,E], format:Option[String]) extends FltOp[M,E,Text] {
   override val canAccel: Boolean = true
 }
 

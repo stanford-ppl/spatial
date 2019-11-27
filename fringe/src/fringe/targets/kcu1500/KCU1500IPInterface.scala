@@ -4,17 +4,21 @@ import chisel3._
 import chisel3.util.Decoupled
 import fringe.globals._
 import fringe._
-import fringe.TopInterface
+import fringe.SpatialIPInterface
 import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Lite, AXI4Probe}
 import fringe.templates.axi4._
 
-class KCU1500Interface extends TopInterface {
-  val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
-  val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 32)
+class KCU1500IPInterface extends SpatialIPInterface {
+  val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 4)
+  val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 4)
 
   val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 
+  val AXIS_IN = new AXI4Stream(AXI4StreamParameters(64,8,64))
+  val AXIS_OUT = Flipped(new AXI4Stream(AXI4StreamParameters(64,8,64)))
+
+//  val ACCEL_CLK = Input(new Clock)
   // // AXI debugging loopbacks
   // val TOP_AXI = new AXI4Probe(axiLiteParams)
   // val DWIDTH_AXI = new AXI4Probe(axiLiteParams)

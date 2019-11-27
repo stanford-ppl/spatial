@@ -90,22 +90,20 @@ object SparseTransfer {
         //   command or else the controller will stall
 
         (requestLength, iters) match {
-          case (Final(requestLength), Final(iters)) if iters >= requestLength & spatialConfig.enablePIR => // Special case iters == requestLength
-            //TODO: some how this break FPAG backend
-            Foreach(iters par p){i =>
-              val addr: I64 = ((addrs.__read(Seq(i),Set()) + origin) * bytesPerWord).to[I64] + dram.address
-              val addr_bytes = addr
-              addrBus := (addr_bytes, dram.isAlloc)
+          case (requestLength, iters) if spatialConfig.enablePIR =>
+            Foreach(requestLength par p){i =>
+              val addr: I64 = ((addrs.__read(Seq(i),Set.empty) + origin) * bytesPerWord).to[I64] + dram.address
+              addrBus := (addr, dram.isAlloc)
             }
             // Fringe
             val load = Fringe.sparseLoad(dram, addrBus, dataBus)
             transferSyncMeta(old, load)
-
             // Receive
-            Foreach(iters par p){i =>
+            Foreach(requestLength par p){i =>
               val data = dataBus.value()
-              local.__write(data, Seq(i), Set())
+              local.__write(data, Seq(i), Set.empty)
             }
+
           case (requestLength, iters) =>
             Foreach(iters par p){i =>
               val lastAddr = Reg[I64]
@@ -131,19 +129,18 @@ object SparseTransfer {
         val ackBus = StreamIn[Bit](ScatterAckBus)
 
         (requestLength, iters) match {
-          case (Final(requestLength), Final(iters)) if iters >= requestLength & spatialConfig.enablePIR => // Special case iters == requestLength
+          case (requestLength, iters) if spatialConfig.enablePIR => // Special case iters == requestLength
             // Send
-            Foreach(iters par p){i =>
-              val pad_addr = max(requestLength - 1, 0.to[I32])
-              val addr: I64  = ((origin + addrs.__read(Seq(i), Set())) * bytesPerWord).to[I64] + dram.address
-              val data     = local.__read(Seq(i), Set())
+            Foreach(requestLength par p){i =>
+              val addr: I64  = ((origin + addrs.__read(Seq(i), Set.empty)) * bytesPerWord).to[I64] + dram.address
+              val data     = local.__read(Seq(i), Set.empty)
               cmdBus := (pack(data, addr), dram.isAlloc)
             }
             // Fringe
             val store = Fringe.sparseStore(dram, cmdBus, ackBus)
             transferSyncMeta(old, store)
             // Receive
-            Foreach(iters by 1 par p){i =>
+            Foreach(requestLength by 1 par p){i =>
               val ack = ackBus.value()
             }
           case (requestLength, iters) =>

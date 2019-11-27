@@ -71,7 +71,7 @@ object AXI4Bundle {
 class AXI4Inlined(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   // aw
   val AWID     = Output(UInt(params.idBits.W))
-  val AWUSER   = Output(UInt(params.addrBits.W))
+  val AWUSER   = Output(UInt(params.idBits.W))
   val AWADDR   = Output(UInt(params.addrBits.W))
   val AWLEN    = Output(UInt(params.lenBits.W))  // number of beats - 1
   val AWSIZE   = Output(UInt(params.sizeBits.W)) // bytes in beat = 2^size
@@ -85,7 +85,7 @@ class AXI4Inlined(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 
   // ar
   val ARID     = Output(UInt(params.idBits.W))
-  val ARUSER   = Output(UInt(params.addrBits.W))
+  val ARUSER   = Output(UInt(params.idBits.W))
   val ARADDR   = Output(UInt(params.addrBits.W))
   val ARLEN    = Output(UInt(params.lenBits.W))  // number of beats - 1
   val ARSIZE   = Output(UInt(params.sizeBits.W)) // bytes in beat = 2^size
@@ -116,10 +116,25 @@ class AXI4Inlined(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 
   // b: Input
   val BID   = Input(UInt(params.idBits.W))
-  val BUSER = Input(UInt(params.addrBits.W))
+  val BUSER = Input(UInt(params.idBits.W))
   val BRESP = Input(UInt(params.respBits.W))
   val BVALID  = Input(Bool())
   val BREADY  = Output(Bool())
+}
+
+class AXI4Stream(params: AXI4StreamParameters) extends AXI4BundleBase(params.asDummyAXI4Bundle) {
+  val TVALID = Input(Bool())
+  val TREADY = Output(Bool())
+  val TDATA = Input(UInt(params.dataBits.W))
+  val TSTRB = Input(UInt((params.dataBits/8).W))
+  val TKEEP = Input(UInt((params.dataBits/8).W))
+  val TLAST = Input(Bool())
+  val TID = Input(UInt(params.idBits.W))
+  val TDEST = Input(UInt(params.idBits.W))
+  val TUSER = Input(UInt(params.userBits.W))
+  def valid = TVALID
+  def ready = TREADY
+  override def cloneType(): this.type = new AXI4Stream(params).asInstanceOf[this.type]
 }
 
 class AXI4Lite(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
@@ -157,7 +172,7 @@ class AXI4Lite(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 class AXI4Probe(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   // aw
   val AWID     = Input(UInt(params.idBits.W))
-  val AWUSER   = Input(UInt(params.addrBits.W))
+  val AWUSER   = Input(UInt(params.idBits.W))
   val AWADDR   = Input(UInt(params.addrBits.W))
   val AWLEN    = Input(UInt(params.lenBits.W))  // number of beats - 1
   val AWSIZE   = Input(UInt(params.sizeBits.W)) // bytes in beat = 2^size
@@ -171,7 +186,7 @@ class AXI4Probe(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 
   // ar
   val ARID     = Input(UInt(params.idBits.W))
-  val ARUSER   = Input(UInt(params.addrBits.W))
+  val ARUSER   = Input(UInt(params.idBits.W))
   val ARADDR   = Input(UInt(params.addrBits.W))
   val ARLEN    = Input(UInt(params.lenBits.W))  // number of beats - 1
   val ARSIZE   = Input(UInt(params.sizeBits.W)) // bytes in beat = 2^size
@@ -193,7 +208,7 @@ class AXI4Probe(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 
   // r: Input
   val RID     = Input(UInt(params.idBits.W))
-  val RUSER   = Input(UInt(params.addrBits.W))
+  val RUSER   = Input(UInt(params.idBits.W))
   val RDATA   = Input(UInt(params.dataBits.W))
   val RRESP   = Input(UInt(params.respBits.W))
   val RLAST   = Input(Bool())
@@ -202,7 +217,7 @@ class AXI4Probe(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
 
   // b: Input
   val BID     = Input(UInt(params.idBits.W))
-  val BUSER   = Input(UInt(params.addrBits.W))
+  val BUSER   = Input(UInt(params.idBits.W))
   val BRESP   = Input(UInt(params.respBits.W))
   val BVALID  = Input(Bool())
   val BREADY  = Input(Bool())

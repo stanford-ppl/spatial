@@ -23,12 +23,13 @@ libraryDependencies ++= (Seq("chisel3","chisel-iotesters").map {
 libraryDependencies ++= Seq(
   "org.typelevel" %% "spire" % "0.16.0",
   "org.scalanlp" %% "breeze" % "0.13.2",
-  "org.scalatest" %% "scalatest" % "2.2.5",
-  "org.scalacheck" %% "scalacheck" % "1.12.4"
+  "org.scalatest" %% "scalatest" % "3.0.8",
+  "org.scalacheck" %% "scalacheck" % "1.12.6"
 )
 
 libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
 libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
+libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

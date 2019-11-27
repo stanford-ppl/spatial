@@ -66,11 +66,35 @@ package object memory {
     @stateful def bankingEffort: Int = metadata[BankingEffort](s).map(_.effort).getOrElse(spatialConfig.bankingEffort)
     def bankingEffort_=(effort: Int): Unit = metadata.add(s, BankingEffort(effort))
 
-    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int])] = metadata[ExplicitBanking](s).map(_.scheme)
-    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])] = metadata[ExplicitBanking](s).map(_.scheme)
+    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])): Unit = metadata.add(s, ExplicitBanking(scheme))
     def explicitNs: Seq[Int] = explicitBanking.get._1
     def explicitBs: Seq[Int] = explicitBanking.get._2
     def explicitAlphas: Seq[Int] = explicitBanking.get._3
+    def explicitPs: Option[Seq[Int]] = explicitBanking.get._4
+    @stateful def explicitScheme: Seq[ModBanking] = {
+      import spatial.metadata.types._
+      import utils.math.{computeP, bestPByVolume}
+      if (explicitNs.size == 1) {
+        val P = explicitPs.getOrElse({
+          val allP = computeP(explicitNs.head, explicitBs.head, explicitAlphas, s.stagedDims.map(_.toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
+          bestPByVolume(allP, s.stagedDims.map(_.toInt))
+        })
+        Seq(ModBanking(explicitNs.head, explicitBs.head, explicitAlphas, Seq.tabulate(explicitNs.size) { i => i }, P, 1, 0))
+      }
+      else {
+        Seq.tabulate(explicitNs.size){i =>
+          val n = explicitNs(i)
+          val b = explicitBs(i)
+          val a = explicitAlphas(i)
+          val P = explicitPs.getOrElse({
+            val allP = computeP(n,b,Seq(a), Seq(s.stagedDims(i).toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
+            bestPByVolume(allP, s.stagedDims.map(_.toInt))
+          })
+          ModBanking(n,b,Seq(a),Seq(i),P,1,0)
+        }
+      }
+    }
     def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).map(_.flag).getOrElse(false)
     def forceExplicitBanking_=(flag: Boolean): Unit = metadata.add(s, ForceExplicitBanking(flag))
 
@@ -116,7 +140,10 @@ package object memory {
     /** Post-unrolling duplicates (exactly one Memory instance per node) */
 
     def getInstance: Option[Memory] = getDuplicates.flatMap(_.headOption)
-    def instance: Memory = getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
+    @stateful def instance: Memory = {
+      if (s.isLockDRAM) Memory(Seq(),1,Seq(),AccumType.None) // Hack for LockDRAM accesses
+      else getInstance.getOrElse{throw new Exception(s"No instance defined for $s")}
+    }
     def instance_=(inst: Memory): Unit = metadata.add(s, Duplicates(Seq(inst)))
 
     def broadcastsAnyRead: Boolean = s.readers.exists{r => if (r.getPorts.isDefined) r.port.broadcast.exists(_ > 0) else false}
@@ -150,7 +177,10 @@ package object memory {
     def dispatches: Map[Seq[Int], Set[Int]] = getDispatches.getOrElse{ Map.empty }
     def dispatches_=(ds: Map[Seq[Int],Set[Int]]): Unit = metadata.add(s, Dispatch(ds))
     def getDispatch(uid: Seq[Int]): Option[Set[Int]] = getDispatches.flatMap(_.get(uid))
-    def dispatch(uid: Seq[Int]): Set[Int] = getDispatch(uid).getOrElse{throw new Exception(s"No dispatch defined for $s {${uid.mkString(",")}}")}
+    @stateful def dispatch(uid: Seq[Int]): Set[Int] = {
+      if (s.readMem.exists(_.isLockDRAM) || s.writtenMem.exists(_.isLockDRAM)) Set(0) // Hack for LockDRAM accesses
+      else getDispatch(uid).getOrElse{throw new Exception(s"No dispatch defined for $s {${uid.mkString(",")}}")}
+    }
 
     def addDispatch(uid: Seq[Int], d: Int): Unit = getDispatch(uid) match {
       case Some(set) => s.dispatches += (uid -> (set + d))
@@ -158,7 +188,10 @@ package object memory {
     }
     def getGroupIds: Option[Map[Seq[Int], Set[Int]]] = metadata[GroupId](s).map(_.m)
     def getGroupId(uid: Seq[Int]): Option[Set[Int]] = getGroupIds.flatMap(_.get(uid))
-    def gid(uid: Seq[Int]): Set[Int] = getGroupId(uid).getOrElse{throw new Exception(s"No group id defined for $s {${uid.mkString(",")}}")}
+    @stateful def gid(uid: Seq[Int]): Set[Int] = {
+      if (s.readMem.exists(_.isLockDRAM) || s.writtenMem.exists(_.isLockDRAM)) Set(0) // Hack for LockDRAM accesses
+      else getGroupId(uid).getOrElse {throw new Exception(s"No group id defined for $s {${uid.mkString(",")}}")}
+    }
     def gids: Map[Seq[Int], Set[Int]] = getGroupIds.getOrElse{ Map.empty }
     def gids_=(gs: Map[Seq[Int],Set[Int]]): Unit = metadata.add(s, GroupId(gs))
     def addGroupId(uid: Seq[Int], g: Set[Int]): Unit = getGroupId(uid) match {
@@ -178,7 +211,10 @@ package object memory {
     }
 
     def getPort(dispatch: Int, uid: Seq[Int]): Option[Port] = getPorts(dispatch).flatMap(_.get(uid))
-    def port(dispatch: Int, uid: Seq[Int]): Port = getPort(dispatch, uid).getOrElse{ throw new Exception(s"No ports defined for $s {${uid.mkString(",")}}") }
+    @stateful def port(dispatch: Int, uid: Seq[Int]): Port = {
+      if (s.readMem.exists(_.isLockDRAM) || s.writtenMem.exists(_.isLockDRAM)) Port(None,0,0,Seq(0),Seq(0)) // Hack for LockDRAM accesses
+      else getPort(dispatch, uid).getOrElse {throw new Exception(s"No ports defined for $s dispatch#${dispatch} {${uid.mkString(",")}}")}
+    }
 
     /** Returns the final port after unrolling. For use after unrolling only. */
     def port: Port = getPorts(0).flatMap(_.values.headOption).getOrElse{ throw new Exception(s"No final port defined for $s") }
@@ -328,6 +364,14 @@ package object memory {
     }
     def isLineBuffer: Boolean = mem.isInstanceOf[LineBuffer[_]]
     def isFIFO: Boolean = mem.isInstanceOf[FIFO[_]]
+    def isLockSRAM: Boolean = mem match {
+      case _: LockSRAM[_,_] => true
+      case _ => false
+    }
+    def isLockDRAM: Boolean = mem match {
+      case _: LockDRAM[_,_] => true
+      case _ => false
+    }
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
     def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
     def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
@@ -357,6 +401,7 @@ package object memory {
       case Op(LUTNew(_,_)) => true
       case _ => false
     }
+
   }
 
 

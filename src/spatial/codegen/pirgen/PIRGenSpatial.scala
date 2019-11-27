@@ -21,6 +21,8 @@ case class PIRGenSpatial(IR: State) extends PIRCodegen
   with PIRGenReg
   //with PIRGenSeries
   with PIRGenSRAM
+  with PIRGenLockSRAM
+  with PIRGenMergeBuffers
   with PIRGenVec
   with PIRGenStream
   with PIRGenRegFile

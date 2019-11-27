@@ -19,7 +19,8 @@ val base = Seq(
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
-    "org.jpmml" % "pmml-evaluator" % "1.4.8"
+    "org.jpmml" % "pmml-evaluator" % "1.4.8",
+    "org.scalanlp" %% "breeze" % "1.0"
     // "com.thoughtworks.xstream" % "xstream" % "1.4.3",
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",
@@ -133,7 +134,7 @@ val fringe_settings = base ++ Seq(
 /** Projects **/
 lazy val utils  = project.settings(utils_settings)
 lazy val emul   = project.settings(emul_settings)
-lazy val fringe = project.settings(fringe_settings).dependsOn(emul)
+lazy val fringe = project.settings(fringe_settings).dependsOn(emul, utils)
 lazy val models = project.settings(models_settings).dependsOn(utils)
 lazy val forge  = project.settings(common).dependsOn(utils)
 lazy val poly   = project.settings(common).dependsOn(utils, emul)

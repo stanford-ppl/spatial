@@ -8,10 +8,11 @@ import fringe.templates.counters.{CompactingCounter, CompactingIncDincCtr, IncDi
 import fringe.templates.math.Math
 import fringe.utils._
 import fringe.utils.HVec
-import fringe.utils.{getRetimed, log2Up}
+import fringe.utils.{getRetimed}
 import fringe.utils.implicits._
 import emul.ResidualGenerator._
 
+import _root_.utils.math._
 
 abstract class MemPrimitive(val p: MemParams) extends Module {
   val io = p.iface match {
@@ -56,15 +57,14 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Get info on physical dims
   // TODO: Upcast dims to evenly bank
-  val numMems = p.banks.product
-  val bankDim = math.ceil(p.depth.toDouble / numMems.toDouble).toInt
-
+  val numMems = p.Ns.product
+  val bankDim = math.ceil(p.volume.toDouble / numMems.toDouble).toInt
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until numMems).map{ i =>
     val mem = Module(new Mem1D(bankDim, p.bitWidth, p.syncMem))
     mem.io <> DontCare
-    val coords = p.banks.zipWithIndex.map{ case (b,j) =>
-      i % (p.banks.drop(j).product) / p.banks.drop(j+1).product
+    val coords = p.Ns.zipWithIndex.map{ case (b,j) =>
+      i % (p.Ns.drop(j).product) / p.Ns.drop(j+1).product
     }
     (mem,coords)
   }
@@ -72,13 +72,13 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
   // Handle Writes
   m.foreach{ mem =>
     // See which W ports can see this mem
-    val connected: Seq[(W_Port, Seq[Int])] = p.WMapping.zip(io.wPort).collect{case (access, port) if (canSee(access.coreBroadcastVisibleBanks, mem._2, p.banks)) => (port, lanesThatCanSee(access.coreBroadcastVisibleBanks, mem._2, p.banks))}
+    val connected: Seq[(W_Port, Seq[Int])] = p.WMapping.zip(io.wPort).collect{case (access, port) if (canSee(access.coreBroadcastVisibleBanks, mem._2, p.Ns)) => (port, lanesThatCanSee(access.coreBroadcastVisibleBanks, mem._2, p.Ns))}
 
     if (connected.size > 0) {
       val (ens, datas, ofs) = connected.map{case (port, lanes) => 
         val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.banks(j))})
-        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.Ns(j))})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.Ns.size).toSeq)
         val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
         val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
         val datas:           Seq[UInt]          = lanes.map(port.data)
@@ -100,13 +100,13 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
 
   // Handle Reads
   m.foreach{ mem =>
-    val connected: Seq[(R_Port, Seq[Int])] = p.RMapping.zip(io.rPort).collect{case (access, port) if (canSee(access.coreBroadcastVisibleBanks, mem._2, p.banks)) => (port, lanesThatCanSee(access.coreBroadcastVisibleBanks, mem._2, p.banks))}
+    val connected: Seq[(R_Port, Seq[Int])] = p.RMapping.zip(io.rPort).collect{case (access, port) if (canSee(access.coreBroadcastVisibleBanks, mem._2, p.Ns)) => (port, lanesThatCanSee(access.coreBroadcastVisibleBanks, mem._2, p.Ns))}
 
     if (connected.size > 0) {
       val (rawEns, ofs, backpressures) = connected.map{case (port, lanes) => 
         val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.banks(j))})
-        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.Ns(j))})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.Ns.size).toSeq)
         val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
         val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
         val ofs:             Seq[UInt]          = lanes.map(port.ofs)
@@ -139,10 +139,10 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
         out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.toList.zip(p.RMapping.flatMap{r => List.fill(r.castgroup.size)(r.muxPort)}).collect{case ((cg, b, o),mp) if (b == 0 && cg == castgrp && mp == rm.muxPort) =>  o}.head
       }
       else {
-        val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.banks(j))}
+        val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.Ns(j))}
         val visibleMems = m.collect{case (m, ba) if (ba.zip(visBanksForLane).forall{case (real, possible) => possible.contains(real)}) => (m, ba)}
         val datas = visibleMems.map(_._1.io.output)
-        val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.banks.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
+        val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.Ns.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
         val en = port.en(lane)
         val sel = bankMatches.map{be => getRetimed(be & en, globals.target.sramload_latency, port.backpressure)}
         out := chisel3.util.PriorityMux(sel, datas)
@@ -230,24 +230,24 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
            bankingMode: BankingMode, init: Option[List[Double]], syncMem: Boolean, fracBits: Int, numActives: Int, myName: String = "FIFO") = this(MemParams(FIFOInterfaceType,logicalDims, bitWidth, banks, blocks, neighborhood, WMapping, RMapping, bankingMode, init, syncMem, fracBits, numActives = numActives, myName = myName))
 
   // Create bank counters
-  val headCtr = Module(new CompactingCounter(p.WMapping.map(_.par).sum, p.depth, p.elsWidth)); headCtr.io <> DontCare
-  val tailCtr = Module(new CompactingCounter(p.RMapping.map(_.par).sum, p.depth, p.elsWidth)); tailCtr.io <> DontCare
+  val headCtr = Module(new CompactingCounter(p.WMapping.map(_.par).sum, p.volume, p.elsWidth)); headCtr.io <> DontCare
+  val tailCtr = Module(new CompactingCounter(p.RMapping.map(_.par).sum, p.volume, p.elsWidth)); tailCtr.io <> DontCare
   (0 until p.WMapping.map(_.par).sum).foreach{i => headCtr.io.input.enables.zip(io.wPort.flatMap(_.en)).foreach{case (l,r) => l := r}}
   (0 until p.RMapping.map(_.par).sum).foreach{i => tailCtr.io.input.enables.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}}
   headCtr.io.input.reset := reset
   tailCtr.io.input.reset := reset
   headCtr.io.input.dir := true.B
   tailCtr.io.input.dir := true.B
-  chisel3.core.dontTouch(io)
+//  chisel3.core.dontTouch(io)
 
   // Create numel counter
-  val elements = Module(new CompactingIncDincCtr(p.WMapping.map(_.par).sum, p.RMapping.map(_.par).sum, p.widestW, p.widestR, p.depth, p.elsWidth))
+  val elements = Module(new CompactingIncDincCtr(p.WMapping.map(_.par).sum, p.RMapping.map(_.par).sum, p.widestW, p.widestR, p.volume, p.elsWidth))
   elements.io <> DontCare
   elements.io.input.inc_en.zip(io.wPort.flatMap(_.en)).foreach{case(l,r) => l := r}
   elements.io.input.dinc_en.zip(io.rPort.flatMap(_.en)).foreach{case(l,r) => l := r}
 
   // Create physical mems
-  val m = (0 until p.numBanks).map{ i => val x = Module(new Mem1D(p.depth/p.numBanks, p.bitWidth)); x.io <> DontCare; x}
+  val m = (0 until p.numBanks).map{ i => val x = Module(new Mem1D(p.volume/p.numBanks, p.bitWidth)); x.io <> DontCare; x}
 
   // Create compacting network
 
@@ -270,7 +270,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Create dequeue compacting network
-  val deqCompactor = Module(new CompactingDeqNetwork(p.RMapping.map(_.par).toList, p.numBanks, p.elsWidth, p.bitWidth))
+  val deqCompactor = Module(new CompactingDeqNetwork(p.RMapping.map(_.par), p.numBanks, p.elsWidth, p.bitWidth))
   deqCompactor.io <> DontCare
   deqCompactor.io.tailCnt := tailCtr.io.output.count
   val active_r_bank = Math.singleCycleModulo(tailCtr.io.output.count, p.numBanks.S(p.elsWidth.W))
@@ -280,12 +280,10 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
     m(i).io.r.ofs.head := addr.asUInt
     deqCompactor.io.input.data(i) := m(i).io.output
   }
-  (0 until p.RMapping.size).foreach{i =>
-    deqCompactor.io.input.deq.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}
-  }
-  io.rPort.foreach{p => 
-    p.output.zip(deqCompactor.io.output).foreach{case (a,b) => a := b}
-  }
+  deqCompactor.io.input.deq.zip(io.rPort.flatMap(_.en)).foreach{case (l,r) => l := r}
+  io.rPort.flatMap(_.output).zip(deqCompactor.io.output).foreach{case (o,d) => o := d}
+//    p.output.zip(deqCompactor.io.output).foreach{case (a,b) => a := b}
+//  }
 
   // Check if there is data
   io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
@@ -315,15 +313,15 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   val par = scala.math.max(pW, pR) // TODO: Update this template because this was from old style
 
   // Register for tracking number of elements in FILO
-  val elements = Module(new IncDincCtr(pW,pR, p.depth))
+  val elements = Module(new IncDincCtr(pW,pR, p.volume))
   elements.io.input.inc_en := io.wPort.flatMap(_.en).toList.reduce{_|_}
   elements.io.input.dinc_en := io.rPort.flatMap(_.en).toList.reduce{_|_}
 
   // Create physical mems
-  val m = (0 until par).map{ i => val x = Module(new Mem1D(p.depth/par, p.bitWidth)); x.io <> DontCare; x}
+  val m = (0 until par).map{ i => val x = Module(new Mem1D(p.volume/par, p.bitWidth)); x.io <> DontCare; x}
 
   // Create head and reader sub counters
-  val sa_width = 2 + log2Up(par)
+  val sa_width = 2 + _root_.utils.math.log2Up(par)
   val subAccessor = Module(new SingleSCounterCheap(1,0,par,pW,-pR,sa_width))
   subAccessor.io <> DontCare
   subAccessor.io.input.enable := io.wPort.flatMap(_.en).toList.reduce{_|_} | io.rPort.flatMap(_.en).toList.reduce{_|_}
@@ -333,8 +331,8 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   val subAccessor_prev = Mux(subAccessor.io.output.count(0) - pR.S(sa_width.W) < 0.S(sa_width.W), (par-pR).S(sa_width.W), subAccessor.io.output.count(0) - pR.S(sa_width.W))
 
   // Create head and reader counters
-  val a_width = 2 + log2Up(p.depth/par)
-  val accessor = Module(new SingleSCounterCheap(1, 0, (p.depth/par), 1, -1, a_width))
+  val a_width = 2 + _root_.utils.math.log2Up(p.volume/par)
+  val accessor = Module(new SingleSCounterCheap(1, 0, (p.volume/par), 1, -1, a_width))
   accessor.io <> DontCare
   accessor.io.input.enable := (io.wPort.flatMap(_.en).toList.reduce{_|_} & subAccessor.io.output.done) | (io.rPort.flatMap(_.en).toList.reduce{_|_} & subAccessor_prev === 0.S(sa_width.W))
   accessor.io.input.dir := io.wPort.flatMap(_.en).toList.reduce{_|_}
@@ -409,9 +407,9 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
-  val m = (0 until p.depth).map{ i =>
-    val coords = p.logicalDims.zipWithIndex.map{ case (b,j) =>
-      i % (p.logicalDims.drop(j).product) / p.logicalDims.drop(j+1).product
+  val m = (0 until p.volume).map{ i =>
+    val coords = p.Ds.zipWithIndex.map{ case (b,j) =>
+      i % (p.Ds.drop(j).product) / p.Ds.drop(j+1).product
     }
     val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
@@ -429,18 +427,18 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val flatCoord = mem._4
     // See which W ports can see this mem
     val connectedNormals: Seq[(W_Port, Seq[Int])] = p.WMapping.zipWithIndex.collect{
-      case (x,i) if (!x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.banks)) => (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.banks))
+      case (x,i) if (!x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.Ns)) => (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.Ns))
     }
     val connectedShifters: Seq[(W_Port, Seq[Int], Int)] = p.WMapping.zipWithIndex.collect{
-      case (x,i) if (x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1))) => 
-        (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.banks.patch(x.shiftAxis.get,Nil,1)), x.shiftAxis.get)
+      case (x,i) if (x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.Ns.patch(x.shiftAxis.get,Nil,1))) =>
+        (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.Ns.patch(x.shiftAxis.get,Nil,1)), x.shiftAxis.get)
     }
 
     val (normalEns, normalDatas) = if (connectedNormals.size > 0) {
       connectedNormals.map{case (port, lanes) => 
         val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.logicalDims(j))})
-        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).toSeq)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.Ds(j))})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.Ns.size).toSeq)
         val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
         val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
         val datas:           Seq[UInt]          = lanes.map(port.data)
@@ -454,8 +452,8 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val (shiftEns, shiftDatas) = if (connectedShifters.size > 0) {
       connectedShifters.map{case (port, lanes, axis) => 
         val lane_enables:    Seq[Bool]          = lanes.map(port.shiftEn)
-        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.patch(axis,Nil,1).map{case(r,j) => r.expand(p.logicalDims(j))})
-        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.banks.size).map(_.patch(axis,Nil,1)).toSeq)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.patch(axis,Nil,1).map{case(r,j) => r.expand(p.Ds(j))})
+        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.Ns.size).map(_.patch(axis,Nil,1)).toSeq)
         val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => val matches = (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}; if (matches.size == 0) true.B else matches.reduce{_&&_}}
         val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
         val datas:           Seq[UInt]          = if (mem._2(axis) == 0) lanes.map(port.data) else m.collect{case (m,coords,_,_) if (coords(axis) == mem._2(axis)-1 && coords.patch(axis,Nil,1) == mem._2.patch(axis,Nil,1)) => m} // Pray there is only one lane connected to this line
@@ -484,10 +482,10 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
         out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.collect{case (cg, b, o) if (b == 0 && cg == castgrp) => o}.head
       }
       else {
-        val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.banks(j))}
+        val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.Ns(j))}
         val visibleMems = m.collect{case (m, ba,_,_) if (ba.zip(visBanksForLane).forall{case (real, possible) => possible.contains(real)}) => (m, ba)}
         val datas = visibleMems.map(_._1)
-        val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.banks.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
+        val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.Ns.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
         val en = port.en(lane)
         val sel = bankMatches.map{be => be & en}
         out := chisel3.util.PriorityMux(sel, datas)
@@ -508,9 +506,9 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
 
 
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
-  val m = (0 until p.depth).map{ i =>
-    val coords = p.logicalDims.zipWithIndex.map{ case (b,j) =>
-      i % (p.logicalDims.drop(j).product) / p.logicalDims.drop(j+1).product
+  val m = (0 until p.volume).map{ i =>
+    val coords = p.Ds.zipWithIndex.map{ case (b,j) =>
+      i % (p.Ds.drop(j).product) / p.Ds.drop(j+1).product
     }
     val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.S((p.bitWidth+1).W).asUInt.apply(p.bitWidth,0) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
@@ -526,10 +524,10 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
         out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.collect{case (cg, b, o) if (b == 0 && cg == castgrp) => o}.head
       }
       else {
-        val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.banks(j))}
+        val visBanksForLane = port.visibleBanks(lane).zipWithIndex.map{case(r,j) => r.expand(p.Ns(j))}
         val visibleMems = m.collect{case (m, ba) if (ba.zip(visBanksForLane).forall{case (real, possible) => possible.contains(real)}) => (m, ba)}
         val datas = visibleMems.map(_._1)
-        val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.banks.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
+        val bankMatches = if (visibleMems.size == 1) Seq(true.B) else visibleMems.map(_._2).map{ba => port.banks.grouped(p.Ns.size).toSeq(lane).zip(ba).map{case (a,b) => a === b.U}.reduce{_&&_} }
         val en = port.en(lane)
         val sel = bankMatches.map{be => be & en}
         out := chisel3.util.PriorityMux(sel, datas)
@@ -543,7 +541,7 @@ class LUT(p: MemParams) extends MemPrimitive(p) {
 class Mem1D(val size: Int, bitWidth: Int, syncMem: Boolean = false) extends Module { // Unbanked, inner 1D mem
   def this(size: Int) = this(size, 32)
 
-  val addrWidth = log2Up(size)
+  val addrWidth = _root_.utils.math.log2Up(size)
 
   val io = IO( new Bundle {
     val r = Input(new R_Port(1, addrWidth, List(1), bitWidth, List(List(ResidualGenerator(1,0,1)))))
@@ -600,35 +598,23 @@ class enqPort(val w: Int) extends Bundle {
 }
 
 class Compactor(val ports: List[Int], val banks: Int, val width: Int, val bitWidth: Int = 32) extends Module {
-  val num_compactors = if (ports.size == 0) 1 else ports.max
   val io = IO( new Bundle {
       val numEnabled =Input(UInt(width.W))
       val in = Vec(1 max ports.sum, Input(new enqPort(bitWidth)))
-      val out = Vec(1 max num_compactors, Output(new enqPort(bitWidth)))
+      val out = Vec(1 max banks, Output(new enqPort(bitWidth)))
     })
 
-    val compacted = (0 until num_compactors).map{i => 
-      val num_inputs_per_bundle = ports.map{p => if (i < p) p-i else 0}
-      val mux_selects = num_inputs_per_bundle.zipWithIndex.flatMap{case(j, id) =>
-        val in_start_id = ports.take(id).sum
-        val connect_start_id = num_inputs_per_bundle.take(id).sum
-        val num_holes = if ((ports(id)-j) > 0) {
-          (0 until (ports(id)-j)).map{ k => Mux(!io.in(in_start_id + k).en, 1.U(width.W), 0.U(width.W)) }.reduce{_+_} // number of 0's in this bundle that precede current
-        } else {
-          0.U(width.W)          
-        }
-        (0 until j).map{k => 
-          val ens_below = if (k > 0) {(0 until k).map{l => Mux(io.in(in_start_id + (ports(id) - j + l)).en, 1.U(width.W), 0.U(width.W)) }.reduce{_+_}} else {0.U(width.W)}
-          io.in(in_start_id + (ports(id) - j + k)).en & ens_below >= num_holes
+    val enBelow = List.tabulate[UInt](ports.sum){j => (0 until j).map{ k => Mux(io.in(k).en, 1.U(16.W), 0.U(16.W)) }.foldLeft(0.U(16.W)){_+_}}
+    (0 until banks).foreach{i =>
+      // Identify first lane between i and ports.sum that is enabled
+      val takeThisLane = List.tabulate(ports.sum){j =>
+        if (j < i) false.B
+        else {
+          io.in(j).en && enBelow(j) === i.U
         }
       }
-      val mux_datas = num_inputs_per_bundle.zipWithIndex.map{case(j, id) => 
-        val in_start_id = ports.take(id).sum
-        val connect_start_id = num_inputs_per_bundle.take(id).sum
-        (0 until j).map{k => io.in(in_start_id + (ports(id) - j + k)).data}
-      }.flatten
-      if (mux_selects.size == 0) io.out(i).data := 0.U else io.out(i).data := chisel3.util.PriorityMux(mux_selects, mux_datas)
-      io.out(i).en := i.U(width.W) < io.numEnabled
+      io.out(i).data := chisel3.util.PriorityMux(takeThisLane, io.in.map(_.data))
+      io.out(i).en := takeThisLane.foldLeft(false.B){_||_}
     }
 }
 
@@ -646,7 +632,7 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
     })
 
   val numEnabled = io.in.map{i => Mux(i.en, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
-  val num_compactors = if (ports.size == 0) 1 else ports.max
+  val num_compactors = if (ports.size == 0) 1 else ports.sum
 
   // Compactor
   val compactor = Module(new Compactor(ports, banks, width, bitWidth))
@@ -661,7 +647,7 @@ class CompactingEnqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val outs = (0 until banks).map{ i =>
     val lane_enable = Mux(i.S(width.W) < num_straddling | (i.S(width.W) >= current_base_bank & i.S(width.W) < current_base_bank + numEnabled.asSInt), true.B, false.B)
     val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, i.S(width.W) - current_base_bank)
-    val port_vals = (0 until num_compactors).map{ i => 
+    val port_vals = (0 until banks).map{ i =>
       (i.U(width.W) -> compactor.io.out(i).data)
     }
     val lane_data = chisel3.util.MuxLookup(id_from_base.asUInt, 0.U(bitWidth.W), port_vals)
@@ -681,12 +667,10 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
         val data = Vec(1 max banks, Input(UInt(bitWidth.W)))
         val deq = Vec(1 max ports.sum, Input(Bool()))
       }
-      val output = Vec({if (ports.size == 0) 1 else ports.max}, Output(UInt(bitWidth.W)))
+      val output = Vec({if (ports.size == 0) 1 else ports.sum}, Output(UInt(bitWidth.W)))
     })
   io.output := DontCare
   // Compactor
-  val num_compactors = if (ports.size == 0) 1 else ports.max
-  // val numPort_width = 1 + Utils.log2Up(ports.max)
   val numEnabled = io.input.deq.map{i => Mux(i, 1.U(width.W), 0.U(width.W))}.reduce{_+_}
 
   // Router
@@ -695,7 +679,7 @@ class CompactingDeqNetwork(val ports: List[Int], val banks: Int, val width: Int,
   val num_straddling = Mux(upper < 0.S(width.W), 0.S(width.W), upper)
   val num_straight = (numEnabled.asSInt) - num_straddling
   // TODO: Probably has a bug if you have more than one dequeuer
-  (0 until {if (ports.size == 0) 1 else ports.max}).foreach{ i =>
+  (0 until {if (ports.size == 0) 1 else ports.sum}).foreach{ i =>
     val id_from_base = Mux(i.S(width.W) < num_straddling, i.S(width.W) + num_straight, Math.singleCycleModulo((i.S(width.W) + current_base_bank), banks.S(width.W)))
     val ens_below = if (i>0) (0 until i).map{j => Mux(io.input.deq(j), 1.U(width.W), 0.U(width.W)) }.reduce{_+_} else 0.U(width.W)
     val proper_bank = Math.singleCycleModulo((current_base_bank.asUInt + ens_below), banks.U(width.W))

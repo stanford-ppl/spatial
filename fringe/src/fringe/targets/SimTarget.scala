@@ -9,7 +9,7 @@ import chisel3._
 abstract class SimTarget extends DeviceTarget {
   def makeBigIP: BigIP = new BigIPSim
 
-  def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
+  def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io: VerilatorInterface = IO(new VerilatorInterface)
 
     val blockingDRAMIssue = false

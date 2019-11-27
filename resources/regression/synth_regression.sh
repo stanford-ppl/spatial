@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export NUM_THREADS=4
+export NUM_THREADS=2
 
 jobs=`ps aux | grep "mattfel.*sbt" | wc -l`
 if [[ $jobs -gt 40 ]]; then

@@ -184,13 +184,11 @@ package object math {
   def hiddenVolume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]) : Int = {
     if (Ps.size == 0) 0
     else if (Ns.size == 1) {
-      val hang = Ps.map{_ % Ns.head}.min
-      if (hang == 0) 0 else Bs.head*(Ns.head - hang)*nhoods(Ds, Ps)
+      Ds.product * Ps.map{x => scala.math.ceil(Ns.head.toDouble*Bs.head/x).toInt - 1}.max
     }
     else Ps.zip(Ns).zipWithIndex.map{case ((p,n),i) =>
-      val hang = p % n
-      if (hang == 0) 0 else Bs(i)*(n - hang)*Ps.patch(i,Nil,1).product
-    }.sum * nhoods(Ds, Ps)
+      Ds(i) * (scala.math.ceil(Bs(i)*n.toDouble/p).toInt - 1)
+    }.product
   }
   def volume(Ns: Seq[Int], Bs: Seq[Int], Ps: Seq[Int], Ds: Seq[Int]): Int = Ds.product + hiddenVolume(Ns, Bs, Ps, Ds)
   def numBanks(Ns: Seq[Int]): Int = Ns.product

@@ -228,9 +228,9 @@ import argon.Block
           }
           val out_sram = SRAM[Int](32)
           Foreach(32 by 1 par P3){k => 
-            val data = List.tabulate(3){i => List.tabulate(3){j => 
+            val data = List.tabulate(3,3){(i,j) =>
               if (row - 1 + i >= 0 && row - 1 + i < 5 && col - 1 + j >= 0 && col - 1 + j < 5) in_sram(i,j,k) else 0
-            }}.flatten.reduceTree{_+_} 
+            }.flatten.reduceTree{_+_}
 
             out_sram(k) = data
           }
@@ -252,6 +252,85 @@ import argon.Block
     assert(gold == results)
 
 
+
+  }
+}
+
+
+@spatial class BankLines2 extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+    /*
+       This app checks if the hierarchical banking works, specifically the interplay between lockstep-ness and projections.
+       bankrow:
+           O   --->
+                        O  --->
+           |--unk-dist--|
+
+       bankcol:
+           O   _ _
+           |    |
+           |    |  unknown dist
+           \/   |
+               _|_
+              O
+              |
+              |
+              \/
+
+        bankdiag
+           O  --->
+             O  --->
+          |-|
+           lockstep dist
+
+
+
+     */
+    val P1 = 3
+
+    val bankrow_dram = DRAM[Int](8,8)
+    val bankcol_dram = DRAM[Int](8,8)
+    val bankdiag_dram = DRAM[Int](8,8)
+
+    Accel{
+      val bankrow = SRAM[Int](8,8).hierarchical.nofission
+      Foreach(8 by 1, 8 by 1){(i,j) => bankrow(i,j) = 0}
+      val starts = LUT[Int](8)(Seq.tabulate(8){i => (i % 4).to[Int]}:_*)
+      Foreach(8 by 1 par P1){row =>
+        Foreach(starts(row) until 8 by 1){col => bankrow(row,col) = row + col}
+      }
+      bankrow_dram store bankrow
+
+      val bankcol = SRAM[Int](8,8).hierarchical.nofission
+      Foreach(8 by 1, 8 by 1){(i,j) => bankcol(i,j) = 0}
+      Foreach(8 by 1 par P1){col =>
+        Foreach(starts(col) until 8 by 1){row => bankcol(row,col) = row + col}
+      }
+      bankcol_dram store bankcol
+
+      val bankdiag = SRAM[Int](8,8).hierarchical.nofission
+      Foreach(8 by 1, 8 by 1){(i,j) => bankdiag(i,j) = 0}
+      Foreach(8 by 1 par P1){row =>
+        Foreach((row % P1) until 8 by 1){col => bankdiag(row,col) = row + col}
+      }
+      bankdiag_dram store bankdiag
+    }
+
+    // Get results
+    val goldrow = (0::8,0::8){(i,j) => if (j < (i % 4)) 0 else (i + j)}
+    val goldcol = (0::8,0::8){(j,i) => if (j < (i % 4)) 0 else (i + j)}
+    val golddiag = (0::8,0::8){(i,j) => if (j < (i % P1)) 0 else (i + j)}
+    val gotrow = getMatrix(bankrow_dram)
+    val gotcol = getMatrix(bankcol_dram)
+    val gotdiag = getMatrix(bankdiag_dram)
+    printMatrix(goldrow, "gold row")
+    printMatrix(gotrow, "got row")
+    printMatrix(goldcol, "gold col")
+    printMatrix(gotcol, "got col")
+    printMatrix(golddiag, "gold diag")
+    printMatrix(gotdiag, "got diag")
+    assert (goldrow == gotrow && goldcol == gotcol && golddiag == gotdiag)
 
   }
 }

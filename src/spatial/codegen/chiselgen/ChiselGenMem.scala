@@ -175,7 +175,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val blockCycs = {if (mem.isLUT | mem.isRegFile) List.fill(dims.size)(1) else inst.Bs}.map(_.toString).mkString("List[Int](",",",")")
     val neighborhood = {if (mem.isLUT | mem.isRegFile) dims else inst.Ps}.map(_.toString).mkString("List[Int](",",",")")
     val bankingMode = "BankedMemory" // TODO: Find correct one
-    val ofsWidth = utils.math.ofsWidth(utils.math.volume(inst.nBanks, inst.Bs, inst.Ps, paddedDims(mem,name)), inst.nBanks)
+    val ofsWidth =
+      if (mem.isLineBuffer) utils.math.ofsWidth(paddedDims(mem,name).last, Seq(inst.nBanks.last))
+      else utils.math.ofsWidth(utils.math.volume(inst.nBanks, inst.Bs, inst.Ps, paddedDims(mem,name)), inst.nBanks)
     val banksWidths = utils.math.banksWidths(inst.nBanks)
 
     val initStr = if (init.isDefined) expandInits(mem, init.get, name) else "None"

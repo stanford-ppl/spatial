@@ -61,7 +61,7 @@ import spatial.dsl._
       last_dram3 store sram3
 
       val lb4 = LineBuffer.strided[I32](8,26,2)
-      val sram4 = SRAM[I32](7,25)
+      val sram4 = SRAM[I32](7,25).flat
       Foreach(12 by 2){i => 
         lb4 load init4_dram(i::i+2, 0::25)
         // Foreach(2 by 1, 25 by 1 par 1){(r,j) => 

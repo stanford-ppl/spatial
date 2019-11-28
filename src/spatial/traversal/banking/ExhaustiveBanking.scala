@@ -90,7 +90,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         }
       }
     }
-    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): Seq[SparseMatrix[Idx]] = {
+    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): Seq[Seq[SparseMatrix[Idx]]] = {
       val fullStrategy = Seq.tabulate(rank){i => i}
       // For hierarchical views, regroup accesses based on whether their "complements" are non-interfering AND their projection is not unique
       val grpViews: Seq[AccessView] = grp.map{mat =>
@@ -99,42 +99,48 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         t
       }
       dbgs(s"")
-      val projectionsToBank = ArrayBuffer[AccessView]()
-      grpViews.foreach{current: AccessView =>
-        val prevAccs = projectionsToBank
-        // Check if this access is "already handled" by a different dimension.
-        //  "Already handled" means that EITHER the prior- or post- complement access has a non-conflicting dimension,
-        //                                   OR no dimensions conflict and dims == first dim.
-        //     We need to do the XOR of these to make sure we don't account for non-conflicting twice and end up with too few
-        //     banks, such as in the case of a diagonal lockstep access pattern.  If no dim conflicts, then no projection will
-        //     take care of it so check for the case of no dims conflicting and we are on the first dim
-        val alreadyHandled: scala.Boolean = prevAccs.exists{other =>
-          val priordiff = current.priorComplementAccess - other.priorComplementAccess
-          val nonconflictingPriorDim = priordiff.rows.exists{row =>
-            val patternForDim = Seq(1)*SparseMatrix[Idx](Seq(row)) === 0
-            val emptyPolytope = patternForDim.andDomain.isEmpty
-            emptyPolytope
+      val projectionsToBank = ArrayBuffer(ArrayBuffer[AccessView]())
+      grpViews.foreach { current: AccessView =>
+        var grpId = 0
+        var placed = false
+        while (!placed & grpId < projectionsToBank.size) {
+          val prevAccs = projectionsToBank(grpId)
+          // Check if this access is "already handled" by a different dimension.
+          //  "Already handled" means that EITHER the prior- or post- complement access has a non-conflicting dimension,
+          //                                   OR no dimensions conflict and dims == first dim.
+          //     We need to do the XOR of these to make sure we don't account for non-conflicting twice and end up with too few
+          //     banks, such as in the case of a diagonal lockstep access pattern.  If no dim conflicts, then no projection will
+          //     take care of it so check for the case of no dims conflicting and we are on the first dim
+          val alreadyHandled: scala.Boolean = prevAccs.exists { other =>
+            val priordiff = current.priorComplementAccess - other.priorComplementAccess
+            val nonconflictingPriorDim = priordiff.rows.exists { row =>
+              val patternForDim = Seq(1) * SparseMatrix[Idx](Seq(row)) === 0
+              val emptyPolytope = patternForDim.andDomain.isEmpty
+              emptyPolytope
+            }
+            val postdiff = current.postComplementAccess - other.postComplementAccess
+            val nonconflictingPostDim = postdiff.rows.exists { row =>
+              val patternForDim = Seq(1) * SparseMatrix[Idx](Seq(row)) === 0
+              val emptyPolytope = patternForDim.andDomain.isEmpty
+              emptyPolytope
+            }
+            nonconflictingPriorDim ^ nonconflictingPostDim
           }
-          val postdiff = current.postComplementAccess - other.postComplementAccess
-          val nonconflictingPostDim = postdiff.rows.exists{row =>
-            val patternForDim = Seq(1)*SparseMatrix[Idx](Seq(row)) === 0
-            val emptyPolytope = patternForDim.andDomain.isEmpty
-            emptyPolytope
+          val noDimsActuallyHandled: scala.Boolean = prevAccs.exists { other =>
+            val alldiff = current.access - other.access
+            val nonconflictingAllDim = alldiff.rows.forall { row =>
+              val patternForDim = Seq(1) * SparseMatrix[Idx](Seq(row)) === 0
+              val emptyPolytope = patternForDim.andDomain.isEmpty
+              emptyPolytope
+            }
+            nonconflictingAllDim && dims == List(0)
           }
-          nonconflictingPriorDim ^ nonconflictingPostDim
+          if (!alreadyHandled || noDimsActuallyHandled) {projectionsToBank(grpId) += current; placed = true}
+          else if (grpId == projectionsToBank.size-1) {projectionsToBank += ArrayBuffer(current); placed = true}
+          else grpId = grpId + 1
         }
-        val noDimsActuallyHandled: scala.Boolean = prevAccs.exists{other =>
-          val alldiff = current.access - other.access
-          val nonconflictingAllDim = alldiff.rows.forall{row =>
-            val patternForDim = Seq(1)*SparseMatrix[Idx](Seq(row)) === 0
-            val emptyPolytope = patternForDim.andDomain.isEmpty
-            emptyPolytope
-          }
-          nonconflictingAllDim && dims == List(0)
-        }
-        if (!alreadyHandled || noDimsActuallyHandled) projectionsToBank += current
       }
-      projectionsToBank.map(_.activeAccess)
+      projectionsToBank.map(_.map(_.activeAccess).toSeq)
     }
 
 //      // TODO: Figure out what this is doing.  It seems unnecessary
@@ -218,8 +224,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             val rawBanking: Seq[Map[AccessGroups, Option[PartialBankingChoices]]] = view.expand().map{axes =>
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-              val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.map{grp => repackageGroup(grp, axes, false).toSet} else myWrites.map(_.toSet)
-              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myReads.map{grp => repackageGroup(grp, axes, true).toSet} else {myReads.map(_.toSet)}
+              val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else myWrites.map(_.toSet)
+              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) {myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet)} else {myReads.map(_.toSet)}
               val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
               selGrps.zipWithIndex.foreach{case (grp,i) =>
                 dbgs(s"Banking group #$i has (${grp.size} accesses)")

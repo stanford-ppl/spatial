@@ -74,11 +74,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           val keyRules: scala.collection.immutable.Map[Idx, (Idx, Int)] = aIters.zipWithIndex.collect {
             // TODO: Figure out why this getDephasedUID is necessary?  Its logic is hard to follow but it seems like it may be doing-
             //       some kind of lookup for a uid fork point up to that point and no deeper, but I'm not sure the synch logic
-            //       needs this anymore
-//            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
-//              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
-            case (iter, i) if rules.contains((iter, a.unroll)) =>
-              iter -> rules((iter, a.unroll))
+            //       needs this anymore.  BankLockstep breaks if you just do a.unroll though...
+            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
+              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
+            // case (iter, i) if rules.contains((iter, a.unroll)) =>
+            //   iter -> rules((iter, a.unroll))
           }.toMap
           if (keyRules.nonEmpty) {
             mem.addDephasedAccess(a.access);

@@ -464,26 +464,20 @@ package object control {
         if (luid != lbase && !forked) {forked = true; firstFork = true}
         // val forkedIters = (bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)).zipped.collect{case (iters,uid0,uid1) if (uid.zip(uid1).exists{case (a,b) => a != b}) => iters}.flatten.toSeq
 
-        // 2.1) If at first fork, mark iterators for layer appropriately and decide if entire subtrees are synchronized or not
-        if (firstFork) {
-          // 3.1) If first fork occurs at inner controller (including itersRed of OpMemReduce), then iterators are always synchronized
-          if (ctrl.isInnerControl || liters.forall(ctrl.memReduceItersRed.contains)) {
-            liters.foreach{iter => map += (iter -> Some(0))}
-          }
-          // 3.2) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
-          else if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
-            val stopAtChild = if (layer + 1 < controlChain.size && (op.isDefined && !op.get.isLoop)) Some(controlChain(layer+1)) else None
-            if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
-            else foundRandomLayer = true
-          }
-          // 3.3) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
-          else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
-            if ((layer + 1 < controlChain.size) && controlChain(layer+1).synchronizedStart((forkedIters ++ liters).distinct, entry = true)) liters.foreach{ iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
-            else foundRandomLayer = true
-          }
-        } else if (forked) {
-          // 3.5) Otherwise assume we can mark synchronization because firstFork determined we are still synchronized
-          liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+        // 3.1) If first fork occurs at inner controller (including itersRed of OpMemReduce), then iterators are always synchronized
+        if (ctrl.isInnerControl || liters.forall(ctrl.memReduceItersRed.contains)) {
+          liters.foreach{iter => map += (iter -> Some(0))}
+        }
+        // 3.2) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
+        else if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
+          val stopAtChild = if (layer + 1 < controlChain.size && (op.isDefined && !op.get.isLoop)) Some(controlChain(layer+1)) else None
+          if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+          else foundRandomLayer = true
+        }
+        // 3.3) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
+        else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
+          liters.foreach{ iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+          if (!((layer + 1 < controlChain.size) && controlChain(layer+1).synchronizedStart((forkedIters ++ liters).distinct, entry = true))) foundRandomLayer = true
         } else {
           liters.foreach{iter => map += (iter -> Some(0))}
         }
@@ -515,7 +509,8 @@ package object control {
     }
 
     /** Returns true if the subtree rooted at ctrl run for the same number of cycles (i.e. iterations) regardless of uid.
-      * entry flag identifies whether the outermost iterator of the cchain should be ignored or not
+      * "entry" flag identifies whether the outermost iterator of the cchain should be ignored or not
+      * "entry" indicates whether the binding Parallel controller is placed as a child of the parallelized LCA or a parent of the parallelized LCA
       */
     @stateful def synchronizedStart(forkedIters: Seq[Idx], entry: Boolean = false, stopAtChild: Option[Sym[_]] = None): Boolean = {
       val meSynch = cchainIsInvariant(forkedIters, entry)
@@ -527,7 +522,7 @@ package object control {
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], entry: Boolean): Boolean = {
       import spatial.util.modeling._
       if (isFSM || isStreamControl) false
-      else if (isSwitch && isOuterControl) {
+      else if (isSwitch && parent.s.get.isOuterControl) { // If this is a switch serving as a controller (i.e. not a dataflow primitive)
         val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
         val condMutators = conditions.flatMap(mutatingBounds(_))
         condMutators.intersect(forkedIters).isEmpty

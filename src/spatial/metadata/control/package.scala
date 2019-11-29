@@ -457,27 +457,33 @@ package object control {
       // 2) For each layer, determine iterOfs based on the uids of this layer and forking of parent layers
       while (layer < bundledIters.size && !foundRandomLayer) {
         val ctrl = controlChain(layer)
-        val liters = bundledIters(layer) // Iterators in the same layer as this fork (i.e. same cchain)
+        val liters = bundledIters(layer)
         val luid = bundledUID(layer)
         val lbase = bundledBase(layer)
         // Mark forked flags when we reach first fork, meaning every descendent from now on comes from different ancestry
         if (luid != lbase && !forked) {forked = true; firstFork = true}
         // val forkedIters = (bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)).zipped.collect{case (iters,uid0,uid1) if (uid.zip(uid1).exists{case (a,b) => a != b}) => iters}.flatten.toSeq
 
-        // 3.1) If first fork occurs at inner controller (including itersRed of OpMemReduce), then iterators are always synchronized
-        if (ctrl.isInnerControl || liters.forall(ctrl.memReduceItersRed.contains)) {
-          liters.foreach{iter => map += (iter -> Some(0))}
-        }
-        // 3.2) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
-        else if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
-          val stopAtChild = if (layer + 1 < controlChain.size && (op.isDefined && !op.get.isLoop)) Some(controlChain(layer+1)) else None
-          if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
-          else foundRandomLayer = true
-        }
-        // 3.3) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
-        else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
-          liters.foreach{ iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
-          if (!((layer + 1 < controlChain.size) && controlChain(layer+1).synchronizedStart((forkedIters ++ liters).distinct, entry = true))) foundRandomLayer = true
+        // 2.1) If at first fork, mark iterators for layer appropriately and decide if entire subtrees are synchronized or not
+        if (firstFork) {
+          // 3.1) If first fork occurs at inner controller (including itersRed of OpMemReduce), then iterators are always synchronized
+          if (ctrl.isInnerControl || liters.forall(ctrl.memReduceItersRed.contains)) {
+            liters.foreach{iter => map += (iter -> Some(0))}
+          }
+          // 3.2) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
+          else if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
+            val stopAtChild = if (layer + 1 < controlChain.size && (op.isDefined && !op.get.isLoop)) Some(controlChain(layer+1)) else None
+            if (ctrl.synchronizedStart(forkedIters, entry = true, stopAtChild = stopAtChild)) liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+            else foundRandomLayer = true
+          }
+          // 3.3) If forked MOP, check synchronization for next layer's ctrl and ignore outermost iterator. I.e. Set forkpoint at next layer's ctrl
+          else if (ctrl.isOuterControl && ctrl.willUnrollAsMOP) {
+            if ((layer + 1 < controlChain.size) && controlChain(layer+1).synchronizedStart(forkedIters ++ liters, entry = true)) liters.foreach{ iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
+            else foundRandomLayer = true
+          }
+        } else if (forked) {
+          // 3.5) Otherwise assume we can mark synchronization because firstFork determined we are still synchronized
+          liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
         } else {
           liters.foreach{iter => map += (iter -> Some(0))}
         }

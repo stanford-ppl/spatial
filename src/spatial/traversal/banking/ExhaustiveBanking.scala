@@ -17,9 +17,11 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 
-case class AccessView(val activeDims: Seq[Int], val fullDims: Seq[Int], val access: SparseMatrix[Idx]){
+case class AccessView(activeDims: Seq[Int], fullDims: Seq[Int], access: SparseMatrix[Idx]){
   def activeAccess: SparseMatrix[Idx] = access.sliceDims(activeDims)
   def complementAccess: SparseMatrix[Idx] = access.sliceDims(fullDims.diff(activeDims))
+  def priorComplementAccess: SparseMatrix[Idx] = access.sliceDims(fullDims.take(activeDims.max))
+  def postComplementAccess: SparseMatrix[Idx] = access.sliceDims(fullDims.takeRight(fullDims.max - activeDims.max))
 }
 
 case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStrategy {
@@ -72,11 +74,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           val keyRules: scala.collection.immutable.Map[Idx, (Idx, Int)] = aIters.zipWithIndex.collect {
             // TODO: Figure out why this getDephasedUID is necessary?  Its logic is hard to follow but it seems like it may be doing-
             //       some kind of lookup for a uid fork point up to that point and no deeper, but I'm not sure the synch logic
-            //       needs this anymore
-//            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
-//              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
-            case (iter, i) if rules.contains((iter, a.unroll)) =>
-              iter -> rules((iter, a.unroll))
+            //       needs this anymore.  BankLockstep breaks if you just do a.unroll though...
+            case (iter, i) if rules.contains((iter, getDephasedUID(aIters, a.unroll, i))) =>
+              iter -> rules((iter, getDephasedUID(aIters, a.unroll, i)))
+            // case (iter, i) if rules.contains((iter, a.unroll)) =>
+            //   iter -> rules((iter, a.unroll))
           }.toMap
           if (keyRules.nonEmpty) {
             mem.addDephasedAccess(a.access);
@@ -88,80 +90,86 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         }
       }
     }
-    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): ArrayBuffer[Seq[SparseMatrix[Idx]]] = {
+    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): Seq[Seq[SparseMatrix[Idx]]] = {
       val fullStrategy = Seq.tabulate(rank){i => i}
       // For hierarchical views, regroup accesses based on whether their "complements" are non-interfering AND their projection is not unique
-      val grpViews = grp.map{mat => 
+      val grpViews: Seq[AccessView] = grp.map{mat =>
         val t = AccessView(dims, fullStrategy, mat)
         if (isRd) lowRankMapping += (t.activeAccess -> {lowRankMapping.getOrElse(t.activeAccess, Set()) ++ Set(mat)}) 
         t
-      } 
-      val regrp = ArrayBuffer[ArrayBuffer[AccessView]]()
-      grpViews.zipWithIndex.foreach{case (current,i) => 
-        if (regrp.isEmpty) regrp += ArrayBuffer(current)
-        else {
-          // Find first group where current access may interfere with ANY of the complementary dimensions
-          var grpId = 0
-          var placed = false
-          while (grpId < regrp.size & !placed) {
-            val newProjection = !regrp(grpId).contains(current.activeDims)
-            val canConflict = regrp(grpId).exists{other => 
-              val diff = current.complementAccess - other.complementAccess
-              val conflictingMatrix = diff.rows.zipWithIndex.forall{case (row, dim) => 
-                val patternForDim = (Seq(1)*SparseMatrix[Idx](Seq(row)) === 0)
-                val conflictingRow = !patternForDim.andDomain.isEmpty
-                // dbgs(s"Row $dim: \n  ISL problem:\n${patternForDim.andDomain}")
-                if (!conflictingRow) {
-                  // dbgs(s"Found nonconflicting complementary dimension: $dim")
-                }
-                conflictingRow
-              }
-              conflictingMatrix
+      }
+      dbgs(s"")
+      val projectionsToBank = ArrayBuffer(ArrayBuffer[AccessView]())
+      grpViews.foreach { current: AccessView =>
+        var grpId = 0
+        var placed = false
+        while (!placed & grpId < projectionsToBank.size) {
+          val prevAccs = projectionsToBank(grpId)
+          // Check if this access is "already handled" by a different dimension.
+          //  "Already handled" means that EITHER the prior- or post- complement access has a non-conflicting dimension,
+          //                                   OR no dimensions conflict and dims == first dim.
+          //     We need to do the XOR of these to make sure we don't account for non-conflicting twice and end up with too few
+          //     banks, such as in the case of a diagonal lockstep access pattern.  If no dim conflicts, then no projection will
+          //     take care of it so check for the case of no dims conflicting and we are on the first dim
+          val alreadyHandled: scala.Boolean = prevAccs.exists { other =>
+            val priordiff = current.priorComplementAccess - other.priorComplementAccess
+            val nonconflictingPriorDim = priordiff.rows.exists { row =>
+              val patternForDim = Seq(1) * SparseMatrix[Idx](Seq(row)) === 0
+              val emptyPolytope = patternForDim.andDomain.isEmpty
+              emptyPolytope
             }
-            if (canConflict || newProjection) {
-              // dbgs(s"Placing in group $grpId")
-              regrp(grpId) = regrp(grpId) ++ ArrayBuffer(current)
-              placed = true
+            val postdiff = current.postComplementAccess - other.postComplementAccess
+            val nonconflictingPostDim = postdiff.rows.exists { row =>
+              val patternForDim = Seq(1) * SparseMatrix[Idx](Seq(row)) === 0
+              val emptyPolytope = patternForDim.andDomain.isEmpty
+              emptyPolytope
             }
-            else if (grpId < regrp.size - 1) {
-              // dbgs(s"Cannot place in group $grpId because it has no conflicts in dim $dims")
-              grpId += 1
-            } else {
-              // dbgs(s"Making new group")
-              regrp += ArrayBuffer(current)
-              placed = true
-            }
+            nonconflictingPriorDim ^ nonconflictingPostDim
           }
+          val noDimsActuallyHandled: scala.Boolean = prevAccs.exists { other =>
+            val alldiff = current.access - other.access
+            val nonconflictingAllDim = alldiff.rows.forall { row =>
+              val patternForDim = Seq(1) * SparseMatrix[Idx](Seq(row)) === 0
+              val emptyPolytope = patternForDim.andDomain.isEmpty
+              emptyPolytope
+            }
+            nonconflictingAllDim && dims == List(0)
+          }
+          if (!alreadyHandled || noDimsActuallyHandled) {projectionsToBank(grpId) += current; placed = true}
+          else if (grpId == projectionsToBank.size-1) {projectionsToBank += ArrayBuffer(current); placed = true}
+          else grpId = grpId + 1
         }
       }
-      // dbgs(s"regrouped $grpViews\n\n-->\n\n$regrp")
-
-      regrp.map{newgrp => 
-        var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
-
-        /** True if the sliced matrix has any of the following:
-          *   - If the access is identical to another within this group
-          *   - If it is the first time we are seeing this "sliced matrix" within this group
-          */
-        def isUniqueSliceInGroup(i: Int): Boolean = {
-          // Current (sliced matrix, complement matrix) tuple
-          val current = newgrp(i)
-
-          // Others in group (Sequence of (sliced matrix, complement matrix) tuples)
-          val pairsExceptCurrent = newgrp.patch(i,Nil,1)
-
-          val totalCollision = pairsExceptCurrent.exists{other => other.access == current.access }
-          val firstTime          = !firstInstances.contains(current.activeAccess)
-
-          totalCollision || firstTime
-        }
-
-        Seq(newgrp.zipWithIndex.collect{case (current,i) if isUniqueSliceInGroup(i) =>
-          firstInstances += current.activeAccess
-          current.activeAccess
-        }:_*)
-      }
+      projectionsToBank.map(_.map(_.activeAccess).toSeq)
     }
+
+//      // TODO: Figure out what this is doing.  It seems unnecessary
+//      regrp.map{newgrp =>
+//        var firstInstances: Set[SparseMatrix[Idx]] = Set.empty
+//
+//        /** True if the sliced matrix has any of the following:
+//          *   - If the access is identical to another within this group
+//          *   - If it is the first time we are seeing this "sliced matrix" within this group
+//          */
+//        def isUniqueSliceInGroup(i: Int): Boolean = {
+//          // Current (sliced matrix, complement matrix) tuple
+//          val current = newgrp(i)
+//
+//          // Others in group (Sequence of (sliced matrix, complement matrix) tuples)
+//          val pairsExceptCurrent = newgrp.patch(i,Nil,1)
+//
+//          val totalCollision = pairsExceptCurrent.exists{other => other.access == current.access }
+//          val firstTime          = !firstInstances.contains(current.activeAccess)
+//
+//          totalCollision || firstTime
+//        }
+//
+//        Seq(newgrp.zipWithIndex.collect{case (current,i) if isUniqueSliceInGroup(i) =>
+//          firstInstances += current.activeAccess
+//          current.activeAccess
+//        }:_*)
+//      }
+//    }
 
     def findSchemes(myReads: Set[Seq[SparseMatrix[Idx]]], myWrites: Set[Seq[SparseMatrix[Idx]]], hostReads: SingleAccessGroup): Map[BankingOptions, Map[AccessGroups, FullBankingChoices]] = {
       val effort = mem.bankingEffort

@@ -12,7 +12,7 @@ trait CppGenFileIO extends CppGenCommon {
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")
       emit(src"""assert(${lhs}.good() && "File ${src"$filename".replace("\"","")} does not exist"); """)
 
-    case op @ ReadBinaryFile(file) =>
+    case op @ ReadBinaryFile(file, isASCIITextFile) =>
       // Pull raw data out of file
       emit(src"${file}.seekg(0, std::ios::end);")
       emit(src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();""")
@@ -21,20 +21,27 @@ trait CppGenFileIO extends CppGenCommon {
       emit(src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);")
       val chars = Math.ceil(op.A.nbits.toDouble / 8).toInt
       val rawtp = asIntType(op.A)
-      // Place raw data in appropriately-sized vector with correct bit width
-      emit(src"std::vector<${rawtp}>* ${lhs}_raw = new std::vector<${rawtp}>(${lhs}_temp.size()/${chars});")
-      emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
-      // Convert raw data into appropriate type
-      emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}((*${lhs}_raw).size());")
-      op.A match { 
-        case FixPtType(s,d,f) => 
-          open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${lhs}).size(); ${lhs}_i++) {")
-            emit(src"(*${lhs})[${lhs}_i] = ${toApproxFix(src"(*${lhs}_raw)[${lhs}_i]", op.A)};")
-          close("}")
-        case _ => 
-          emit(src"${lhs} = ${lhs}_raw;")
-      }
 
+      // Avoid double allocating vectors when the binary file is a large text file
+      if (isASCIITextFile) {
+        emit(
+          src"${lhs.tp}* ${lhs} = ${lhs}_temp;"
+        )
+      } else {
+        // Place raw data in appropriately-sized vector with correct bit width
+        emit(src"std::vector<${rawtp}>* ${lhs}_raw = new std::vector<${rawtp}>(${lhs}_temp.size()/${chars});")
+        emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
+        // Convert raw data into appropriate type
+        emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}((*${lhs}_raw).size());")
+        op.A match {
+          case FixPtType(s,d,f) =>
+            open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${lhs}).size(); ${lhs}_i++) {")
+            emit(src"(*${lhs})[${lhs}_i] = ${toApproxFix(src"(*${lhs}_raw)[${lhs}_i]", op.A)};")
+            close("}")
+          case _ =>
+            emit(src"${lhs} = ${lhs}_raw;")
+        }
+      }
 
     case op @ WriteBinaryFile(file, len, value) =>
       val i = value.input
@@ -54,7 +61,6 @@ trait CppGenFileIO extends CppGenCommon {
       
     case CloseBinaryFile(file) =>
       emit(src"$file.close();")
-
 
     case OpenCSVFile(filename, isWr) => 
       val dir = if (isWr) "o" else "i"

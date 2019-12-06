@@ -16,7 +16,7 @@ trait CppGenFileIO extends CppGenCommon {
       // Pull raw data out of file
       emit(src"${file}.seekg(0, std::ios::end);")
       emit(src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();""")
-      emit(src"std::vector<char> ${lhs}_temp (${lhs}_pos); ")
+      emit(src"std::vector<char> ${lhs}_temp (${lhs}_pos); ") // TODO: need to new this thing.
       emit(src"${file}.seekg(0, std::ios::beg);")
       emit(src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);")
       val chars = Math.ceil(op.A.nbits.toDouble / 8).toInt
@@ -25,7 +25,7 @@ trait CppGenFileIO extends CppGenCommon {
       // Avoid double allocating vectors when the binary file is a large text file
       if (isASCIITextFile) {
         emit(
-          src"${lhs.tp}* ${lhs} = ${lhs}_temp;"
+          src"vector<char>* ${lhs} = &${lhs}_temp;"
         )
       } else {
         // Place raw data in appropriately-sized vector with correct bit width

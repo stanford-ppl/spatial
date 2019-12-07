@@ -42,6 +42,7 @@ else
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs vcs"
 endif
 	cp -r vcs.hw-resources/* verilog-vcs
+	cp *.v verilog-vcs # hack for grabbing any blackboxes that may have been dumped here
 	touch in.txt
 	make -C verilog-vcs
 	ln -sf verilog-vcs verilog

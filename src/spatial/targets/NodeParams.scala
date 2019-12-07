@@ -9,6 +9,7 @@ import spatial.util.spatialConfig
 import spatial.metadata.control._
 import spatial.metadata.types._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 import spatial.metadata.retiming._
 import scala.math.log
 
@@ -40,6 +41,8 @@ trait NodeParams {
     case _@DelayLine(d,_) => ("DelayLine", Seq("d" -> {if (s.userInjectedDelay) d else 0}))
 
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
+
+    case op:VerilogBlackbox[_,_] => ("VerilogBlackbox", Seq("lat" -> s.bboxInfo.latency))
 
     case _:SRAMRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMAsyncRead", Nil)
     case _:SRAMBankedRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMBankedAsyncRead", Nil)

@@ -2,7 +2,7 @@ package spatial.node
 
 import argon._
 import forge.tags._
-
+import argon.node.{Primitive, StructAlloc}
 import spatial.lang._
 
 abstract class BlackBox[R:Type] extends Control[R]
@@ -39,5 +39,9 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
 //@op case class CONVBox() extends BlackBox
 //@op case class SHIFTBox(validAfter: Int) extends BlackBox
 
+//@op case class VerilogBlackBox[A:Bits](ins: Seq[A])(implicit val tV: Vec[A]) extends Primitive[Vec[A]] {
+@op case class VerilogBlackbox[A:Struct,B:Struct](in: Bits[A]) extends Primitive[B] {
+  override def effects = Effects.Unique
+}
 
 

@@ -18,8 +18,6 @@ trait CppCodegen extends FileDependencies with AccelTraversal  {
   }
 
   override def copyDependencies(out: String): Unit = {
-    val cppResourcesPath = "synth/"
-
     // // FIXME: Should be OS-independent. Ideally want something that also supports wildcards, maybe recursive copy
     // // Kill old datastructures
     // s"""rm -rf ${out}/datastructures""".!

@@ -96,7 +96,7 @@ trait FileIOAPI { this: Implicits =>
   }
 
   @rig def openBinary(filename: Text, write: Boolean): BinaryFile = stage(OpenBinaryFile(filename, write))
-  @rig def readBinary[A:Num](file: BinaryFile, isASCIITextFile: Boolean = false): Tensor1[A] = stage(ReadBinaryFile(file, isASCIITextFile))
+  @rig def readBinary[A:Num](file: BinaryFile, isASCIITextFile: Boolean = false): Tensor1[A] = stage(ReadBinaryFile(file))
   @rig def writeBinary[A:Num](file: BinaryFile, len: I32)(func: I32 => A): Void = {
     val i = boundVar[I32]
     val f = stageLambda1(i){ func(i) }
@@ -126,11 +126,12 @@ trait FileIOAPI { this: Implicits =>
   @api def loadNumpy2D[T:Num](name: String): Tensor2[T] = stage(NumpyMatrix(name))
 
 
-  /** Loads an ASCII text file. */
-  @api def loadASCIITextFile(filename: Text): Tensor1[spatial.dsl.Char] = {
+  /** Returns a 1-D DRAM preloaded with a raw text file.
+    * We assume that the text file is sufficiently large.
+    * Hence, we cannot */
+  @api def loadDRAMWithASCIIText[T:Num](filename: Text, dram: DRAM1[T]): Void = {
     val file = openBinary(filename, write = false)
-    val array = readBinary[spatial.dsl.Char](file, isASCIITextFile = true)
+    stage(LoadDRAMWithASCIIText(file, dram))
     closeBinary(file)
-    array
   }
 }

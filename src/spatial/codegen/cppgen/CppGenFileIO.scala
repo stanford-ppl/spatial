@@ -7,40 +7,55 @@ import spatial.node._
 trait CppGenFileIO extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op @ LoadDRAMWithASCIIText(file, dram) =>
+      emit(src"${file}.seekg(0, std::ios::end);")
+      emit(src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();""")
+      emit(src"std::vector<char> ${lhs}_temp = new std::vector((${lhs}_pos)); ")
+      emit(src"${file}.seekg(0, std::ios::beg);")
+      emit(src"${file}.read(${lhs}_temp[0], ${lhs}_pos);")
+
+      val chars = Math.ceil(op.A.nbits.toDouble / 8).toInt
+      val rawtp = asIntType(op.A)
+      emit(src"I'm here...")
+//      emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
+//      emit(src"c1->memcpy($dram, &(*$ptr)[0], (*$ptr).size() * sizeof(${rawtp}));")
+
     case OpenBinaryFile(filename, isWr) =>
       val dir = if (isWr) "o" else "i"
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")
       emit(src"""assert(${lhs}.good() && "File ${src"$filename".replace("\"","")} does not exist"); """)
 
-    case op @ ReadBinaryFile(file, isASCIITextFile) =>
+    case op @ ReadBinaryFile(file) =>
       // Pull raw data out of file
       emit(src"${file}.seekg(0, std::ios::end);")
       emit(src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();""")
-      emit(src"std::vector<char> ${lhs}_temp (${lhs}_pos); ") // TODO: need to new this thing.
+//      if (isASCIITextFile)
+//        emit(src"std::vector<char> ${lhs}_temp = new std::vector((${lhs}_pos)); ")
+//      else
+      emit(src"std::vector<char> ${lhs}_temp (${lhs}_pos); ")
       emit(src"${file}.seekg(0, std::ios::beg);")
       emit(src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);")
       val chars = Math.ceil(op.A.nbits.toDouble / 8).toInt
       val rawtp = asIntType(op.A)
 
       // Avoid double allocating vectors when the binary file is a large text file
-      if (isASCIITextFile) {
-        emit(
-          src"vector<char>* ${lhs} = &${lhs}_temp;"
-        )
-      } else {
+//      if (isASCIITextFile) {
+//        emit(
+//          src"vector<char>* ${lhs} = &${lhs}_temp;"
+//        )
+//      } else {
         // Place raw data in appropriately-sized vector with correct bit width
-        emit(src"std::vector<${rawtp}>* ${lhs}_raw = new std::vector<${rawtp}>(${lhs}_temp.size()/${chars});")
-        emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
-        // Convert raw data into appropriate type
-        emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}((*${lhs}_raw).size());")
-        op.A match {
-          case FixPtType(s,d,f) =>
-            open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${lhs}).size(); ${lhs}_i++) {")
-            emit(src"(*${lhs})[${lhs}_i] = ${toApproxFix(src"(*${lhs}_raw)[${lhs}_i]", op.A)};")
-            close("}")
-          case _ =>
-            emit(src"${lhs} = ${lhs}_raw;")
-        }
+      emit(src"std::vector<${rawtp}>* ${lhs}_raw = new std::vector<${rawtp}>(${lhs}_temp.size()/${chars});")
+      emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
+      // Convert raw data into appropriate type
+      emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}((*${lhs}_raw).size());")
+      op.A match {
+        case FixPtType(s,d,f) =>
+          open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${lhs}).size(); ${lhs}_i++) {")
+          emit(src"(*${lhs})[${lhs}_i] = ${toApproxFix(src"(*${lhs}_raw)[${lhs}_i]", op.A)};")
+          close("}")
+        case _ =>
+          emit(src"${lhs} = ${lhs}_raw;")
       }
 
     case op @ WriteBinaryFile(file, len, value) =>

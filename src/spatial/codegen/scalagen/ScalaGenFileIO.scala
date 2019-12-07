@@ -51,7 +51,7 @@ trait ScalaGenFileIO extends ScalaCodegen {
 
     case OpenBinaryFile(filename, write) => emit(src"val $lhs = $filename")
 
-    case op @ ReadBinaryFile(file, _) =>
+    case op @ ReadBinaryFile(file) =>
       open(src"val $lhs = {")
         emit(src"val filepath = java.nio.file.Paths.get($file)")
         emit(src"val buffer = java.nio.file.Files.readAllBytes(filepath)")

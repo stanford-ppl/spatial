@@ -3,7 +3,8 @@ import spatial.dsl._
 // PASSED
 @spatial object TextFileIO extends SpatialApp {
   def main(args: Array[String]): Unit = {
-    val dataFname = "../../data/source.txt"
+    val dataDir = sys.env("DATA")
+    val dataFname = dataDir + "/sflow/sentiment_analysis/source.txt"
 
     val dramSrc = DRAM[Char](128)
     loadDRAMWithASCIIText[Char](dataFname, dramSrc)

@@ -1,4 +1,0 @@
-This is a first test of the sentiment analyzer.
-Test 2 is about tokenizing simple things.
-Test 3 is going on.
-Hopefully I should be able to get a good performance out of this.

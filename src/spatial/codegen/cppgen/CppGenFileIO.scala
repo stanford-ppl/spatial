@@ -7,16 +7,28 @@ import spatial.node._
 trait CppGenFileIO extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op @ LoadDRAMWithASCIIText(file, dram) =>
-      emit(src"${file}.seekg(0, std::ios::end);")
-      emit(src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();""")
-      emit(src"std::vector<char> ${lhs}_temp = new std::vector((${lhs}_pos)); ")
-      emit(src"${file}.seekg(0, std::ios::beg);")
-      emit(src"${file}.read(${lhs}_temp[0], ${lhs}_pos);")
-
-      val chars = Math.ceil(op.A.nbits.toDouble / 8).toInt
-      val rawtp = asIntType(op.A)
-      emit(src"I'm here...")
+    case op @ LoadDRAMWithASCIIText(dram, file) =>
+      emit(
+        src"${file}.seekg(0, std::ios::end);"
+      )
+      emit(
+        src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();"""
+      )
+      emit(
+        src"char* ${lhs}_temp = (char *) malloc(${lhs}_pos * sizeof(char));"
+      )
+      emit(
+        src"${file}.seekg(0, std::ios::beg);"
+      )
+      emit(
+        src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);"
+      )
+      emit(
+        src"c1->memcpy($dram, &${lhs}_temp[0], ${lhs}_pos * sizeof(char));"
+      )
+      emit(
+        src"free(${lhs}_temp);"
+      )
 //      emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
 //      emit(src"c1->memcpy($dram, &(*$ptr)[0], (*$ptr).size() * sizeof(${rawtp}));")
 

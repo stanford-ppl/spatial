@@ -3,8 +3,6 @@ import spatial.dsl._
 // PASSED
 @spatial object TextFileIO extends SpatialApp {
   def main(args: Array[String]): Unit = {
-    val testLen = 128
-    val argOut = ArgOut[I32]
     val dataFname = "../../data/source.txt"
 
     val dramSrc = DRAM[Char](128)
@@ -18,7 +16,6 @@ import spatial.dsl._
       dramOut(0::128) store mem
     }
 
-    println(argOut.value)
     printArray(getMem(dramOut))
   }
 }

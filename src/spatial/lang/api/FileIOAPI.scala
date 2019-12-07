@@ -131,7 +131,7 @@ trait FileIOAPI { this: Implicits =>
     * Hence, we cannot */
   @api def loadDRAMWithASCIIText[T:Num](filename: Text, dram: DRAM1[T]): Void = {
     val file = openBinary(filename, write = false)
-    stage(LoadDRAMWithASCIIText(file, dram))
+    stage(LoadDRAMWithASCIIText(dram, file))
     closeBinary(file)
   }
 }

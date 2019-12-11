@@ -9,7 +9,7 @@ protected class SpatialModuleClass(name: Option[String]) {
   lazy val options = CtrlOpt(name, None, None, mop = false, pom = false)
 
 
-  @api def apply(scope: => Any): Void = {
-    stageWithFlow(SpatialModuleScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
-  }
+  // @api def apply(scope: => Any): Void = {
+  //   stageWithFlow(SpatialModuleScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
+  // }
 }

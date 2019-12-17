@@ -18,23 +18,6 @@ trait ChiselGenController extends ChiselGenCommon {
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
   private var memsWithReset: List[Sym[_]] = List()
 
-  final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
-    if (inHw) ctrls = ctrls :+ lhs
-    val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
-    controllerStack.push(lhs)
-    ensigs = new scala.collection.mutable.ListBuffer[String]
-    if (spatialConfig.enableInstrumentation && inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
-    if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
-    else if (lhs.isInnerControl) { depthStats += controllerStack.length }
-    parent
-  }
-
-  final private def exitCtrl(lhs: Sym[_]): Unit = {
-    // Tree stuff
-    controllerStack.pop()
-  }
-
   final private def connectItersAndValids(lhs: Sym[_]) = {
     val cchain = lhs.cchains.head
     val iters = lhs.toScope.iters
@@ -186,7 +169,7 @@ trait ChiselGenController extends ChiselGenCommon {
             emit("val rr = Input(Bool())")
             if (lhs.op.exists(_.R.isBits)) emit(src"val ret = Output(${remap(lhs.op.get.R.tp)})")
           close("})")
-          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
+          inputs.filter(!_.isString).foreach{in =>
             if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"def ${in}_copy$c = {io.in_${in}_copy$c}; io.in_${in}_copy$c := DontCare")}
             else emit(src"def $in = {io.in_$in} ${if (ledgerized(in) | in.isCounterChain) src"; io.in_$in := DontCare" else ""}")
           }
@@ -196,16 +179,17 @@ trait ChiselGenController extends ChiselGenCommon {
         val numgrps = math.ceil(inputs.count(!_.isString).toDouble / 100.0)
         inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  => 
           open(src"def connectWires$grpid(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
-            inpgrp.foreach{ in => 
-            if (ledgerized(in)) {
-              emit(src"$in.connectLedger(module.io.in_$in)")
-              if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
-              else if (in.isMergeBuffer || in.isDRAMAccel) emit(src"module.io.in_$in.output <> $in.output")
-              else if (in.isBreaker) emit(src"module.io.in_$in.rPort <> $in.rPort")
-            } 
-            else if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
-            else if (in.isCounterChain) emit(src"module.io.in_$in.input <> $in.input; module.io.in_$in.output <> $in.output")
-            else emit(src"module.io.in_$in <> $in")}
+            inpgrp.foreach { in =>
+              if (ledgerized(in)) {
+                emit(src"$in.connectLedger(module.io.in_$in)")
+                if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
+                else if (in.isMergeBuffer || in.isDRAMAccel) emit(src"module.io.in_$in.output <> $in.output")
+                else if (in.isBreaker) emit(src"module.io.in_$in.rPort <> $in.rPort")
+              }
+              else if (cchainCopies.contains(in)) cchainCopies(in).foreach { c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output") }
+              else if (in.isCounterChain) emit(src"module.io.in_$in.input <> $in.input; module.io.in_$in.output <> $in.output")
+              else emit(src"module.io.in_$in <> $in")
+            }
           close("}")
         }
       }
@@ -268,6 +252,7 @@ trait ChiselGenController extends ChiselGenCommon {
           close("}")
           emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth)); module.io := DontCare")
           val numgrps = math.ceil(inputs.count(!_.isString).toDouble / 100.0).toInt
+          emit("// Connect ports on this kernel to its parent")
           List.tabulate(numgrps){i => emit(src"connectWires$i(module)")}
           if (spatialConfig.enableInstrumentation) emit("Ledger.connectInstrCtrs(instrctrs, module.io.in_instrctrs)")
           emit(src"Ledger.connectBreakpoints(breakpoints, module.io.in_breakpoints)")
@@ -360,7 +345,6 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"$lhs$swobj.sm.io.break := $myBreak")
 
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
-    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
     val noop = if (lhs.cchains.nonEmpty) src"~$lhs.cchain.head.output.noop" else "true.B"
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
     emit(src"$lhs$swobj.mask := $noop & $parentMask")

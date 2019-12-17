@@ -48,7 +48,7 @@ endif
 	cp cxp.hw-resources/build/* ${CXP_V_DIR}
 	#cp -r ${CXP_EXAMPLE}/02_coaxlink ${CXP_V_DIR}
 	cp -r cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/02_coaxlink ${CXP_V_DIR}
-	cp *.v ${CXP_V_DIR} # hack for grabbing any blackboxes that may have been dumped here
+	cp *.v ${CXP_V_DIR} 2>/dev/null || : # hack for grabbing any blackboxes that may have been dumped here
 	#cp ${CXP_EXAMPLE}/03_scripts/*.tcl ${CXP_V_DIR}
 	cp cxp.hw-resources/euresys/CoaxlinkQuadCxp12_1cam/03_scripts/*.tcl ${CXP_V_DIR}
 	sed -i "s/\.\.\///g" ${CXP_V_DIR}/create_vivado_project.tcl

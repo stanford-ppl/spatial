@@ -159,8 +159,6 @@ class FIFOInterface(p: MemParams) extends MemInterface(p) {
 }
 object FIFOInterfaceType extends MemInterfaceType
 
-
-
 class NBufInterface(val np: NBufParams) extends FIFOInterface(np.p) {
   val sEn = Vec(np.numBufs, Input(Bool()))
   val sDone = Vec(np.numBufs, Input(Bool()))
@@ -321,4 +319,41 @@ class MultiArgOut(nw: Int) extends Bundle {
   }
 
   override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]
+}
+
+/** Bundle representing a StreamStruct, where each port has its bits/valid signals inbound and ready signal outbound
+  *
+  * @param setup
+  */
+class StreamStructInterface(setup: Map[String,Int]) extends Bundle {
+  val ports = HVec(setup.toSeq.map{case (_, w) => Decoupled(UInt(w.W))})
+
+  def get(field: String): DecoupledIO[UInt] = {
+    val idx = setup.toSeq.indexWhere(_._1 == field)
+    ports(idx)
+  }
+
+  def getForwardPressures(fields: String*): Bool = {
+    fields.map{field =>
+      get(field).valid
+    }.reduce{_&&_}
+  }
+
+  def getBackPressures(fields: String*): Bool = {
+    fields.map{field =>
+      ~get(field).ready
+    }.reduce{_||_}
+  }
+
+  def connectLedger(op: StreamStructInterface)(implicit stack: List[KernelHash]): Unit = {
+    if (stack.isEmpty) this <> op
+    else {
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.structPort.foreach(p => get(p) <> op.get(p))
+//      cxn.accessActivesIn.foreach { p => this.asInstanceOf[FIFOInterface].accessActivesIn(p) <> op.asInstanceOf[FIFOInterface].accessActivesIn(p) }
+      Ledger.substitute(op.hashCode, this.hashCode)
+    }
+  }
+
+  override def cloneType(): this.type = new StreamStructInterface(setup).asInstanceOf[this.type]
 }

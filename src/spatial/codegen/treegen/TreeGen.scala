@@ -130,8 +130,8 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   }
 
   def print_stream_info(sym: Sym[_]): Unit = {
-    val listens = getReadStreams(sym.toCtrl).map{a => s"$a" }
-    val pushes  = getWriteStreams(sym.toCtrl).map{a => s"$a" }
+    val listens = getReadStreams(sym.toCtrl).map{case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a,sym.toCtrl).mkString(",")}]"; case a => s"$a" }
+    val pushes  = getWriteStreams(sym.toCtrl).map{case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a,sym.toCtrl).mkString(",")}]"; case a => s"$a" }
     if (listens.nonEmpty || pushes.nonEmpty) {
       emit(s"""${"  "*ident}<div style="border:1px solid black"><font size = "2">Stream Info</font><br><font size = "1"> """)
       if (listens.nonEmpty) emit(s"""<p align="left">----->$listens""")

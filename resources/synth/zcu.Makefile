@@ -40,7 +40,7 @@ hw:
 	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${ZCU_V_DIR}/SpatialIP.v; \
 	fi; fi; fi;
 	cp zcu.hw-resources/build/* ${ZCU_V_DIR}
-	cp *.v ${ZCU_V_DIR} # hack for grabbing any blackboxes that may have been dumped here
+	cp *.v ${ZCU_V_DIR} 2>/dev/null || : # hack for grabbing any blackboxes that may have been dumped here
 	mv ${ZCU_V_DIR}/fsbl.elf._ ${ZCU_V_DIR}/fsbl.elf
 	mv ${ZCU_V_DIR}/u-boot.elf._ ${ZCU_V_DIR}/u-boot.elf
 	sed -i "s/^set TARGET .*/set TARGET ZCU102/g" ${ZCU_V_DIR}/settings.tcl

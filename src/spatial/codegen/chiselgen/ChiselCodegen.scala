@@ -329,6 +329,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => super.remap(tp)
   }
 
+  /** Define how to pass a node through a Scala function call.  We use Scala function calls to handle modularization of
+    * kernels.
+     */
   protected def arg(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
     case FixPtType(s,d,f) => s"FixedPoint"
     case _: Var[_] => "String"
@@ -336,6 +339,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case BitType() => "Bool"
     case tp: Vec[_] => src"Vec[${arg(tp.typeArgs.head)}]"
     case _: Struct[_] => s"UInt"
+    case _: StreamStruct[_] => s"StreamStructInterface"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
       case Some(x) if x.isNBuffered => "NBufInterface"
@@ -384,6 +388,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     }
   }
 
+  /** Define how set up the IO port for a node on a Chisel Module. */
   protected def port(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
     case FixPtType(s,d,f) => s"Input(${remap(tp)})"
     case _: Var[_] => "String"
@@ -391,6 +396,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case BitType() => "Input(Bool())"
     case tp: Vec[_] => src"Vec(${tp.width},${port(tp.typeArgs.head)})"
     case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}.W))"
+    case x: StreamStruct[_] =>
+        val widths = x.fields.map{case (f,t) => s"""("$f" -> ${bitWidth(t)})"""}.mkString("Map(",",",")")
+        s"Flipped(new StreamStructInterface($widths))"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => node match {
       case Some(x) if x.isNBuffered => src"""Flipped(new NBufInterface(ModuleParams.getParams("${x}_p").asInstanceOf[NBufParams] ))"""
@@ -472,6 +480,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
   protected def ledgerized(node: Sym[_]): Boolean = node match {
     case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
     case _ if node.isDRAMAccel => true
+    case _ if node.isCtrlBlackbox => true
     case _ => false
   }
 

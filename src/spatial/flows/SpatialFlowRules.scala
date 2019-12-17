@@ -11,8 +11,9 @@ import spatial.node._
 
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
-    case MemAlloc(mem) if mem.isLocalMem => LocalMemories += mem
-    case MemAlloc(mem) if (mem.isRemoteMem || a.isStreamIn || a.isStreamOut) => RemoteMemories += a
+    case MemAlloc(mem) if mem.isLocalMem  => LocalMemories += mem
+    case mem if mem.isCtrlBlackbox => LocalMemories += mem
+    case MemAlloc(mem) if mem.isRemoteMem || a.isStreamIn || a.isStreamOut => RemoteMemories += a
     case _ =>
   }
 
@@ -24,6 +25,15 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case UnrolledAccessor(wr,rd) =>
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
+
+    case FieldDeq(st,f,_) =>
+      st.readers += s; logs(s"  Readers of $st is now: ${st.readers}")
+
+    case VerilogCtrlBlackbox(st) =>
+      st.readers += s; logs(s"  Readers of $st is now: ${st.readers}")
+      st match {
+        case Op(SimpleStreamStruct(elems: Seq[(String,Sym[_])])) => elems.foreach{e => e._2 match {case Op(FIFODeqInterface(mem,_)) => s.readMems += mem}}
+      }
 
     case Resetter(mem,ens) => mem.resetters += s
 
@@ -146,40 +156,41 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       // --- Blk Hierarchy --- //
       // Set the reads and writes of each symbol defined in this controller
       op.blocks.zipWithIndex.foreach{case (block,bId) =>
-        block.stms.foreach{lhs =>
-          lhs match {
-            case Accessor(wr,rd) =>
-              wr.foreach{w => s.writtenMems += w.mem }
-              rd.foreach{r => s.readMems += r.mem }
+        block.stms.foreach {
+          case Op(x@FIFODeqInterface(_,_)) =>
+          // This does not belong to parent controller. It belongs to downstream blackbox
 
-            case UnrolledAccessor(wr,rd) =>
-              wr.foreach{w => s.writtenMems += w.mem }
-              rd.foreach{r => s.readMems += r.mem }
+          case Accessor(wr, rd) =>
+            wr.foreach { w => s.writtenMems += w.mem }
+            rd.foreach { r => s.readMems += r.mem }
 
-            case StatusReader(mem, _) => 
-              s.readMems += mem
+          case UnrolledAccessor(wr, rd) =>
+            wr.foreach { w => s.writtenMems += w.mem }
+            rd.foreach { r => s.readMems += r.mem }
 
-            case Op(_@FringeDenseStore(d,_,_,_)) =>
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@FringeSparseStore(d,_,_)) =>
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@DRAMAlloc(d,_)) => 
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
+          case StatusReader(mem, _) =>
+            s.readMems += mem
 
-            case Op(_@FringeDenseLoad(d,_,_)) =>
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@FringeSparseLoad(d,_,_)) =>
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@DRAMDealloc(d)) => 
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@FringeDenseStore(d, _, _, _)) =>
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@FringeSparseStore(d, _, _)) =>
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@DRAMAlloc(d, _)) =>
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
 
-            case Op(_@(BreakpointIf(_) | ExitIf(_))) =>
-              lhs.parent.s.get.shouldNotBind = true
+          case Op(_@FringeDenseLoad(d, _, _)) =>
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@FringeSparseLoad(d, _, _)) =>
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@DRAMDealloc(d)) =>
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
 
-            case _ =>
-          }
+          case lhs@Op(_@(BreakpointIf(_) | ExitIf(_))) =>
+            lhs.parent.s.get.shouldNotBind = true
+
+          case _ =>
         }
       }
 

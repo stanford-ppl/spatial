@@ -44,4 +44,12 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
   override def effects = Effects.Unique
 }
 
+@op case class VerilogCtrlBlackbox[A:StreamStruct,B:StreamStruct](in: Bits[A]) extends EnControl[B] {
+  override def iters: Seq[I32] = Seq()
+  var ens = Set()
+  override def cchains = Seq()
+  override def bodies = Seq()
+  override def effects = Effects.Unique andAlso Effects.Mutable
+}
+
 

@@ -8,6 +8,7 @@ import spatial.node._
 import spatial.util.shouldMotionFromConditional
 import spatial.traversal.AccelTraversal
 import spatial.metadata.control._
+import spatial.metadata.memory._
 
 /** Converts Stream Foreach controllers into Stream Unit controllers with the counterchain
   * duplicated and injected directly into children controllers. This removes the overhead of
@@ -69,7 +70,12 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
     case OpForeach(ens, cchain, block, iters, stopWhen) if inHw && lhs.isStreamControl && lhs.isOuterControl =>
-      stageWithFlow(UnitPipe(ens, injectCtrs(block, cchain.counters, iters), stopWhen)){lhs2 => transferData(lhs, lhs2)}
+      if (lhs.children.exists{x => x.s.get.isCtrlBlackbox}) {
+        warn(s"Optimization for folding the counter chain of a Stream controller into its child counter chains is not supported on VerilogCtrlBlackBoxes!  Optimization ignored")
+        super.transform(lhs,rhs)
+      } else {
+        stageWithFlow(UnitPipe(ens, injectCtrs(block, cchain.counters, iters), stopWhen)){lhs2 => transferData(lhs, lhs2)}
+      }
 
     case _ => dbgs(s"visiting $lhs = $rhs");super.transform(lhs,rhs)
   }

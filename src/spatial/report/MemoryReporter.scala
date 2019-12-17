@@ -16,7 +16,7 @@ case class MemoryReporter(IR: State) extends Pass {
   def run(): Unit = {
     import scala.language.existentials
 
-    val mems = LocalMemories.all.map{case Stm(s,d) =>
+    val mems = LocalMemories.all.filter(!_.isCtrlBlackbox).map{case Stm(s,d) =>
       val area = areaModel.areaOf(s, d, inHwScope = true, inReduce = false)
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)

@@ -31,7 +31,7 @@ case class MemoryAllocator(IR: State) extends Pass {
     }
 
     // Memories which can use more specialized memory resources
-    val (sramAble,nonSRAM) = LocalMemories.all.partition(canSRAM)
+    val (sramAble,nonSRAM) = LocalMemories.all.filter(!_.isCtrlBlackbox).partition(canSRAM)
 
     var unassigned: Set[Instance] = sramAble.flatMap{mem =>
       mem.duplicates.zipWithIndex.map{case (d,i) => Instance(mem,d,i) }

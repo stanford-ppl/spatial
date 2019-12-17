@@ -17,7 +17,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   private var memsWithReset: List[Sym[_]] = List()
 
   // def and(owner: Sym[_], ens: Set[Bit]): String = {
-  //   and(ens.map{x => if (controllerStack.head.isOuterControl) appendSuffix(owner,x) else quote(x)})
+  //   and(ens.map{x => if (controllerStack.head.isOuterControl) appendSuffix(lhs.parent.s.get,x) else quote(x)})
   // }
   private def zipAndConnect(lhs: Sym[_], mem: Sym[_], port: String, tp: String, payload: Seq[String], suffix: String): Unit = {
     val zipThreshold = 150 max payload.map(_.size).sorted.headOption.getOrElse(0) // Max number of characters before deciding to split line into many
@@ -58,20 +58,32 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
     if (mem.isFIFOReg && lhs.parent.s.get.isOuterControl) src"~$break && $done" // Don't know why this is the rule, but this is what works
-    else               src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+    else               src"""~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}"""
   }
 
   private def invisibleEnableWrite(lhs: Sym[_]): String = {
     val flowEnable = src"~$break && $backpressure"
-    src"""~$break && ${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)} & $flowEnable"""
+    src"""~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")
       else {
         memsWithReset = memsWithReset :+ mem
-        val invisibleEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+        val invisibleEnable = src"""${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}"""
         emit(src"${mem}.connectReset(${invisibleEnable} & ${and(en)})")
       }
+  }
+
+  private def emitReadInterface(lhs: Sym[_], mem: Sym[_], ens: Seq[Set[Bit]]): Unit = {
+    emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
+    emit(src"val ${lhs}_valid = Wire(Bool())")
+    emit(src"val ${lhs}_ready = Wire(Bool())")
+    val invisibleEnable = invisibleEnableRead(lhs,mem)
+    val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
+    val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}.map(appendSuffix(lhs.parent.s.get, _))
+    splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
+    emit(src"""$lhs.r := $mem.connectRPort(${lhs.hashCode}, List[UInt](), List[UInt](), $backpressure, ${lhs}_en.map(_ && ${lhs}_ready && $invisibleEnable && ${and(commonEns.map(appendSuffix(lhs.parent.s.get, _)))}), ${!mem.broadcastsAnyRead}).head""")
+    emit(src"${lhs}_valid := ~$mem.empty")
   }
 
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
@@ -229,10 +241,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFORegNew(init) => emitMem(lhs, Some(List(init)))
     case FIFORegEnq(reg, data, ens) => 
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-      emit(src"${reg}.connectAccessActivesIn(${activesMap(lhs)}, ${and(ens)})") 
+      emit(src"${reg}.connectAccessActivesIn(${activesMap(lhs)}, ${and(ens)})")
     case FIFORegDeq(reg, ens) => 
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(ens))
-      emit(src"${reg}.connectAccessActivesIn(${activesMap(lhs)}, ${and(ens)})") 
+      emit(src"${reg}.connectAccessActivesIn(${activesMap(lhs)}, ${and(ens)})")
 
     // Registers
     case RegNew(init) => 
@@ -332,7 +344,10 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))") 
+      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
+    case op@FIFODeqInterface(fifo, ens) =>
+      emitReadInterface(lhs, fifo, Seq(ens))
+      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map(appendSuffix(lhs.parent.s.get, _)))}))")
     case FIFOBankedEnq(fifo, data, ens) => 
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
       emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))") 

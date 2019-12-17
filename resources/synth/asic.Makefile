@@ -40,7 +40,7 @@ hw:
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs asic"
 	cp -r asic.hw-resources/* verilog-asic
 	cp -r asic.hw-resources/build/* verilog-asic
-	cp *.v verilog-asic # hack for grabbing any blackboxes that may have been dumped here
+	cp *.v verilog-asic 2>/dev/null || : # hack for grabbing any blackboxes that may have been dumped here
 	touch in.txt
 	make -C verilog-asic
 	ln -sf verilog-asic verilog

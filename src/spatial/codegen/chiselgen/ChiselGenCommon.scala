@@ -66,6 +66,23 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  final protected def enterCtrl(lhs: Sym[_]): Sym[_] = {
+    if (inHw) ctrls = ctrls :+ lhs
+    val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
+    controllerStack.push(lhs)
+    ensigs = new scala.collection.mutable.ListBuffer[String]
+    if (spatialConfig.enableInstrumentation && inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+    val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
+    if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
+    else if (lhs.isInnerControl) { depthStats += controllerStack.length }
+    parent
+  }
+
+  final protected def exitCtrl(lhs: Sym[_]): Unit = {
+    // Tree stuff
+    controllerStack.pop()
+  }
+
   protected def iodot: String = if (spatialConfig.enableModular) "io." else ""
   protected def dotio: String = if (spatialConfig.enableModular) ".io" else ""
   protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.output"
@@ -93,6 +110,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def mask: String = s"${iodot}sigsIn.mask"
   protected def ctrDone: String = s"${iodot}sigsIn.ctrDone"
   protected def iiDone: String = s"${iodot}sigsIn.iiDone"
+  protected def iiIssue: String = s"${iodot}sigsIn.iiIssue"
   protected def backpressure: String = s"${iodot}sigsIn.backpressure"
   protected def forwardpressure: String = s"${iodot}sigsIn.forwardpressure"
 
@@ -182,6 +200,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
       case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty"
+      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}})"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
@@ -195,6 +214,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
             src"~${merge}.output.full($way)"
         }
+      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}})"
     }) else "true.B"
   }
 
@@ -222,8 +242,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     if (ctrl.parent.s.isDefined) {
       val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
       y match {
-        case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
-        case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
+        case x if x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
+        case x if x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x)) => src"${x}_copy$ctrl"
         case x => src"$x" 
       }
     } else src"$y"
@@ -233,8 +253,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     if (ctrl.parent.s.isDefined) {
       val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
       y match {
-        case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
-        case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x)) => src"${x}_copy$ctrl"
+        case x if x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x) => src"${x}_chain_read_${getSlot(ctrl)}"
+        case x if x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x) => src"${x}_copy$ctrl"
         case x => src"$x" 
       }
     } else src"$y"

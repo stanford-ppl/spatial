@@ -11,4 +11,4 @@ protected class SpatialModuleClass(name: Option[String]) {
 //  @api def apply(scope: => Any): Void = {
 //    stageWithFlow(SpatialModuleScope(stageBlock{ scope; void })){pipe => options.set(pipe) }
 //  }
-
+}

@@ -169,7 +169,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
             }
 
             val escapingHolders = escaping.map{
-              case s if s.isTransient || (s == block.result && res.isDefined) => res.get
+              case s if s == block.result && res.isDefined => res.get
               case s => resFrom(s, parent)
             }
 

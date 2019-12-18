@@ -56,12 +56,12 @@ trait ChiselGenMem extends ChiselGenCommon {
     }
   }
 
-  private def invisibleEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
+  private def implicitEnableRead(lhs: Sym[_], mem: Sym[_]): String = {
     if (mem.isFIFOReg && lhs.parent.s.get.isOuterControl) src"~$break && $done" // Don't know why this is the rule, but this is what works
     else               src"""~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}"""
   }
 
-  private def invisibleEnableWrite(lhs: Sym[_]): String = {
+  private def implicitEnableWrite(lhs: Sym[_]): String = {
     val flowEnable = src"~$break && $backpressure"
     src"""~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)} & $flowEnable"""
   }
@@ -70,7 +70,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       else {
         memsWithReset = memsWithReset :+ mem
         val invisibleEnable = src"""${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}"""
-        emit(src"${mem}.connectReset(${invisibleEnable} & ${and(en)})")
+        emit(src"$mem.connectReset($invisibleEnable & ${and(en)})")
       }
   }
 
@@ -78,7 +78,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
     emit(src"val ${lhs}_valid = Wire(Bool())")
     emit(src"val ${lhs}_ready = Wire(Bool())")
-    val invisibleEnable = invisibleEnableRead(lhs,mem)
+    val invisibleEnable = implicitEnableRead(lhs,mem)
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}.map(appendSuffix(lhs.parent.s.get, _))
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
@@ -94,7 +94,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       case _ => emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
     }
 
-    val invisibleEnable = invisibleEnableRead(lhs,mem)
+    val invisibleEnable = implicitEnableRead(lhs,mem)
     val banklist = bank.flatten.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}}
     splitAndCreate(lhs, mem, src"${lhs}_banks", "UInt", banklist)
     splitAndCreate(lhs, mem, src"${lhs}_ofs", "UInt", ofs.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}})
@@ -107,7 +107,7 @@ trait ChiselGenMem extends ChiselGenCommon {
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
 
-    val invisibleEnable = invisibleEnableWrite(lhs)
+    val invisibleEnable = implicitEnableWrite(lhs)
     val banklist = bank.flatten.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}}
     splitAndCreate(lhs, mem, src"${lhs}_banks", "UInt", banklist)
     splitAndCreate(lhs, mem, src"${lhs}_ofs", "UInt", ofs.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}})
@@ -223,8 +223,8 @@ trait ChiselGenMem extends ChiselGenCommon {
   ))""")
      emit(src"m.io${ifaceType(mem)} <> DontCare")
       if (name == "FIFO" || name == "FIFOReg") {
-        mem.writers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> i); emit(src"// enqActive_$x = ${activesMap(x)}")}
-        mem.readers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> {i + mem.writers.size}); emit(src"// deqActive_$x = ${activesMap(x)}")}
+        mem.writers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> i)}
+        mem.readers.zipWithIndex.foreach{case (x,i) => activesMap += (x -> {i + mem.writers.size})}
       }
       if (mem.resetters.isEmpty && !mem.isBreaker) emit(src"m.io.reset := false.B")
     }
@@ -297,22 +297,22 @@ trait ChiselGenMem extends ChiselGenCommon {
           }
         case Some(AccumUnk) => throw new Exception(s"Cannot emit Reg with specialized reduce of type Unk yet!")
       }
-    case RegWrite(reg, data, ens) if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
+    case RegWrite(reg, data, ens) if !reg.isArgOut & !reg.isArgIn & !reg.isHostIO =>
       emitWrite(lhs, reg, Seq(data), Seq(Seq()), Seq(), Seq(ens))
-    case RegRead(reg)  if (!reg.isArgOut & !reg.isArgIn & !reg.isHostIO) => 
+    case RegRead(reg)  if !reg.isArgOut & !reg.isArgIn & !reg.isHostIO =>
       emitRead(lhs, reg, Seq(Seq()), Seq(), Seq(Set()))
     case RegAccumOp(reg, data, ens, t, first) => 
       val index = reg.writers.toList.indexOf(lhs)
-      val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.connectWPort($index, $data.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, ${first})")
+      val invisibleEnable = implicitEnableRead(lhs,reg)
+      emit(src"$reg.connectWPort($index, $data.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, $first)")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.output")
+      emit(src"$lhs.r := $reg.output")
     case RegAccumFMA(reg, data1, data2, ens, first) => 
       val index = reg.writers.toList.indexOf(lhs)
-      val invisibleEnable = invisibleEnableRead(lhs,reg)
-      emit(src"${reg}.connectWPort($index, $data1.r, $data2.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, ${first})")
+      val invisibleEnable = implicitEnableRead(lhs,reg)
+      emit(src"$reg.connectWPort($index, $data1.r, $data2.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, $first)")
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"${lhs}.r := ${reg}.output")
+      emit(src"$lhs.r := $reg.output")
     case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
@@ -322,7 +322,6 @@ trait ChiselGenMem extends ChiselGenCommon {
     case RegFileShiftIn(rf,data,addr,en,axis)        => emitWrite(lhs,rf,Seq(data),Seq(addr),Seq(),Seq(en), Some(axis))
     case RegFileBankedShiftIn(rf,data,addr,en,axis)  => emitWrite(lhs,rf,data,addr,Seq(),en, Some(axis))
 
-    // TODO: Matt are these correct?
     case RegFileVectorRead(rf,addr,ens)       => emitRead(lhs,rf,addr,addr.map{_ => I32(0) },ens)
     case RegFileVectorWrite(rf,data,addr,ens) => emitWrite(lhs,rf,data,addr,addr.map{_ => I32(0) },ens)
 
@@ -339,9 +338,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFOIsAlmostFull(fifo,_) => emit(src"val $lhs = ${fifo}.almostFull")
     case op@FIFOPeek(fifo,ens) => 
       emitRead(lhs, fifo, Seq(Seq()), Seq(), Seq(Set(Bit(false))))
-      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, false.B)") 
+      emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, false.B)")
       // emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.rPort(0).output.head")
-    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := ${fifo}.numel")
+    case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
       emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
@@ -350,7 +349,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map(appendSuffix(lhs.parent.s.get, _)))}))")
     case FIFOBankedEnq(fifo, data, ens) => 
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
-      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))") 
+      emit(src"${fifo}.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
 
     // LIFOs
     case LIFONew(depths) => emitMem(lhs, None)
@@ -376,20 +375,20 @@ trait ChiselGenMem extends ChiselGenCommon {
       }
     case MergeBufferBankedEnq(merge, way, data, ens) =>
       val d = data.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
-      val invEn = invisibleEnableWrite(lhs)
+      val invEn = implicitEnableWrite(lhs)
       val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[Bool](", ",", ")")
       emit(src"""$merge.connectMergeEnq($way, $d, $en)""")
     case MergeBufferBankedDeq(merge, ens) => 
       val readerIdx = merge.readers.collect { case r@Op(MergeBufferBankedDeq(_, _)) => r }.toSeq.indexOf(lhs)
       emit(src"""val $lhs = Wire(Vec(${ens.length}, ${merge.tp.typeArgs.head}))""")
-      val invEn = invisibleEnableRead(lhs,merge)
+      val invEn = implicitEnableRead(lhs,merge)
       val en = ens.map{ and(_) + src"&& $invEn" }.mkString(src"List[Bool](", ",", ")")
       emit(src"$lhs.toSeq.zip($merge.connectMergeDeq($readerIdx, $en)).foreach{case (l,r) => l.r := r}")
     case MergeBufferBound(merge, way, data, ens) =>
-      val invEn = invisibleEnableWrite(lhs)
+      val invEn = implicitEnableWrite(lhs)
       emit(src"$merge.connectMergeBound($way, $data.r, ${and(ens)} & $invEn)")
     case MergeBufferInit(merge, data, ens) =>
-      val invEn = invisibleEnableWrite(lhs)
+      val invEn = implicitEnableWrite(lhs)
       emit(src"$merge.connectMergeInit($data.r, ${and(ens)} & $invEn)")
 
     case _ => super.gen(lhs, rhs)

@@ -323,7 +323,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""$lhs$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
       } else if (lhs match {case Op(_:StateMachine[_]) if isInner && !lhs.children.exists(_.s.get != lhs) => true; case _ => false }) {
         val x = lhs match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
-        emit(src"""$lhs$swobj.sm.io.ctrDone := $lhs$swobj.iiDone.D(${x.fullDelay})""")
+        emit(src"""$lhs$swobj.sm.io.ctrDone := $lhs$swobj.iiDone //.D(${x.fullDelay})""")
       } else {
         emit(src"""$lhs$swobj.sm.io.ctrDone := risingEdge($lhs$swobj.sm.io.ctrInc)""")
       }

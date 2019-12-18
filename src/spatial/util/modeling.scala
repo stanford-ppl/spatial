@@ -151,7 +151,7 @@ object modeling {
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
-      rds.cross(wrs).collect{case (rd, wr) if (!brokenByRetimeGate(rd,wr,schedule)) =>
+      rds.cross(wrs).collect{case (rd, wr) if !brokenByRetimeGate(rd,wr,schedule) =>
       // rds.cross(wrs).flatMap{case (rd, wr) =>
         lazy val triple = AccumTriple(mem, rd, wr)
         val path = getAllNodesBetween(rd, wr, scope.toSet)
@@ -298,47 +298,54 @@ object modeling {
       case _ => // Do nothing
     }
 
+    /** If these accesses were banked as part of the same group, then we don't need to treat them as a true AAA cycle */
+    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = {
+      // TODO: Poor man's way of checking if two accesses were part of the same banking group is to check if they came
+      //       from the same pre-unrolled symbol.  Must actually check banking group of each access, perhaps by adding
+      //       some kind of bank group hash metadata.
+      accesses.forallPairs{case (a,b) => a.originalSym.isDefined && a.originalSym == b.originalSym}
+    }
 
-    def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
-      if (accesses.nonEmpty && verbose){
+    def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.filter{case (_, accesses) => !bankedTogether(accesses)}.flatMap{case (mem,accesses) =>
+      if (accesses.nonEmpty && verbose) {
         dbgs(s"Multiplexed accesses for memory $mem: ")
-        accesses.foreach{access => dbgs(s"  ${stm(access)}") }
+        accesses.foreach { access => dbgs(s"  ${stm(access)}") }
       }
 
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
       val instances = if (mem.getDuplicates.isDefined) mem.duplicates.length else 0
-      (0 to instances-1).map{id =>
+      (0 to instances - 1).map { id =>
         val accs = accesses.filter(_.dispatches.values.exists(_.contains(id))).filter(!_.op.get.isInstanceOf[FIFOPeek[_]])
 
-        val muxPairs = accs.map{access =>
+        val muxPairs = accs.map { access =>
           val muxes = access.ports(0).values.map(_.muxPort)
-          (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
-        }.toSeq
+          (access, paths.getOrElse(access, 0.0), muxes.maxOrElse(0))
+        }
 
         val length = muxPairs.map(_._3).maxOrElse(0) - muxPairs.map(_._3).minOrElse(0) + 1
 
         // Keep accesses with the same mux index together, even if they have different delays
         // TODO[1]: This isn't quite right - should order by common parent instead?
-        val groupedMuxPairs = muxPairs.groupBy(_._3)  // Group by maximum mux port
-        val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
+        val groupedMuxPairs = muxPairs.groupBy(_._3) // Group by maximum mux port
+      val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy { pairs => pairs.map(_._2).max }
         var writeStage = 0.0
-        orderedMuxPairs.foreach{pairs =>
+        orderedMuxPairs.foreach { pairs =>
           val dlys = pairs.map(_._2) :+ writeStage
-          val writeDelay = dlys.max 
+          val writeDelay = dlys.max
           writeStage = writeDelay + 1
-          pairs.foreach{case (access, dly, _) =>
+          pairs.foreach { case (access, _, _) =>
             val oldPath = paths(access)
-            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
-            if (writeDelay-oldPath > 0) {
+            dbgs(s"Pushing ${stm(access)} by ${writeDelay - oldPath} to $writeDelay due to muxing.")
+            if (writeDelay - oldPath > 0) {
               paths(access) = writeDelay
-              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              dbgs(s"  Also pushing these by ${writeDelay - oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
               val affectedNodes = consumersDfs(access.consumers, Set(), scope.toSet) intersect scope
-              affectedNodes.foreach{case x if (paths.contains(x)) => 
-                  dbgs(s"  $x")
-                  paths(x) = paths(x) + (writeDelay-oldPath)
-                case _ =>
+              affectedNodes.foreach { case x if (paths.contains(x)) =>
+                dbgs(s"  $x")
+                paths(x) = paths(x) + (writeDelay - oldPath)
+              case _ =>
               }
             }
           }

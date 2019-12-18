@@ -197,24 +197,24 @@ trait ChiselGenCommon extends ChiselCodegen {
   def getForwardPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty"
-      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}})"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
+      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty.D(${sym.s.get.II}-1)"
+      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${fifo}.ready"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.full"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.full | ~(${FIFOBackwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.full | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFONew(_)) => src"(~${fifo}.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.output.full($way)"
+            src"~${merge}.output.full($way).D(${sym.s.get.II}-1)"
         }
-      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}})"
+      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
 

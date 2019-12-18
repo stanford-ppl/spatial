@@ -303,7 +303,6 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def inLane[A](lane:Lane)(block: => A): A = {
       // Note that we don't use isolateSubst (or similar here) because that would also save/restore lanes
       val i = ulanes.indexOf(lane)
-      dbgs(s"in lane $lane, $i from $ulanes")
       val save     = subst
       val saveMems = memories
       val addr     = lane.map { l => parAddr(l) }.transpose

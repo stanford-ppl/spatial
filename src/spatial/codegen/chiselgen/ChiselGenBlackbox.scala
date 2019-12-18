@@ -30,7 +30,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
             inports.fields.foreach{case(name, typ) => emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")}
             outports.fields.foreach{case(name, typ) => emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")}
           close("})")
-          val paramString = params.map{case (param, value) => s""""$param" -> PARAM($value)"""}.mkString("Map(",",",")")
+          val paramString = params.map{case (param, value) => s""""$param" -> IntParam($value)"""}.mkString("Map(",",",")")
           emit(src"val vbox = Module(new $bbName($paramString))")
           emit("vbox.io.clock := io.clock")
           emit("vbox.io.reset := io.reset")
@@ -91,7 +91,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
             emit(src"""val in = Flipped(new StreamStructInterface($inportString))""")
             emit(src"""val out = new StreamStructInterface($outportString)""")
           close("})")
-          val paramString = params.map{case (param, value) => s""""$param" -> PARAM($value)"""}.mkString("Map(",",",")")
+          val paramString = params.map{case (param, value) => s""""$param" -> IntParam($value)"""}.mkString("Map(",",",")")
           emit(src"val vbox = Module(new $bbName($paramString))")
           emit("vbox.io.clock := io.clock")
           emit("vbox.io.reset := io.reset")

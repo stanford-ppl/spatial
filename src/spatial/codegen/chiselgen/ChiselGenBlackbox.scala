@@ -6,40 +6,57 @@ import spatial.metadata.blackbox._
 import spatial.metadata.control._
 import spatial.node._
 
+import scala.collection.mutable.ArrayBuffer
+
 trait ChiselGenBlackbox extends ChiselGenCommon {
 
+  val createdBoxes = ArrayBuffer[String]()
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case VerilogBlackbox(inputs) =>
       val inports: Struct[_] = inputs.tp.asInstanceOf[Struct[_]]
       val outports: Struct[_] = lhs.tp.asInstanceOf[Struct[_]]
-      val BlackboxConfig(file, latency, pipelined, params) = lhs.bboxInfo
-      val bbName: String = file.split("/").last.split('.').head
+      val BlackboxConfig(file, moduleName, _, _, params) = lhs.bboxInfo
+      val bbName: String = moduleName.getOrElse(file.split("/").last.split('.').head)
       inGen(out, src"bb_$lhs.scala") {
         emit(s"""package accel""")
         emit("import chisel3._")
         emit("import chisel3.experimental._")
         emit("import chisel3.util._")
         emit("import java.nio.file.{Files, Paths, StandardCopyOption}")
-        open(src"class $bbName() extends BlackBox(")
-        val paramString = params.map{case (param, value) => s""""$param" -> $value"""}.mkString("Map(",",",")")
-        emit(src"$paramString")
-        closeopen(") {")
+        open(src"class ${bbName}_${lhs}_wrapper() extends Module {")
           open(src"val io = IO(new Bundle {")
             emit("val clock = Input(Clock())")
             emit("val reset = Input(Bool())")
             inports.fields.foreach{case(name, typ) => emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")}
             outports.fields.foreach{case(name, typ) => emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")}
           close("})")
-          emit("val path = Files.copy(")
-          emit(s"""    Paths.get("$file"),""")
-          emit(s"""    Paths.get(System.getProperty("user.dir") + "/${file.split("/").last}"),""")
-          emit("""    StandardCopyOption.REPLACE_EXISTING""")
-          emit(")")
-          emit("// TODO: Make sure file copies properly")
-
+          val paramString = params.map{case (param, value) => s""""$param" -> PARAM($value)"""}.mkString("Map(",",",")")
+          emit(src"val vbox = Module(new $bbName($paramString))")
+          emit("vbox.io.clock := io.clock")
+          emit("vbox.io.reset := io.reset")
+          inports.fields.foreach{case(name, _) => emit(src"""vbox.io.$name := io.$name""")}
+          outports.fields.foreach{case(name, _) => emit(src"""io.$name := vbox.io.$name""")}
         close("}")
+
+        if (!createdBoxes.contains(bbName)) {
+          createdBoxes += bbName
+          open(src"class $bbName(params: Map[String, chisel3.core.Param]) extends BlackBox(params) {")
+            open("val io = IO(new Bundle{")
+              emit("val clock = Input(Clock())")
+              emit("val reset = Input(Bool())")
+              inports.fields.foreach{case(name, typ) => emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")}
+              outports.fields.foreach{case(name, typ) => emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")}
+            close("})")
+            emit("val path = Files.copy(")
+            emit(s"""    Paths.get("$file"),""")
+            emit(s"""    Paths.get(System.getProperty("user.dir") + "/${file.split("/").last}"),""")
+            emit("""    StandardCopyOption.REPLACE_EXISTING""")
+            emit(")")
+            emit("// TODO: Make sure file copies properly")
+          close("}")
+        }
       }
-      emit(src"val ${lhs}_bbox = Module(new $bbName())")
+      emit(src"val ${lhs}_bbox = Module(new ${bbName}_${lhs}_wrapper())")
       emit(src"${lhs}_bbox.io.clock := clock")
       emit(src"${lhs}_bbox.io.reset := reset.toBool")
       inports.fields.foreach{case (field, _) =>
@@ -53,8 +70,8 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       enterCtrl(lhs)
       val inports: StreamStruct[_] = inputs.tp.asInstanceOf[StreamStruct[_]]
       val outports: StreamStruct[_] = lhs.tp.asInstanceOf[StreamStruct[_]]
-      val BlackboxConfig(file, _, _, params) = lhs.bboxInfo
-      val bbName: String = file.split("/").last.split('.').head
+      val BlackboxConfig(file, moduleName, _, _, params) = lhs.bboxInfo
+      val bbName: String = moduleName.getOrElse(file.split("/").last.split('.').head)
       inGen(out, src"bb_$lhs.scala") {
         emit(s"""package accel""")
         emit("import chisel3._")
@@ -63,7 +80,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
         emit("import fringe.templates.memory._")
         emit("import fringe.templates._")
         emit("import java.nio.file.{Files, Paths, StandardCopyOption}")
-        open(src"class ${bbName}_wrapper() extends Module() {")
+        open(src"class ${bbName}_${lhs}_wrapper() extends Module() {")
         val inportString = inports.fields.map{case(name, typ) => src""" ("$name" -> ${bitWidth(typ)}) """}.mkString("Map(", ",", ")")
         val outportString = outports.fields.map{case(name, typ) => src""" ("$name" -> ${bitWidth(typ)}) """}.mkString("Map(", ",", ")")
           open(src"val io = IO(new Bundle {")
@@ -74,7 +91,8 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
             emit(src"""val in = Flipped(new StreamStructInterface($inportString))""")
             emit(src"""val out = new StreamStructInterface($outportString)""")
           close("})")
-          emit(src"val vbox = Module(new ${bbName}())")
+          val paramString = params.map{case (param, value) => s""""$param" -> PARAM($value)"""}.mkString("Map(",",",")")
+          emit(src"val vbox = Module(new $bbName($paramString))")
           emit("vbox.io.clock := io.clock")
           emit("vbox.io.reset := io.reset")
           emit("vbox.io.enable := io.enable")
@@ -90,36 +108,37 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
              emit(src"""vbox.io.${name}_ready := io.out.get("$name").ready""")
            }
         close("}")
-        open(src"class $bbName() extends BlackBox(")
-        val paramString = params.map{case (param, value) => s""""$param" -> $value"""}.mkString("Map(",",",")")
-        emit(src"$paramString")
-        closeopen(") {")
-          open("val io = IO(new Bundle{")
-            emit("val clock = Input(Clock())")
-            emit("val reset = Input(Bool())")
-            emit("val enable = Input(Bool())")
-            emit("val done = Output(Bool())")
-            inports.fields.foreach{case(name, typ) =>
-               emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")
-               emit(src"val ${name}_valid = Input(Bool())")
-               emit(src"val ${name}_ready = Output(Bool())")
-             }
-             outports.fields.foreach{case(name, typ) =>
-               emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")
-               emit(src"val ${name}_valid = Output(Bool())")
-               emit(src"val ${name}_ready = Input(Bool())")
-             }
-          close("})")
-          emit("val path = Files.copy(")
-          emit(s"""    Paths.get("$file"),""")
-          emit(s"""    Paths.get(System.getProperty("user.dir") + "/${file.split("/").last}"),""")
-          emit("""    StandardCopyOption.REPLACE_EXISTING""")
-          emit(")")
-          emit("// TODO: Make sure file copies properly")
-        close("}")
+
+        if (!createdBoxes.contains(bbName)) {
+          createdBoxes += bbName
+          open(src"class $bbName(params: Map[String, chisel3.core.Param]) extends BlackBox(params){")
+            open("val io = IO(new Bundle{")
+              emit("val clock = Input(Clock())")
+              emit("val reset = Input(Bool())")
+              emit("val enable = Input(Bool())")
+              emit("val done = Output(Bool())")
+              inports.fields.foreach{case(name, typ) =>
+                 emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")
+                 emit(src"val ${name}_valid = Input(Bool())")
+                 emit(src"val ${name}_ready = Output(Bool())")
+               }
+               outports.fields.foreach{case(name, typ) =>
+                 emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")
+                 emit(src"val ${name}_valid = Output(Bool())")
+                 emit(src"val ${name}_ready = Input(Bool())")
+               }
+            close("})")
+            emit("val path = Files.copy(")
+            emit(s"""    Paths.get("$file"),""")
+            emit(s"""    Paths.get(System.getProperty("user.dir") + "/${file.split("/").last}"),""")
+            emit("""    StandardCopyOption.REPLACE_EXISTING""")
+            emit(")")
+            emit("// TODO: Make sure file copies properly")
+          close("}")
+        }
       }
       val idx = lhs.parent.s.get.children.indexWhere{x => x.s.get == lhs}
-      emit(src"val ${lhs}_bbox = Module(new ${bbName}_wrapper())")
+      emit(src"val ${lhs}_bbox = Module(new ${bbName}_${lhs}_wrapper())")
       emit(src"${lhs}_bbox.io.clock := clock")
       emit(src"${lhs}_bbox.io.reset := reset.toBool")
       emit(src"${lhs}_bbox.io.enable := io.sigsIn.smEnableOuts($idx)")

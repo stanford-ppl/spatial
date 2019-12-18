@@ -16,7 +16,6 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
     val a = args(0).to[Int]
-    val b = args(1).to[Int]
     val in1 = ArgIn[Int]
     val sum = DRAM[Int](16)
     val prod = DRAM[Int](16)
@@ -31,13 +30,13 @@ import spatial.dsl._
       val divsram = SRAM[Int](16)
       val modsram = SRAM[Int](16)
       val delaysram = SRAM[Int](16)
-      Foreach(16 by 1) { i =>
-        addsram(i) = verilogPrimitiveBlackBox[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/adder.v", latency = 3, pipelined = true, params = Map("LATENCY" -> 3)).out
-        mulsram(i) = verilogPrimitiveBlackBox[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/multiplier.v", latency = 8, pipelined = true, params = Map("LATENCY" -> 8)).out
-        val dm = verilogPrimitiveBlackBox[BBOX_IN,BBOX_DM_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/divmodder.v", latency = 15, pipelined = true, params =  Map("LATENCY" -> 15))
+      Foreach(16 by 1 par 2) { i =>
+        addsram(i) = verilogPrimitiveBlackbox[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/adder.v", latency = 3, pipelined = true, params = Map("LATENCY" -> 3)).out
+        mulsram(i) = verilogPrimitiveBlackbox[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/multiplier.v", latency = 8, pipelined = true, params = Map("LATENCY" -> 8)).out
+        val dm = verilogPrimitiveBlackbox[BBOX_IN,BBOX_DM_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/divmodder.v", latency = 15, pipelined = true, params =  Map("LATENCY" -> 15))
         modsram(i) = dm.mod
         divsram(i) = dm.div
-        delaysram(i) = verilogPrimitiveBlackBox[BBOX_IN,BBOX_OUT](BBOX_IN(i, 0))(s"$DATA/verilogboxes/nopipeline.v", latency = 2, pipelined = false, params = Map("LATENCY" -> 2)).out
+        delaysram(i) = verilogPrimitiveBlackbox[BBOX_IN,BBOX_OUT](BBOX_IN(i, 0))(s"$DATA/verilogboxes/nopipeline.v", Some("delayer"), latency = 2, pipelined = false, params = Map("LATENCY" -> 2)).out
       }
       sum store addsram
       prod store mulsram
@@ -75,6 +74,115 @@ import spatial.dsl._
     printArray(delaygold, "wanted delay:")
     println(r"OK: ${delaygold == getMem(delay)}")
     assert(delaygold == getMem(delay))
+  }
+
+}
+
+
+/** Example usage of a Spatial-defined primitive blackbox.  The input and output types must be defined as @structs.
+  * Compile-time params can be passed in a Map.
+  */
+@spatial class SpatialPrimitiveBBox extends SpatialTest {
+  override def runtimeArgs: Args = "2"
+
+  @struct case class BBOX_IN(idx: Int, scalar: I32, in0: I32, in1: I32, in2: I32, in3: I32, in4: I32, in5: I32)
+  @struct case class BBOX_OUT(max_idx: Int, max_val: I32, min_idx: Int, min_val: I32)
+
+  def main(args: Array[String]): Unit = {
+    val a = args(0).to[I32]
+    val in1 = ArgIn[I32]
+    val max_idx = DRAM[Int](8)
+    val max_val = DRAM[I32](8)
+    val min_idx = DRAM[Int](8)
+    val min_val = DRAM[I32](8)
+    setArg(in1, a)
+
+    // Find idx where pow3 of in0-5 add up to the largest value and the smallest value
+    def minmax(idx: Int, scalar: I32, in0: I32, in1: I32, in2: I32, in3: I32, in4: I32, in5: I32): (Int, I32, Int, I32) = {
+      val max_val_reg = Reg[I32](0).conflictable
+      val max_idx_reg = Reg[Int](-1).conflictable
+      val min_val_reg = Reg[I32](0).conflictable
+      val min_idx_reg = Reg[Int](-1).conflictable
+
+      val sum = scalar * (in0 * in0 * in0 + in1 * in1 * in1 + in2 * in2 * in2 + in3 * in3 * in3 + in4 * in4 * in4 + in5 * in5 * in5)
+      if (idx == 0 || max_val_reg.value < sum) {
+        max_val_reg:= sum
+        max_idx_reg:= idx
+      }
+      if (idx == 0 || min_val_reg.value > sum) {
+        min_val_reg:= sum
+        min_idx_reg:= idx
+      }
+      (max_idx_reg.value, max_val_reg.value, min_idx_reg.value, min_val_reg.value)
+    }
+
+    Accel {
+//      val bbox = spatialPrimitiveBlackbox[BBOX_IN,BBOX_OUT]{in: BBOX_IN =>
+//        val out = minmax(in.idx, in.in0, in.in1, in.in2, in.in3, in.in4, in.in5)
+//        BBOX_OUT(out.max_idx, out.max_val, out.min_idx, out.min_val)
+//      }
+      val max_idx_sram = SRAM[Int](8)
+      val max_val_sram = SRAM[I32](8)
+      val min_idx_sram = SRAM[Int](8)
+      val min_val_sram = SRAM[I32](8)
+
+      Foreach(8 by 1 par 1) { i =>
+        val rowOfs = i * 2 // For noisifying the generated data and make the correctness check easy
+        val range = i + 10
+        val center = range/2
+        Foreach(64 by 1){ j =>
+          val data = List.tabulate[I32](6){k =>
+            // Include spikes to make it easy to check for correctness
+            val pos = j + k
+            if (pos > 12 - rowOfs && pos < 15 - rowOfs) 12.to[I32]
+            else if (pos > 21 - rowOfs && pos < 28 - rowOfs) (24 + rowOfs).to[I32]
+            else if (pos > 30 - rowOfs && pos < 34 - rowOfs) -12.to[I32]
+            else if (pos > 37 - rowOfs && pos < 44 - rowOfs) (-24 + rowOfs).to[I32]
+            else (pos % range - center).to[I32]
+          }
+
+          // Using blackbox
+
+          // Using Inline function
+          val (max_idx, max_val, min_idx, min_val) = minmax(j, in1.value, data(0), data(1), data(2), data(3), data(4), data(5))
+          if (j == 63.to[Int]) {
+            max_idx_sram(i) = max_idx
+            max_val_sram(i) = max_val
+            min_idx_sram(i) = min_idx
+            min_val_sram(i) = min_val
+          }
+        }
+      }
+      max_idx store max_idx_sram
+      max_val store max_val_sram
+      min_idx store min_idx_sram
+      min_val store min_val_sram
+    }
+
+    printArray(getMem(max_idx), "got max_idx:" )
+    val max_idx_gold = Array.tabulate(8){i => 1 + 21 - i*2}
+    printArray(max_idx_gold, "wanted max_idx:")
+    println(r"OK: ${max_idx_gold == getMem(max_idx)}")
+//    assert(max_idx_gold == getMem(max_idx))
+
+    printArray(getMem(max_val), "got max_val:" )
+    val max_val_gold = Array.tabulate(8){i => ((24 + 2*i) * (24 + 2*i) * (24 + 2*i)*6*a).to[I32]}
+    printArray(max_val_gold, "wanted max_val:")
+    println(r"OK: ${max_val_gold == getMem(max_val)}")
+//    assert(max_val_gold == getMem(max_val))
+
+    printArray(getMem(min_idx), "got min_idx:" )
+    val min_idx_gold = Array.tabulate(8){i => 1 + 37 - i*2}
+    printArray(min_idx_gold, "wanted min_idx:")
+    println(r"OK: ${min_idx_gold == getMem(min_idx)}")
+//    assert(min_idx_gold == getMem(min_idx))
+
+    printArray(getMem(min_val), "got min_val:" )
+    val min_val_gold = Array.tabulate(8){i => ((-24 + i.to[I32]*2)*(-24 + i.to[I32]*2)*(-24 + i.to[I32]*2)*6*a).to[I32]}
+    printArray(min_val_gold, "wanted min_val:")
+    println(r"OK: ${min_val_gold == getMem(min_val)}")
+//    assert(min_val_gold == getMem(min_val))
+
   }
 
 }
@@ -149,7 +257,7 @@ import spatial.dsl._
           scalar.enq(row.to[I16] + 1)
         }
 
-        val bbox = verilogControllerBlackBox[BBOX_IN,BBOX_OUT](BBOX_IN(numel.deqInterface(), scalar.deqInterface()))(s"$DATA/verilogboxes/ctrl.v", params = Map("WIDTH" -> 16))
+        val bbox = verilogControllerBlackbox[BBOX_IN,BBOX_OUT](BBOX_IN(numel.deqInterface(), scalar.deqInterface()))(s"$DATA/verilogboxes/ctrl.v", params = Map("WIDTH" -> 16))
 
         Foreach(4 by 1){ row =>
           val numel = bbox.numelOut

@@ -11,14 +11,17 @@ trait VerilogBlackboxAPI {
     * and the programmer does not need to explicitly declare or wire these in Spatial.  Assumes there is no "enable" signal
     * in the verilog module (see issue #287).  You must provide the full path to the verilog file, fixed latency for the module,
     * and whether or not the module can run pipelined (i.e is II = 1 ok?).
+    * If module name you are invoking differs from the [name].v part of the file path, then you can provide Option[String] as the module name
     */
-  @api def verilogPrimitiveBlackBox[A:Struct,B:Struct](inputs: Bits[A])(file: String, latency: scala.Int = 1, pipelined: scala.Boolean = true, params: Map[String, Any] = Map()): B = {
+  @api def verilogPrimitiveBlackbox[A:Struct,B:Struct](inputs: Bits[A])(file: String, moduleName: Option[String] = None, latency: scala.Int = 1, pipelined: scala.Boolean = true, params: Map[String, Any] = Map()): B = {
     val vbbox = stage(VerilogBlackbox[A,B](inputs))
-    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, latency, pipelined, params)
+    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, latency, pipelined, params)
     vbbox
   }
 
-  /** Instantiate a verilog black box as a controller node.  You must provide the full path to the verilog file.
+  /** Instantiate a verilog black box as a controller node.  You must provide the full path to the verilog file.  If the
+    *     module name you are invoking differs from the [name].v part of the file path, then you can provide Option[String] as
+    *     the module name
     *   Spatial assumes the verilog module has at least the following ports:
     *   - clock (input)
     *   - enable (input)
@@ -29,9 +32,9 @@ trait VerilogBlackboxAPI {
     *   - done (output)
     *   This kind of black box is treated as an inner controller and must be the immediate child of a Stream controller.
     */
-  @api def verilogControllerBlackBox[A:StreamStruct,B:StreamStruct](inputs: Bits[A])(file: String, params: Map[String, Any] = Map()): B = {
+  @api def verilogControllerBlackbox[A:StreamStruct,B:StreamStruct](inputs: Bits[A])(file: String, moduleName: Option[String] = None, params: Map[String, Any] = Map()): B = {
     val vbbox = stage(VerilogCtrlBlackbox[A,B](inputs))
-    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, 1, true, params)
+    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, 1, true, params)
     vbbox.asInstanceOf[Sym[_]].rawLevel = Inner
 //    assert(vbbox.asInstanceOf[Sym[_]].parent.s.get.getRawSchedule.contains(Stream) && vbbox.asInstanceOf[Sym[_]].parent.s.get.isSingleControl)
     vbbox

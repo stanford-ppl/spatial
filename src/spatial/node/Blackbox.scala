@@ -2,13 +2,13 @@ package spatial.node
 
 import argon._
 import forge.tags._
-import argon.node.{Primitive, StructAlloc}
+import argon.node.{Alloc, DSLOp, Primitive, StructAlloc}
 import spatial.lang._
 
-abstract class BlackBox[R:Type] extends Control[R]
+abstract class Blackbox[R:Type] extends Control[R]
 
 /** Black box which must be expanded early in compiler (after initial analyses). */
-abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
+abstract class EarlyBlackbox[R:Type] extends Blackbox[R] {
   override def cchains = Nil
   override def iters = Nil
   override def bodies = Nil
@@ -28,7 +28,7 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
   mt:    I32,
   nt:    I32,
   iters: Seq[I32]
-) extends BlackBox[Void] {
+) extends Blackbox[Void] {
   override def cchains = Seq(cchain -> iters)
   override def bodies = Nil
   override def effects: Effects = Effects.Writes(y)
@@ -51,5 +51,24 @@ abstract class EarlyBlackBox[R:Type] extends BlackBox[R] {
   override def bodies = Seq()
   override def effects = Effects.Unique andAlso Effects.Mutable
 }
+
+@op case class SpatialBlackboxImpl[A:Struct,B:Struct](func: Lambda1[A,B])(implicit val tA: Type[A], val tB: Type[B]) extends Alloc[SpatialBlackbox[A,B]] {
+  override def effects = Effects.Unique //andAlso Effects.Sticky
+  override def binds = super.binds + func.input
+}
+
+@op case class SpatialBlackboxUse[A:Struct,B:Struct](bbox: SpatialBlackbox[A,B], in: A) extends Primitive[B] {
+  override def effects = Effects.Unique //andAlso Effects.Sticky
+}
+
+@op case class SpatialCtrlBlackboxImpl[A:StreamStruct,B:StreamStruct](func: Lambda1[A,B])(implicit val tA: Type[A], val tB: Type[B]) extends Alloc[SpatialCtrlBlackbox[A,B]] {
+  override def effects = Effects.Unique //andAlso Effects.Sticky
+  override def binds = super.binds + func.input
+}
+
+@op case class SpatialCtrlBlackboxUse[A:StreamStruct,B:StreamStruct](bbox: SpatialCtrlBlackbox[A,B], in: A) extends Primitive[B] {
+  override def effects = Effects.Unique //andAlso Effects.Sticky
+}
+
 
 

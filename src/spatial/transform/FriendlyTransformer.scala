@@ -23,7 +23,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
-    case Some(data) if (lhs.parent.hasAncestor(data.parent)) =>
+    case Some(data) if lhs.parent.hasAncestor(data.parent) =>
       // Don't get rid of reads being used for DRAM allocations
       if (lhs.consumers.exists{case Op(DRAMHostNew(_,_)) => true; case _ => false }) {
         dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
@@ -55,6 +55,10 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       addedArgIns ++= bitsInputs.map{s => s -> argIn(f(s)) }
 
       isolateSubstWith(escape=Nil, addedArgIns:_*){ super.transform(lhs,rhs) }
+    }
+
+    case SpatialBlackboxImpl(func) => inAccel {
+      isolateSubstWith(escape=Nil){ super.transform(lhs,rhs) }
     }
 
     // Add ArgIns for DRAM dimensions

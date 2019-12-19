@@ -160,6 +160,7 @@ package object control {
     def level: CtrlLevel = toCtrl match {
       case ctrl @ Ctrl.Node(sym,_) if sym.isRawOuter && ctrl.mayBeOuterBlock => Outer
       case Ctrl.Host => Outer
+      case Ctrl.PrimitiveBlackbox(sym) => Inner
       case _         => Inner
     }
 
@@ -201,6 +202,7 @@ package object control {
             case Streaming => Streaming
             case ForkJoin  =>  ForkJoin
             case Fork => Fork
+            case PrimitiveBox => PrimitiveBox
           }
           case (Single, Outer) => actualSchedule match {
             case Sequenced => Sequenced
@@ -208,6 +210,7 @@ package object control {
             case Streaming => Streaming
             case ForkJoin  => ForkJoin
             case Fork => Fork
+            case PrimitiveBox => PrimitiveBox
           }
         }
       }
@@ -727,8 +730,8 @@ package object control {
 
 
   implicit class SymControlOps(s: Sym[_]) extends ScopeHierarchyOps(Some(s)) {
-    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else s.parent
-    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else s.scope
+    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isSpatialPrimitiveBlackbox) Ctrl.PrimitiveBlackbox(s) else s.parent
+    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isSpatialPrimitiveBlackbox) Scope.PrimitiveBlackbox(s) else s.scope
     def isControl: Boolean = s.op.exists(_.isControl)
     def stopWhen: Option[Sym[_]] = if (s.isControl) Ctrl.Node(s,-1).stopWhen else None
 
@@ -821,6 +824,7 @@ package object control {
     def toCtrl: Ctrl = scp match {
       case Scope.Node(sym,id,_) => Ctrl.Node(sym,id)
       case Scope.Host           => Ctrl.Host
+      case Scope.PrimitiveBlackbox(sym) => Ctrl.PrimitiveBlackbox(sym)
     }
     def toScope: Scope = scp
     def isControl: Boolean = true
@@ -833,6 +837,7 @@ package object control {
 
     def iters: Seq[I32] = Try(scp match {
       case Scope.Host => Nil
+      case Scope.PrimitiveBlackbox(sym) => Nil
       case Scope.Node(Op(loop: Loop[_]), -1, -1)         => loop.iters
       case Scope.Node(Op(loop: Loop[_]), stage, block)   => loop.bodies(stage).blocks.apply(block)._1
       case Scope.Node(Op(loop: UnrolledLoop[_]), -1, -1) => loop.iters
@@ -902,12 +907,14 @@ package object control {
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent
       case Ctrl.Node(sym, _) => Ctrl.Node(sym, -1)
+      case Ctrl.PrimitiveBlackbox(sym) => Ctrl.PrimitiveBlackbox(sym)
       case Ctrl.Host => Ctrl.Host
     }
 
     def scope: Scope = ctrl match {
       case Ctrl.Node(sym,-1) => sym.scope
       case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
+      case Ctrl.PrimitiveBlackbox(sym) => Scope.PrimitiveBlackbox(sym)
       case Ctrl.Host         => Scope.Host
     }
 

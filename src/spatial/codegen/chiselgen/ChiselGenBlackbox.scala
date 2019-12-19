@@ -10,7 +10,8 @@ import scala.collection.mutable.ArrayBuffer
 
 trait ChiselGenBlackbox extends ChiselGenCommon {
 
-  val createdBoxes = ArrayBuffer[String]()
+  val createdBoxes: ArrayBuffer[String] = ArrayBuffer[String]()
+
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case VerilogBlackbox(inputs) =>
       val inports: Struct[_] = inputs.tp.asInstanceOf[Struct[_]]
@@ -160,6 +161,60 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
 
       emit(src"val $lhs = ${lhs}_bbox.io.out")
       exitCtrl(lhs.parent.s.get)
+
+//   case SpatialBlackbox(inputs) =>
+//      val inports: Struct[_] = inputs.tp.asInstanceOf[Struct[_]]
+//      val outports: Struct[_] = lhs.tp.asInstanceOf[Struct[_]]
+//      val BlackboxConfig(file, moduleName, _, _, params) = lhs.bboxInfo
+//      val bbName: String = moduleName.getOrElse(file.split("/").last.split('.').head)
+//      inGen(out, src"bb_$lhs.scala") {
+//        emit(s"""package accel""")
+//        emit("import chisel3._")
+//        emit("import chisel3.experimental._")
+//        emit("import chisel3.util._")
+//        emit("import java.nio.file.{Files, Paths, StandardCopyOption}")
+//        open(src"class ${bbName}_${lhs}_wrapper() extends Module {")
+//          open(src"val io = IO(new Bundle {")
+//            emit("val clock = Input(Clock())")
+//            emit("val reset = Input(Bool())")
+//            inports.fields.foreach{case(name, typ) => emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")}
+//            outports.fields.foreach{case(name, typ) => emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")}
+//          close("})")
+//          val paramString = params.map{case (param, value) => s""""$param" -> IntParam($value)"""}.mkString("Map(",",",")")
+//          emit(src"val vbox = Module(new $bbName($paramString))")
+//          emit("vbox.io.clock := io.clock")
+//          emit("vbox.io.reset := io.reset")
+//          inports.fields.foreach{case(name, _) => emit(src"""vbox.io.$name := io.$name""")}
+//          outports.fields.foreach{case(name, _) => emit(src"""io.$name := vbox.io.$name""")}
+//        close("}")
+//
+//        if (!createdBoxes.contains(bbName)) {
+//          createdBoxes += bbName
+//          open(src"class $bbName(params: Map[String, chisel3.core.Param]) extends BlackBox(params) {")
+//            open("val io = IO(new Bundle{")
+//              emit("val clock = Input(Clock())")
+//              emit("val reset = Input(Bool())")
+//              inports.fields.foreach{case(name, typ) => emit(src"val $name = Input(UInt(${bitWidth(typ)}.W))")}
+//              outports.fields.foreach{case(name, typ) => emit(src"val $name = Output(UInt(${bitWidth(typ)}.W))")}
+//            close("})")
+//            emit("val path = Files.copy(")
+//            emit(s"""    Paths.get("$file"),""")
+//            emit(s"""    Paths.get(System.getProperty("user.dir") + "/${file.split("/").last}"),""")
+//            emit("""    StandardCopyOption.REPLACE_EXISTING""")
+//            emit(")")
+//            emit("// TODO: Make sure file copies properly")
+//          close("}")
+//        }
+//      }
+//      emit(src"val ${lhs}_bbox = Module(new ${bbName}_${lhs}_wrapper())")
+//      emit(src"${lhs}_bbox.io.clock := clock")
+//      emit(src"${lhs}_bbox.io.reset := reset.toBool")
+//      inports.fields.foreach{case (field, _) =>
+//        val (start, end) = getField(inports, field)
+//        emit(src"${lhs}_bbox.io.$field := $inputs($start,$end).r")
+//      }
+//      val outbits = outports.fields.map{case (field, _) => src"${lhs}_bbox.io.$field"}.reverse.mkString(",")
+//      emit(src"val $lhs = Cat($outbits)")
 
      case _ => super.gen(lhs, rhs)
   }

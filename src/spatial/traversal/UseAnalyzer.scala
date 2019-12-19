@@ -86,8 +86,8 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
   private def blkOfUser(x: Sym[_], block: Blk): Blk = {
     x match {
-      case s if (s.isControl) => Blk.Node(s,-1)
-      case s if ((s.isCounter || s.isCounterChain) && s.getOwner.isDefined) => Blk.Node(s.owner,-1)
+      case s if s.isControl => Blk.Node(s,-1)
+      case s if (s.isCounter || s.isCounterChain) && s.getOwner.isDefined => Blk.Node(s.owner,-1)
       case _ => block
     }
   }
@@ -99,7 +99,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     dbgs(s"  Uses:    ${pending.mkString(", ")}")
     dbgs(s"  Transient: ${lhs.isTransient}")
     // We care about whether the IR scope is outer, not whether the owning controller is outer
-    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl || (blk.toScope.toCtrl.isInnerControl && blk.toScope.children.length > 0)
+    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl || (blk.toScope.toCtrl.isInnerControl && blk.toScope.children.nonEmpty)
     dbgs(s"  Outer: $isOuter")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node

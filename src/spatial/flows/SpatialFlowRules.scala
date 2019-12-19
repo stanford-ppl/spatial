@@ -197,6 +197,14 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _ =>
   }
 
+  @flow def blackbox(s: Sym[_], op: Op[_]): Unit = {
+    op match {
+      case ctrl@SpatialBlackboxImpl(func) =>
+        func.stms.foreach { c => c.rawParent = s.toCtrl }
+      case _ =>
+    }
+  }
+
   @flow def blockLevel(s: Sym[_], op: Op[_]): Unit = {
     // Set blk for nodes inside ctrl
     op.blocks.zipWithIndex.foreach{case (block,bId) =>
@@ -226,6 +234,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
     case _: ParallelPipe         => s.rawSchedule = ForkJoin
     case _: Switch[_]            => s.rawSchedule = Fork
+    case _: SpatialBlackboxImpl[_,_] => s.rawSchedule = PrimitiveBox
     case _: IfThenElse[_]        => s.rawSchedule = Fork
     case _: SwitchCase[_]        => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined

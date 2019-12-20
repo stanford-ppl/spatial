@@ -8,6 +8,7 @@ import spatial.metadata.access._
 import spatial.metadata.retiming._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 import spatial.metadata.types._
 import spatial.util.modeling.scrubNoise
 import spatial.util.spatialConfig
@@ -101,7 +102,7 @@ trait ChiselGenController extends ChiselGenCommon {
   private def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
     // Find everything that is used in this scope
     // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
-    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet
+    val used: Set[Sym[_]] = ({lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet).filterNot(_.isBlackboxImpl)
     val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
     val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl) ++ getWriteStreams(lhs.toCtrl)} else Set()
     val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
@@ -176,8 +177,7 @@ trait ChiselGenController extends ChiselGenCommon {
 
         close("}")
 
-        val numgrps = math.ceil(inputs.count(!_.isString).toDouble / 100.0)
-        inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  => 
+        inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  =>
           open(src"def connectWires$grpid(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
             inpgrp.foreach { in =>
               if (ledgerized(in)) {
@@ -209,21 +209,7 @@ trait ChiselGenController extends ChiselGenCommon {
             emit("val rr = io.rr")
         }
         if (lhs.op.exists(_.R.isBits) && !spatialConfig.enableModular) emit(src"val ret = Wire(${remap(lhs.op.get.R.tp)})")
-        if (spatialConfig.enableInstrumentation) {
-          emit("""val cycles = Module(new InstrumentationCounter())""")
-          emit("""val iters = Module(new InstrumentationCounter())""")          
-          emit(src"cycles.io.enable := $baseEn")
-          emit(src"iters.io.enable := risingEdge($done)")
-          if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
-            emit("""val stalls = Module(new InstrumentationCounter())""")
-            emit("""val idles = Module(new InstrumentationCounter())""")          
-            emit(src"stalls.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
-            emit(src"idles.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
-            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles.io.count, iters.io.count, stalls.io.count, idles.io.count)")
-          } else {
-            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles.io.count, iters.io.count, 0.U, 0.U)")
-          }
-        }
+        createAndTieInstrs(lhs)
 
         // Set up reg chains
         if (!lhs.isOuterStreamControl) {
@@ -352,7 +338,7 @@ trait ChiselGenController extends ChiselGenCommon {
     val sigsIn = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsIn)"
     val sigsOut = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsOut)"
     emit(src"""$lhs$swobj.configure("$lhs$swobj", $sigsIn, $sigsOut, isSwitchCase = ${lhs.isSwitchCase && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl})""")
-      
+
     if (lhs.op.exists(_.R.isBits)) emit(src"$lhs.r := $lhs$swobj.kernel().r")
     else emit(src"$lhs$swobj.kernel()")
 

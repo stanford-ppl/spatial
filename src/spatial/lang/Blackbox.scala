@@ -12,14 +12,14 @@ import spatial.metadata.control._
 //  val A: Bits[A] = Bits[A]
   override val __neverMutable = true
 
-  @api def apply(in: A): B = stage(SpatialBlackboxUse[A,B](this, in))
+  @api def apply(in: Bits[A]): B = stage(SpatialBlackboxUse[A,B](this, in))
 }
 
 @ref class SpatialCtrlBlackbox[A:StreamStruct, B:StreamStruct] extends Top[SpatialCtrlBlackbox[A,B]] with Ref[scala.Array[Any],SpatialCtrlBlackbox[A,B]] {
 //  val A: Bits[A] = Bits[A]
   override val __neverMutable = true
 
-  @api def apply(in: A): B = stage(SpatialCtrlBlackboxUse[A,B](this, in))
+  @api def apply(in: Bits[A]): B = stage(SpatialCtrlBlackboxUse[A,B](this, in))
 }
 
 object Blackbox {
@@ -32,7 +32,7 @@ object Blackbox {
     val block = stageLambda1[A, B](in) {
       func(in)
     }
-    val sbbox = stageWithFlow(SpatialBlackboxImpl[A, B](block)){box => }
+    val sbbox = stageWithFlow(SpatialBlackboxImpl[A, B](block)){ _ => }
     //    SpatialBlackboxes += sbbox
     sbbox
   }
@@ -46,7 +46,7 @@ object Blackbox {
     val block = stageLambda1[A, B](in) {
       func(in)
     }
-    val sbbox = stageWithFlow(SpatialCtrlBlackboxImpl[A, B](block)){box => }
+    val sbbox = stageWithFlow(SpatialCtrlBlackboxImpl[A, B](block)){ _ => }
     //    SpatialBlackboxes += sbbox
     sbbox
   }
@@ -54,12 +54,12 @@ object Blackbox {
   /** Instantiate a verilog black box as a primitive node.  This assumes the blackbox has "clock" and "reset" input ports in the verilog
     * and the programmer does not need to explicitly declare or wire these in Spatial.  Assumes there is no "enable" signal
     * in the verilog module (see issue #287).  You must provide the full path to the verilog file, fixed latency for the module,
-    * and whether or not the module can run pipelined (i.e is II = 1 ok?).
+    * and the pipelineFactor (i.e II constraint, or number of cycles that must elapse before box can accept new input).
     * If module name you are invoking differs from the [name].v part of the file path, then you can provide Option[String] as the module name
     */
-  @api def VerilogPrimitive[A: Struct, B: Struct](inputs: Bits[A])(file: String, moduleName: Option[String] = None, latency: scala.Int = 1, pipelined: scala.Boolean = true, params: Map[String, Any] = Map()): B = {
+  @api def VerilogPrimitive[A: Struct, B: Struct](inputs: Bits[A])(file: String, moduleName: Option[String] = None, latency: scala.Int = 1, pipelineFactor: scala.Int = 1, params: Map[String, Any] = Map()): B = {
     val vbbox = stage(VerilogBlackbox[A, B](inputs))
-    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, latency, pipelined, params)
+    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, latency, pipelineFactor, params)
     vbbox
   }
 
@@ -79,7 +79,7 @@ object Blackbox {
     */
   @api def VerilogController[A: StreamStruct, B: StreamStruct](inputs: Bits[A])(file: String, moduleName: Option[String] = None, params: Map[String, Any] = Map()): B = {
     val vbbox = stage(VerilogCtrlBlackbox[A, B](inputs))
-    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, 1, true, params)
+    vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, 1, 1, params)
     vbbox.asInstanceOf[Sym[_]].rawLevel = Inner
     vbbox
   }

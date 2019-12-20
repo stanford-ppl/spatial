@@ -4,10 +4,12 @@ import spatial.dsl._
 
 /** Example usage of a primitive blackbox.  The input and output types must be defined as @structs.
   * You must provide the full path to the verilog file, the latency of the box (cycle count from input value change to output value change),
-  * and whether it is pipelined.  Partial pipelining (i.e. can accept a new value every n cycles, where n > 1 and n < latency) is not
-  * currently supported but would be easy to add if needed.  Verilog module params can be passed in a Map.
+  * and its pipeline factor (i.e. number of cycles before a new input can be accepted).  Verilog module params can be passed in a Map.
   */
-@spatial class VerilogPrimitiveBBox extends SpatialTest {
+class VerilogPrimitiveBBox extends VerilogPrimitive(true)
+class VerilogPrimitiveInline extends VerilogPrimitive(false)
+
+@spatial abstract class VerilogPrimitive(usebox: scala.Boolean) extends SpatialTest {
   override def runtimeArgs: Args = "3"
 
   @struct case class BBOX_IN(in1: Int, in2: Int)
@@ -31,12 +33,20 @@ import spatial.dsl._
       val modsram = SRAM[Int](16)
       val delaysram = SRAM[Int](16)
       Foreach(16 by 1 par 2) { i =>
-        addsram(i) = Blackbox.VerilogPrimitive[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/adder.v", latency = 3, pipelined = true, params = Map("LATENCY" -> 3)).out
-        mulsram(i) = Blackbox.VerilogPrimitive[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/multiplier.v", latency = 8, pipelined = true, params = Map("LATENCY" -> 8)).out
-        val dm = Blackbox.VerilogPrimitive[BBOX_IN,BBOX_DM_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/divmodder.v", latency = 15, pipelined = true, params =  Map("LATENCY" -> 15))
+        addsram(i) =
+          if (usebox) Blackbox.VerilogPrimitive[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/adder.v", latency = 3, pipelineFactor = 1, params = Map("LATENCY" -> 3)).out
+          else i + in1.value
+        mulsram(i) =
+          if (usebox) Blackbox.VerilogPrimitive[BBOX_IN,BBOX_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/multiplier.v", latency = 8, pipelineFactor = 1, params = Map("LATENCY" -> 8)).out
+          else i * in1.value
+        val dm =
+          if (usebox) Blackbox.VerilogPrimitive[BBOX_IN,BBOX_DM_OUT](BBOX_IN(i, in1.value))(s"$DATA/verilogboxes/divmodder.v", latency = 15, pipelineFactor = 1, params =  Map("LATENCY" -> 15))
+          else BBOX_DM_OUT(i / in1.value, i % in1.value)
         modsram(i) = dm.mod
         divsram(i) = dm.div
-        delaysram(i) = Blackbox.VerilogPrimitive[BBOX_IN,BBOX_OUT](BBOX_IN(i, 0))(s"$DATA/verilogboxes/nopipeline.v", Some("delayer"), latency = 2, pipelined = false, params = Map("LATENCY" -> 2)).out
+        delaysram(i) =
+          if (usebox) Blackbox.VerilogPrimitive[BBOX_IN,BBOX_OUT](BBOX_IN(i, 0))(s"$DATA/verilogboxes/nopipeline.v", Some("delayer"), latency = 5, pipelineFactor = 2, params = Map("LATENCY" -> 5)).out
+          else retime(1,i) | i // There's not actually a way to write Spatial that forces II = 2 the way that the raw verilog does it
       }
       sum store addsram
       prod store mulsram
@@ -80,7 +90,7 @@ import spatial.dsl._
 
 
 /** Example usage of a Spatial-defined primitive blackbox.  The input and output types must be defined as @structs.
-  * Compile-time params can be passed in a Map.
+  * Compile-time params to blackbox not currently supported but can be added if necessary
   */
 class SpatialPrimitiveBBox extends SpatialPrimitive(true)
 class SpatialPrimitiveInline extends SpatialPrimitive(false)
@@ -107,7 +117,15 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
       val min_val_reg = Reg[I32](0).conflictable
       val min_idx_reg = Reg[Int](-1).conflictable
 
-      val sum = scalar * (in0 * in0 * in0 + in1 * in1 * in1 + in2 * in2 * in2 + in3 * in3 * in3 + in4 * in4 * in4 + in5 * in5 * in5)
+      // This function just makes the blackbox body have lots more nodes unless if you choose one of these random values for your input :)
+      def randomOps(x: I32): I32 = {
+        if (scalar == 430978) x / (x+1) + x + scalar
+        else if (scalar == 130876) x - x * x + scalar * x
+        else if (scalar == 38756114) x % 71 - x + scalar * x
+        else x * x * x
+      }
+
+      val sum = scalar * (randomOps(in0) + randomOps(in1) + randomOps(in2) + randomOps(in3) + randomOps(in4) + randomOps(in5))
       if (idx == 0 || max_val_reg.value < sum) {
         max_val_reg:= sum
         max_idx_reg:= idx
@@ -132,7 +150,7 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
       val min_idx_sram = SRAM[Int](8)
       val min_val_sram = SRAM[I32](8)
 
-      Foreach(8 by 1 par 1) { i =>
+      Foreach(8 by 1 par 4) { i =>
         val rowOfs = i * 2 // For noisifying the generated data and make the correctness check easy
         val range = i + 10
         val center = range/2
@@ -201,6 +219,98 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
   }
 }
 
+
+/** Example usage of a Spatial-defined controller blackbox.  The input and output types must be defined as @streamstructs.
+  * Compile-time params to blackbox not currently supported but can be added if necessary
+  */
+class SpatialCtrlBBox extends SpatialCtrl(true)
+class SpatialCtrlInline extends SpatialCtrl(false)
+
+@spatial abstract class SpatialCtrl(usebox: scala.Boolean) extends SpatialTest {
+  @streamstruct case class BBOX_IN(numel: Int, scalar: I16)
+  @streamstruct case class BBOX_OUT(index: Int, payload: I16, numelOut: Int)
+
+  def main(args: Array[String]): Unit = {
+
+    val result = DRAM[I16](4,64)
+
+    // Define bbox outside of Accel
+    val bboxImpl = Blackbox.SpatialController[BBOX_IN, BBOX_OUT] { in: BBOX_IN =>
+      val index = FIFO[Int](8)
+      val payload = FIFO[I16](8)
+      val numelOut = FIFO[Int](8)
+      Foreach(4 by 1) { _ =>
+        val N = in.numel
+        val sc = in.scalar
+        Foreach(N * 2 by 1) { i =>
+          index.enq(i)
+          payload.enq(i.to[I16] * sc)
+          if (i == 0) numelOut.enq(N * 2)
+        }
+      }
+      BBOX_OUT(index.deqInterface(), payload.deqInterface(), numelOut.deqInterface())
+    }
+
+    Accel {
+      val sram = SRAM[I16](4,64)
+      Foreach(sram.rows by 1, sram.cols by 1){(i,j) => sram(i,j) = 0.to[I16]}
+      Stream.Foreach(5 by 1){ _ =>
+//      Stream{
+        val numel = FIFO[Int](8)
+        val scalar = FIFO[I16](8)
+        Foreach(4 by 1) { row =>
+          numel.enq(row * 4 + 16)
+          scalar.enq(row.to[I16] + 1)
+        }
+
+        if (usebox) {
+     val bbox = bboxImpl(BBOX_IN(numel.deqInterface(), scalar.deqInterface()))
+          Foreach(4 by 1) { row =>
+            val numel = bbox.numelOut
+            Foreach(numel by 1) { i =>
+              sram(row, bbox.index) = bbox.payload
+            }
+          }
+        } else {
+          val index = FIFO[Int](8)
+          val payload = FIFO[I16](8)
+          val numelOut = FIFO[Int](8)
+          'BBOX.Pipe{
+            Foreach(4 by 1) { _ =>
+              val N = numel.deq()
+              val sc = scalar.deq()
+              Foreach(N * 2 by 1) { i =>
+                index.enq(i)
+                payload.enq(i.to[I16] * sc)
+                if (i == 0) numelOut.enq(N * 2)
+              }
+            }
+          }
+          Foreach(4 by 1){ row =>
+            val N = numelOut.deq()
+            Foreach(N by 1){ i =>
+              sram(row, index.deq()) = payload.deq()
+            }
+          }
+        }
+      }
+
+      result store sram
+
+    }
+
+    printMatrix(getMatrix(result), "got:" )
+    val gold = (0::4,0::64){(i,j) =>
+      val scalar = (i + 1).to[I16]
+      val numel = (i * 4 + 16)*2
+      if (j < numel) (j.to[I16] * scalar) else 0.to[I16]
+    }
+    printMatrix(gold, "wanted:")
+    println(r"OK: ${gold == getMatrix(result)}")
+    assert(gold == getMatrix(result))
+
+  }
+}
 
 /** Example usage of a verilog blackbox as a controller.  You must create a @streamstruct to represent the input and output types.
   * The verilog must have enable, done, reset, and clock signals, and these are automatically wired up by the compiler.

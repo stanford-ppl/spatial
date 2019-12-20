@@ -3,7 +3,7 @@ package spatial.metadata.blackbox
 import argon._
 
 
-case class BlackboxConfig(file: String, moduleName: Option[String] = None, latency: scala.Int = 1, pipelined: scala.Boolean = true, params: Map[String, Any] = Map())
+case class BlackboxConfig(file: String, moduleName: Option[String] = None, latency: scala.Int = 1, pf: scala.Int = 1, params: Map[String, Any] = Map())
 
 /** Information needed to manage a verilog black box.
   * Post-unrolling:

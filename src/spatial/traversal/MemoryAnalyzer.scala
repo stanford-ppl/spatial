@@ -13,6 +13,7 @@ import spatial.metadata.memory._
 import spatial.lang._
 import spatial.lang.types._
 import spatial.metadata.memory.LocalMemories
+import spatial.metadata.blackbox._
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator) extends Codegen { // Printing with Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()

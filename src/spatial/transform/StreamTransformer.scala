@@ -9,6 +9,7 @@ import spatial.util.shouldMotionFromConditional
 import spatial.traversal.AccelTraversal
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 
 /** Converts Stream Foreach controllers into Stream Unit controllers with the counterchain
   * duplicated and injected directly into children controllers. This removes the overhead of

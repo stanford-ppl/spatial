@@ -159,6 +159,24 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
+  protected def createAndTieInstrs(lhs: Sym[_]): Unit = {
+    if (spatialConfig.enableInstrumentation) {
+      emit(src"""val cycles_$lhs = Module(new InstrumentationCounter())""")
+      emit(src"""val iters_$lhs = Module(new InstrumentationCounter())""")
+      emit(src"cycles_$lhs.io.enable := $baseEn")
+      emit(src"iters_$lhs.io.enable := risingEdge($done)")
+      if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
+        emit(src"""val stalls_$lhs = Module(new InstrumentationCounter())""")
+        emit(src"""val idles_$lhs = Module(new InstrumentationCounter())""")
+        emit(src"stalls_$lhs.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+        emit(src"idles_$lhs.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+        emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles_$lhs.io.count, iters_$lhs.io.count, stalls_$lhs.io.count, idles_$lhs.io.count)")
+      } else {
+        emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles_$lhs.io.count, iters_$lhs.io.count, 0.U, 0.U)")
+      }
+    }
+  }
+
   protected def createWire(name: String, payload: String): String = {
     src"""val $name = Wire($payload).suggestName(""" + "\"\"\"" + src"$name" + "\"\"\"" + ")"
   }
@@ -200,7 +218,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
       case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty.D(${sym.s.get.II}-1)"
-      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
+      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
@@ -214,7 +232,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
             src"~${merge}.output.full($way).D(${sym.s.get.II}-1)"
         }
-      case bbox@Op(VerilogCtrlBlackbox(_)) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
+      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
 

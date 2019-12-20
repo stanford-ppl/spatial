@@ -13,4 +13,7 @@ object Blk {
     override def toString: String = s"$sym (block: $blk)"
   }
   case object Host extends Blk(None, 0)
+  case class SpatialBlackbox(sym: Sym[_]) extends Blk(Some(sym), 0) {
+    override def toString: String = s"BBox $sym (block: 0)"
+  }
 }

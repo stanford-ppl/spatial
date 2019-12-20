@@ -12,6 +12,7 @@ import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 
 import scala.collection.immutable.SortedSet
+import spatial.metadata.blackbox._
 
 case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTraversal {
   override def shouldRun: Boolean = spatialConfig.enableRetiming
@@ -249,7 +250,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   private def transformCtrl[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if (lhs.isInnerControl && !rhs.isSwitch && inHw) {
+    if ((lhs.isInnerControl || lhs.isBlackboxImpl) && !rhs.isSwitch && inHw) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       val retimePushLaterBlock = rhs.blocks.map{_ => false }.toList
       rhs match {
@@ -266,6 +267,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   override def transform[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = rhs match {
     case _:AccelScope => inAccel { transformCtrl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox { transformCtrl(lhs,rhs) }
     case _ => transformCtrl(lhs, rhs)
   }
 }

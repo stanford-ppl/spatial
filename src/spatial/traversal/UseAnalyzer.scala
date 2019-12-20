@@ -6,6 +6,7 @@ import spatial.metadata.PendingUses
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 
 case class UseAnalyzer(IR: State) extends BlkTraversal {
   var boundSyms: Set[Sym[_]] = Set.empty
@@ -50,18 +51,20 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       super.visit(lhs, rhs)
     }
 
+    dbgs(s" aoeu visiting $lhs wchic is a control? ${lhs.isControl}")
     if (lhs.isControl) {
       lhs.transientReadMems = Set()
       lhs match {
         case Op(OpForeach(_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(OpReduce(_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
-        case Op(OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true 
+        case Op(OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(UnrolledForeach(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(UnrolledReduce(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
-        case _ => 
+        case _ =>
       }
-      inCtrl(lhs){ inspect() } 
-    } else inspect()
+      inCtrl(lhs){ inspect() }
+    } else if (lhs.isSpatialPrimitiveBlackbox) inBox(lhs){ inspect() }
+    else inspect()
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {

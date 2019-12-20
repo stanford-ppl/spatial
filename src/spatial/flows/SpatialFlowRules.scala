@@ -8,6 +8,7 @@ import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.node._
+import spatial.metadata.blackbox._
 
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {

@@ -68,6 +68,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ super.transform(lhs,rhs) }
     case op: DenseTransfer[_,_,_] if lowerTransfers => op.lower(lhs)
     case op: SparseTransfer[_,_] if lowerTransfers => op.lower(lhs)
     case op: FrameTransmit[_,_,_] if lowerTransfers => op.lower(lhs)

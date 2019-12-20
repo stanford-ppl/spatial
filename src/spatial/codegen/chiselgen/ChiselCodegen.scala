@@ -7,6 +7,7 @@ import spatial.codegen.naming._
 import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
+import spatial.metadata.blackbox._
 import spatial.metadata.memory._
 import spatial.node._
 import spatial.traversal.AccelTraversal

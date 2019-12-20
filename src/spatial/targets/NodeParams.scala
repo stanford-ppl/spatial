@@ -42,6 +42,7 @@ trait NodeParams {
 
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
 
+    case op@SpatialBlackboxUse(bbox,_) => ("SpatialBlackbox", Seq("lat" -> bbox.bodyLatency.headOption.getOrElse(0.0).toInt))
     case op:VerilogBlackbox[_,_] => ("VerilogBlackbox", Seq("lat" -> s.bboxInfo.latency))
 
     case _:SRAMRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMAsyncRead", Nil)

@@ -1,5 +1,6 @@
 Operation,Param #1,Param #2,Param #3,Param #4,RequiresRegs,RequiresInReduce,LatencyOf,LatencyInReduce,BuiltInLatency,
 VerilogBlackbox,lat,,,,0,0,lat,lat,0
+SpatialBlackbox,lat,,,,0,0,lat,lat,0
 isAllocation,,,,,0,0,0,0,0,
 FieldApply,,,,,0,0,0,0,0,
 VectorApply,,,,,0,0,0,0,0,

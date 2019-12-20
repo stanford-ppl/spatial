@@ -15,14 +15,14 @@ case class SwitchOptimizer(IR: State) extends MutateTransformer with AccelTraver
 
   // Hotswap is defined as when the firstBlock writes to a Reg and that Reg is read and used to set up the condition in a Switch in the secondBlock
   private def markHotSwaps(prevHotSwaps: Seq[(Sym[_], Sym[_])], firstBlock: Block[_], secondBlock: Block[_]): Unit = {
-    val hotSwapRegs:Seq[(Sym[_], Sym[_])] = firstBlock.nestedStms.collect{case x if (x.isWriter && x.writtenMem.isDefined && x.writtenMem.get.isReg) => (x, x.writtenMem.get)}
+    val hotSwapRegs:Seq[(Sym[_], Sym[_])] = firstBlock.nestedStms.collect{case x if x.isWriter && x.writtenMem.isDefined && x.writtenMem.get.isReg => (x, x.writtenMem.get)}
     val nestedSwitches: Option[(Seq[Sym[_]], Block[_])] = secondBlock.nestedStms.collectFirst{case Op(op@Switch(sels, bod)) => (sels,bod)}
     if (nestedSwitches.isDefined) {
-      val hotSwapReaders = secondBlock.nestedStms.collect{case x if (x.isReader && x.readMem.isDefined && (prevHotSwaps ++ hotSwapRegs).map(_._2).contains(x.readMem.get)) => x}
+      val hotSwapReaders = secondBlock.nestedStms.collect{case x if x.isReader && x.readMem.isDefined && (prevHotSwaps ++ hotSwapRegs).map(_._2).contains(x.readMem.get) => x}
       hotSwapReaders.foreach{x => 
         val relationships: Map[Sym[_], Set[Sym[_]]] = x.readMem.get.hotSwapPairings
-        val conflicts: Set[Sym[_]] = hotSwapRegs.collect{ case (w,r) if (r == x.readMem.get) => w}.toSet
-        x.readMem.get.hotSwapPairings = relationships.filter(_._1 != x).toMap ++ Map((x -> (conflicts ++ relationships.getOrElse(x,Set()))))
+        val conflicts: Set[Sym[_]] = hotSwapRegs.collect{ case (w,r) if r == x.readMem.get => w}.toSet
+        x.readMem.get.hotSwapPairings = relationships.filter(_._1 != x).toMap ++ Map(x -> (conflicts ++ relationships.getOrElse(x,Set())))
       }
       val bodies = nestedSwitches.get._2.nestedStms.collect{case Op(op@SwitchCase(bod)) => bod}
       markHotSwaps(prevHotSwaps ++ hotSwapRegs, bodies(0), bodies(1))
@@ -31,6 +31,7 @@ case class SwitchOptimizer(IR: State) extends MutateTransformer with AccelTraver
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ super.transform(lhs,rhs) }
 
     case SwitchCase(_) =>
       dbgs(s"$lhs = $rhs")

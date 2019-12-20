@@ -17,6 +17,7 @@ import scala.util.Try
 
 import utils.Tree
 import utils.implicits.collections._
+import spatial.metadata.blackbox._
 
 package object control {
 
@@ -160,7 +161,7 @@ package object control {
     def level: CtrlLevel = toCtrl match {
       case ctrl @ Ctrl.Node(sym,_) if sym.isRawOuter && ctrl.mayBeOuterBlock => Outer
       case Ctrl.Host => Outer
-      case Ctrl.PrimitiveBlackbox(sym) => Inner
+      case Ctrl.SpatialBlackbox(sym) => Inner
       case _         => Inner
     }
 
@@ -730,8 +731,8 @@ package object control {
 
 
   implicit class SymControlOps(s: Sym[_]) extends ScopeHierarchyOps(Some(s)) {
-    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isSpatialPrimitiveBlackbox) Ctrl.PrimitiveBlackbox(s) else s.parent
-    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isSpatialPrimitiveBlackbox) Scope.PrimitiveBlackbox(s) else s.scope
+    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isSpatialPrimitiveBlackbox) Ctrl.SpatialBlackbox(s) else s.parent
+    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isSpatialPrimitiveBlackbox) Scope.SpatialBlackbox(s) else s.scope
     def isControl: Boolean = s.op.exists(_.isControl)
     def stopWhen: Option[Sym[_]] = if (s.isControl) Ctrl.Node(s,-1).stopWhen else None
 
@@ -824,7 +825,7 @@ package object control {
     def toCtrl: Ctrl = scp match {
       case Scope.Node(sym,id,_) => Ctrl.Node(sym,id)
       case Scope.Host           => Ctrl.Host
-      case Scope.PrimitiveBlackbox(sym) => Ctrl.PrimitiveBlackbox(sym)
+      case Scope.SpatialBlackbox(sym) => Ctrl.SpatialBlackbox(sym)
     }
     def toScope: Scope = scp
     def isControl: Boolean = true
@@ -837,7 +838,7 @@ package object control {
 
     def iters: Seq[I32] = Try(scp match {
       case Scope.Host => Nil
-      case Scope.PrimitiveBlackbox(sym) => Nil
+      case Scope.SpatialBlackbox(sym) => Nil
       case Scope.Node(Op(loop: Loop[_]), -1, -1)         => loop.iters
       case Scope.Node(Op(loop: Loop[_]), stage, block)   => loop.bodies(stage).blocks.apply(block)._1
       case Scope.Node(Op(loop: UnrolledLoop[_]), -1, -1) => loop.iters
@@ -878,6 +879,11 @@ package object control {
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
+
+      case Ctrl.SpatialBlackbox(sym) => sym match {
+        case Op(prim: SpatialBlackboxImpl[_,_]) => Seq()
+        case Op(ctrl: SpatialCtrlBlackboxImpl[_,_]) => throw new Exception("How to return children of ctrl bbox?")
+      }
     }
 
     @stateful def nestedChildren: Seq[Ctrl.Node] = ctrl match {
@@ -900,6 +906,7 @@ package object control {
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
+      case Ctrl.SpatialBlackbox(s) => throw new Exception(s"Not sure how to give nested children for $s yet")
     }
 
     @stateful def siblings: Seq[Ctrl.Node] = parent.children
@@ -907,14 +914,14 @@ package object control {
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent
       case Ctrl.Node(sym, _) => Ctrl.Node(sym, -1)
-      case Ctrl.PrimitiveBlackbox(sym) => Ctrl.PrimitiveBlackbox(sym)
+      case Ctrl.SpatialBlackbox(sym) => Ctrl.SpatialBlackbox(sym)
       case Ctrl.Host => Ctrl.Host
     }
 
     def scope: Scope = ctrl match {
       case Ctrl.Node(sym,-1) => sym.scope
       case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
-      case Ctrl.PrimitiveBlackbox(sym) => Scope.PrimitiveBlackbox(sym)
+      case Ctrl.SpatialBlackbox(sym) => Scope.SpatialBlackbox(sym)
       case Ctrl.Host         => Scope.Host
     }
 
@@ -932,6 +939,7 @@ package object control {
   implicit class BlkOps(blk: Blk) {
     def toScope: Scope = blk match {
       case Blk.Host      => Scope.Host
+      case Blk.SpatialBlackbox(s)      => Scope.SpatialBlackbox(s)
       case Blk.Node(s,i) => s match {
         case Op(op:Control[_]) =>
           val block = op.blocks(i)
@@ -1292,6 +1300,7 @@ package object control {
 
       val head: Iterator[String] = Seq(lca match {
         case Ctrl.Node(s,id) => "  "*tab + s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]"
+        case Ctrl.SpatialBlackbox(s) => "  "*tab + s"${shortStm(s)} [Blackbox]"
         case Ctrl.Host       => "  "*tab + "Host"
       }).iterator
       if (lca.isInnerControl) {

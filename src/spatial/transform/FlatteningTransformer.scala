@@ -33,7 +33,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
   private var deleteChild: Boolean = false
 
   private def transformCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case ctrl: Control[_] if (lhs.isInnerControl || ctrl.bodies.exists(_.isInnerStage)) =>
+    case ctrl: Control[_] if lhs.isInnerControl || ctrl.bodies.exists(_.isInnerStage) =>
       ctrl.bodies.foreach{body =>
         // Pre-transform all blocks which correspond to inner stages in this controller
         if (lhs.isInnerControl || body.isInnerStage) {
@@ -50,7 +50,16 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
       // Mirror the controller symbol (with any block substitutions in place)
       super.transform(lhs,rhs)
 
-    case ctrl: Control[_] if (lhs.isOuterControl && lhs.children.length == 1) => 
+    case box@SpatialBlackboxImpl(func) =>
+      val saveFlatten = flattenSwitch
+      flattenSwitch = true
+      val block2 = f(func)
+      register(func -> block2)
+      flattenSwitch = saveFlatten
+      super.transform(lhs,rhs)
+
+
+    case ctrl: Control[_] if lhs.isOuterControl && lhs.children.length == 1 =>
       val child = lhs.children.head
       // If child is UnitPipe, inline its contents with parent
       val childInputs = child.s.get.op.get.inputs
@@ -114,6 +123,7 @@ case class FlatteningTransformer(IR: State) extends MutateTransformer with Accel
 
     case _:Switch[_]  => super.transform(lhs,rhs)
     case _:AccelScope => inAccel{ transformCtrl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ transformCtrl(lhs,rhs) }
     case _:Control[_] => transformCtrl(lhs,rhs)
 
     case _ => super.transform(lhs,rhs)

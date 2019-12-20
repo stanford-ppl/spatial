@@ -39,11 +39,12 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
   }
 
   private def visitControl(lhs: Sym[_], rhs: Op[_]): Unit = {
-    if (lhs.isInnerControl) visitInnerControl(lhs,rhs) else visitOuterControl(lhs,rhs)
+    if (lhs.isInnerControl | lhs.isSpatialPrimitiveBlackbox) visitInnerControl(lhs,rhs) else visitOuterControl(lhs,rhs)
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel{ visitControl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ visitControl(lhs,rhs) }
 
     // TODO[4]: Still need to verify that this rule is generally correct
     case StateMachine(_,_,notDone,action,nextState) if lhs.isInnerControl =>

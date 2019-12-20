@@ -7,6 +7,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.modeling._
 import utils.implicits.collections._
+import spatial.metadata.blackbox._
 
 case class MemoryReporter(IR: State) extends Pass {
   override def shouldRun: Boolean = config.enInfo

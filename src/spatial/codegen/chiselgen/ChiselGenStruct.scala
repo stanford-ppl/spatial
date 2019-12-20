@@ -4,6 +4,8 @@ import argon._
 import argon.node._
 import spatial.lang._
 import spatial.metadata.retiming._
+import spatial.metadata.blackbox._
+import spatial.metadata.control._
 import spatial.node.{FieldDeq, SimpleStreamStruct}
 
 trait ChiselGenStruct extends ChiselGenCommon {
@@ -28,6 +30,11 @@ trait ChiselGenStruct extends ChiselGenCommon {
       emit(src"""$lhs.r := $struct.get("$field").bits""")
       emit(src"""$struct.get("$field").ready := ${and(ens)} & ~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}""")
       emit(src"""Ledger.connectStructPort($struct.hashCode, "$field")""")
+
+//    case FieldApply(struct, field) if lhs.parent.s.exists(_.isBlackboxImpl) && struct.isBound =>
+//      emit(createWire(quote(lhs),remap(lhs.tp)))
+//      emit(src"$lhs.r := io.$field")
+
     case FieldApply(struct, field) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))
       val (start, end) = getField(struct.tp, field)

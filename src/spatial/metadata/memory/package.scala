@@ -375,8 +375,6 @@ package object memory {
     def isLIFO: Boolean = mem.isInstanceOf[LIFO[_]]
     def isMergeBuffer: Boolean = mem.isInstanceOf[MergeBuffer[_]]
     def isFIFOReg: Boolean = mem.isInstanceOf[FIFOReg[_]]
-    def isCtrlBlackbox: Boolean = mem.op.exists{ case _: VerilogCtrlBlackbox[_,_] => true; case _: SpatialCtrlBlackboxImpl[_,_] => true; case _ => false}
-    def isSpatialPrimitiveBlackbox: Boolean = mem.op.exists{ case _: SpatialBlackboxImpl[_,_] => true; case _ => false}
     def hasDestructiveReads: Boolean = isFIFO || isLIFO || isFIFOReg
 
     def isLUT: Boolean = mem match {

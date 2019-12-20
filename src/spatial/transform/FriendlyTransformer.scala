@@ -57,7 +57,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       isolateSubstWith(escape=Nil, addedArgIns:_*){ super.transform(lhs,rhs) }
     }
 
-    case SpatialBlackboxImpl(func) => inAccel {
+    case _: BlackboxImpl[_,_,_] => inBox {
       isolateSubstWith(escape=Nil){ super.transform(lhs,rhs) }
     }
 
@@ -88,7 +88,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         err[A](s"Get $tp in host")
       }
 
-      if (!inHw) {
+      if (!inHw && !inBBox) {
         if       (reg.isArgIn) extract(lhs,rhs,reg,"ArgIn")
         else if (reg.isHostIO) extract(lhs,rhs,reg,"HostIO")
         else if (reg.isArgOut) super.transform(lhs,rhs)
@@ -112,7 +112,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         err[A](s"Read $tp in host")
       }
 
-      if (!inHw) {
+      if (!inHw && !inBBox) {
         if       (reg.isArgIn) extract(lhs,rhs,reg,"ArgIn")
         else if (reg.isHostIO) extract(lhs,rhs,reg,"HostIO")
         else if (reg.isArgOut) get("ArgOut")
@@ -183,7 +183,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         err[A](s"Write $tp in Accel")
       }
 
-      if (!inHw) {
+      if (!inHw && !inBBox) {
         if       (reg.isArgIn) super.transform(lhs,rhs)
         else if (reg.isHostIO) super.transform(lhs,rhs)
         else if (reg.isArgOut) noHostWrite("ArgOut registers")

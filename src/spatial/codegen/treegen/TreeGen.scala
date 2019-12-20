@@ -11,6 +11,7 @@ import spatial.util.modeling.scrubNoise
 import spatial.util.spatialConfig
 
 import scala.collection.mutable.HashMap
+import spatial.metadata.blackbox._
 
 case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen {
   override val ext: String = "html"

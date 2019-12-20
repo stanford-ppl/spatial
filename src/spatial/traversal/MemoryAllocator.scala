@@ -7,6 +7,7 @@ import models._
 import spatial.metadata.memory._
 import spatial.util.modeling.{target, areaModel}
 import spatial.targets.MemoryResource
+import spatial.metadata.blackbox._
 
 case class MemoryAllocator(IR: State) extends Pass {
   implicit def AREA_FIELDS: AreaFields[Double] = areaModel.RESOURCE_FIELDS

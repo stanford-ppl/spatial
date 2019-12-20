@@ -220,97 +220,97 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
 }
 
 
-/** Example usage of a Spatial-defined controller blackbox.  The input and output types must be defined as @streamstructs.
-  * Compile-time params to blackbox not currently supported but can be added if necessary
-  */
-class SpatialCtrlBBox extends SpatialCtrl(true)
-class SpatialCtrlInline extends SpatialCtrl(false)
-
-@spatial abstract class SpatialCtrl(usebox: scala.Boolean) extends SpatialTest {
-  @streamstruct case class BBOX_IN(numel: Int, scalar: I16)
-  @streamstruct case class BBOX_OUT(index: Int, payload: I16, numelOut: Int)
-
-  def main(args: Array[String]): Unit = {
-
-    val result = DRAM[I16](4,64)
-
-    // Define bbox outside of Accel
-    val bboxImpl = Blackbox.SpatialController[BBOX_IN, BBOX_OUT] { in: BBOX_IN =>
-      val index = FIFO[Int](8)
-      val payload = FIFO[I16](8)
-      val numelOut = FIFO[Int](8)
-      Foreach(4 by 1) { _ =>
-        val N = in.numel
-        val sc = in.scalar
-        Foreach(N * 2 by 1) { i =>
-          index.enq(i)
-          payload.enq(i.to[I16] * sc)
-          if (i == 0) numelOut.enq(N * 2)
-        }
-      }
-      BBOX_OUT(index.deqInterface(), payload.deqInterface(), numelOut.deqInterface())
-    }
-
-    Accel {
-      val sram = SRAM[I16](4,64)
-      Foreach(sram.rows by 1, sram.cols by 1){(i,j) => sram(i,j) = 0.to[I16]}
-      Stream.Foreach(5 by 1){ _ =>
-//      Stream{
-        val numel = FIFO[Int](8)
-        val scalar = FIFO[I16](8)
-        Foreach(4 by 1) { row =>
-          numel.enq(row * 4 + 16)
-          scalar.enq(row.to[I16] + 1)
-        }
-
-        if (usebox) {
-     val bbox = bboxImpl(BBOX_IN(numel.deqInterface(), scalar.deqInterface()))
-          Foreach(4 by 1) { row =>
-            val numel = bbox.numelOut
-            Foreach(numel by 1) { i =>
-              sram(row, bbox.index) = bbox.payload
-            }
-          }
-        } else {
-          val index = FIFO[Int](8)
-          val payload = FIFO[I16](8)
-          val numelOut = FIFO[Int](8)
-          'BBOX.Pipe{
-            Foreach(4 by 1) { _ =>
-              val N = numel.deq()
-              val sc = scalar.deq()
-              Foreach(N * 2 by 1) { i =>
-                index.enq(i)
-                payload.enq(i.to[I16] * sc)
-                if (i == 0) numelOut.enq(N * 2)
-              }
-            }
-          }
-          Foreach(4 by 1){ row =>
-            val N = numelOut.deq()
-            Foreach(N by 1){ i =>
-              sram(row, index.deq()) = payload.deq()
-            }
-          }
-        }
-      }
-
-      result store sram
-
-    }
-
-    printMatrix(getMatrix(result), "got:" )
-    val gold = (0::4,0::64){(i,j) =>
-      val scalar = (i + 1).to[I16]
-      val numel = (i * 4 + 16)*2
-      if (j < numel) (j.to[I16] * scalar) else 0.to[I16]
-    }
-    printMatrix(gold, "wanted:")
-    println(r"OK: ${gold == getMatrix(result)}")
-    assert(gold == getMatrix(result))
-
-  }
-}
+///** Example usage of a Spatial-defined controller blackbox.  The input and output types must be defined as @streamstructs.
+//  * Compile-time params to blackbox not currently supported but can be added if necessary
+//  */
+//class SpatialCtrlBBox extends SpatialCtrl(true)
+//class SpatialCtrlInline extends SpatialCtrl(false)
+//
+//@spatial abstract class SpatialCtrl(usebox: scala.Boolean) extends SpatialTest {
+//  @streamstruct case class BBOX_IN(numel: Int, scalar: I16)
+//  @streamstruct case class BBOX_OUT(index: Int, payload: I16, numelOut: Int)
+//
+//  def main(args: Array[String]): Unit = {
+//
+//    val result = DRAM[I16](4,64)
+//
+//    // Define bbox outside of Accel
+//    val bboxImpl = Blackbox.SpatialController[BBOX_IN, BBOX_OUT] { in: BBOX_IN =>
+//      val index = FIFO[Int](8)
+//      val payload = FIFO[I16](8)
+//      val numelOut = FIFO[Int](8)
+//      Foreach(4 by 1) { _ =>
+//        val N = in.numel
+//        val sc = in.scalar
+//        Foreach(N * 2 by 1) { i =>
+//          index.enq(i)
+//          payload.enq(i.to[I16] * sc)
+//          if (i == 0) numelOut.enq(N * 2)
+//        }
+//      }
+//      BBOX_OUT(index.deqInterface(), payload.deqInterface(), numelOut.deqInterface())
+//    }
+//
+//    Accel {
+//      val sram = SRAM[I16](4,64)
+//      Foreach(sram.rows by 1, sram.cols by 1){(i,j) => sram(i,j) = 0.to[I16]}
+//      Stream.Foreach(5 by 1){ _ =>
+////      Stream{
+//        val numel = FIFO[Int](8)
+//        val scalar = FIFO[I16](8)
+//        Foreach(4 by 1) { row =>
+//          numel.enq(row * 4 + 16)
+//          scalar.enq(row.to[I16] + 1)
+//        }
+//
+//        if (usebox) {
+//        val bbox = bboxImpl(BBOX_IN(numel.deqInterface(), scalar.deqInterface()))
+//          Foreach(4 by 1) { row =>
+//            val numel = bbox.numelOut
+//            Foreach(numel by 1) { i =>
+//              sram(row, bbox.index) = bbox.payload
+//            }
+//          }
+//        } else {
+//          val index = FIFO[Int](8)
+//          val payload = FIFO[I16](8)
+//          val numelOut = FIFO[Int](8)
+//          'BBOX.Pipe{
+//            Foreach(4 by 1) { _ =>
+//              val N = numel.deq()
+//              val sc = scalar.deq()
+//              Foreach(N * 2 by 1) { i =>
+//                index.enq(i)
+//                payload.enq(i.to[I16] * sc)
+//                if (i == 0) numelOut.enq(N * 2)
+//              }
+//            }
+//          }
+//          Foreach(4 by 1){ row =>
+//            val N = numelOut.deq()
+//            Foreach(N by 1){ i =>
+//              sram(row, index.deq()) = payload.deq()
+//            }
+//          }
+//        }
+//      }
+//
+//      result store sram
+//
+//    }
+//
+//    printMatrix(getMatrix(result), "got:" )
+//    val gold = (0::4,0::64){(i,j) =>
+//      val scalar = (i + 1).to[I16]
+//      val numel = (i * 4 + 16)*2
+//      if (j < numel) (j.to[I16] * scalar) else 0.to[I16]
+//    }
+//    printMatrix(gold, "wanted:")
+//    println(r"OK: ${gold == getMatrix(result)}")
+//    assert(gold == getMatrix(result))
+//
+//  }
+//}
 
 /** Example usage of a verilog blackbox as a controller.  You must create a @streamstruct to represent the input and output types.
   * The verilog must have enable, done, reset, and clock signals, and these are automatically wired up by the compiler.

@@ -27,7 +27,7 @@ object Blackbox {
     *
     * TODO: Allow metaprogrammed params
     */
-  @api def SpatialPrimitive[A:Struct,B:Struct](func: (A, Map[String,Any]) => B): SpatialBlackbox[A,B] = {
+  @api def SpatialPrimitive[A:Struct,B:Struct](func: A => B): SpatialBlackbox[A,B] = {
     val in = boundVar[A]
     val block = stageLambda1[A, B](in) {
       func(in)

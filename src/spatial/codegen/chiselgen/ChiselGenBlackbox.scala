@@ -4,8 +4,11 @@ import argon._
 import spatial.lang._
 import spatial.metadata.blackbox._
 import spatial.metadata.control._
+import spatial.metadata.access._
+import spatial.metadata.memory.LocalMemories
 import spatial.node._
 import spatial.util.spatialConfig
+import spatial.util.modeling.scrubNoise
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -68,7 +71,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       val outbits = outports.fields.map { case (field, _) => src"${lhs}_bbox.io.$field" }.reverse.mkString(",")
       emit(src"val $lhs = Cat($outbits)")
 
-    case VerilogCtrlBlackbox(inputs) =>
+    case VerilogCtrlBlackbox(ens, inputs) =>
       enterCtrl(lhs)
       val inports: StreamStruct[_] = inputs.tp.asInstanceOf[StreamStruct[_]]
       val outports: StreamStruct[_] = lhs.tp.asInstanceOf[StreamStruct[_]]
@@ -102,11 +105,13 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
         inports.fields.foreach { case (name, typ) =>
           emit(src"""vbox.io.$name := io.in.get("$name").bits""")
           emit(src"""vbox.io.${name}_valid := io.in.get("$name").valid""")
+          emit(src"""io.in.getActive("$name").in := vbox.io.${name}_ready // Feed the ready (i.e. read inside blackbox) to external world""")
           emit(src"""io.in.get("$name").ready := vbox.io.${name}_ready""")
         }
         outports.fields.foreach { case (name, typ) =>
           emit(src"""io.out.get("$name").bits := vbox.io.$name""")
           emit(src"""io.out.get("$name").valid := vbox.io.${name}_valid""")
+          emit(src"""io.out.getActive("$name").out := io.out.getActive("$name").in // Loopback the enable of some external reader """)
           emit(src"""vbox.io.${name}_ready := io.out.get("$name").ready""")
         }
         close("}")
@@ -143,7 +148,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       emit(src"val ${lhs}_bbox = Module(new ${bbName}_${lhs}_wrapper())")
       emit(src"${lhs}_bbox.io.clock := clock")
       emit(src"${lhs}_bbox.io.reset := reset.toBool")
-      emit(src"${lhs}_bbox.io.enable := io.sigsIn.smEnableOuts($idx)")
+      emit(src"${lhs}_bbox.io.enable := io.sigsIn.smEnableOuts($idx) & ${and(ens.map{x => appendSuffix(lhs, x)})}")
       createAndTieInstrs(lhs)
       if (lhs.parent.s.get.isLoopControl) {
         emit(src"io.sigsOut.cchainEnable($idx) := ${lhs}_bbox.io.done")
@@ -153,13 +158,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       val parentMask = and(lhs.parent.s.get.toScope.valids.map { x => appendSuffix(lhs, x) })
       emit(src"io.sigsOut.smDoneIn($idx) := ${lhs}_bbox.io.done")
       emit(src"io.sigsOut.smMaskIn($idx) := $parentMask")
-      inputs match {
-        case Op(SimpleStreamStruct(elems)) => elems.foreach { case (field, s) =>
-          emit(src"""${lhs}_bbox.io.in.get("$field").bits := $s.r""")
-          emit(src"""${lhs}_bbox.io.in.get("$field").valid := ${s}_valid""")
-          emit(src"""${s}_ready := ${lhs}_bbox.io.in.get("$field").ready""")
-        }
-      }
+      emit(src"${lhs}_bbox.io.in <> $inputs")
 
       emit(src"val $lhs = ${lhs}_bbox.io.out")
       exitCtrl(lhs.parent.s.get)
@@ -224,6 +223,99 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       emit(src"${lhs}_bbox.io.in_breakpoints <> io.in_breakpoints")
       val outbits = outports.fields.map { case (field, _) => src"${lhs}_bbox.io.$field" }.reverse.mkString(",")
       emit(src"val $lhs = Cat($outbits)")
+
+    case SpatialCtrlBlackboxImpl(func) =>
+      LocalMemories += func.input // Push the input onto the local memory stack as an honarary memory for the sake of codegen here
+      if (!spatialConfig.enableModular) throw new Exception("Cannot generate a Ctrl blackbox without modular codegen enabled!")
+      val inports: StreamStruct[_] = func.input.tp.asInstanceOf[StreamStruct[_]]
+      val outports: StreamStruct[_] = lhs.tp.typeArgs.last.asInstanceOf[StreamStruct[_]]
+      inBox {
+        enterCtrl(lhs)
+        inGen(out, src"bb_$lhs.scala") {
+          emitHeader()
+          open(src"class ${lhs}_kernel(")
+          emit(s"in: ${arg(func.input.tp)},")
+          emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
+          closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
+
+          // Poor man's createSMObject
+          val lat = if (spatialConfig.enableRetiming & lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
+          val ii = if (lhs.II <= 1 | !spatialConfig.enableRetiming | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
+          emit("")
+          emit("val me = this")
+          emit(src"""val sm = Module(new OuterControl(Sequenced, ${lhs.children.size}, isFSM = false, latency = $lat.toInt, myName = "${lhs}_sm")); sm.io <> DontCare""")
+          emit(src"""val iiCtr = Module(new IICounter($ii.toInt, 2 + _root_.utils.math.log2Up($ii.toInt), "${lhs}_iiCtr"))""")
+          emit("")
+          open(src"abstract class ${lhs}_module(depth: Int)(implicit stack: List[KernelHash]) extends Module {")
+            open("val io = IO(new Bundle {")
+            emit(src"val in = ${port(func.input.tp, Some(func.input))}")
+            if (spatialConfig.enableInstrumentation) emit("val in_instrctrs = Vec(api.numCtrls, Output(new InstrCtr()))")
+            val nMyChildren = lhs.children.count(_.s.get != lhs) max 1
+            emit(s"val in_breakpoints = Vec(api.numArgOuts_breakpts, Output(Bool()))")
+            emit(s"val sigsIn = Input(new InputKernelSignals($nMyChildren, 1, List(1), List(32)))")
+            emit(s"val sigsOut = Output(new OutputKernelSignals($nMyChildren, 1))")
+            emit("val rr = Input(Bool())")
+            val outportString = outports.fields.map { case (name, typ) => src""" ("$name" -> ${bitWidth(typ)}) """ }.mkString("Map(", ",", ")")
+            emit(src"""val out = new StreamStructInterface($outportString)""")
+            close("})")
+            emit(src"def ${func.input} = io.in")
+            close("}")
+
+
+            open(src"def kernel(): ${arg(func.result.tp)} = {")
+            emit(src"""Ledger.enter(this.hashCode, "$lhs")""")
+            emit("implicit val stack = ControllerStack.stack.toList")
+            open(src"class ${lhs}_concrete(depth: Int)(implicit stack: List[KernelHash]) extends ${lhs}_module(depth) {")
+            emit("io.sigsOut := DontCare")
+            emit("val breakpoints = io.in_breakpoints; breakpoints := DontCare")
+            if (spatialConfig.enableInstrumentation) emit("val instrctrs = io.in_instrctrs; instrctrs := DontCare")
+            emit("val rr = io.rr")
+            createAndTieInstrs(lhs)
+
+            emit("// Emit blackbox function")
+            gen(func)
+
+            emit("// Wire up the output ports")
+            outports.fields.foreach {case (name, _) => emit(src"""io.out.getActive("$name").out := io.out.getActive("$name").in // Loopback the enable of some external reader """)}
+
+            emit(src"io.out <> ${func.result}")
+
+            close("}")
+            emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth)); module.io := DontCare")
+            emit("// Connect ports on this kernel to its parent")
+            emit(src"in.connectLedger(module.io.in)")
+            emit(src"module.io.in <> in")
+            if (spatialConfig.enableInstrumentation) emit("Ledger.connectInstrCtrs(instrctrs, module.io.in_instrctrs)")
+            emit(src"Ledger.connectBreakpoints(breakpoints, module.io.in_breakpoints)")
+            emit("module.io.rr := rr")
+            emit("module.io.sigsIn := me.sigsIn")
+            emit("me.sigsOut := module.io.sigsOut")
+            emit("val out = module.io.out")
+            emit("""Ledger.exit()""")
+            emit("out")
+            close("}")
+            close("}")
+          }
+        }
+        exitCtrl(lhs)
+        LocalMemories -= func.input
+
+    case SpatialCtrlBlackboxUse(ens, bbox, inputs) =>
+      val inports: StreamStruct[_] = inputs.tp.asInstanceOf[StreamStruct[_]]
+      val outports: StreamStruct[_] = lhs.tp.asInstanceOf[StreamStruct[_]]
+      enterCtrl(lhs)
+      val idx = lhs.parent.s.get.children.indexWhere { x => x.s.get == lhs }
+      val inportString = inports.fields.map { case (name, typ) => src""" ("$name" -> ${bitWidth(typ)}) """ }.mkString("Map(", ",", ")")
+      val outportString = outports.fields.map { case (name, typ) => src""" ("$name" -> ${bitWidth(typ)}) """ }.mkString("Map(", ",", ")")
+      emit(src"val ${lhs}_bbox = new ${bbox}_kernel($inputs, Some(me), List(), 1, 1, 1, List(1), List(32), breakpoints, rr)")
+      emit(src"""${lhs}_bbox.sm.io.ctrDone := risingEdge(${lhs}_bbox.sm.io.ctrInc)""")
+      emit(src"${lhs}_bbox.backpressure := ${getBackPressure(lhs.toCtrl)} | ${lhs}_bbox.sm.io.doneLatch")
+      emit(src"${lhs}_bbox.forwardpressure := true.B | ${lhs}_bbox.sm.io.doneLatch // Always has forward pressure because it is an outer?")
+      emit(src"${lhs}_bbox.sm.io.enableOut.zip(${lhs}_bbox.smEnableOuts).foreach{case (l,r) => r := l}")
+      emit(src"${lhs}_bbox.sm.io.break := false.B // TODO: What if bbox can raise break signal?!")
+      emit(src"${lhs}_bbox.mask := ${and(ens.map{x => appendSuffix(lhs, x)})}")
+      emit(src"""${lhs}_bbox.configure("$lhs", Some(io.sigsIn), Some(io.sigsOut), false)""")
+      emit(src"val $lhs = ${lhs}_bbox.kernel()")
 
     case _ => super.gen(lhs, rhs)
   }

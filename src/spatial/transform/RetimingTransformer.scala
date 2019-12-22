@@ -206,8 +206,6 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     val scope = block.nestedStms
     val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_))
 
-    import spatial.metadata.access._
-    import spatial.metadata.memory._
     dbgs(s"Retiming block $block:")
     scope.foreach{e => dbgs(s"  ${stm(e)} (${e.fullDelay})") }
     //dbgs(s"Result: ")
@@ -250,7 +248,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   private def transformCtrl[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if ((lhs.isInnerControl || lhs.isBlackboxImpl) && !rhs.isSwitch && inHw) {
+    if ((lhs.isInnerControl || lhs.isSpatialPrimitiveBlackbox) && !rhs.isSwitch && inHw) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       val retimePushLaterBlock = rhs.blocks.map{_ => false }.toList
       rhs match {

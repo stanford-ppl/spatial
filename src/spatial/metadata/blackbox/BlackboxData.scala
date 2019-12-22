@@ -13,3 +13,5 @@ case class BlackboxConfig(file: String, moduleName: Option[String] = None, laten
   * Default: undefined
   */
 case class BlackboxInfo(cfg: BlackboxConfig) extends Data[BlackboxInfo](SetBy.User)
+
+case class BlackboxUserNodes(node: Seq[Sym[_]]) extends Data[BlackboxUserNodes](SetBy.Flow.Consumer)

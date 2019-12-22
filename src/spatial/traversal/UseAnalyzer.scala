@@ -52,7 +52,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
 
     dbgs(s" aoeu visiting $lhs wchic is a control? ${lhs.isControl}")
-    if (lhs.isControl) {
+    if (lhs.isControl | lhs.isCtrlBlackbox) {
       lhs.transientReadMems = Set()
       lhs match {
         case Op(OpForeach(_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true

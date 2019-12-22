@@ -209,7 +209,7 @@ class FIFOReg(p: MemParams) extends MemPrimitive(p) {
   isValid.io.input.asyn_reset := false.B
 
   // Check if there is data
-  io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
+  io.asInstanceOf[FIFOInterface].active.map(_.out).zip(io.asInstanceOf[FIFOInterface].active.map(_.in)).foreach{case (o,i) => o := i}
   io.asInstanceOf[FIFOInterface].empty := ~isValid.io.output
   io.asInstanceOf[FIFOInterface].full := isValid.io.output
   io.asInstanceOf[FIFOInterface].almostEmpty := false.B
@@ -286,7 +286,7 @@ class FIFO(p: MemParams) extends MemPrimitive(p) {
 //  }
 
   // Check if there is data
-  io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
+  io.asInstanceOf[FIFOInterface].active.map(_.out).zip(io.asInstanceOf[FIFOInterface].active.map(_.in)).foreach{case (o,i) => o := i}
   io.asInstanceOf[FIFOInterface].empty := elements.io.output.empty
   io.asInstanceOf[FIFOInterface].full := elements.io.output.full
   io.asInstanceOf[FIFOInterface].almostEmpty := elements.io.output.almostEmpty
@@ -385,7 +385,7 @@ class LIFO(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Check if there is data
-  io.asInstanceOf[FIFOInterface].accessActivesOut.zip(io.asInstanceOf[FIFOInterface].accessActivesIn).foreach{case (o,i) => o := i}
+  io.asInstanceOf[FIFOInterface].active.map(_.out).zip(io.asInstanceOf[FIFOInterface].active.map(_.in)).foreach{case (o,i) => o := i}
   io.asInstanceOf[FIFOInterface].empty := elements.io.output.empty
   io.asInstanceOf[FIFOInterface].full := elements.io.output.full
   io.asInstanceOf[FIFOInterface].almostEmpty := elements.io.output.almostEmpty

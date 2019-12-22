@@ -99,24 +99,6 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-  private def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
-    // Find everything that is used in this scope
-    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
-    val used: Set[Sym[_]] = ({lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet).filterNot(_.isBlackboxImpl)
-    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
-    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl) ++ getWriteStreams(lhs.toCtrl)} else Set()
-    val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
-    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
-
-    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
-    dbgs(s"Inputs for $lhs are ($used ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
-    (allUsed diff made).filterNot{s => s.trace.isValue}.toSeq    
-  }
-
-  private def groupInputs(inss: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
-    inss.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map(List(_) -> name) else Seq(ins -> name)}.flatten.toMap
-  }
-
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
     // val oldInputs = scopeInputs
@@ -333,6 +315,8 @@ trait ChiselGenController extends ChiselGenCommon {
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
     val noop = if (lhs.cchains.nonEmpty) src"~$lhs.cchain.head.output.noop" else "true.B"
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
+    println(s"regular mask parent $lhs = ${controllerStack.head} and ${controllerStack.head.enables}")
+
     emit(src"$lhs$swobj.mask := $noop & $parentMask")
 
     val sigsIn = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsIn)"
@@ -427,7 +411,7 @@ trait ChiselGenController extends ChiselGenCommon {
         exitCtrl(lhs)
       }
 
-    case ctrl: EnControl[_] if !lhs.isFSM => 
+    case ctrl: EnControl[_] if !lhs.isFSM & !lhs.isCtrlBlackbox =>
       enterCtrl(lhs)
       instantiateKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*){}
       writeKernelClass(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {

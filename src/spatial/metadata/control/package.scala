@@ -10,6 +10,7 @@ import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
+import spatial.metadata.blackbox._
 import spatial.util.spatialConfig
 import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
@@ -656,6 +657,8 @@ package object control {
     /** True if this controller or symbol has a streaming controller parent. */
     @stateful def hasStreamParent: Boolean = toCtrl.parent.isStreamControl
 
+    @stateful def isInBlackboxImpl: Boolean = ancestors.exists(_.s.exists(_.isBlackboxImpl))
+
     /** True if this controller or symbol has an ancestor which runs forever. */
     def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
 
@@ -731,13 +734,13 @@ package object control {
 
 
   implicit class SymControlOps(s: Sym[_]) extends ScopeHierarchyOps(Some(s)) {
-    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isSpatialPrimitiveBlackbox) Ctrl.SpatialBlackbox(s) else s.parent
-    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isSpatialPrimitiveBlackbox) Scope.SpatialBlackbox(s) else s.scope
+    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isBlackboxImpl) Ctrl.SpatialBlackbox(s) else s.parent
+    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isBlackboxImpl) Scope.SpatialBlackbox(s) else s.scope
     def isControl: Boolean = s.op.exists(_.isControl)
     def stopWhen: Option[Sym[_]] = if (s.isControl) Ctrl.Node(s,-1).stopWhen else None
 
     @stateful def children: Seq[Ctrl.Node] = {
-      if (s.isControl) toCtrl.children
+      if (s.isControl || s.isCtrlBlackbox) toCtrl.children
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
@@ -789,7 +792,7 @@ package object control {
     def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
 
     def rawChildren: Seq[Ctrl.Node] = {
-      if (!s.isControl) throw new Exception(s"Cannot get children of non-controller.")
+      if (!s.isControl && !s.isCtrlBlackbox) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](s).map(_.children).getOrElse(Nil)
     }
     def rawChildren_=(cs: Seq[Ctrl.Node]): Unit = metadata.add(s, Children(cs))
@@ -882,7 +885,7 @@ package object control {
 
       case Ctrl.SpatialBlackbox(sym) => sym match {
         case Op(prim: SpatialBlackboxImpl[_,_]) => Seq()
-        case Op(ctrl: SpatialCtrlBlackboxImpl[_,_]) => throw new Exception("How to return children of ctrl bbox?")
+        case Op(ctrl: SpatialCtrlBlackboxImpl[_,_]) => sym.rawChildren
       }
     }
 
@@ -1320,17 +1323,14 @@ package object control {
   }
 
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getReadStreams).toSet ++
+    println(s"in $ctrl, getting read streams for ${LocalMemories.all} \n their readers: ${LocalMemories.all.map{_.readers}} \n tehir reader parents: ${LocalMemories.all.map{_.readers.map(_.parent)}}")
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox}
-    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox || mem.isInstanceOf[StreamStruct[_]]}
   }
 
   @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getWriteStreams).toSet ++
     LocalMemories.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
       .filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox}
-    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
   }
 
   @stateful def getUsedFields(bbox: Sym[_], ctrl: Ctrl): Seq[String] = {

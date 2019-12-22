@@ -482,6 +482,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
     case _ if node.isDRAMAccel => true
     case _ if node.isCtrlBlackbox => true
+    case _ if node.isBlackboxUse => true
     case _ => false
   }
 

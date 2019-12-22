@@ -71,7 +71,7 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
     case OpForeach(ens, cchain, block, iters, stopWhen) if inHw && lhs.isStreamControl && lhs.isOuterControl =>
-      if (lhs.children.exists{x => x.s.get.isCtrlBlackbox}) {
+      if (lhs.children.exists{x => x.s.get.isCtrlBlackbox || x.s.get.isBlackboxUse}) {
         warn(s"Optimization for folding the counter chain of a Stream controller into its child counter chains is not supported on VerilogCtrlBlackBoxes!  Optimization ignored")
         super.transform(lhs,rhs)
       } else {

@@ -5,6 +5,8 @@ import argon.node._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
+import spatial.metadata.retiming._
+import spatial.metadata.blackbox._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.spatialConfig
@@ -81,6 +83,24 @@ trait ChiselGenCommon extends ChiselCodegen {
   final protected def exitCtrl(lhs: Sym[_]): Unit = {
     // Tree stuff
     controllerStack.pop()
+  }
+
+  protected def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
+    // Find everything that is used in this scope
+    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
+    val used: Set[Sym[_]] = ({lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet).filterNot(_.isBlackboxImpl)
+    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl) ++ getWriteStreams(lhs.toCtrl)} else Set()
+    val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
+    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
+
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
+    dbgs(s"Inputs for $lhs are ($used ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
+    (allUsed diff made).filterNot{s => s.trace.isValue}.toSeq
+  }
+
+  protected def groupInputs(inss: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
+    inss.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map(List(_) -> name) else Seq(ins -> name)}.flatten.toMap
   }
 
   protected def iodot: String = if (spatialConfig.enableModular) "io." else ""
@@ -185,44 +205,48 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{
-      case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
-      case a@Op(x: FIFORegDeq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
+    or(fifo.readers.filter(_.parent.s.get == sym.s.get).collect{
+      case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.active(${activesMap(a)}).out"
+      case a@Op(x: FIFODeqInterface[_]) => src"${fifo}.active(${activesMap(a)}).out"
+      case a@Op(x: FIFORegDeq[_]) => src"${fifo}.active(${activesMap(a)}).out"
     })
   }
 
+  // TODO: Not sure if FIFOBackwardActive is actually needed
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{
-      case a@Op(x: FIFOBankedEnq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
-      case a@Op(x: FIFORegEnq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
+    or(fifo.writers.filter(_.parent.s.get == sym.s.get).collect{
+      case a@Op(x: FIFOBankedEnq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFODeqInterface[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFORegEnq[_]) => src"$fifo.active(${activesMap(a)}).out"
     })
   }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
-    if (c.hasStreamAncestor) and(getReadStreams(c.toCtrl).collect {
+    if (c.hasStreamAncestor || c.isInBlackboxImpl) and(getReadStreams(c.toCtrl).collect {
       case fifo @ Op(StreamInNew(bus)) => src"${fifo}.valid"
     }) else "true.B"
   }
 
   def getStreamBackPressure(c: Sym[_]): String = { 
-    if (c.hasStreamAncestor) and(getWriteStreams(c.toCtrl).collect {
+    if (c.hasStreamAncestor || c.isInBlackboxImpl) and(getWriteStreams(c.toCtrl).collect {
       case fifo @ Op(StreamOutNew(bus)) => src"${fifo}.ready"
     }) else "true.B"
   }
 
-  def hasForwardPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getReadStreams(sym).nonEmpty
-  def hasBackPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getWriteStreams(sym).nonEmpty
+  def hasForwardPressure(sym: Ctrl): Boolean = (sym.hasStreamAncestor || sym.isInBlackboxImpl) && getReadStreams(sym).nonEmpty
+  def hasBackPressure(sym: Ctrl): Boolean = (sym.hasStreamAncestor || sym.isInBlackboxImpl) && getWriteStreams(sym).nonEmpty
   def getForwardPressure(sym: Ctrl): String = {
-    if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
+    if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getReadStreams(sym).collect{
       case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
       case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty.D(${sym.s.get.II}-1)"
-      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
+      case bbox@Op(_:CtrlBlackboxUse[_,_]) if getUsedFields(bbox, sym).nonEmpty => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
+      case b if b.isBound && b.isInstanceOf[StreamStruct[_]] && getUsedFields(b, sym).nonEmpty => src"$b.getForwardPressures(${getUsedFields(b, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
-    if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
+    if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"${fifo}.ready"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.full"
       case fifo@Op(FIFONew(_)) => src"(~${fifo}.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
@@ -232,7 +256,7 @@ trait ChiselGenCommon extends ChiselCodegen {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
             src"~${merge}.output.full($way).D(${sym.s.get.II}-1)"
         }
-      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
+//      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
 

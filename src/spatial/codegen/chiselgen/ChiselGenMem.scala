@@ -316,8 +316,11 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
     case op@FIFODeqInterface(fifo, ens) =>
       emitReadInterface(lhs, fifo, Seq(ens))
-      emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map(appendSuffix(lhs.parent.s.get, _)))}))")
-    case FIFOBankedEnq(fifo, data, ens) => 
+      emit(src"val ${lhs}_active_in = Wire(Bool())")
+      emit(src"val ${lhs}_active_out = Wire(Bool())")
+      emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, ${lhs}_active_in /*(${or(ens.map(appendSuffix(lhs.parent.s.get, _)))})*/)")
+      emit(src"${lhs}_active_out := $fifo.active(${activesMap(lhs)}).out")
+    case FIFOBankedEnq(fifo, data, ens) =>
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
 

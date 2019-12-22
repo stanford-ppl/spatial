@@ -37,9 +37,8 @@ abstract class EarlyBlackbox[R:Type] extends FunctionBlackbox[R] {
 abstract class PrimitiveBlackboxUse[A:Struct,B:Struct] extends Primitive[B] {
   override def effects = Effects.Unique
 }
-abstract class CtrlBlackboxUse[A:StreamStruct,B:StreamStruct] extends EnControl[B] {
+abstract class CtrlBlackboxUse[A:StreamStruct,B:StreamStruct](ens: Set[Bit]) extends EnControl[B] {
   override def iters: Seq[I32] = Seq()
-  var ens = Set()
   override def cchains = Seq()
   override def bodies = Seq()
   override def effects = Effects.Unique andAlso Effects.Mutable
@@ -52,8 +51,8 @@ abstract class BlackboxImpl[T:Type,A:Type,B:Type](func: Lambda1[A,B]) extends Al
 @op case class VerilogBlackbox[A:Struct,B:Struct](in: Bits[A]) extends PrimitiveBlackboxUse[A,B]
 @op case class SpatialBlackboxUse[A:Struct,B:Struct](bbox: SpatialBlackbox[A,B], in: Bits[A]) extends PrimitiveBlackboxUse[A,B]
 
-@op case class VerilogCtrlBlackbox[A:StreamStruct,B:StreamStruct](in: Bits[A]) extends CtrlBlackboxUse[A,B]
-@op case class SpatialCtrlBlackboxUse[A:StreamStruct,B:StreamStruct](bbox: SpatialCtrlBlackbox[A,B], in: Bits[A]) extends CtrlBlackboxUse[A,B]
+@op case class VerilogCtrlBlackbox[A:StreamStruct,B:StreamStruct](ens: Set[Bit], in: Bits[A]) extends CtrlBlackboxUse[A,B](ens)
+@op case class SpatialCtrlBlackboxUse[A:StreamStruct,B:StreamStruct](ens: Set[Bit], bbox: SpatialCtrlBlackbox[A,B], in: Bits[A]) extends CtrlBlackboxUse[A,B](ens)
 
 @op case class SpatialBlackboxImpl[A:Struct,B:Struct](func: Lambda1[A,B])(implicit val tA: Type[A], val tB: Type[B]) extends BlackboxImpl[SpatialBlackbox[A,B],A,B](func)
 @op case class SpatialCtrlBlackboxImpl[A:StreamStruct,B:StreamStruct](func: Lambda1[A,B])(implicit val tA: Type[A], val tB: Type[B]) extends BlackboxImpl[SpatialCtrlBlackbox[A,B],A,B](func)

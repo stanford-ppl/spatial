@@ -19,7 +19,7 @@ import spatial.metadata.control._
 //  val A: Bits[A] = Bits[A]
   override val __neverMutable = true
 
-  @api def apply(in: Bits[A]): B = stage(SpatialCtrlBlackboxUse[A,B](this, in))
+  @api def apply(in: Bits[A]): B = stage(SpatialCtrlBlackboxUse[A,B](Set(), this, in))
 }
 
 object Blackbox {
@@ -27,7 +27,7 @@ object Blackbox {
     *
     * TODO: Allow metaprogrammed params
     */
-  @api def SpatialPrimitive[A:Struct,B:Struct](func: A => B): SpatialBlackbox[A,B] = {
+  @api def SpatialPrimitive[A:Struct,B:Struct](func: (A, Map[String,Any]) => B): SpatialBlackbox[A,B] = {
     val in = boundVar[A]
     val block = stageLambda1[A, B](in) {
       func(in)
@@ -78,7 +78,7 @@ object Blackbox {
     * This kind of black box is treated as an inner controller and must be the immediate child of a Stream controller.
     */
   @api def VerilogController[A: StreamStruct, B: StreamStruct](inputs: Bits[A])(file: String, moduleName: Option[String] = None, params: Map[String, Any] = Map()): B = {
-    val vbbox = stage(VerilogCtrlBlackbox[A, B](inputs))
+    val vbbox = stage(VerilogCtrlBlackbox[A, B](Set(), inputs))
     vbbox.asInstanceOf[Sym[_]].bboxInfo = BlackboxConfig(file, moduleName, 1, 1, params)
     vbbox.asInstanceOf[Sym[_]].rawLevel = Inner
     vbbox

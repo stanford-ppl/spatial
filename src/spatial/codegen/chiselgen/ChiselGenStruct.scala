@@ -4,9 +4,7 @@ import argon._
 import argon.node._
 import spatial.lang._
 import spatial.metadata.retiming._
-import spatial.metadata.blackbox._
-import spatial.metadata.control._
-import spatial.node.{FieldDeq, SimpleStreamStruct}
+import spatial.node.{FIFODeqInterface, FieldDeq, SimpleStreamStruct}
 
 trait ChiselGenStruct extends ChiselGenCommon {
 
@@ -21,19 +19,22 @@ trait ChiselGenStruct extends ChiselGenCommon {
       emit(src"$lhs.r := Cat(${st.reverse.map{f => if (bitWidth(f._2.tp) > 1) src"${f._2}.r" else src"${f._2}"}.mkString(",")})")
 
     case SimpleStreamStruct(st) =>
-//      emit(src"val $lhs = HVec(${st.reverse.map{f => src"${f._2}_decoupled.asDecoupledDriver" }.mkString("Seq(",",",")")})")
+      val inportString = st.map { case (name, typ) => src""" ("$name" -> ${bitWidth(typ.tp)}) """ }.mkString("Map(", ",", ")")
+      emit(src"val $lhs = Wire(Flipped(new StreamStructInterface($inportString)))")
+      st.foreach { case (field, s) =>
+        emit(src"""$lhs.get("$field").bits := $s.r""")
+        emit(src"""$lhs.get("$field").valid := ${s}_valid""")
+        emit(src"""$lhs.getActive("$field").out := ${s}_active_out""")
+        emit(src"""${s}_ready := $lhs.get("$field").ready""")
+        emit(src"""${s}_active_in := $lhs.getActive("$field").in""")
+      }
 
     case FieldDeq(struct, field, ens) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))
-//      val idx = struct.tp.asInstanceOf[StreamStruct[_]].fields.indexWhere{case (s,_) => s == field}
-//      val (start, end) = getField(struct.tp, field)
       emit(src"""$lhs.r := $struct.get("$field").bits""")
       emit(src"""$struct.get("$field").ready := ${and(ens)} & ~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}""")
+      emit(src"""$struct.getActive("$field").in := ${and(ens)}""")
       emit(src"""Ledger.connectStructPort($struct.hashCode, "$field")""")
-
-//    case FieldApply(struct, field) if lhs.parent.s.exists(_.isBlackboxImpl) && struct.isBound =>
-//      emit(createWire(quote(lhs),remap(lhs.tp)))
-//      emit(src"$lhs.r := io.$field")
 
     case FieldApply(struct, field) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))

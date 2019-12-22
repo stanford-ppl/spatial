@@ -4,12 +4,32 @@ import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.node.{DenseTransfer, MemDenseAlias, SparseTransfer}
+import utils.implicits.collections._
 
 trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   val evMem: C[A] <:< Mem[A,C]
   implicit val A: Bits[A]
 
   override protected val __neverMutable: Boolean = false
+}
+
+trait TensorMem[A] {
+
+  /** Returns the total capacity (in elements) of this memory. */
+  @api def size: I32 = product(dims:_*)
+
+  /** Returns the dimensions of this memory as a Sequence. */
+  @api def dims: Seq[I32]
+  /** Returns dim0 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim0: I32 = dims.indexOrElse(0, I32(1))
+  /** Returns dim1 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
+  /** Returns dim2 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
+  /** Returns dim3 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
+  /** Returns dim4 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 }
 
 trait RemoteMem[A,C[_]] extends Mem[A,C] {

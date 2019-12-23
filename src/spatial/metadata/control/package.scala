@@ -1323,7 +1323,6 @@ package object control {
   }
 
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    println(s"in $ctrl, getting read streams for ${LocalMemories.all} \n their readers: ${LocalMemories.all.map{_.readers}} \n tehir reader parents: ${LocalMemories.all.map{_.readers.map(_.parent)}}")
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
       .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox || mem.isInstanceOf[StreamStruct[_]]}
   }

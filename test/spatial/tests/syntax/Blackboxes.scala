@@ -90,7 +90,10 @@ class VerilogPrimitiveInline extends VerilogPrimitive(false)
 
 
 /** Example usage of a Spatial-defined primitive blackbox.  The input and output types must be defined as @structs.
-  * Compile-time params to blackbox not currently supported but can be added if necessary
+  * Compile-time params to blackbox not currently supported but can be added if necessary. Compile time params are not really
+  * required though because ideally the compiler should apply optimizations to the bbox contents, and having parameters
+  * may result in different instantiations of the blackbox requiring different optimizations, and therefore you end up
+  * with two separate modules anyway (i.e. you may as well just use function calls instead of blackboxes).
   */
 class SpatialPrimitiveBBox extends SpatialPrimitive(true)
 class SpatialPrimitiveInline extends SpatialPrimitive(false)
@@ -221,18 +224,22 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
 
 
 /** Example usage of a Spatial-defined controller blackbox.  The input and output types must be defined as @streamstructs.
-  * Compile-time params to blackbox not currently supported but can be added if necessary
+  * Compile-time params to blackbox not currently supported but can be added if necessary.  Compile time params are not really
+  * required though because ideally the compiler should apply optimizations to the bbox contents, and having parameters
+  * may result in different instantiations of the blackbox requiring different optimizations, and therefore you end up
+  * with two separate modules anyway (i.e. you may as well just use function calls instead of blackboxes).
   */
 class SpatialCtrlBBox extends SpatialCtrl(true)
 class SpatialCtrlInline extends SpatialCtrl(false)
 
 @spatial abstract class SpatialCtrl(usebox: scala.Boolean) extends SpatialTest {
+  override def compileArgs = super.compileArgs and "--noModifyStream"
   @streamstruct case class BBOX_IN(numel: Int, scalar: I16)
   @streamstruct case class BBOX_OUT(index: Int, payload: I16, numelOut: Int)
 
   def main(args: Array[String]): Unit = {
-
-    val result = DRAM[I16](4,64)
+    val numInstantiations = 2
+    val result = List.fill(numInstantiations) (DRAM[I16](4,64))
 
     // Define bbox outside of Accel
     val bboxImpl = Blackbox.SpatialController[BBOX_IN, BBOX_OUT] { in: BBOX_IN =>
@@ -242,7 +249,11 @@ class SpatialCtrlInline extends SpatialCtrl(false)
       Foreach(4 by 1) { _ =>
         val N = in.numel
         val sc = in.scalar
-        Foreach(N * 2 by 1) { i =>
+        val counterReg = Reg[Int]
+        Reduce(counterReg)(N by 1) { i =>
+          mux(i == 357861, 3112, 2) // Random stuff
+        }{_+_}
+        Foreach(counterReg by 1) { i =>
           index.enq(i)
           payload.enq(i.to[I16] * sc)
           if (i == 0) numelOut.enq(N * 2)
@@ -252,63 +263,75 @@ class SpatialCtrlInline extends SpatialCtrl(false)
     }
 
     Accel {
-      val sram = SRAM[I16](4,64)
-      Foreach(sram.rows by 1, sram.cols by 1){(i,j) => sram(i,j) = 0.to[I16]}
+      val sram = List.fill(numInstantiations) (SRAM[I16](4,64))
+      Foreach(sram.head.rows by 1, sram.head.cols by 1){(i,j) => sram.foreach{s => s(i,j) = 0.to[I16]}}
       Stream.Foreach(5 by 1){ _ =>
 //      Stream{
-        val numel = FIFO[Int](8)
-        val scalar = FIFO[I16](8)
+        val numel = List.fill(numInstantiations)(FIFO[Int](8))
+        val scalar = List.fill(numInstantiations)(FIFO[I16](8))
         Foreach(4 by 1) { row =>
-          numel.enq(row * 4 + 16)
-          scalar.enq(row.to[I16] + 1)
+          numel.foreach(_.enq(row * 4 + 16))
+          scalar.foreach(_.enq(row.to[I16] + 1))
         }
 
         if (usebox) {
-          val bbox = bboxImpl(BBOX_IN(numel.deqInterface(), scalar.deqInterface()))
-          Foreach(4 by 1) { row =>
-            val numel = bbox.numelOut
-            Foreach(numel by 1) { i =>
-              sram(row, bbox.index) = bbox.payload
-            }
-          }
-        } else {
-          val index = FIFO[Int](8)
-          val payload = FIFO[I16](8)
-          val numelOut = FIFO[Int](8)
-          'BBOX.Pipe{
-            Foreach(4 by 1) { _ =>
-              val N = numel.deq()
-              val sc = scalar.deq()
-              Foreach(N * 2 by 1) { i =>
-                index.enq(i)
-                payload.enq(i.to[I16] * sc)
-                if (i == 0) numelOut.enq(N * 2)
+          val bbox = List.tabulate(numInstantiations){lane => bboxImpl(BBOX_IN(numel(lane).deqInterface(), scalar(lane).deqInterface()))}
+          List.tabulate(numInstantiations) { lane =>
+            Foreach(4 by 1) { row =>
+              val numel = bbox(lane).numelOut
+              Foreach(numel by 1) { i =>
+                sram(lane)(row, bbox(lane).index) = bbox(lane).payload
               }
             }
           }
-          Foreach(4 by 1){ row =>
-            val N = numelOut.deq()
-            Foreach(N by 1){ i =>
-              sram(row, index.deq()) = payload.deq()
+          0
+        } else {
+          List.tabulate(numInstantiations){ lane =>
+            val index = FIFO[Int](8)
+            val payload = FIFO[I16](8)
+            val numelOut = FIFO[Int](8)
+            'BBOX.Pipe {
+              Foreach(4 by 1) { _ =>
+                val N = numel(lane).deq()
+                val sc = scalar(lane).deq()
+                val counterReg = Reg[Int]
+                Reduce(counterReg)(N by 1) { i =>
+                  mux(i == 357861, 3112, 2) // Random stuff
+                }{_+_}
+                Foreach(counterReg by 1) { i =>
+                  index.enq(i)
+                  payload.enq(i.to[I16] * sc)
+                  if (i == 0) numelOut.enq(N * 2)
+                }
+              }
+            }
+            Foreach(4 by 1) { row =>
+              val N = numelOut.deq()
+              Foreach(N by 1) { i =>
+                sram(lane)(row, index.deq()) = payload.deq()
+              }
             }
           }
+          0
         }
       }
 
-      result store sram
-
+      result.zip(sram).foreach{case (d,s) => d store s}
     }
 
-    printMatrix(getMatrix(result), "got:" )
     val gold = (0::4,0::64){(i,j) =>
       val scalar = (i + 1).to[I16]
       val numel = (i * 4 + 16)*2
       if (j < numel) (j.to[I16] * scalar) else 0.to[I16]
     }
-    printMatrix(gold, "wanted:")
-    println(r"OK: ${gold == getMatrix(result)}")
-    assert(gold == getMatrix(result))
 
+    List.tabulate(numInstantiations) { lane =>
+      printMatrix(getMatrix(result(lane)), "got:")
+      printMatrix(gold, "wanted:")
+      println(r"OK: ${gold == getMatrix(result(lane))}}")
+      assert(gold == getMatrix(result(lane)))
+    }
+    ()
   }
 }
 
@@ -322,72 +345,81 @@ class VerilogCtrlBBox extends VerilogCtrl(true)
 class VerilogCtrlInline extends VerilogCtrl(false)
 
 @spatial abstract class VerilogCtrl(usebox: scala.Boolean) extends SpatialTest {
+  override def compileArgs: Args = super.compileArgs and "--noModifyStream"
   @streamstruct case class BBOX_IN(numel: Int, scalar: I16)
   @streamstruct case class BBOX_OUT(index: Int, payload: I16, numelOut: Int)
 
   def main(args: Array[String]): Unit = {
 
-    val result = DRAM[I16](4,64)
+    val numInstantiations = 2
+    val result = List.fill(numInstantiations) (DRAM[I16](4,64))
 
     Accel {
-      val sram = SRAM[I16](4,64)
-      Foreach(sram.rows by 1, sram.cols by 1){(i,j) => sram(i,j) = 0.to[I16]}
+      val sram = List.fill(numInstantiations) (SRAM[I16](4,64))
+      Foreach(sram.head.rows by 1, sram.head.cols by 1){(i,j) => sram.foreach{s => s(i,j) = 0.to[I16]}}
       Stream.Foreach(5 by 1){ _ =>
 //      Stream{
-        val numel = FIFO[Int](8)
-        val scalar = FIFO[I16](8)
+        val numel = List.fill(numInstantiations)(FIFO[Int](8))
+        val scalar = List.fill(numInstantiations)(FIFO[I16](8))
         Foreach(4 by 1) { row =>
-          numel.enq(row * 4 + 16)
-          scalar.enq(row.to[I16] + 1)
+          numel.foreach(_.enq(row * 4 + 16))
+          scalar.foreach(_.enq(row.to[I16] + 1))
         }
 
         if (usebox) {
-          val bbox = Blackbox.VerilogController[BBOX_IN, BBOX_OUT](BBOX_IN(numel.deqInterface(), scalar.deqInterface()))(s"$DATA/verilogboxes/ctrl.v", params = Map("WIDTH" -> 16))
+          val bbox = List.tabulate(numInstantiations){lane => Blackbox.VerilogController[BBOX_IN, BBOX_OUT](BBOX_IN(numel(lane).deqInterface(), scalar(lane).deqInterface()))(s"$DATA/verilogboxes/ctrl.v", params = Map("WIDTH" -> 16))}
 
-          Foreach(4 by 1) { row =>
-            val numel = bbox.numelOut
-            Foreach(numel by 1) { i =>
-              sram(row, bbox.index) = bbox.payload
-            }
-          }
-        } else {
-          val index = FIFO[Int](8)
-          val payload = FIFO[I16](8)
-          val numelOut = FIFO[Int](8)
-          'BBOX.Pipe{
-            Foreach(4 by 1) { _ =>
-              val N = numel.deq()
-              val sc = scalar.deq()
-              Foreach(N * 2 by 1) { i =>
-                index.enq(i)
-                payload.enq(i.to[I16] * sc)
-                if (i == 0) numelOut.enq(N * 2)
+          List.tabulate(numInstantiations){lane =>
+            Foreach(4 by 1) { row =>
+              val numel = bbox(lane).numelOut
+              Foreach(numel by 1) { i =>
+                sram(lane)(row, bbox(lane).index) = bbox(lane).payload
               }
             }
           }
-          Foreach(4 by 1){ row =>
-            val N = numelOut.deq()
-            Foreach(N by 1){ i =>
-              sram(row, index.deq()) = payload.deq()
+          0
+        } else {
+          List.tabulate(numInstantiations) { lane => {
+            val index = FIFO[Int](8)
+            val payload = FIFO[I16](8)
+            val numelOut = FIFO[Int](8)
+            'BBOX.Pipe {
+              Foreach(4 by 1) { _ =>
+                val N = numel(lane).deq()
+                val sc = scalar(lane).deq()
+                Foreach(N * 2 by 1) { i =>
+                  index.enq(i)
+                  payload.enq(i.to[I16] * sc)
+                  if (i == 0) numelOut.enq(N * 2)
+                }
+              }
             }
-          }
+            Foreach(4 by 1) { row =>
+              val N = numelOut.deq()
+              Foreach(N by 1) { i =>
+                sram(lane)(row, index.deq()) = payload.deq()
+              }
+            }
+          }}
+          0
         }
       }
 
-      result store sram
-
+      result.zip(sram).foreach{case (d,s) => d store s}
     }
 
-    printMatrix(getMatrix(result), "got:" )
-    val gold = (0::4,0::64){(i,j) =>
+    val gold = (0 :: 4, 0 :: 64) { (i, j) =>
       val scalar = (i + 1).to[I16]
-      val numel = (i * 4 + 16)*2
+      val numel = (i * 4 + 16) * 2
       if (j < numel) (j.to[I16] * scalar) else 0.to[I16]
     }
-    printMatrix(gold, "wanted:")
-    println(r"OK: ${gold == getMatrix(result)}")
-    assert(gold == getMatrix(result))
-
+    List.tabulate(numInstantiations) { lane =>
+      printMatrix(getMatrix(result(lane)), "got:")
+      printMatrix(gold, "wanted:")
+      println(r"OK: ${gold == getMatrix(result(lane))}")
+      assert(gold == getMatrix(result(lane)))
+    }
+    ()
   }
 }
 

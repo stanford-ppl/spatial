@@ -206,9 +206,10 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
     or(fifo.readers.filter(_.parent.s.get == sym.s.get).collect{
-      case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.active(${activesMap(a)}).out"
-      case a@Op(x: FIFODeqInterface[_]) => src"${fifo}.active(${activesMap(a)}).out"
-      case a@Op(x: FIFORegDeq[_]) => src"${fifo}.active(${activesMap(a)}).out"
+      case a@Op(x: FIFOBankedDeq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFODeqInterface[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFORegDeq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x@FieldDeq(struct, field, ens)) => src"""$struct.getActive("$field").out"""
     })
   }
 
@@ -218,6 +219,7 @@ trait ChiselGenCommon extends ChiselCodegen {
       case a@Op(x: FIFOBankedEnq[_]) => src"$fifo.active(${activesMap(a)}).out"
       case a@Op(x: FIFODeqInterface[_]) => src"$fifo.active(${activesMap(a)}).out"
       case a@Op(x: FIFORegEnq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x@FieldDeq(struct, field, ens)) => src"""$struct.getActive("$field").out"""
     })
   }
 

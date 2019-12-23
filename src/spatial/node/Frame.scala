@@ -8,7 +8,7 @@ import spatial.lang._
 
 abstract class FrameNew[A:Bits,C[T]](implicit C: Type[C[A]]) extends MemAlloc[A,C]
 
-@op case class FrameHostNew[A:Bits,C[T]](dims: Seq[I32], zero: A)(implicit tp: Type[C[A]]) extends FrameNew[A,C]
+@op case class FrameHostNew[A:Bits,C[T]](dims: Seq[I32], zero: A, stream: Sym[_])(implicit tp: Type[C[A]]) extends FrameNew[A,C]
 
 @op case class FrameAddress[A:Bits,C[T]](dram: Frame[A,C]) extends Primitive[I64] {
   val A: Bits[A] = Bits[A]

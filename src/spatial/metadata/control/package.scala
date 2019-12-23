@@ -490,7 +490,7 @@ package object control {
         firstFork = false
         layer = layer + 1
       }
-      dbgs(s"itersynch info for $leaf $iters $baseUID $uid = $map")
+      // dbgs(s"itersynch info for $leaf $iters $baseUID $uid = $map")
       map.collect{case (i, o) if o.isDefined => (i -> o.get)}.toMap
     }
 
@@ -515,7 +515,8 @@ package object control {
     }
 
     /** Returns true if the subtree rooted at ctrl run for the same number of cycles (i.e. iterations) regardless of uid.
-      * entry flag identifies whether the outermost iterator of the cchain should be ignored or not
+      * "entry" flag identifies whether the outermost iterator of the cchain should be ignored or not
+      * "entry" indicates whether the binding Parallel controller is placed as a child of the parallelized LCA or a parent of the parallelized LCA
       */
     @stateful def synchronizedStart(forkedIters: Seq[Idx], entry: Boolean = false, stopAtChild: Option[Sym[_]] = None): Boolean = {
       val meSynch = cchainIsInvariant(forkedIters, entry)
@@ -527,12 +528,11 @@ package object control {
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], entry: Boolean): Boolean = {
       import spatial.util.modeling._
       if (isFSM || isStreamControl) false
-      else if (isSwitch) {
+      else if (isSwitch && parent.s.get.isOuterControl) { // If this is a switch serving as a controller (i.e. not a dataflow primitive)
         val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
         val condMutators = conditions.flatMap(mutatingBounds(_))
         condMutators.intersect(forkedIters).isEmpty
       } else {
-        // TODO: Actually check if cchains vary with forkedIters
         val ctrsToDrop = if (entry) 1 else 0
         cchains.forall{cchain =>
           cchain.counters.drop(ctrsToDrop).forall{ctr => ctr.isFixed(forkedIters)}

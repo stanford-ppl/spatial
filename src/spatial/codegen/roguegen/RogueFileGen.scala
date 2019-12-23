@@ -42,6 +42,31 @@ trait RogueFileGen extends RogueCodegen {
         emit("accel.Reset.set(0)")
         emit("print(\"Starting TopHost.py...\")")
     }
+    inGen(out, "ConnectStreams.py") {
+      emit("#!/usr/bin/env python3")
+      emit("import setupLibPaths")
+      emit("")
+      emit("import sys")
+      emit("import argparse")
+      emit("import rogue")
+      emit("import rogue.hardware.axi")
+      emit("import rogue.interfaces.stream")
+      emit("import rogue.interfaces.memory")
+      emit("")
+      emit("import pyrogue as pr")
+      emit("import pyrogue.gui")
+      emit("import pyrogue.utilities.prbs")
+      emit("import pyrogue.interfaces.simulation")
+      emit("")
+      emit("import axipcie  as pcie")
+      emit("# import rogue.axi as axi")
+      emit("")
+      emit("import time")
+      emit("from FrameSlave import FrameSlave")
+      emit("from FrameMaster import FrameMaster")
+      emit("")
+      open("def connect(base):")
+    }
   }
 
   override protected def emitEntry(block: Block[_]): Unit = {
@@ -50,6 +75,9 @@ trait RogueFileGen extends RogueCodegen {
 
   override def emitFooter(): Unit = {
     inGen(out, entryFile) {
+      close("")
+    }
+    inGen(out, "ConnectStreams.py") {
       close("")
     }
     super.emitFooter()

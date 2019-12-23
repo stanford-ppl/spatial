@@ -26,15 +26,16 @@ The StreamIn/Out[T] gives you a Decoupled(T) in Chisel-speak, meaning you have a
 signals that go along with it.  The ready/valid signals are used in the control flow for Spatial Stream controllers.
 You can use the Bus case class info in codegen if you actually need to handle more than a DecoupledIO, or you can make the type
 a Tuple if you need to manipulate more data in the Spatial app (i.e. ARUSER, AWID, etc.) 
-    * Bus.scala - This is where Bus case classes are defined.  I'm not actually sure why both the StreamIn/Out and the Bus 
-    require Type arguments.  
+    * Bus.scala - This is where Bus case classes are defined. 
 * spatial/src/spatial/codegen/chiselgen - This is where you set up some wires for your stream to interact with Fringe (if you 
 need some parameterized hardware like the load/store/scatter/gather DMA) or you can hook up to the SpatialIP interface directly
     * ChiselGenStream.scala - You need to add the following:
         * StreamInNew/StreamOutNew rules - If your StreamIn/Out will be defined outside the Accel (i.e. val in = StreamIn[T](...) as
         opposed to an implicit StreamIn[CmdBus](BurstCmdBus()) that is created inside the Accel by a BlockBox lowering rule), and you
         the IR will contain a node for this StreamInNew/OutNew *outside* of the Accel scope, and will refer to this
-        IR node later in the accel.  You should match on your Bus and assign $lhs to that DecoupledIO port. 
+        IR node later in the accel.  You should match on your Bus and assign $lhs to that DecoupledIO port.  For StreamIn[T](bus),
+        the T tells you the type to expect when you interact with it, the bus tells you what interface (i.e. AXI Stream) the data is
+        coming over.
         Spatial's modularizer and Java chunker will handle the boilerplate so that anywhere in your app that requires this
         Stream will have access to this $lhs
         * StreamOutBankedWrite/StreamInBankedRead rules - This is how you extract data off of your Bus. The unroller turns all

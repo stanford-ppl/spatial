@@ -7,8 +7,8 @@ import spatial.dsl._
 
   def main(args: Array[String]): Unit = {
     // Declare SW-HW interface vals
-    val in = StreamIn[U256](AxiStream256Bus)
-    val out = StreamOut[U256](AxiStream256Bus)
+    val in = StreamIn[U256](AxiStream256Bus(0,0))
+    val out = StreamOut[U256](AxiStream256Bus(0,1))
 
     // Create HW accelerator
     Accel {

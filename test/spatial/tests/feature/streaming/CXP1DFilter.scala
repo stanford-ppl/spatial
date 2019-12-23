@@ -47,12 +47,12 @@ import spatial.tests.apps._
     // val output_composite_dram = DRAM[composite](LINES_TODO)
 
     /** BOARD TESTING */
-    val in = StreamIn[AxiStream256](AxiStream256Bus)
+    val in = StreamIn[AxiStream256](AxiStream256Bus(0,0))
     val LINES_TODO = ArgIn[Int]
     setArg(LINES_TODO, rows)
     val COLS = interleave_cols;
 //    setArg(COLS, 1024)
-    val out = StreamOut[AxiStream256](AxiStream256Bus)
+    val out = StreamOut[AxiStream256](AxiStream256Bus(0,1))
 
     // Create HW accelerator
     Accel {

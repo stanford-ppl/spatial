@@ -21,7 +21,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       forceEmit(src"val $lhs = Wire(new FixedPoint(true, 64, 0))")
       forceEmit(src"$lhs.r := accelUnit.io.argIns(api.${argHandle(lhs)}_ptr)")
 
-    case FrameHostNew(size,_) =>
+    case FrameHostNew(size,_,_) =>
 
     case DRAMAccelNew(dim) =>
 

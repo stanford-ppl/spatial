@@ -254,6 +254,8 @@ trait MemoryUnrolling extends UnrollingBase {
           Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), locks, ens2), vecIds.toList, 0))
         }
 
+        dbgs(s"banked is $banked")
+
         // hack for issue #90
         val newOfs = mems.map{case UnrollInstance(m,_,_,p,_,_) => (m,p)}.take(i).count(_ == (mem2,port))
         
@@ -414,7 +416,9 @@ trait MemoryUnrolling extends UnrollingBase {
           bug(access.ctx)
         }
         dispatches.map{dispatchId =>
-          val ports:Seq[Port] = vids.map { vid => access.port(dispatchId, vid) }.distinct
+          val portsPerLane:Seq[Port] = vids.map { vid => access.port(dispatchId, vid) }
+          // LockDRAMs are hacked into the compiler and all vids have same port, so make sure we keep info for each lane for PIR unrolling
+          val ports = if (mem.isLockDRAM) portsPerLane else portsPerLane.distinct
           //dbgs(s"ports:")
           //ports.foreach { p =>
             //dbgs(s"$p")

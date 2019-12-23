@@ -64,6 +64,7 @@ class FringeZynq(
   })
 
   io <> DontCare
+
   // Common Fringe
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
   fringeCommon.io <> DontCare
@@ -131,6 +132,9 @@ class FringeZynq(
     axiBridge.io.in <> fringeCommon.io.dram(i)
     maxi <> axiBridge.io.M_AXI
   }
-
-
+  // TODO: This was an attempt to resolve issue #276 but it didn't work
+  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
+    io.M_AXI.foreach(_.AWVALID := false.B)
+    io.M_AXI.foreach(_.ARVALID := false.B)
+  }
 }

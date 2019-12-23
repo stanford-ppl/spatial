@@ -16,10 +16,15 @@ package object retiming {
     def fullDelay: Double = metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
     def fullDelay_=(d: Double): Unit = metadata.add(s, FullDelay(d))
 
+    def isRetimeGate: Boolean = s match { case Op(RetimeGate()) => true; case _ => false }
+    def isDelayLine: Boolean = s match { case Op(DelayLine(_,_)) => true; case _ => false }
     def trace: Sym[_] = s match {
       case Op(DelayLine(_,data)) => data.trace
       case _ => s
     }
+
+    def userInjectedDelay: Boolean = metadata[UserInjectedDelay](s).map(_.flag).getOrElse(false)
+    def userInjectedDelay_=(flag: Boolean): Unit = metadata.add(s, UserInjectedDelay(flag))
 
     def traceToInt: Int = s.trace match {
       case Const(c: FixedPoint) => c.toInt

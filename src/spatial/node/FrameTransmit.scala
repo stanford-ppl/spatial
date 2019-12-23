@@ -57,7 +57,8 @@ object FrameTransmit {
   ): Void = {
     import spatial.metadata.types._
 
-    val Op(FrameHostNew(len,_)) = frame
+    val Op(FrameHostNew(len,_,dataStream)) = frame
+
 
     if (A.nbits % 8 != 0) throw new Exception(s"Cannot transfer to/from Frame ${A.nbits} bits per cycle, since it cannot be packed into bytes. ${frame} (${frame.name.getOrElse("")}) <-> ${local} (${local.name.getOrElse("")}) ")
 
@@ -68,21 +69,19 @@ object FrameTransmit {
           i: I32 => i % local.constDims.map(_.toInt).product
         } else {i: I32 => i}
       if (isLoad) {
-        val dataStream = frame.asInstanceOf[Sym[_]].interfaceStream.get.asInstanceOf[StreamIn[A]]
 
         // Data loading
         Stream.Foreach(len.head by 1){i =>
-          local.__write(dataStream.value(), Seq(localAddr(i)), Set.empty)
+          local.__write(dataStream.asInstanceOf[StreamIn[A]].value(), Seq(localAddr(i)), Set.empty)
         }
       }
       else {
-        val dataStream = frame.asInstanceOf[Sym[_]].interfaceStream.get.asInstanceOf[StreamOut[AxiStream512]]
-
+        val (tid, tdest) = dataStream.asInstanceOf[Sym[_]] match { case _@Op(StreamOutNew(bus: AxiStream64Bus)) => (bus.tid, bus.tdest); case _ => (0,0)}
         Stream.Foreach(len.head by 1){i =>
-          val tuser = mux(i === 0, 2.to[U64], 0.to[U64])
+          val tuser = mux(i === 0, 2.to[U32], 0.to[U32])
           val data = local.__read(Seq(localAddr(i)), Set.empty)
           val last = i === (len.head-1)
-          dataStream := AxiStream512(data.as[U512], /*~*/0.to[U64], /*~*/0.to[U64], last, 0.to[U8], 1.to[U8], tuser)
+          dataStream.asInstanceOf[StreamOut[AxiStream64]] := AxiStream64(data.as[U64], /*~*/0.to[U8], /*~*/0.to[U8], last, tid.to[U8], tdest.to[U8], tuser)
         }
       }
     }

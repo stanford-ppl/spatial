@@ -3,11 +3,12 @@ package spatial.tests.feature.transfers
 
 import argon.static.Sym
 import spatial.dsl._
+import _root_.spatial.lang.{AxiStream64, AxiStream64Bus}
 
 @spatial class FrameLoadTest extends SpatialTest {
   def main(args: Array[String]): Unit = {
-
-    val in = FrameIn[U64](8)
+    val inbus = StreamIn[U64](AxiStream64Bus(tid = 0, tdest = 0))
+    val in = Frame[U64](8, inbus)
     val data = Array[U64](Seq.tabulate(8){i => List.tabulate(4){j => ((i*4+j)%256) << (j*8)}.sum}.map(_.to[U64]):_*)
 
     setFrame(in,data)
@@ -31,8 +32,8 @@ import spatial.dsl._
 
 @spatial class FrameStoreTest extends SpatialTest {
   def main(args: Array[String]): Unit = {
-
-    val out = FrameOut[U64](8)
+    val outbus = StreamOut[U64](AxiStream64Bus(tid = 0, tdest = 0))
+    val out = Frame[U64](8, outbus)
     Accel {
       val a = SRAM[U64](8)
       Foreach(32 by 4) {i => a(i/4) = Vec.ZeroFirst(i.to[U8], (i+1).to[U8], (i+2).to[U8], (i+3).to[U8], 0.to[U8], 0.to[U8], 0.to[U8], 0.to[U8]).asPacked[U64]}
@@ -49,10 +50,12 @@ import spatial.dsl._
 
 @spatial class FrameLoadStoreTest extends SpatialTest {
   def main(args: Array[String]): Unit = {
-    val in = FrameIn[U32](64)
+    val inbus = StreamIn[U32](AxiStream64Bus(tid = 0, tdest = 0))
+    val in = Frame[U32](64, inbus)
     val data = Array.tabulate[U32](64){i => i.to[U32]}
     setFrame(in, data)
-    val out = FrameOut[U32](64)
+    val outbus = StreamOut[U32](AxiStream64Bus(tid = 0, tdest = 1))
+    val out = Frame[U32](64, outbus)
     Accel {
       Stream {
         val a = FIFO[U32](8)
@@ -61,17 +64,58 @@ import spatial.dsl._
         Foreach(64 by 1){_ => b.enq(a.deq() + 5)}
         out store b
       }
-//      Stream.Foreach(64 by 1) { _ =>
-//        import spatial.lang._
-//        import spatial.metadata.memory._
-//        val a = FIFO[U32](8)
-//        val strmIn = in.asInstanceOf[Sym[_]].interfaceStream
-//        a.enq(strmIn.value)
-//        val b = FIFO[U32](depth=8)
-//        b.enq(a.deq() + 5)
-//        val strmOut = out.asInstanceOf[Sym[_]].interfaceStream
-//        strmOut := b.deq()
-//      }
+    }
+    val got = getFrame(out)
+    val gold = data.map(_+5)
+    printArray(gold, "Wanted:")
+    printArray(got, "Got:")
+    assert(got == gold)
+  }
+}
+
+@spatial class FrameEnqDeqTest extends SpatialTest {
+  // TODO: Need to handle structs properly in rogue backend and handle getFrame of AxiStream64 type as U64 instead of a whole struct
+  def main(args: Array[String]): Unit = {
+    val inbus = StreamIn[U32](AxiStream64Bus(tid = 0, tdest = 0))
+    val in = Frame[U32](64, inbus)
+    val data = Array.tabulate[U32](64){i => i.to[U32]}
+    setFrame(in, data) // Types are a little screwy here
+    val outbus = StreamOut[AxiStream64](AxiStream64Bus(tid = 0, tdest = 1))
+    val out = Frame[AxiStream64](64, outbus)
+    Accel {
+      Stream.Foreach(64 by 1) { i =>
+        val in_packet = inbus.value
+        val tuser = mux(i === 0, 2.to[U32], 0.to[U32])
+        val data = in_packet + 5
+        val last = i == 63
+        outbus := AxiStream64(data.as[U64], /*~*/0.to[U8], /*~*/0.to[U8], last, 0.to[U8], 1.to[U8], tuser)
+      }
+    }
+    val got = getFrame(out)
+    val gold = data.map(_+5)
+    printArray(gold, "Wanted:")
+    printArray(got, "Got:")
+    assert(got == gold)
+  }
+}
+
+@spatial class FrameAndDRAMTest extends SpatialTest {
+  // TODO: Need to implement DRAM for rogue
+  def main(args: Array[String]): Unit = {
+    val inbus = StreamIn[U32](AxiStream64Bus(tid = 0, tdest = 0))
+    val in = Frame[U32](64, inbus)
+    val data = Array.tabulate[U32](64){i => i.to[U32]}
+    setFrame(in, data)
+    val outbus = StreamOut[U32](AxiStream64Bus(tid = 0, tdest = 1))
+    val out = Frame[U32](64, outbus)
+    val dram = DRAM[U32](64)
+    Accel {
+      val fifoin = FIFO[U32](64)
+      fifoin load in
+      dram store fifoin
+      val fifoout = FIFO[U32](64)
+      fifoout load dram
+      out store fifoout
     }
     val got = getFrame(out)
     val gold = data.map(_+5)

@@ -38,7 +38,10 @@ struct opts {
 #endif
 
 #ifdef SIM // Sim
+  // Unfortunately Sim seems to have changed in the new shell. If this doesn't work 
+  // then see how cl_hello_world and cl_dram_dma do simulation (new APIs) and change this file.  
   #include "sh_dpi_tasks.h"
+  // #include <utils/sh_dpi_tasks.h>  Try this if needed
   #define BASE_ADDR_A         UINT64_C_AWS(0x0000000000000100)   // DDR CHANNEL A
   #define BASE_ADDR_B         UINT64_C_AWS(0x0000000000000200)   // DDR CHANNEL B
   #define BASE_ADDR_C         UINT64_C_AWS(0x0000000000000300)   // DDR CHANNEL C
@@ -51,14 +54,23 @@ struct opts {
   #include <unistd.h>
   #include <poll.h>
   #include <stdbool.h>
+  #include <stdarg.h>
   #include <fpga_pci.h>
   #include <fpga_mgmt.h>
   #include <utils/lcd.h>
   #include <time.h>
+  #include <sys/stat.h>
+  #include <sys/types.h>
+
+  // Try these if needed
+  // #include "fpga_pci.h"
+  // #include "fpga_mgmt.h"
+  #include <fpga_dma.h>
+  // #include "utils/lcd.h"
   
   #define MEM_16G (1ULL << 34)
-  static uint16_t pci_vendor_id = 0x1D0F; /* Amazon PCI Vendor ID */
-  static uint16_t pci_device_id = 0xF001;
+  static const uint16_t AMZ_PCI_VENDOR_ID = 0x1D0F; /* Amazon PCI Vendor ID */
+  static const uint16_t PCI_DEVICE_ID = 0xF001;
 
   #define LOW_32b(a)  ((uint32_t)((uint64_t)(a) & 0xffffffff))
   #define HIGH_32b(a) ((uint32_t)(((uint64_t)(a)) >> 32L))
@@ -81,7 +93,8 @@ class FringeContextAWS : public FringeContextBase<void> {
 private:
 #ifdef SIM
 #else // F1
-  int fd;
+  int read_fd;
+  int write_fd;
   int slot_id;
   int channel;
   pci_bar_handle_t pci_bar_handle;
@@ -131,15 +144,15 @@ private:
     }
 
     /* confirm that the AFI that we expect is in fact loaded */
-    if (info.spec.map[FPGA_APP_PF].vendor_id != pci_vendor_id ||
-      info.spec.map[FPGA_APP_PF].device_id != pci_device_id) {
+    if (info.spec.map[FPGA_APP_PF].vendor_id != AMZ_PCI_VENDOR_ID ||
+        info.spec.map[FPGA_APP_PF].device_id != PCI_DEVICE_ID) {
       rc = 1;
       printf("The slot appears loaded, but the pci vendor or device ID doesn't "
              "match the expected values. You may need to rescan the fpga with \n"
              "fpga-describe-local-image -S %i -R\n"
              "Note that rescanning can change which device file in /dev/ a FPGA will map to.\n"
-             "To remove and re-add your edma driver and reset the device file mappings, run\n"
-             "`sudo rmmod edma-drv && sudo insmod <aws-fpga>/sdk/linux_kernel_drivers/edma/edma-drv.ko`\n",
+             "To remove and re-add your xdma driver and reset the device file mappings, run\n"
+             "`sudo rmmod xdma && sudo insmod <aws-fpga>/sdk/linux_kernel_drivers/xdma/xdma.ko`\n",
              slot_id);
       fail_on(rc, out, "The PCI vendor id and device of the loaded image are "
                        "not the expected values.");
@@ -157,7 +170,8 @@ public:
 #else // F1
     slot_id = 0; // For now fix slot to 0
     channel = 0; // For now fix channel to 0
-    fd = -1;
+    read_fd = -1;
+    write_fd = -1;
 
     /* pci_bar_handle_t is a handler for an address space exposed by one PCI BAR on one of the PCI PFs of the FPGA */
     pci_bar_handle = PCI_BAR_HANDLE_INIT;
@@ -184,7 +198,6 @@ public:
     int bar_id = 0;
     int fpga_attach_flags = 0;
     int rc;
-    char device_file_name[256];
     fpga_mgmt_init();
     
     // ---------------------------------
@@ -203,34 +216,24 @@ public:
      * This function accepts the slot_id, physical function, and bar number
      */
 
-    // TODO: Check if check_slot_config should be here, or down below?
-    // rc = check_slot_config(slot_id);
-    rc = fpga_pci_attach(slot_id, pf_id, bar_id, fpga_attach_flags, &pci_bar_handle);
-    fail_on(rc, out, "Unable to attach to the AFI on slot id %d", slot_id);
-
-    // ---------------------------------
-    // DMA
-    // ---------------------------------
-    
-    rc = sprintf(device_file_name, "/dev/edma%i_queue_0", slot_id);
-    fail_on((rc = (rc < 0)? 1:0), out, "Unable to format device file name.");
-
     // make sure the AFI is loaded and ready
     rc = check_slot_config(slot_id);
     fail_on(rc, out, "slot config is not correct");
 
-    fd = open(device_file_name, O_RDWR);
-    if(fd<0){
-      printf("Cannot open device file %s.\nMaybe the EDMA "
-             "driver isn't installed, isn't modified to attach to the PCI ID of "
-             "your CL, or you're using a device file that doesn't exist?\n"
-             "See the edma_install manual at <aws-fpga>/sdk/linux_kernel_drivers/edma/edma_install.md\n"
-             "Remember that rescanning your FPGA can change the device file.\n"
-             "To remove and re-add your edma driver and reset the device file mappings, run\n"
-             "`sudo rmmod edma-drv && sudo insmod <aws-fpga>/sdk/linux_kernel_drivers/edma/edma-drv.ko`\n",
-             device_file_name);
-      fail_on((rc = (fd < 0)? 1:0), out, "unable to open DMA queue. ");
-    }
+    rc = fpga_pci_attach(slot_id, pf_id, bar_id, fpga_attach_flags, &pci_bar_handle);
+    fail_on(rc, out, "Unable to attach to the AFI on slot id %d", slot_id);
+
+    // ---------------------------------
+    // XDMA
+    // ---------------------------------
+    
+    read_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot_id,
+        /*channel*/ 0, /*is_read*/ true);
+    fail_on((rc = (read_fd < 0) ? -1 : 0), out, "unable to open read dma queue");
+
+    write_fd = fpga_dma_open_queue(FPGA_DMA_XDMA, slot_id,
+        /*channel*/ 0, /*is_read*/ false);
+    fail_on((rc = (write_fd < 0) ? -1 : 0), out, "unable to open write dma queue");
     
   out:
     ;
@@ -244,8 +247,11 @@ public:
   ~FringeContextAWS() {
 #ifdef SIM
 #else // F1
-    if (fd >= 0) {
-      close(fd);
+    if (write_fd >= 0) {
+        close(write_fd);
+    }
+    if (read_fd >= 0) {
+        close(read_fd);
     }
     if (pci_bar_handle >= 0) {
         int rc = fpga_pci_detach(pci_bar_handle);
@@ -278,8 +284,8 @@ public:
 
   // Copy host to device
   virtual void memcpy(uint64_t devmem, void* hostmem, size_t size) {
-#ifdef SIM
     printf("[memcpy HOST->DEV] hostmem = %p, devmem = %lx, size = %lx\n", hostmem, devmem, size);
+#ifdef SIM
     TMP_que_buffer_to_cl((uint64_t)hostmem, devmem, size);
     TMP_start_que_to_cl();
     /*
@@ -298,10 +304,16 @@ public:
     char *write_buffer = (char *)hostmem;
     size_t write_offset = 0;
     while (write_offset < size) {
+      /*
       if (write_offset != 0) {
         printf("Partial write by driver, trying again with remainder of buffer (%lu bytes)\n", size - write_offset);
       }
-      rc = pwrite(fd, write_buffer + write_offset, size - write_offset, channel*MEM_16G + devmem + write_offset);
+      */
+      size_t count = size - write_offset;
+      if (count > 128) {
+        count = 128;
+      }
+      rc = pwrite(write_fd, write_buffer + write_offset, count, channel*MEM_16G + devmem + write_offset);
       assert(rc >= 0);
       write_offset += rc;
     }
@@ -311,8 +323,8 @@ public:
 
   // Copy device to host
   virtual void memcpy(void* hostmem, uint64_t devmem, size_t size) {
-#ifdef SIM
     printf("[memcpy DEV->HOST] hostmem = %p, devmem = %lx, size = %lx\n", hostmem, devmem, size);
+#ifdef SIM
     TMP_que_cl_to_buffer((uint64_t)hostmem, devmem, size);
     TMP_start_que_to_buffer();
     /*
@@ -331,10 +343,16 @@ public:
     char *read_buffer = (char *)hostmem;
     size_t read_offset = 0;
     while (read_offset < size) {
+      /*
       if (read_offset != 0) {
         printf("Partial read by driver, trying again with remainder of buffer (%lu bytes)\n", size - read_offset);
       }
-      rc = pread(fd, read_buffer + read_offset, size - read_offset, channel*MEM_16G + devmem + read_offset);
+      */
+      size_t count = size - read_offset;
+      if (count > 128) {
+        count = 128;
+      }
+      rc = pread(read_fd, read_buffer + read_offset, count, channel*MEM_16G + devmem + read_offset);
       assert(rc >= 0);
       read_offset += rc;
     }
@@ -345,8 +363,8 @@ public:
   // set enable high in app and poll until done is high
   virtual void run() {
     // TODO: See if these lines should be here rather than in load()
-    // aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 1);
-    // aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 0);
+    aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 1);
+    aws_poke(SCALAR_CMD_BASE_ADDR + RESET_REG_ADDR, 0);
 
     printf("[run] Begin\n");
 #ifdef SIM
@@ -356,7 +374,6 @@ public:
     aws_poke(BASE_ADDR_C + ATG, 0x00000001);
     aws_poke(BASE_ADDR_D + ATG, 0x00000001);
 #else // F1
-    assert(fsync(fd) == 0); // TODO: Is this needed?
     double startTime = 0.0;
     struct timespec ts1;
     clock_gettime (CLOCK_MONOTONIC, &ts1);
@@ -388,7 +405,6 @@ public:
     aws_peek(SCALAR_CMD_BASE_ADDR + PERF_COUNTER, &total_cycles);
     printf("Total cycles = %d\n", total_cycles);
     // */
-    assert(fsync(fd) == 0); // TODO: Is this needed?
 #endif // F1
     printf("[run] Done\n");
   }

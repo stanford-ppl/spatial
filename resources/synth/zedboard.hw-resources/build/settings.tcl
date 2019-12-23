@@ -1,6 +1,7 @@
 ## TARGET_ARCH must either be ZC706 or Zedboard or ZCU102
-# set TARGET ZC706
-set TARGET Zedboard
+ set TARGET ZC706
+# set TARGET Zedboard
+# set TARGET Virtex7
 
 set ver [version -short]
 
@@ -22,6 +23,11 @@ switch $TARGET {
       set BOARD xilinx.com:zcu102:part0:3.0
       set PART xczu9eg-ffvb1156-2-i      
     }
+  }
+  "Virtex7" {
+    #set_property board_part xilinx.com:vc707:part0:1.4
+    set BOARD xilinx.com:vc707:part0:1.4
+    set PART xc7vx485tffg1761-2
   }
   default {
     puts "$TARGET" is not a valid target! Must either be 'ZC706' or 'Zedboard' or 'ZCU102'

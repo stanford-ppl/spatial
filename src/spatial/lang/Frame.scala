@@ -40,23 +40,13 @@ abstract class Frame[A:Bits,C[T]](implicit val evMem: C[A] <:< Frame[A,C]) exten
     super.eql(that)
   }
 }
-object FrameIn {
+object Frame {
   /** Allocates a 1-dimensional [[Frame1]] with capacity of `length` elements of type A. */
-  @api def apply[A:Bits](length: scala.Int): Frame1[A] = {
-    val strm = stage(StreamInNew[AxiStream512](AxiStream512Bus))
-    val frame = stage(FrameHostNew[A,Frame1](Seq(length),zero[A]))
-    frame.asInstanceOf[Sym[_]].interfaceStream = strm
-    frame
+  @api def apply[A:Bits](length: scala.Int, stream: StreamIn[A]): Frame1[A] = {
+    stage(FrameHostNew[A,Frame1](Seq(length),zero[A],stream))
   }
-}
-
-object FrameOut {
-  /** Allocates a 1-dimensional [[Frame1]] with capacity of `length` elements of type A. */
-  @api def apply[A:Bits](length: scala.Int): Frame1[A] = {
-    val strm = stage(StreamOutNew[AxiStream512](AxiStream512Bus))
-    val frame = stage(FrameHostNew[A,Frame1](Seq(length),zero[A]))
-    frame.asInstanceOf[Sym[_]].interfaceStream = strm
-    frame
+  @api def apply[A:Bits](length: scala.Int, stream: StreamOut[A]): Frame1[A] = {
+    stage(FrameHostNew[A,Frame1](Seq(length),zero[A],stream))
   }
 }
 

@@ -20,6 +20,7 @@ import emul.FixedPoint
 
 import utils.math.{isPow2,log2,gcd}
 import spatial.util.math._
+import utils.math.{isSumOfPow2,asSumOfPow2,isMersenne,withinNOfMersenne}
 
 /** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
@@ -36,6 +37,49 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       case _ => false
     }} else false
     add.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA
+  }
+
+  def rewriteMul[S,I,F](a: Fix[S,I,F], q: Int, mul1: Int, mul2: Int, dir: String): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    dir match {
+      case "add" if q > 0 => stage(FixAdd(stage(FixMul(a, Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(mul2)))))
+      case "sub" if q > 0 => stage(FixSub(stage(FixMul(a, Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(mul2)))))
+      case "add" if q < 0 => stage(FixAdd(stage(FixMul(a, Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(-mul2)))))
+      case "sub" if q < 0 => stage(FixSub(stage(FixMul(a, Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(-mul2)))))
+      case _ => throw new Exception(s"Something very bad happened while trying to rewrite $a * $q!  ($mul1 $mul2 $dir)")
+    }
+  }
+
+  // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
+  def rewriteModWithMersenne[S,I,F](a: Fix[S,I,F], mod: Int): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
+    val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
+    dbgs(s"Rewriting $a mod $mod with $levels bitshifts")
+    val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
+    temps(0) = stage(FixAdd[S,I,F](stage(FixSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
+    List.tabulate(levels.size-1) { level =>
+      temps(level+1) = stage(FixAdd[S,I,F](
+                                stage(FixSRA(temps(level),levels(level+1))),
+                                stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
+                          )
+    }
+    val boundaries = if (mod == 3) Seq(3,6) else Seq.tabulate(3){i => mod*(i+1)}
+    stage(PriorityMux(boundaries.map{b => temps.last < b}, boundaries.map{b => temps.last - (b - mod)}))
+  }
+
+  def rewriteMod[S,I,F](a: Fix[S,I,F], mod: Int, closestMersenne: Int): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    val bigmod = rewriteModWithMersenne(a, closestMersenne)
+    dbgs(s"Rewriting $a mod $mod as a function of $closestMersenne")
+    val boundaries = Seq.tabulate(closestMersenne / mod){i => mod*(i+1)}
+    stage(PriorityMux(boundaries.map{b => bigmod < Type[Fix[S,I,F]].from(b)}, boundaries.map{b => bigmod - Type[Fix[S,I,F]].from(b - mod)}))
   }
 
   def writeReg[A](lhs: Sym[_], reg: Reg[_], data: Bits[A], ens: Set[Bit]): Void = {
@@ -85,6 +129,17 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+
+    case FixMul(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
+      val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))
+      transferDataToAllNew(lhs){ rewriteMul(a,q.toInt,mul1,mul2,dir).asInstanceOf[A] }
+
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
+      transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }
+
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).isDefined =>
+      transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).get).asInstanceOf[A] }
+
 
     case RegWrite(F(reg), F(data), F(en)) => data match {
       // Look for very specific FixFMA pattern and replace with FixFMAAccum node (Issue #63).. This gives error about not wanting to match Node[Fix[S,I,F]] <: Node[Any] because Op is type R and not +R
@@ -163,7 +218,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       super.transform(lhs,rhs)
 
     // m1*m2 + add --> fma(m1,m2,add)
-    case FixAdd((mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
+    case FixAdd(F(mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
       transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
 
     case FixAdd(F(add: Fix[s,i,f]), F(mul@Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>

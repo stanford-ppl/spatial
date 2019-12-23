@@ -17,15 +17,17 @@ trait ChiselGenStream extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case StreamInNew(bus) =>
       bus match {
-        case AxiStream256Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 256))
-        case AxiStream512Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 512))
+        case AxiStream64Bus(tid, tdest) => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 64))
+        case AxiStream256Bus(tid, tdest) => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 256))
+        case AxiStream512Bus(tid, tdest) => forceEmit(src"val $lhs = accelUnit.io.axiStreamsIn(${axiStreamIns.size})"); axiStreamIns += (lhs -> (axiStreamIns.size, 512))
         case _ =>
       }
 
     case StreamOutNew(bus) =>
       bus match {
-        case AxiStream256Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 256))
-        case AxiStream512Bus => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 512))
+        case AxiStream64Bus(tid, tdest) => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 64))
+        case AxiStream256Bus(tid, tdest) => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 256))
+        case AxiStream512Bus(tid, tdest) => forceEmit(src"val $lhs = accelUnit.io.axiStreamsOut(${axiStreamOuts.size})"); axiStreamOuts += (lhs -> (axiStreamOuts.size, 512))
         case _ =>
       }
 
@@ -76,7 +78,8 @@ trait ChiselGenStream extends ChiselGenCommon {
             emit(src"$stream.bits.wdata($i) := $d($dataMSB, $dataLSB)")
           }
 
-        case AxiStream256Bus if data.head.tp.isInstanceOf[AxiStream256] =>
+        case AxiStream256Bus(tid, tdest) if data.head.tp.isInstanceOf[AxiStream256] =>
+          warn(s"Ignoring tid = $tid and $tdest = $tdest since you are treating StreamOut as a full AxiStream type.  Be sure you set these fields correctly in the app!")
           emit(src"$stream.TDATA.r := ${data.head}.TDATA.r")
           emit(src"$stream.TSTRB.r := ${data.head}.TSTRB.r")
           emit(src"$stream.TKEEP.r := ${data.head}.TKEEP.r")
@@ -84,15 +87,33 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"$stream.TDEST.r := ${data.head}.TDEST.r")
           emit(src"$stream.TLAST := ${data.head}.TLAST")
           emit(src"$stream.TUSER := ${data.head}.TUSER")
-        case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+        case AxiStream256Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"$stream.TDATA.r := ${data.head}.r")
           emit(src"$stream.TSTRB.r := ~0.U(32.W)")
           emit(src"$stream.TKEEP.r := ~0.U(32.W)")
-          emit(src"$stream.TID.r := 0.U")
-          emit(src"$stream.TDEST.r := 0.U")
+          emit(src"$stream.TID.r := $tid.U")
+          emit(src"$stream.TDEST.r := $tdest.U")
           emit(src"$stream.TLAST := 0.U")
           emit(src"$stream.TUSER.r := 4.U")
-        case AxiStream512Bus if data.head.tp.isInstanceOf[AxiStream512] =>
+        case AxiStream64Bus(tid, tdest) if data.head.tp.isInstanceOf[AxiStream64] =>
+          warn(s"Ignoring tid = $tid and $tdest = $tdest since you are treating StreamOut as a full AxiStream type.  Be sure you set these fields correctly in the app!")
+          emit(src"$stream.TDATA.r := ${data.head}.r(63,0)")
+          emit(src"$stream.TSTRB.r := ${data.head}.r(71,64)")
+          emit(src"$stream.TKEEP.r := ${data.head}.r(79,72)")
+          emit(src"$stream.TID.r := ${data.head}.r(88,81)")
+          emit(src"$stream.TDEST.r := ${data.head}.r(96,89)")
+          emit(src"$stream.TLAST := ${data.head}.r(80)")
+          emit(src"$stream.TUSER := ${data.head}.r(128,97)")
+        case AxiStream64Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"$stream.TDATA.r := ${data.head}.r")
+          emit(src"$stream.TSTRB.r := ~0.U(8.W)")
+          emit(src"$stream.TKEEP.r := ~0.U(8.W)")
+          emit(src"$stream.TID.r := $tid.U")
+          emit(src"$stream.TDEST.r := $tdest.U")
+          emit(src"$stream.TLAST := 0.U")
+          emit(src"$stream.TUSER.r := 0.U")
+        case AxiStream512Bus(tid, tdest) if data.head.tp.isInstanceOf[AxiStream512] =>
+          warn(s"Ignoring tid = $tid and $tdest = $tdest since you are treating StreamOut as a full AxiStream type.  Be sure you set these fields correctly in the app!")
           emit(src"$stream.TDATA.r := ${data.head}.r(511,0)")
           emit(src"$stream.TSTRB.r := ${data.head}.r(575,512)")
           emit(src"$stream.TKEEP.r := ${data.head}.r(639,576)")
@@ -100,12 +121,12 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"$stream.TDEST.r := ${data.head}.r(657,649)")
           emit(src"$stream.TLAST := ${data.head}.r(640)")
           emit(src"$stream.TUSER := ${data.head}.r(720,658)")
-        case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+        case AxiStream512Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"$stream.TDATA.r := ${data.head}.r")
           emit(src"$stream.TSTRB.r := ~0.U(64.W)")
           emit(src"$stream.TKEEP.r := ~0.U(64.W)")
-          emit(src"$stream.TID.r := 0.U")
-          emit(src"$stream.TDEST.r := 0.U")
+          emit(src"$stream.TID.r := $tid.U")
+          emit(src"$stream.TDEST.r := $tdest.U")
           emit(src"$stream.TLAST := 0.U")
           emit(src"$stream.TUSER.r := 4.U")
         case _ =>
@@ -126,7 +147,8 @@ trait ChiselGenStream extends ChiselGenCommon {
       bus match {
         case _: BurstDataBus[_] => emit(src"""(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits.rdata(i).r }""")
         case _: GatherDataBus[_] => emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.bits(i).r }")
-        case AxiStream256Bus if lhs.tp.isInstanceOf[AxiStream256] =>
+        case AxiStream256Bus(tid, tdest) if lhs.tp.isInstanceOf[AxiStream256] =>
+          warn(s"Not exactly sure what to do with tid = $tid and $tdest = $tdest for reading StreamIn of AxiStream type...")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
@@ -134,9 +156,11 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
-        case AxiStream256Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+        case AxiStream256Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
-        case AxiStream512Bus if lhs.tp.isInstanceOf[AxiStream512] =>
+          emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) & (${strm}.TID.r === $tid.U) & (${strm}.TDEST.r === $tdest.U)""")
+        case AxiStream64Bus(tid, tdest) if lhs.tp.isInstanceOf[AxiStream64] =>
+          warn(s"Not exactly sure what to do with tid = $tid and $tdest = $tdest for reading StreamIn of AxiStream type...")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
@@ -144,8 +168,21 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
-        case AxiStream512Bus => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+        case AxiStream64Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
+          emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) & (${strm}.TID.r === $tid.U) & (${strm}.TDEST.r === $tdest.U)""")
+        case AxiStream512Bus(tid, tdest) if lhs.tp.isInstanceOf[AxiStream512] =>
+          warn(s"Not exactly sure what to do with tid = $tid and $tdest = $tdest for reading StreamIn of AxiStream type...")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TID.r := ${strm}.TID.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
+        case AxiStream512Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
+          emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) & (${strm}.TID.r === $tid.U) & (${strm}.TDEST.r === $tdest.U)""")
 
 
 
@@ -163,6 +200,8 @@ trait ChiselGenStream extends ChiselGenCommon {
     val insList = axiStreamIns.map{case (s, (_,w)) => s"AXI4StreamParameters($w, 8, 32)" }.mkString(",")
     val outsList = axiStreamOuts.map{case (s, (_,w)) => s"AXI4StreamParameters($w, 8, 32)" }.mkString(",")
 
+    if (axiStreamIns.size > 1) error(s"We currently only support up to 1 AxiStream In.  Its easy to support more, we just haven't implemented it yet.  Post an issue to make me do it :)")
+    if (axiStreamOuts.size > 1) error(s"We currently only support up to 1 AxiStream Out.  Its easy to support more, we just haven't implemented it yet.  Post an issue to make me do it :)")
     inGen(out, s"AccelWrapper.$ext") {
       emit(src"// Non-memory Streams")
       emit(s"""val io_axiStreamInsInfo = List(${insList})""")

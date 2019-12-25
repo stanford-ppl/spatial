@@ -10,6 +10,7 @@ import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
+import spatial.metadata.blackbox._
 import spatial.util.spatialConfig
 import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
@@ -17,6 +18,7 @@ import scala.util.Try
 
 import utils.Tree
 import utils.implicits.collections._
+import spatial.metadata.blackbox._
 
 package object control {
 
@@ -160,6 +162,7 @@ package object control {
     def level: CtrlLevel = toCtrl match {
       case ctrl @ Ctrl.Node(sym,_) if sym.isRawOuter && ctrl.mayBeOuterBlock => Outer
       case Ctrl.Host => Outer
+      case Ctrl.SpatialBlackbox(sym) => Inner
       case _         => Inner
     }
 
@@ -201,6 +204,7 @@ package object control {
             case Streaming => Streaming
             case ForkJoin  =>  ForkJoin
             case Fork => Fork
+            case PrimitiveBox => PrimitiveBox
           }
           case (Single, Outer) => actualSchedule match {
             case Sequenced => Sequenced
@@ -208,6 +212,7 @@ package object control {
             case Streaming => Streaming
             case ForkJoin  => ForkJoin
             case Fork => Fork
+            case PrimitiveBox => PrimitiveBox
           }
         }
       }
@@ -652,6 +657,8 @@ package object control {
     /** True if this controller or symbol has a streaming controller parent. */
     @stateful def hasStreamParent: Boolean = toCtrl.parent.isStreamControl
 
+    @stateful def isInBlackboxImpl: Boolean = ancestors.exists(_.s.exists(_.isBlackboxImpl))
+
     /** True if this controller or symbol has an ancestor which runs forever. */
     def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
 
@@ -727,13 +734,13 @@ package object control {
 
 
   implicit class SymControlOps(s: Sym[_]) extends ScopeHierarchyOps(Some(s)) {
-    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else s.parent
-    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else s.scope
+    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isBlackboxImpl) Ctrl.SpatialBlackbox(s) else s.parent
+    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isBlackboxImpl) Scope.SpatialBlackbox(s) else s.scope
     def isControl: Boolean = s.op.exists(_.isControl)
     def stopWhen: Option[Sym[_]] = if (s.isControl) Ctrl.Node(s,-1).stopWhen else None
 
     @stateful def children: Seq[Ctrl.Node] = {
-      if (s.isControl) toCtrl.children
+      if (s.isControl || s.isCtrlBlackbox) toCtrl.children
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
@@ -785,7 +792,7 @@ package object control {
     def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
 
     def rawChildren: Seq[Ctrl.Node] = {
-      if (!s.isControl) throw new Exception(s"Cannot get children of non-controller.")
+      if (!s.isControl && !s.isCtrlBlackbox) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](s).map(_.children).getOrElse(Nil)
     }
     def rawChildren_=(cs: Seq[Ctrl.Node]): Unit = metadata.add(s, Children(cs))
@@ -821,6 +828,7 @@ package object control {
     def toCtrl: Ctrl = scp match {
       case Scope.Node(sym,id,_) => Ctrl.Node(sym,id)
       case Scope.Host           => Ctrl.Host
+      case Scope.SpatialBlackbox(sym) => Ctrl.SpatialBlackbox(sym)
     }
     def toScope: Scope = scp
     def isControl: Boolean = true
@@ -833,6 +841,7 @@ package object control {
 
     def iters: Seq[I32] = Try(scp match {
       case Scope.Host => Nil
+      case Scope.SpatialBlackbox(sym) => Nil
       case Scope.Node(Op(loop: Loop[_]), -1, -1)         => loop.iters
       case Scope.Node(Op(loop: Loop[_]), stage, block)   => loop.bodies(stage).blocks.apply(block)._1
       case Scope.Node(Op(loop: UnrolledLoop[_]), -1, -1) => loop.iters
@@ -873,6 +882,11 @@ package object control {
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
+
+      case Ctrl.SpatialBlackbox(sym) => sym match {
+        case Op(prim: SpatialBlackboxImpl[_,_]) => Seq()
+        case Op(ctrl: SpatialCtrlBlackboxImpl[_,_]) => sym.rawChildren
+      }
     }
 
     @stateful def nestedChildren: Seq[Ctrl.Node] = ctrl match {
@@ -895,6 +909,7 @@ package object control {
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
+      case Ctrl.SpatialBlackbox(s) => throw new Exception(s"Not sure how to give nested children for $s yet")
     }
 
     @stateful def siblings: Seq[Ctrl.Node] = parent.children
@@ -902,12 +917,14 @@ package object control {
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent
       case Ctrl.Node(sym, _) => Ctrl.Node(sym, -1)
+      case Ctrl.SpatialBlackbox(sym) => Ctrl.SpatialBlackbox(sym)
       case Ctrl.Host => Ctrl.Host
     }
 
     def scope: Scope = ctrl match {
       case Ctrl.Node(sym,-1) => sym.scope
       case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
+      case Ctrl.SpatialBlackbox(sym) => Scope.SpatialBlackbox(sym)
       case Ctrl.Host         => Scope.Host
     }
 
@@ -925,6 +942,7 @@ package object control {
   implicit class BlkOps(blk: Blk) {
     def toScope: Scope = blk match {
       case Blk.Host      => Scope.Host
+      case Blk.SpatialBlackbox(s)      => Scope.SpatialBlackbox(s)
       case Blk.Node(s,i) => s match {
         case Op(op:Control[_]) =>
           val block = op.blocks(i)
@@ -1285,6 +1303,7 @@ package object control {
 
       val head: Iterator[String] = Seq(lca match {
         case Ctrl.Node(s,id) => "  "*tab + s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]"
+        case Ctrl.SpatialBlackbox(s) => "  "*tab + s"${shortStm(s)} [Blackbox]"
         case Ctrl.Host       => "  "*tab + "Host"
       }).iterator
       if (lca.isInnerControl) {
@@ -1304,16 +1323,16 @@ package object control {
   }
 
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getReadStreams).toSet ++
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg }
-    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox || mem.isInstanceOf[StreamStruct[_]]}
   }
 
   @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getWriteStreams).toSet ++
     LocalMemories.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg }
-    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+      .filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox}
+  }
+
+  @stateful def getUsedFields(bbox: Sym[_], ctrl: Ctrl): Seq[String] = {
+    ctrl.s.get.blocks.flatMap(_.nestedStms.flatMap{case x@Op(FieldDeq(ss, field, _)) if ss == bbox => Some(field); case _ => None})
   }
 }

@@ -19,10 +19,10 @@ case class AreaAnalyzer(IR: State) extends AccelTraversal with RerunTraversal {
   override def init(): Unit = super.init()
 
   override def rerun(sym: Sym[_], block: Block[_]): Unit = {
-    inHw = true
+    inAccel = true
     totalArea = savedArea
     super.rerun(sym, block)
-    inHw = false
+    inAccel = false
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {

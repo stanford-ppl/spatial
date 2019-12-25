@@ -7,6 +7,7 @@ import models._
 import spatial.metadata.memory._
 import spatial.util.modeling.{target, areaModel}
 import spatial.targets.MemoryResource
+import spatial.metadata.blackbox._
 
 case class MemoryAllocator(IR: State) extends Pass {
   implicit def AREA_FIELDS: AreaFields[Double] = areaModel.RESOURCE_FIELDS
@@ -31,7 +32,7 @@ case class MemoryAllocator(IR: State) extends Pass {
     }
 
     // Memories which can use more specialized memory resources
-    val (sramAble,nonSRAM) = LocalMemories.all.partition(canSRAM)
+    val (sramAble,nonSRAM) = LocalMemories.all.filter(!_.isCtrlBlackbox).partition(canSRAM)
 
     var unassigned: Set[Instance] = sramAble.flatMap{mem =>
       mem.duplicates.zipWithIndex.map{case (d,i) => Instance(mem,d,i) }

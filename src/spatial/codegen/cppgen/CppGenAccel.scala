@@ -10,6 +10,8 @@ import spatial.util.spatialConfig
 trait CppGenAccel extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case SpatialBlackboxImpl(_) =>
+    case SpatialCtrlBlackboxImpl(_) =>
 
     case AccelScope(func) =>
       controllerStack.push(lhs)

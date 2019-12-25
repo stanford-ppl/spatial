@@ -3,6 +3,8 @@ package spatial.codegen.chiselgen
 import argon._
 import argon.node._
 import spatial.lang._
+import spatial.metadata.retiming._
+import spatial.node.{FIFODeqInterface, FieldDeq, SimpleStreamStruct}
 
 trait ChiselGenStruct extends ChiselGenCommon {
 
@@ -15,6 +17,24 @@ trait ChiselGenStruct extends ChiselGenCommon {
     case SimpleStruct(st) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := Cat(${st.reverse.map{f => if (bitWidth(f._2.tp) > 1) src"${f._2}.r" else src"${f._2}"}.mkString(",")})")
+
+    case SimpleStreamStruct(st) =>
+      val inportString = st.map { case (name, typ) => src""" ("$name" -> ${bitWidth(typ.tp)}) """ }.mkString("Map(", ",", ")")
+      emit(src"val $lhs = Wire(Flipped(new StreamStructInterface($inportString)))")
+      st.foreach { case (field, s) =>
+        emit(src"""$lhs.get("$field").bits := $s.r""")
+        emit(src"""$lhs.get("$field").valid := ${s}_valid""")
+        emit(src"""$lhs.getActive("$field").out := ${s}_active_out""")
+        emit(src"""${s}_ready := $lhs.get("$field").ready""")
+        emit(src"""${s}_active_in := $lhs.getActive("$field").in""")
+      }
+
+    case FieldDeq(struct, field, ens) =>
+      emit(createWire(quote(lhs),remap(lhs.tp)))
+      emit(src"""$lhs.r := $struct.get("$field").bits""")
+      emit(src"""$struct.get("$field").ready := ${and(ens)} & ~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}""")
+      emit(src"""$struct.getActive("$field").in := ${and(ens)}""")
+      emit(src"""Ledger.connectStructPort($struct.hashCode, "$field")""")
 
     case FieldApply(struct, field) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))

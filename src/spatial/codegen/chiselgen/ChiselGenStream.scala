@@ -39,7 +39,7 @@ trait ChiselGenStream extends ChiselGenCommon {
       val maskingLogic = src"$backpressure" 
       ens.zipWithIndex.foreach{case(e,i) =>
         val en = if (e.isEmpty) "true.B" else src"${e.toList.map(quote).mkString("&")}"
-        emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiDone", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
+        emit(src"""${stream}.valid := ${DL(src"$datapathEn & $iiIssue", src"${lhs.fullDelay}.toInt", true)} & $en & $maskingLogic""")
       }
       val Op(StreamOutNew(bus)) = stream
       bus match {

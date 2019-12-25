@@ -7,6 +7,7 @@ import spatial.util.spatialConfig
 import spatial.util.modeling._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 
 case class InitiationAnalyzer(IR: State) extends AccelTraversal {
 
@@ -22,13 +23,14 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
     dbgs(stm(lhs))
     val blks = rhs.blocks.map{block => latencyAndInterval(block) }
     val latency = blks.map(_._1).sum
-    val interval = (1.0 +: blks.map(_._2)).max
-    val iterdiffs = rhs.blocks.map{block => block.stms.collect{case x if (x.getIterDiff.isDefined) => x.iterDiff}}.flatten.sorted
+    val slowestBbox: Double = rhs.blocks.map{block => block.stms.map{x => x.bboxII}.sorted.lastOption.getOrElse(1.0)}.sorted.lastOption.getOrElse(1.0)
+    val interval: Double = (slowestBbox +: blks.map(_._2)).max
+    val iterdiffs = rhs.blocks.flatMap { block => block.stms.collect { case x if x.getIterDiff.isDefined => x.iterDiff } }.sorted
     val forceII1 = iterdiffs.reverse.headOption.getOrElse(1) <= 0
-    val minIterDiff = iterdiffs.filter(_>0).headOption
-    rhs.blocks.map{block => block.stms.foreach{x => dbgs(s"   stm: $x, ${x.getIterDiff}")}}
+    val minIterDiff = iterdiffs.find(_ > 0)
+    rhs.blocks.foreach{ block => block.stms.foreach{ x => dbgs(s"   stm: $x, ${x.getIterDiff}")}}
     dbgs(s" - Latency:  $latency")
-    dbgs(s" - Interval: $interval")
+    dbgs(s" - Interval: $interval ($slowestBbox bbox)")
     dbgs(s" - Iter Diff: $minIterDiff (from $iterdiffs)")
     lhs.bodyLatency = latency
     val compilerII = if (forceII1) 1.0 else if (minIterDiff.isEmpty) interval else if (minIterDiff.get == 1) interval else scala.math.ceil(interval/minIterDiff.get)
@@ -37,11 +39,12 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
   }
 
   private def visitControl(lhs: Sym[_], rhs: Op[_]): Unit = {
-    if (lhs.isInnerControl) visitInnerControl(lhs,rhs) else visitOuterControl(lhs,rhs)
+    if (lhs.isInnerControl | lhs.isSpatialPrimitiveBlackbox) visitInnerControl(lhs,rhs) else visitOuterControl(lhs,rhs)
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel{ visitControl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ visitControl(lhs,rhs) }
 
     // TODO[4]: Still need to verify that this rule is generally correct
     case StateMachine(_,_,notDone,action,nextState) if lhs.isInnerControl =>

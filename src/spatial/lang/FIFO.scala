@@ -55,6 +55,12 @@ import scala.collection.mutable.Queue
   /** Creates a conditional dequeue (destructive read) port to this FIFO enabled by `en`. **/
   @api def deq(en: Bit): A = stage(FIFODeq(this,Set(en)))
 
+  /** Creates a dequeue interface, to be used with Blackboxes and StreamStructs */
+  @api def deqInterface(): A = this.deqInterface(true)
+
+  /** Creates a dequeue interface with en mask included, to be used with Blackboxes and StreamStructs */
+  @api def deqInterface(en: Bit): A = stage(FIFODeqInterface(this,Set(en)))
+
   /** Creates a non-destructive read port to this FIFO. **/
   @api def peek(): A = stage(FIFOPeek(this,Set.empty))
 

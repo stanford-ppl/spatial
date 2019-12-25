@@ -11,6 +11,7 @@ import spatial.util.modeling.scrubNoise
 import spatial.util.spatialConfig
 
 import scala.collection.mutable.HashMap
+import spatial.metadata.blackbox._
 
 case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen {
   override val ext: String = "html"
@@ -30,6 +31,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func)     => inAccel{ printControl(lhs,rhs) }
+    case SpatialCtrlBlackboxUse(_,box,_) => printControl(box, box.op.get)
     case _:Control[_] if inHw => printControl(lhs, rhs)
     case _:MemAlloc[_,_] if inHw && (lhs.isSRAM | lhs.isRegFile | lhs.isReg | lhs.isLineBuffer | lhs.isFIFOReg | lhs.isFIFO | lhs.isLIFO) => logMem(lhs, rhs)
     case _ => rhs.blocks.foreach{blk => gen(blk) }
@@ -102,10 +104,11 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
     val cchain = lhs.cchains.headOption.map(_.toString)
     val isLeaf = lhs.isInnerControl && lhs.rawChildren.isEmpty
     val line   = lhs.ctx.content.getOrElse("<?:?:?>")
+    val isBox = if (lhs.isBlackboxImpl) " BLACKBOX" else ""
 
     val isFSM = lhs match {case Op(_: StateMachine[_]) => " FSM"; case _ => ""}
     inCell(src"$lhs", !isLeaf){
-      emit(s"""${"  "*ident}<font size = "6">${link(s"${lhs}")}: ${lhs.schedule} $isFSM<font size = "4"> (${lhs.level})</font>""")
+      emit(s"""${"  "*ident}<font size = "6">${link(s"$lhs")}$isBox: ${lhs.schedule} $isFSM<font size = "4"> (${lhs.level})</font>""")
       emit(s"""${"  "*ident}<br><font size = "2">${lhs.ctx} <font color="grey">- $line</font></font>""")
       val ii = scrubNoise(lhs.II).toInt
       val lat = scrubNoise(lhs.bodyLatency.sum).toInt
@@ -130,8 +133,8 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   }
 
   def print_stream_info(sym: Sym[_]): Unit = {
-    val listens = getReadStreams(sym.toCtrl).map{a => s"$a" }
-    val pushes  = getWriteStreams(sym.toCtrl).map{a => s"$a" }
+    val listens = getReadStreams(sym.toCtrl).map{case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a,sym.toCtrl).mkString(",")}]"; case a => s"$a" }
+    val pushes  = getWriteStreams(sym.toCtrl).map{case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a,sym.toCtrl).mkString(",")}]"; case a => s"$a" }
     if (listens.nonEmpty || pushes.nonEmpty) {
       emit(s"""${"  "*ident}<div style="border:1px solid black"><font size = "2">Stream Info</font><br><font size = "1"> """)
       if (listens.nonEmpty) emit(s"""<p align="left">----->$listens""")

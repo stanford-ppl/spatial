@@ -1,12 +1,10 @@
 package spatial.traversal
 
 import argon._
-import spatial.metadata.access._
+import spatial.metadata.blackbox._
 import spatial.metadata.control._
-import spatial.metadata.memory._
 import spatial.metadata.math._
 import spatial.metadata.retiming._
-import spatial.lang._
 import spatial.node._
 import spatial.util.modeling._
 import spatial.util.spatialConfig
@@ -29,8 +27,6 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
     val scope = block.nestedStms.toSortedSeq
     val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_)).toSortedSeq
 
-    import spatial.metadata.access._
-    import spatial.metadata.memory._
     dbgs(s"Retiming block $block:")
     //scope.foreach{e => dbgs(s"  ${stm(e)}") }
     //dbgs(s"Result: ")
@@ -96,7 +92,7 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
 
 
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if (lhs.isInnerControl && !rhs.isSwitch && inHw) {
+    if ((lhs.isInnerControl || lhs.isBlackboxImpl) && !rhs.isSwitch && inHw) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       val retimePushLaterBlock = rhs.blocks.map{_ => false }.toList
       rhs match {
@@ -115,7 +111,8 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel { analyzeCtrl(lhs,rhs) }
-    case _ if (lhs.isInnerControl) => analyzeCtrl(lhs, rhs)
+    case _:BlackboxImpl[_,_,_] => inAccel { analyzeCtrl(lhs,rhs) }
+    case _ if lhs.isInnerControl => analyzeCtrl(lhs, rhs)
     case _ => super.visit(lhs,rhs)
   }
 

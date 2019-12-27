@@ -125,21 +125,29 @@ class IICounter(val ii: Int, val width: Int = 32, val myName: String = "iiCtr") 
       val reset  = Input(Bool())
     }
     val output = new Bundle {
+      val issue = Output(Bool())
       val done   = Output(Bool())
     }
   })
 
-  override def desiredName = myName
+  override def desiredName: String = myName
   if (ii > 1) {
     val cnt = RegInit((ii-1).S(width.W))
-    val isDone = (cnt === (ii-1).S(width.W)) & io.input.enable
+    // TODO: iiCtr used to issue done on the very first cycle, which is not correct but it's unclear how much other logic relies on this.
+    //       Switching it to cnt == 0 rather than cnt == ii-1 for now and seeing what breaks
+    val isIssue = (cnt === (ii-1).S(width.W)) & io.input.enable
+    val isDone = (cnt === 0.S(width.W)) & io.input.enable
 
     val nextLive = Mux(cnt === 0.S(width.W), (ii-1).S(width.W), cnt-1.S(width.W))
     val next = Mux(io.input.enable, nextLive, cnt)
     cnt := Mux(io.input.reset, (ii-1).S(width.W), next)
 
     io.output.done := isDone
-  } else io.output.done := true.B
+    io.output.issue := isIssue
+  } else {
+    io.output.done := true.B
+    io.output.issue := true.B
+  }
 }
 
 class CompactingIncDincCtr(inc: Int, dinc: Int, widest_inc: Int, widest_dinc: Int, stop: Int, width: Int = 32) extends Module {

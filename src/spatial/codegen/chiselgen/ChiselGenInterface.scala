@@ -74,15 +74,15 @@ trait ChiselGenInterface extends ChiselGenCommon {
             if (s) {
               val pad = 64 - d - f
               if (pad > 0) {
-                emit(src"""${reg}.connectWPort($id, util.Cat(util.Fill($pad, ${v}.msb), ${v}.r), ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+                emit(src"""${reg}.connectWPort($id, util.Cat(util.Fill($pad, ${v}.msb), ${v}.r), ${enStr} & ${DL(src"${datapathEn} & ${iiIssue}", lhs.fullDelay)})""")
               } else {
-                emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+                emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiIssue}", lhs.fullDelay)})""")
               }
             } else {
-              emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+              emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiIssue}", lhs.fullDelay)})""")
             }
           case _ =>
-            emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+            emit(src"""${reg}.connectWPort($id, ${v}.r, ${enStr} & ${DL(src"${datapathEn} & ${iiIssue}", lhs.fullDelay)})""")
         }
       }
 
@@ -96,7 +96,7 @@ trait ChiselGenInterface extends ChiselGenCommon {
           case _ => src"$v.r"
         }
         val enStr = if (en.isEmpty) "true.B" else en.map(quote).mkString(" & ")
-        emit(src"""${reg}.connectWPort($id, $padded, ${enStr} & ${DL(src"${datapathEn} & ${iiDone}", lhs.fullDelay)})""")
+        emit(src"""${reg}.connectWPort($id, $padded, ${enStr} & ${DL(src"${datapathEn} & ${iiIssue}", lhs.fullDelay)})""")
       }
 
     case FringeDenseLoad(dram,cmdStream,dataStream) =>

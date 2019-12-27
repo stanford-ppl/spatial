@@ -32,7 +32,7 @@ import spatial.util.modeling.target
   )(implicit
     val bA:   Bits[A],
     val tL:   Type[Local[A]])
-  extends EarlyBlackBox[Void] {
+  extends EarlyBlackbox[Void] {
   def isScatter: Boolean = !isGather
 
   override def effects: Effects = if (isScatter) Effects.Writes(dram) else Effects.Writes(local)

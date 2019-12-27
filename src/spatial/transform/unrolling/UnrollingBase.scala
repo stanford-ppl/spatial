@@ -153,16 +153,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
     else {
       dbgs(s"$lhs = $rhs [duplicate 1/1] in lanes $lanes")
-      val first = lanes.foreach{p => duplicate() }
-      // val first = lanes.inLane(0){ duplicate() }
-
-      lanes.unify(lhs, first)
+      if (rhs.R.isInstanceOf[Void]) lanes.unify(lhs,lanes.foreach{p => duplicate()})
+      else lanes.unify(lhs, lanes.map{p => duplicate()}.head)
     }
 
   }
 
   final override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+    case _:SpatialCtrlBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
     case _ =>
       val duplicates: List[Sym[_]] = unroll(lhs, rhs)
       if (duplicates.length == 1) duplicates.head.asInstanceOf[Sym[A]]
@@ -184,12 +183,19 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   override def mirrorNode[A](rhs: Op[A]): Op[A] = rhs match {
     case u@UnitPipe(ens, block, stopWhen) if stopWhen.isDefined => UnitPipe(f(enables ++ ens), f(block), Some(memories(stopWhen.get,0).asInstanceOf[Reg[Bit]])).asInstanceOf[Op[A]]
-    case e:Enabled[_] => e.mirrorEn(f, enables).asInstanceOf[Op[A]]
+//    case d@FieldDeq(struct, field, ens) =>
+//      val st = struct.asInstanceOf[StreamStruct[_]]
+//      println(s"${struct.tp}  ${st.tp}")
+//      implicit val A: Bits[A] = st.fields.collectFirst{case (n,t) if n == field => t}.get.asInstanceOf[Bits[A]]
+//      val a = f(struct)
+//      println(s"$a")
+//      FieldDeq(f(struct), field, f(ens)) // TODO: Figure out why mirroring this node complains about casting Void to StreamStruct
+    case e:Enabled[_] => (e mirrorEn(f, enables)).asInstanceOf[Op[A]]
     case LaneStatic(iter, resolutions) if unrollNum.getOrElse(iter.asInstanceOf[Idx], Seq()).size == 1 =>
       val i = iter.asInstanceOf[Idx]
       LaneStatic[FixPt[TRUE,_32,_0]](iter.asInstanceOf[FixPt[TRUE,_32,_0]], Seq(resolutions(unrollNum(i).head))).asInstanceOf[Op[A]]
       // resolutions(unrollNum(i).head).asInstanceOf[Op[A]]
-    case _ => super.mirrorNode(rhs)
+    case x => super.mirrorNode(rhs)
   }
   override def updateNode[A](node: Op[A]): Unit = node match {
     case e:Enabled[_] => e.updateEn(f, enables)
@@ -298,7 +304,6 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def inLane[A](lane:Lane)(block: => A): A = {
       // Note that we don't use isolateSubst (or similar here) because that would also save/restore lanes
       val i = ulanes.indexOf(lane)
-      dbgs(s"in lane $lane, $i from $ulanes")
       val save     = subst
       val saveMems = memories
       val addr     = lane.map { l => parAddr(l) }.transpose

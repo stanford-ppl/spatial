@@ -301,7 +301,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     case Reader(mem,adr,_)   => 
       lhs match {
         case Op(RegRead(reg)) if !reg.isRemoteMem => 
-          val reachingWrite = reachingWritesToReg(lhs, reg.writers.toSet)
+          val reachingWrite = reachingWritesToReg(lhs, reg.writers)
           if (reachingWrite.size == 1 && reachingWrite.head.accumType == AccumType.Unknown) {
             val data = reachingWrite.head match {
               case Op(x: Enqueuer[_]) => x.data

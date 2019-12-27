@@ -8,11 +8,13 @@ import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.node._
+import spatial.metadata.blackbox._
 
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
-    case MemAlloc(mem) if mem.isLocalMem => LocalMemories += mem
-    case MemAlloc(mem) if (mem.isRemoteMem || a.isStreamIn || a.isStreamOut) => RemoteMemories += a
+    case MemAlloc(mem) if mem.isLocalMem  => LocalMemories += mem
+    case mem if mem.isCtrlBlackbox => LocalMemories += mem
+    case MemAlloc(mem) if mem.isRemoteMem || a.isStreamIn || a.isStreamOut => RemoteMemories += a
     case _ =>
   }
 
@@ -24,6 +26,15 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case UnrolledAccessor(wr,rd) =>
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
+
+    case FieldDeq(st,f,_) =>
+      st.readers += s; logs(s"  Readers of $st is now: ${st.readers}")
+
+    case VerilogCtrlBlackbox(_, st) =>
+      st.readers += s; logs(s"  Readers of $st is now: ${st.readers}")
+      st match {
+        case Op(SimpleStreamStruct(elems: Seq[(String,Sym[_])])) => elems.foreach{e => e._2 match {case Op(FIFODeqInterface(mem,_)) => s.readMems += mem}}
+      }
 
     case Resetter(mem,ens) => mem.resetters += s
 
@@ -62,6 +73,94 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
 
       val isOuter = children.exists{c => !c.isBranch || c.isOuterControl} || op.isMemReduce
       s.rawLevel = if (isOuter) Outer else Inner
+
+    case box@SpatialCtrlBlackboxImpl(func) =>
+      val children = op.blocks.flatMap(_.stms.filter(_.isControl))
+      s.rawChildren = children.map{c => Ctrl.Node(c,-1) }
+      if (s.rawChildren.isEmpty) throw new Exception(s"Please use Blackbox.SpatialPrimitive to implement a blackbox that does not contain controllers!")
+      s.rawLevel = Outer
+//
+//      val bodies = ctrl.bodies
+//
+//      op.blocks.foreach{block =>
+//        val (body,stageId) = bodies.zipWithIndex.collectFirst{case (stg,i) if stg.blocks.exists(_._2 == block) => (stg,i) }
+//                                    .getOrElse{throw new Exception(s"Block $block is not associated with an ID in control $ctrl")}
+//
+//        // --- Ctrl Hierarchy --- //
+//        // Don't track pseudoscopes in the control hierarchy (use master controller instead)
+//        val control: Ctrl = Ctrl.Node(s, stageId)
+//        val parent: Ctrl  = if (body.isPseudoStage) master else control
+//        ctrl.iters.foreach{b => b.rawParent = parent}
+//        ctrl match {
+//          case ctrl:UnrolledLoop[_] => ctrl.valids.foreach{b => b.rawParent = parent}
+//          case _ =>
+//        }
+//
+//        // --- Scope Hierarchy --- //
+//        // Always track all scopes in the scope hierarchy
+//        val blockId = body.blocks.indexWhere(_._2 == block)
+//        val scope: Scope = Scope.Node(s, stageId, blockId)
+//
+//        // Iterate from last to first
+//        block.stms.reverse.foreach{lhs =>
+//          if (lhs.isCounter || lhs.isCounterChain || specialCases.contains(lhs)) {
+//            // Ignore
+//          }
+//          else if (lhs.isTransient) {
+//            val consumerParents = lhs.consumers.map{c => c.toCtrl }
+//            val nodeMaster = consumerParents.find{c => c != master && c != parent && c != Ctrl.Host }
+//            val nodeParent = nodeMaster.getOrElse(parent)
+//            val nodeScope  = nodeMaster.map{c => Scope.Node(c.s.get,-1,-1) }.getOrElse(scope)
+//            lhs.rawParent = nodeParent
+//            lhs.rawScope  = nodeScope
+//          }
+//          else {
+//            lhs.rawParent = parent
+//            lhs.rawScope  = scope
+//          }
+//        }
+//      }
+//
+//      // --- Blk Hierarchy --- //
+//      // Set the reads and writes of each symbol defined in this controller
+//      op.blocks.zipWithIndex.foreach{case (block,bId) =>
+//        block.stms.foreach {
+//          case Op(x@FIFODeqInterface(_,_)) =>
+//          // This does not belong to parent controller. It belongs to downstream blackbox
+//
+//          case Accessor(wr, rd) =>
+//            wr.foreach { w => s.writtenMems += w.mem }
+//            rd.foreach { r => s.readMems += r.mem }
+//
+//          case UnrolledAccessor(wr, rd) =>
+//            wr.foreach { w => s.writtenMems += w.mem }
+//            rd.foreach { r => s.readMems += r.mem }
+//
+//          case StatusReader(mem, _) =>
+//            s.readMems += mem
+//
+//          case Op(_@FringeDenseStore(d, _, _, _)) =>
+//            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+//          case Op(_@FringeSparseStore(d, _, _)) =>
+//            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+//          case Op(_@DRAMAlloc(d, _)) =>
+//            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+//            s.readDRAMs += d.asInstanceOf[Sym[_]]
+//
+//          case Op(_@FringeDenseLoad(d, _, _)) =>
+//            s.readDRAMs += d.asInstanceOf[Sym[_]]
+//          case Op(_@FringeSparseLoad(d, _, _)) =>
+//            s.readDRAMs += d.asInstanceOf[Sym[_]]
+//          case Op(_@DRAMDealloc(d)) =>
+//            s.readDRAMs += d.asInstanceOf[Sym[_]]
+//            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+//
+//          case lhs@Op(_@(BreakpointIf(_) | ExitIf(_))) =>
+//            lhs.parent.s.get.shouldNotBind = true
+//
+//          case _ =>
+//        }
+//      }
 
     case ctrl: Control[_] =>
       // Find all children controllers within this controller
@@ -146,44 +245,59 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       // --- Blk Hierarchy --- //
       // Set the reads and writes of each symbol defined in this controller
       op.blocks.zipWithIndex.foreach{case (block,bId) =>
-        block.stms.foreach{lhs =>
-          lhs match {
-            case Accessor(wr,rd) =>
-              wr.foreach{w => s.writtenMems += w.mem }
-              rd.foreach{r => s.readMems += r.mem }
+        block.stms.foreach {
+          case Op(x@FIFODeqInterface(_,_)) =>
+          // This does not belong to parent controller. It belongs to downstream blackbox
 
-            case UnrolledAccessor(wr,rd) =>
-              wr.foreach{w => s.writtenMems += w.mem }
-              rd.foreach{r => s.readMems += r.mem }
+          case Accessor(wr, rd) =>
+            wr.foreach { w => s.writtenMems += w.mem }
+            rd.foreach { r => s.readMems += r.mem }
 
-            case StatusReader(mem, _) => 
-              s.readMems += mem
+          case UnrolledAccessor(wr, rd) =>
+            wr.foreach { w => s.writtenMems += w.mem }
+            rd.foreach { r => s.readMems += r.mem }
 
-            case Op(_@FringeDenseStore(d,_,_,_)) =>
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@FringeSparseStore(d,_,_)) =>
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@DRAMAlloc(d,_)) => 
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
+          case StatusReader(mem, _) =>
+            s.readMems += mem
 
-            case Op(_@FringeDenseLoad(d,_,_)) =>
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@FringeSparseLoad(d,_,_)) =>
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@DRAMDealloc(d)) => 
-              s.readDRAMs += d.asInstanceOf[Sym[_]]
-              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@FringeDenseStore(d, _, _, _)) =>
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@FringeSparseStore(d, _, _)) =>
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@DRAMAlloc(d, _)) =>
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
 
-            case Op(_@(BreakpointIf(_) | ExitIf(_))) =>
-              lhs.parent.s.get.shouldNotBind = true
+          case Op(_@FringeDenseLoad(d, _, _)) =>
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@FringeSparseLoad(d, _, _)) =>
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
+          case Op(_@DRAMDealloc(d)) =>
+            s.readDRAMs += d.asInstanceOf[Sym[_]]
+            s.writtenDRAMs += d.asInstanceOf[Sym[_]]
 
-            case _ =>
-          }
+          case lhs@Op(_@(BreakpointIf(_) | ExitIf(_))) =>
+            lhs.parent.s.get.shouldNotBind = true
+
+          case _ =>
         }
       }
 
     case _ =>
+  }
+
+  @flow def blackbox(s: Sym[_], op: Op[_]): Unit = {
+    op match {
+      case ctrl@SpatialBlackboxImpl(func) =>
+        func.stms.foreach { c => c.rawParent = s.toCtrl }
+      case use@SpatialBlackboxUse(bbox,_) =>
+        bbox.addUserNode(s)
+      case ctrl@SpatialCtrlBlackboxImpl(func) =>
+        func.stms.foreach { c => c.rawParent = s.toCtrl }
+      case use@SpatialCtrlBlackboxUse(_,bbox,_) =>
+        bbox.addUserNode(s)
+      case _ =>
+    }
   }
 
   @flow def blockLevel(s: Sym[_], op: Op[_]): Unit = {
@@ -215,6 +329,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
     case _: ParallelPipe         => s.rawSchedule = ForkJoin
     case _: Switch[_]            => s.rawSchedule = Fork
+    case _: SpatialBlackboxImpl[_,_] => s.rawSchedule = PrimitiveBox
+    case _: SpatialCtrlBlackboxImpl[_,_] => s.rawSchedule = Sequenced
     case _: IfThenElse[_]        => s.rawSchedule = Fork
     case _: SwitchCase[_]        => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined

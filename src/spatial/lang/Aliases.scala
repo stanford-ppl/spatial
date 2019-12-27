@@ -48,6 +48,7 @@ trait InternalAliases extends argon.lang.ExternalAliases {
   lazy val Tensor5 = spatial.lang.host.Tensor5
   type CSVFile = spatial.lang.host.CSVFile
   type BinaryFile = spatial.lang.host.BinaryFile
+
 }
 
 /** Aliases for external use (application writers).
@@ -100,6 +101,8 @@ trait ExternalAliases extends InternalAliases {
   type RegFile3[A] = spatial.lang.RegFile3[A]
   lazy val RegFile = spatial.lang.RegFile
 
+  lazy val Blackbox = spatial.lang.Blackbox
+
   type MergeBuffer[A] = spatial.lang.MergeBuffer[A]
   lazy val MergeBuffer = spatial.lang.MergeBuffer
   type LineBuffer[A] = spatial.lang.LineBuffer[A]
@@ -143,6 +146,8 @@ trait ExternalAliases extends InternalAliases {
 
   type Wildcard = spatial.lang.Wildcard
 
+  type StreamStruct[A] = spatial.lang.StreamStruct[A]
+  lazy val StreamStruct = spatial.lang.StreamStruct
 }
 
 /** Remaining aliases that shadow original Scala types. */

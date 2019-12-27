@@ -14,17 +14,6 @@ import utils.implicits.collections._
 
 case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
-  private def visitInnerControl(lhs: Sym[_], rhs: Op[_]): Unit = {
-    dbgs(stm(lhs))
-    val blks = rhs.blocks.map{block => latencyAndInterval(block) }
-    val latency = blks.map(_._1).sum
-    val interval = (1.0 +: blks.map(_._2)).max
-    dbgs(s" - Latency:  $latency")
-    dbgs(s" - Interval: $interval")
-    lhs.bodyLatency = latency
-    lhs.II = lhs.userII.getOrElse(interval)
-  }
-
   private def findCycles(lhs: Sym[_], ctrl: Control[_]): Unit = {
     ctrl.bodies.foreach{body =>
       body.blocks.foreach{case (iters, block) =>
@@ -33,8 +22,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
         if (cycles.nonEmpty) {
           dbgs(s"\n\nFound cycles in $lhs ($iters): ")
           cycles.foreach{c => dbgs(s"  $c")}
-          val allWritePositions = cycles.map(_.write.affineMatrices.head.matrix.collapse.sorted.headOption.getOrElse(0))
-          cycles.collect{case AccumTriple(mem,reader,writer) if (mem.isLocalMem && reader != writer && !mem.shouldIgnoreConflicts) =>
+          cycles.collect{case AccumTriple(mem,reader,writer) if mem.isLocalMem && reader != writer && !mem.shouldIgnoreConflicts =>
 
             if (reader.affineMatrices.nonEmpty && writer.affineMatrices.nonEmpty) {
               val huge = 99999
@@ -68,12 +56,12 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                       }
                   }
                 }
-                val selfRelativeTicks: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => (i -> d._1)}.toMap
-                val strides: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => (i -> d._2)}.toMap
+                val selfRelativeTicks: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => i -> d._1 }.toMap
+                val strides: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => i -> d._2 }.toMap
 
                 // Figure out number of ticks of innermost iterator that each iterator takes to increment. 
                 // TODO: What to do when iterators come from different levels of control hierarchy?
-                val ticks: Map[I32, Int] = List.tabulate(iters.size){i => (iters(i) -> selfRelativeTicks.values.drop(i+1).product)}.toMap
+                val ticks: Map[I32, Int] = List.tabulate(iters.size){i => iters(i) -> selfRelativeTicks.values.drop(i+1).product }.toMap
 
                 dbgs(s"Iter info:")
                 iters.map{it => dbgs(s"$it:");dbgs(s"  ${selfRelativeTicks(it)} personal ticks to exhaust");dbgs(s"  ${ticks(it)} global ticks to increment");dbgs(s"  ${strides(it)} stride")}
@@ -84,8 +72,6 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                 val thisIterWrites = writer.affineMatrices.map(_.matrix)
                 // val nextIterReads  = reader.affineMatrices.map(_.matrix.increment(iters.last,1))
 
-                def isMoreInner(a: I32, b: I32): Boolean = iters.indexOf(a) > iters.indexOf(b)
-
                 def ticksToCoverDist(w: SparseMatrix[Idx], r: SparseMatrix[Idx]): Int = {
                   val diff = w - r
                   // Compute ticks required to cover this distance
@@ -94,7 +80,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                   val ticksToCoverDist = diff.collapse.zip(itersContributingToDim).zipWithIndex.map{case ((dist, its),i) => 
                     // Figure out which iterator closes gap the fastest. TODO: What if both are required to close it?
                     if (its.nonEmpty) {
-                      val innermostDep = its.toList.sortBy(accumIters.indexOf(_)).last
+                      val innermostDep = its.toList.maxBy(accumIters.indexOf(_))
                       (dist * ticks.getOrElse(innermostDep.asInstanceOf[I32], 1)) / strides.getOrElse(innermostDep.asInstanceOf[I32], 1)
                     } else 0
                   }.sum
@@ -121,9 +107,9 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                 //   To get worst case, check every combination of the four corners of iteration space (write lane 0, write lane N, read lane 0, read lane N)
                 //   If all values are 0, then take 0
                 val minTicksPairings = corners(thisIterWrites, thisIterReads){(w,r) => ticksToCoverDist(w, r)}
-                val minTicksToOverlap = if (minTicksPairings.forall(_ == 0)) 0 else minTicksPairings.filter(_ != 0).sorted.head
-                dbgs(s"minTickslist is ${minTicksPairings}")
-                dbgs(s"This accumulation needs result written ${minTicksToOverlap} (or more) ticks prior")
+                val minTicksToOverlap = if (minTicksPairings.forall(_ == 0)) 0 else minTicksPairings.filter(_ != 0).min
+                dbgs(s"minTickslist is $minTicksPairings")
+                dbgs(s"This accumulation needs result written $minTicksToOverlap (or more) ticks prior")
 
                 reader.iterDiff = if (reader.getIterDiff.isDefined && reader.iterDiff != 0) {reader.iterDiff min minTicksToOverlap} else minTicksToOverlap
                 writer.iterDiff = if (writer.getIterDiff.isDefined && writer.iterDiff != 0) {writer.iterDiff min minTicksToOverlap} else minTicksToOverlap
@@ -164,10 +150,10 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
                   // For each reader, figure out first writer who requires the same address and push to next available segment
                   
-                  val segments = scala.collection.mutable.HashMap[Int, Int]((0 -> 0))
+                  val segments = scala.collection.mutable.HashMap[Int, Int](0 -> 0)
                   val existingSegments = reader.segmentMapping
                   thisIterReads.drop(1).zipWithIndex.foreach{case (r,i) => 
-                    val laneDep = thisIterWrites.take(i+1).zipWithIndex.collectFirst{case (w, j) if ((w-r).collapse.forall(_ == 0)) => j}.getOrElse(-1)
+                    val laneDep = thisIterWrites.take(i+1).zipWithIndex.collectFirst{case (w, j) if (w-r).collapse.forall(_ == 0) => j}.getOrElse(-1)
                     val segmentDep = segments.getOrElse(laneDep,-1) + 1
                     val existingDep = existingSegments.getOrElse(i+1, 0)
                     segments += ({i + 1} -> {existingDep max segmentDep})
@@ -192,6 +178,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel{ super.visit(lhs, rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ super.visit(lhs, rhs) }
 
     case ctrl: Control[_] => 
       lhs match {

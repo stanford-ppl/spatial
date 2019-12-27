@@ -1,6 +1,7 @@
 package spatial
 
 import argon.tags.StagedStructsMacro
+import spatial.tags.StagedStreamStructsMacro
 
 trait SpatialDSL extends lang.api.StaticAPI_Frontend
 
@@ -19,6 +20,9 @@ object libdsl extends SpatialDSL {
   final class struct extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro StagedStructsMacro.impl
   }
+  final class streamstruct extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro StagedStreamStructsMacro.impl
+  }
 }
 
 /** A full view of the Spatial DSL, including shadowing of Scala names. */
@@ -35,5 +39,8 @@ object dsl extends SpatialDSL with lang.api.StaticAPI_Shadowing {
 
   final class struct extends StaticAnnotation {
     def macroTransform(annottees: Any*): Any = macro StagedStructsMacro.impl
+  }
+  final class streamstruct extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro StagedStreamStructsMacro.impl
   }
 }

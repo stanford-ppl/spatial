@@ -12,6 +12,11 @@ import spatial.lang._
 @op case class FIFOEnq[A:Bits](mem: FIFO[A], data: Bits[A], ens: Set[Bit]) extends Enqueuer[A]
 @op case class FIFODeq[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends Dequeuer[A,A]
 
+/** Node representing the possibility to dequeue.  To be used with Blackbox interfaces */
+@op case class FIFODeqInterface[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends Dequeuer[A,A] {
+  override val isTransient = true
+}
+
 @op case class FIFOVecEnq[A:Bits](
   mem:  FIFO[A],
   data: Vec[A],

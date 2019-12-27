@@ -121,6 +121,7 @@ case class BindingTransformer(IR: State) extends MutateTransformer with AccelTra
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:Switch[_]  => super.transform(lhs,rhs)
     case _:AccelScope => inAccel{ transformCtrl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ transformCtrl(lhs,rhs) }
     case _:Control[_] => transformCtrl(lhs,rhs)
 
     case _ => super.transform(lhs,rhs)

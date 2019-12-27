@@ -23,7 +23,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
   }
 
   def extract[A:Type](lhs: Sym[A], rhs: Op[A], reg: Reg[A], tp: String): Sym[A] = mostRecentWrite.get(reg) match {
-    case Some(data) if (lhs.parent.hasAncestor(data.parent)) =>
+    case Some(data) if lhs.parent.hasAncestor(data.parent) =>
       // Don't get rid of reads being used for DRAM allocations
       if (lhs.consumers.exists{case Op(DRAMHostNew(_,_)) => true; case _ => false }) {
         dbg(s"Node $lhs ($rhs) has a dram reading its most recent write")
@@ -57,6 +57,10 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
       isolateSubstWith(escape=Nil, addedArgIns:_*){ super.transform(lhs,rhs) }
     }
 
+    case _: BlackboxImpl[_,_,_] => inBox {
+      isolateSubstWith(escape=Nil){ super.transform(lhs,rhs) }
+    }
+
     // Add ArgIns for DRAM dimensions
     case DRAMHostNew(F(dims),_) =>
       dimMapping ++= dims.distinct.map{
@@ -84,7 +88,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         err[A](s"Get $tp in host")
       }
 
-      if (!inHw) {
+      if (!inHw && !inBBox) {
         if       (reg.isArgIn) extract(lhs,rhs,reg,"ArgIn")
         else if (reg.isHostIO) extract(lhs,rhs,reg,"HostIO")
         else if (reg.isArgOut) super.transform(lhs,rhs)
@@ -108,7 +112,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         err[A](s"Read $tp in host")
       }
 
-      if (!inHw) {
+      if (!inHw && !inBBox) {
         if       (reg.isArgIn) extract(lhs,rhs,reg,"ArgIn")
         else if (reg.isHostIO) extract(lhs,rhs,reg,"HostIO")
         else if (reg.isArgOut) get("ArgOut")
@@ -179,7 +183,7 @@ case class FriendlyTransformer(IR: State) extends MutateTransformer with AccelTr
         err[A](s"Write $tp in Accel")
       }
 
-      if (!inHw) {
+      if (!inHw && !inBBox) {
         if       (reg.isArgIn) super.transform(lhs,rhs)
         else if (reg.isHostIO) super.transform(lhs,rhs)
         else if (reg.isArgOut) noHostWrite("ArgOut registers")

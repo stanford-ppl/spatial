@@ -75,6 +75,7 @@ trait RogueFileGen extends RogueCodegen {
 
   override def emitFooter(): Unit = {
     inGen(out, entryFile) {
+      emit(s"""print("Done executing Spatial app!")""")
       close("")
     }
     inGen(out, "ConnectStreams.py") {

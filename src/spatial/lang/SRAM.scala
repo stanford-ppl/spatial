@@ -81,7 +81,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}
-  def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .onlyduplicate instead")}
+  def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .fullfission instead")}
   /** Only attempt to bank with N's from the "pow2" category */
   def nPow2: C[A] = {throw new Exception(s".nPow2 has been deprecated.  Please use .nBest instead")}
   /** Only attempt to bank with alphas from the "pow2" category */

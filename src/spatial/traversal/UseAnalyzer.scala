@@ -6,6 +6,7 @@ import spatial.metadata.PendingUses
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 
 case class UseAnalyzer(IR: State) extends BlkTraversal {
   var boundSyms: Set[Sym[_]] = Set.empty
@@ -50,18 +51,20 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       super.visit(lhs, rhs)
     }
 
-    if (lhs.isControl) {
+    dbgs(s" aoeu visiting $lhs wchic is a control? ${lhs.isControl}")
+    if (lhs.isControl | lhs.isCtrlBlackbox) {
       lhs.transientReadMems = Set()
       lhs match {
         case Op(OpForeach(_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(OpReduce(_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
-        case Op(OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true 
+        case Op(OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(UnrolledForeach(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(UnrolledReduce(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
-        case _ => 
+        case _ =>
       }
-      inCtrl(lhs){ inspect() } 
-    } else inspect()
+      inCtrl(lhs){ inspect() }
+    } else if (lhs.isSpatialPrimitiveBlackbox) inBox(lhs){ inspect() }
+    else inspect()
   }
 
   override protected def visitBlock[R](block: Block[R]): Block[R] = {
@@ -86,8 +89,8 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
   private def blkOfUser(x: Sym[_], block: Blk): Blk = {
     x match {
-      case s if (s.isControl) => Blk.Node(s,-1)
-      case s if ((s.isCounter || s.isCounterChain) && s.getOwner.isDefined) => Blk.Node(s.owner,-1)
+      case s if s.isControl => Blk.Node(s,-1)
+      case s if (s.isCounter || s.isCounterChain) && s.getOwner.isDefined => Blk.Node(s.owner,-1)
       case _ => block
     }
   }
@@ -99,7 +102,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     dbgs(s"  Uses:    ${pending.mkString(", ")}")
     dbgs(s"  Transient: ${lhs.isTransient}")
     // We care about whether the IR scope is outer, not whether the owning controller is outer
-    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl || (blk.toScope.toCtrl.isInnerControl && blk.toScope.children.length > 0)
+    val isOuter = lhs.isControl || blk.toScope.toCtrl.isOuterControl || (blk.toScope.toCtrl.isInnerControl && blk.toScope.children.nonEmpty)
     dbgs(s"  Outer: $isOuter")
     if (pending.nonEmpty) {
       // All nodes which could potentially use a reader outside of an inner control node

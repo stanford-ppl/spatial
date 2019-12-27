@@ -19,4 +19,7 @@ object Scope {
   case object Host extends Scope(None, 0, 0) {
     def master: Scope = Scope.Host
   }
+  case class SpatialBlackbox(sym: Sym[_]) extends Scope(Some(sym), 0, 0) {
+    def master: Scope = Scope.SpatialBlackbox(sym)
+  }
 }

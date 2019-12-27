@@ -13,4 +13,5 @@ case class LocalMemories(memories: Set[Sym[_]]) extends Data[LocalMemories](Glob
 @data object LocalMemories {
   def all: Set[Sym[_]] = globals[LocalMemories].map(_.memories).getOrElse(Set.empty)
   def +=(mem: Sym[_]): Unit = globals.add(LocalMemories(LocalMemories.all + mem ))
+  def -=(mem: Sym[_]): Unit = globals.add(LocalMemories(LocalMemories.all - mem ))
 }

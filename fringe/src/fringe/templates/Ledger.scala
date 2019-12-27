@@ -20,7 +20,7 @@ import java.io.{File, PrintWriter}
       ____/_____    _\________    ___/______    _\________            
      | KERNEL2  |  | KERNEL3  |  | KERNEL6  |  | KERNEL7  |    
      | xBarW 0  |  | xBarW 1  |  | xBarR 2  |  | xBarR 3  |                                          
-      ``````````    ``````````    ``````````    ``````````                                             
+      ``````````    ``````````    ``````````    `````````
                                                         
               Visit kernel0: Ledger.connections(mem) = HashMap()
                              controllerStack = K0
@@ -88,6 +88,7 @@ object Ledger {
   class ExposedPorts {
     var rPort = ListBuffer[Int]()
     var wPort = ListBuffer[Int]()
+    var structPort = ListBuffer[String]() // StructPort assumes one consumer per field
     var broadcastW = ListBuffer[Int]()
     var broadcastR = ListBuffer[Int]()
     var reset = ListBuffer[Int]()
@@ -100,9 +101,10 @@ object Ledger {
     var mergeInit = ListBuffer[Int]()
     var allocDealloc = ListBuffer[Int]()
 
-    def allEmpty: Boolean = rPort.isEmpty && wPort.isEmpty && broadcastW.isEmpty && broadcastR.isEmpty && reset.isEmpty && output.isEmpty && accessActivesIn.isEmpty && stageCtrl.isEmpty && mergeEnq.isEmpty && mergeDeq.isEmpty && mergeBound.isEmpty && mergeInit.isEmpty && allocDealloc.isEmpty
+    def allEmpty: Boolean = rPort.isEmpty && wPort.isEmpty && structPort.isEmpty && broadcastW.isEmpty && broadcastR.isEmpty && reset.isEmpty && output.isEmpty && accessActivesIn.isEmpty && stageCtrl.isEmpty && mergeEnq.isEmpty && mergeDeq.isEmpty && mergeBound.isEmpty && mergeInit.isEmpty && allocDealloc.isEmpty
     def addRPort(p: Int): ExposedPorts = {rPort = rPort :+ p; this}
     def addWPort(p: Int): ExposedPorts = {wPort = wPort :+ p; this}
+    def addStructPort(field: String): ExposedPorts = {structPort = structPort :+ field; this}
     def addBroadcastW(p: Int): ExposedPorts = {broadcastW = broadcastW :+ p; this}
     def addBroadcastR(p: Int): ExposedPorts = {broadcastR = broadcastR :+ p; this}
     def addReset(p: Int): ExposedPorts = {reset = reset :+ p; this}
@@ -118,6 +120,7 @@ object Ledger {
       if (!allEmpty) write(s"+ K.$k:")
       if (rPort.nonEmpty)           write(s"|-- rPort: $rPort")
       if (wPort.nonEmpty)           write(s"|-- wPort: $wPort")
+      if (structPort.nonEmpty)           write(s"|-- structPort: $structPort")
       if (broadcastW.nonEmpty)      write(s"|-- broadcastW: $broadcastW")
       if (broadcastR.nonEmpty)      write(s"|-- broadcastR: $broadcastR")
       if (reset.nonEmpty)           write(s"|-- reset: $reset")
@@ -133,6 +136,7 @@ object Ledger {
     def merge(port: ExposedPorts): ExposedPorts = {
       rPort = rPort ++ port.rPort
       wPort = wPort ++ port.wPort
+      structPort = structPort ++ port.structPort
       broadcastW = broadcastW ++ port.broadcastW
       broadcastR = broadcastR ++ port.broadcastR
       reset = reset ++ port.reset
@@ -189,92 +193,99 @@ object Ledger {
   def connectRPort(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addRPort(p))}
-      write(s"connectRPort(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addRPort(p))}
+      write(s"connectRPort($hash, $p)")
     }
   }
   def connectWPort(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addWPort(p))}
-      write(s"connectWPort(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addWPort(p))}
+      write(s"connectWPort($hash, $p)")
+    }
+  }
+  def connectStructPort(hash: OpHash, field: String)(implicit stack: List[KernelHash]): Unit = {
+    if (globals.enableModular) {
+      val bmap = connections.getOrElseUpdate(hash, new BoreMap())
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addStructPort(field))}
+      write(s"connectStructPort($hash, $field)")
     }
   }
   def connectBroadcastW(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastW(p))}
-      write(s"connectBroadcastW(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastW(p))}
+      write(s"connectBroadcastW($hash, $p)")
     }
   }
   def connectBroadcastR(hash: OpHash, p: Int, lane: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastR(p))}
-      write(s"connectBroadcastR(${hash}, $p, $lane)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addBroadcastR(p))}
+      write(s"connectBroadcastR($hash, $p, $lane)")
     }
   }
   def connectReset(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addReset(p))}
-      write(s"connectReset(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addReset(p))}
+      write(s"connectReset($hash, $p)")
     }
   }
   def connectOutput(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addOutput(p))}
-      write(s"connectOutput(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addOutput(p))}
+      write(s"connectOutput($hash, $p)")
     }
   }
   def connectAccessActivesIn(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAccessActivesIn(p))}
-      write(s"connectAccessActivesIn(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAccessActivesIn(p))}
+      write(s"connectAccessActivesIn($hash, $p)")
     }
   }
   def connectStageCtrl(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addStageCtrl(p))}
-      write(s"connectStageCtrl(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addStageCtrl(p))}
+      write(s"connectStageCtrl($hash, $p)")
     }
   }
   def connectMergeEnq(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeEnq(p))}
-      write(s"connectMergeEnq(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeEnq(p))}
+      write(s"connectMergeEnq($hash, $p)")
     }    
   }
   def connectMergeDeq(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeDeq(p))}
-      write(s"connectMergeDeq(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeDeq(p))}
+      write(s"connectMergeDeq($hash, $p)")
     }    
   }
   def connectMergeBound(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeBound(p))}
-      write(s"connectMergeBound(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeBound(p))}
+      write(s"connectMergeBound($hash, $p)")
     }    
   }
   def connectMergeInit(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeInit(p))}
-      write(s"connectMergeInit(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addMergeInit(p))}
+      write(s"connectMergeInit($hash, $p)")
     }    
   }
   def connectAllocDealloc(hash: OpHash, p: Int)(implicit stack: List[KernelHash]): Unit = {
     if (globals.enableModular) {
       val bmap = connections.getOrElseUpdate(hash, new BoreMap())
-      stack.foreach{case k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAllocDealloc(p))}
-      write(s"connectAllocDealloc(${hash}, $p)")
+      stack.foreach{k => connections(hash) += (k -> bmap.getOrElse(k, new ExposedPorts).addAllocDealloc(p))}
+      write(s"connectAllocDealloc($hash, $p)")
     }    
   }
 

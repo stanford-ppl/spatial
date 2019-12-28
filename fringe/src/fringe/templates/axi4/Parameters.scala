@@ -8,6 +8,11 @@ import _root_.utils.math.log2Up
 
 import scala.math.max
 
+// Avalon buses
+class AvalonBundleParameters(addrBits: Int, dataBits: Int, idBits: Int) extends
+  AXI4BundleParameters(addrBits, dataBits, idBits)
+
+// AXI buses
 case class AXI4SlaveParameters(
   address:       Seq[AddressSet],
   regionType:    RegionType.T  = RegionType.GET_EFFECTS,

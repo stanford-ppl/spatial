@@ -11,8 +11,9 @@ class DE1Interface extends SpatialIPInterface {
   val S_AVALON = new AvalonSlave(avalonLiteParams)
 
   // We rely on Intel's protocol converter to do the weight-lifting part.
+  // TODO: Get the memStream working.
   val M_AXI: Vec[AXI4Inlined] =
     Vec(NUM_CHANNELS, new AXI4Inlined(avalonBurstParams))
 
-  // TODO: avalon debugging probes
+  // TODO: Avalon debugging probes
 }

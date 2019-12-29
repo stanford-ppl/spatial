@@ -33,7 +33,7 @@ trait CommonMain {
     case "vcs"       => true
     case "cxp"       => true
     case "xsim"      => true
-    case "de1soc"    => true
+    case "de1"    => true
     case "arria10"   => true
     case "kcu1500"   => true
     case "asic"      => true

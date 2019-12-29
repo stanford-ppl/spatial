@@ -2,9 +2,8 @@ package fringe.targets.de1
 
 import chisel3.Module
 import chisel3.core.DontCare
-import fringe.targets.zynq.{FringeZynq, ZynqLike}
+import fringe.targets.zynq.ZynqLike
 import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
-import fringe.targets.{BigIPSim, DeviceTarget}
 
 class DE1Like extends ZynqLike {
   override def makeBigIP: BigIP = new fringe.targets.de1.BigIPDE1
@@ -19,28 +18,29 @@ class DE1Like extends ZynqLike {
     // TOOD: Fringe Avalon
 
     // Fringe <-> Host connections
-    fringe.io.S_AXI <> io.S_AVALON
+    fringe.io.S_AVALON <> io.S_AVALON
 
     // Fringe <-> DRAM connections
-    io.M_AXI <> fringe.io.M_AXI
+//    io.M_AXI <> fringe.io.M_AXI
 
     // TODO: More on probing AXI
 
     // io.rdata handled by bridge inside FringeZynq
-    io.rdata := DontCare
+    // io.rdata := DontCare
 
     accel.io.argIns := fringe.io.argIns
     fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
       fringeArgOut.bits := accelArgOut.port.bits
       fringeArgOut.valid := accelArgOut.port.valid
     }
+
     fringe.io.argEchos.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
       accelArgOut.echo := fringeArgOut
     }
 
     fringe.io.externalEnable := false.B
-    fringe.io.memStreams <> accel.io.memStreams
-    fringe.io.heap <> accel.io.heap
+//    fringe.io.memStreams <> accel.io.memStreams
+//    fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
     fringe.reset := !reset.toBool

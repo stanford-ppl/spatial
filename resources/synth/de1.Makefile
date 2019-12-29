@@ -34,7 +34,7 @@ sw:
 	cp sp.rbf ./prog/verilog/accel.bit.bin
 
 hw:
-	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1soc"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1"
 	sed -i 's/SRFF/SRFF_sp/g' verilog-de1soc/SpatialIP.v
 	cp -r hw-resources/simulation verilog-de1soc/
 	cp -r hw-resources/* verilog-de1soc/

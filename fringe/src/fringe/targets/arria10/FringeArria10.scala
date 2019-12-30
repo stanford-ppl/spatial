@@ -65,8 +65,8 @@ class FringeArria10 (
   fringeCommon.io.raddr := io.S_AVALON.address
   fringeCommon.io.wen := io.S_AVALON.write
   fringeCommon.io.waddr := io.S_AVALON.address
-  fringeCommon.io.wdata := io.S_AVALON.writedata
-  io.S_AVALON.readdata := fringeCommon.io.rdata
+  fringeCommon.io.wdata := io.S_AVALON.writeData
+  io.S_AVALON.readData := fringeCommon.io.rdata
 
   io.enable := fringeCommon.io.enable
   fringeCommon.io.done := io.done

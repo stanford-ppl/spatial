@@ -22,22 +22,25 @@ trait CommonMain {
   def tester: DUTType => ArgsTester[DUTType]
 
   // TODO: This should be removed in favor of the check in Top
-  def supportedTarget(t: String): Boolean = t match {
-    case "aws"       => true
-    case "aws-sim"   => true
-    case "zynq"      => true
-    case "zcu"       => true
-    case "fringeless" => true
-    case "zedboard"       => true
-    case "verilator" => true
-    case "vcs"       => true
-    case "cxp"       => true
-    case "xsim"      => true
-    case "de1"    => true
-    case "arria10"   => true
-    case "kcu1500"   => true
-    case "asic"      => true
-    case _           => false
+  def supportedTarget(t: String): Boolean = {
+    scala.Console.println(t)
+    t match {
+      case "aws"       => true
+      case "aws-sim"   => true
+      case "zynq"      => true
+      case "zcu"       => true
+      case "fringeless" => true
+      case "zedboard"       => true
+      case "verilator" => true
+      case "vcs"       => true
+      case "cxp"       => true
+      case "xsim"      => true
+      case "de1"       => true
+      case "arria10"   => true
+      case "kcu1500"   => true
+      case "asic"      => true
+      case _           => false
+    }
   }
 
   def target: String = if (args.nonEmpty) args(0) else "verilator"
@@ -55,6 +58,7 @@ trait CommonMain {
   }
 
   def main(args: Array[String]): Unit = {
+    scala.Console.println("In commonMain")
     val splitArgs = separateChiselArgs(args)
     this.args = splitArgs.testArgs
 

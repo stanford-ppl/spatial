@@ -35,13 +35,13 @@ sw:
 
 hw:
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1"
-	sed -i 's/SRFF/SRFF_sp/g' verilog-de1soc/SpatialIP.v
-	cp -r hw-resources/simulation verilog-de1soc/
-	cp -r hw-resources/* verilog-de1soc/
-	cp verilog-de1soc/SpatialIP.v verilog-de1soc/Computer_System/synthesis/submodules
-	cd verilog-de1soc && chmod +x compile.sh && ./compile.sh
-	echo "sp.rbf generated. Please copy it to your working dir on FPGA ARM"
-	cp verilog-de1soc/sp.rbf ./
+# 	sed -i 's/SRFF/SRFF_sp/g' verilog-de1soc/SpatialIP.v
+# 	cp -r hw-resources/simulation verilog-de1soc/
+# 	cp -r hw-resources/* verilog-de1soc/
+# 	cp verilog-de1soc/SpatialIP.v verilog-de1soc/Computer_System/synthesis/submodules
+# 	cd verilog-de1soc && chmod +x compile.sh && ./compile.sh
+# 	echo "sp.rbf generated. Please copy it to your working dir on FPGA ARM"
+# 	cp verilog-de1soc/sp.rbf ./
 
 hw-clean:
 	rm -rf verilog-de1soc

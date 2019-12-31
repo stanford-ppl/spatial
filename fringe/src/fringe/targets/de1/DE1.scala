@@ -57,7 +57,7 @@ class DE1 extends DE1Like {
   override def makeBigIP: BigIP = new fringe.targets.de1.BigIPDE1
   override def regFileAddrWidth(n: Int): Int = 32
   override val magPipelineDepth: Int = 0
-  override val addrWidth: Int = 32
+  override val addrWidth: Int = 20
   override val dataWidth: Int = 32
   override val wordsPerStream: Int = 16
   override val num_channels = 1

@@ -2,17 +2,17 @@ CC=g++
 LINK=g++
 CROSS_COMPILE=${QUARTUS_ROOTDIR}/../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/bin/
 # arm-xilinx-linux-gnueabi- 
-FRINGE_SRC=./SW
+FRINGE_SRC=../de1.sw-resources
 HOST_SRC=./
 
 SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
 
-INCLUDES +=													\
+INCLUDES +=																					\
 			-I${HOST_SRC}/datastructures 	                \
-			-I$(JAVA_HOME)/include 				            \
-			-I$(JAVA_HOME)/include/linux
-			-I../sw-resources 					  	        \
-			-I${FRINGE_SRC} 					  	        \
+			-I$(JAVA_HOME)/include 				            		\
+			-I$(JAVA_HOME)/include/linux 									\
+			-I${FRINGE_SRC} 					  	        				\
+			-I${HOST_SRC} 					  	        					\
 
 
 OBJECTS=$(SOURCES:.cpp=.o)
@@ -36,7 +36,7 @@ Top: $(OBJECTS)
 	$(CROSS_COMPILE)$(LINK) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@ $(LIBS) $(SC_LIBS) 2>&1 | c++filt
 
 %.o: %.cpp
-	  $(CROSS_COMPILE)$(CC) $(INCLUDES) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@  $<
+	$(CROSS_COMPILE)$(CC) $(INCLUDES) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@  $<
 
 ## Clean up
 clean:

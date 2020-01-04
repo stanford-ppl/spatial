@@ -28,28 +28,41 @@ typedef uint64_t u64;
   }
 
 struct opts {
-  int sobelMode;
-  int webcam;
-  char *videoFile;
-  char *instBuf;
-  char *inBuf;
-  char *outBuf;
-  int debug;
+    int sobelMode;
+    int webcam;
+    char *videoFile;
+    char *instBuf;
+    char *inBuf;
+    char *outBuf;
+    int debug;
 };
 
 int fileToBuf(unsigned char *buf, char *filename, u32 max_bytes);
+
 int fileToBufHex(unsigned char *buf, char *filename, u32 max_bytes);
+
 void bufToFile(char *filename, unsigned char *buf, u32 max_bytes);
+
 void bufToFileHex(char *filename, unsigned char *buf, u32 max_bytes);
+
 void htonlBuf(uint32_t *buf, u32 numWords);
+
 void ntohlBuf(uint32_t *buf, u32 numWords);
+
 void printHelp(int argc, char **argv);
+
 void printOpts();
+
 void parseOpts(int argc, char **argv, struct opts *opts);
+
 u32 Xil_In32(u32 Addr);
+
 void Xil_Out32(u32 OutAddress, u32 Value);
+
 u64 Xil_In64(u64 Addr);
+
 void Xil_Out64(u64 OutAddress, u64 Value);
+
 double getTime();
 
 #endif // ifndef __DE1_UTILS_H__

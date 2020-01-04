@@ -1,6 +1,6 @@
 CC=g++
 LINK=g++
-CROSS_COMPILE=arm-linux-gnueabihf-
+CROSS_COMPILE=${QUARTUS_ROOTDIR}/../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/bin/
 # arm-xilinx-linux-gnueabi- 
 FRINGE_SRC=./SW
 HOST_SRC=./
@@ -8,18 +8,18 @@ HOST_SRC=./
 SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
 
 INCLUDES +=													\
-			-I${HOST_SRC}/datastructures 	\
-			-I$(JAVA_HOME)/include 				\
-			-I$(JAVA_HOME)/include/linux 	\
-			-I../sw-resources 					  	\
-			-I${FRINGE_SRC} 					  	\
+			-I${HOST_SRC}/datastructures 	                \
+			-I$(JAVA_HOME)/include 				            \
+			-I$(JAVA_HOME)/include/linux
+			-I../sw-resources 					  	        \
+			-I${FRINGE_SRC} 					  	        \
 
 
 OBJECTS=$(SOURCES:.cpp=.o)
 
 DEFINES=$(OBJECTS:.o=.d)
 
-CXXFLAGS=-DDE1SoC  -D__USE_STD_STRING__ -std=c++11
+CXXFLAGS=-DDE1 -D__USE_STD_STRING__ -std=c++11
 LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm -static
 
 all: pre-build-checks Top

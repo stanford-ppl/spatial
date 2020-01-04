@@ -37,8 +37,9 @@ sw:
 
 hw:
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1"
-	sed -i 's/SRFF/SRFF_sp/g' verilog-de1/SpatialIP.v
 	cat de1.hw-resources/SRAMVerilogAWS.v >> ${DE1_DIR}/SpatialIP.v
+	cp de1.hw-resources/build/* ${DE1_DIR}
+	sed -i 's/SRFF/SRFF_sp/g' verilog-de1/SpatialIP.v
 
 # 	cp -r hw-resources/simulation verilog-de1/
 # 	cp -r hw-resources/* verilog-de1/

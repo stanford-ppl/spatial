@@ -23,10 +23,10 @@ trait ChiselGenStruct extends ChiselGenCommon {
       emit(src"val $lhs = Wire(Flipped(new StreamStructInterface($inportString)))")
       st.foreach { case (field, s) =>
         emit(src"""$lhs.get("$field").bits := $s.r""")
-        emit(src"""$lhs.get("$field").valid := ${s}_valid""")
-        emit(src"""$lhs.getActive("$field").out := ${s}_active_out""")
-        emit(src"""${s}_ready := $lhs.get("$field").ready""")
-        emit(src"""${s}_active_in := $lhs.getActive("$field").in""")
+        emit(src"""$lhs.get("$field").valid := ${s}.valid""")
+        emit(src"""$lhs.getActive("$field").out := ${s}.activeOut""")
+        emit(src"""$s.ready := $lhs.get("$field").ready""")
+        emit(src"""$s.activeIn := $lhs.getActive("$field").in""")
       }
 
     case FieldDeq(struct, field, ens) =>

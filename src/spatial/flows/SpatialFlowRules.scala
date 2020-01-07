@@ -290,10 +290,12 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     op match {
       case ctrl@SpatialBlackboxImpl(func) =>
         func.stms.foreach { c => c.rawParent = s.toCtrl }
+        func.input.rawParent = s.toCtrl
       case use@SpatialBlackboxUse(bbox,_) =>
         bbox.addUserNode(s)
       case ctrl@SpatialCtrlBlackboxImpl(func) =>
         func.stms.foreach { c => c.rawParent = s.toCtrl }
+        func.input.rawParent = s.toCtrl
       case use@SpatialCtrlBlackboxUse(_,bbox,_) =>
         bbox.addUserNode(s)
       case _ =>

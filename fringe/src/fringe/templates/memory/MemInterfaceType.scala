@@ -338,6 +338,8 @@ class BitLoopback extends Bundle {
   val in = Input(Bool())
   val out = Output(Bool())
 }
+
+
 /** Bundle representing a StreamStruct, where each port has its bits/valid signals inbound and ready signal outbound
   *
   * @param setup
@@ -378,4 +380,18 @@ class StreamStructInterface(setup: Map[String,Int]) extends Bundle {
   }
 
   override def cloneType(): this.type = new StreamStructInterface(setup).asInstanceOf[this.type]
+}
+
+/** Bundle representing the basic signals you need for a handshake deq interface on a stateful memory (i.e. FIFO)
+  *
+  * @param w
+  */
+class FIFODeqInterface(w: Int) extends Bundle {
+  val r = UInt(w.W)
+  val ready = Bool()
+  val valid = Bool()
+  val activeIn = Bool()
+  val activeOut = Bool()
+
+  override def cloneType(): this.type = new FIFODeqInterface(w).asInstanceOf[this.type]
 }

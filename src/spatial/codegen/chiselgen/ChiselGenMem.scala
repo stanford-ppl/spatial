@@ -56,22 +56,22 @@ trait ChiselGenMem extends ChiselGenCommon {
   }
 
   private def emitReadInterface(lhs: Sym[_], mem: Sym[_], ens: Seq[Set[Bit]]): Unit = {
-    emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
-    emit(src"val ${lhs}_valid = Wire(Bool())")
-    emit(src"val ${lhs}_ready = Wire(Bool())")
+    emit(createWire(quote(lhs), src"new FIFODeqInterface(${bitWidth(mem.tp.typeArgs.head)})"))
     val invisibleEnable = implicitEnableRead(lhs,mem)
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}.map(appendSuffix(lhs.parent.s.get, _))
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    emit(src"""$lhs.r := $mem.connectRPort(${lhs.hashCode}, List[UInt](), List[UInt](), $backpressure, ${lhs}_en.map(_ && ${lhs}_ready && $invisibleEnable && ${and(commonEns.map(appendSuffix(lhs.parent.s.get, _)))}), ${!mem.broadcastsAnyRead}).head""")
-    emit(src"${lhs}_valid := ~$mem.empty")
+    emit(src"""$lhs.r := $mem.connectRPort(${lhs.hashCode}, List[UInt](), List[UInt](), $backpressure, ${lhs}_en.map(_ && $lhs.ready && $invisibleEnable && ${and(commonEns.map(appendSuffix(lhs.parent.s.get, _)))}), ${!mem.broadcastsAnyRead}).head""")
+    emit(src"$lhs.valid := ~$mem.empty")
+    emit(src"$mem.connectAccessActivesIn(${activesMap(lhs)}, ${lhs}.activeIn /*(${or(ens.head.map(appendSuffix(lhs.parent.s.get, _)))})*/)")
+    emit(src"$lhs.activeOut := $mem.active(${activesMap(lhs)}).out")
   }
 
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
     
     lhs.tp match {
-      case _: Vec[_] => emit(createWire(src"${lhs}",src"Vec(${ens.length}, ${mem.tp.typeArgs.head})")) 
+      case _: Vec[_] => emit(createWire(src"$lhs",src"Vec(${ens.length}, ${mem.tp.typeArgs.head})"))
       case _ => emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
     }
 
@@ -138,7 +138,7 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     if (!mem.isNBuffered && name == "LineBuffer") throw new Exception(s"Cannot create non-buffered line buffer!  Make sure $mem has readers and writers bound by a pipelined LCA, or else turn it into an SRAM")
 
-    val templateName = if (!mem.isNBuffered && name != "LineBuffer") s"${name}("
+    val templateName = if (!mem.isNBuffered && name != "LineBuffer") s"$name("
                        else {
                          if (name == "SRAM") appPropertyStats += HasNBufSRAM
                          mem.swappers.zipWithIndex.foreach{case (node, port) => 
@@ -166,13 +166,13 @@ trait ChiselGenMem extends ChiselGenCommon {
     createMemObject(mem) {
       mem.writers.zipWithIndex.foreach{ case (w, i) => 
         val resids = w.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
-        emit(src"val w$i = Access(${w.hashCode}, ${w.port.muxPort}, ${w.port.muxOfs}, ${w.port.castgroup.mkString("List(",",",")")}, ${w.port.broadcast.mkString("List(",",",")")}, ${w.shiftAxis}, PortInfo(${w.port.bufferPort}, ${1 max w.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
+        emit(src"val w$i = Access(${w.hashCode}, ${w.port.muxPort}, ${w.port.muxOfs}, ${w.port.castgroup.mkString("List(",",",")")}, ${w.port.broadcast.mkString("List(",",",")")}, ${w.shiftAxis}, PortInfo(${w.port.bufferPort}, ${1 max w.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, $resids))")
       }
       if (mem.writers.isEmpty) {emit(src"val w0 = AccessHelper.singular(32)")}
       mem.readers.zipWithIndex.foreach{ case (r, i) =>
         val resids = r.residualGenerators.map(_.map{x => s"$x"}.mkString("List(", ",", ")")).mkString("List(",",",")")
         if (r.port.bufferPort.isEmpty && mem.isNBuffered && !mem.isLineBuffer) throw new Exception(src"Unsure how to handle broadcasted read @ ${r.ctx.content.getOrElse("<?:?:?>")} ($mem port $r)")
-        emit(src"val r$i = Access(${r.hashCode}, ${r.port.muxPort}, ${r.port.muxOfs}, ${r.port.castgroup.mkString("List(",",",")")}, ${r.port.broadcast.mkString("List(",",",")")}, ${r.shiftAxis}, PortInfo(${r.port.bufferPort}, ${1 max r.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, ${resids}))")
+        emit(src"val r$i = Access(${r.hashCode}, ${r.port.muxPort}, ${r.port.muxOfs}, ${r.port.castgroup.mkString("List(",",",")")}, ${r.port.broadcast.mkString("List(",",",")")}, ${r.shiftAxis}, PortInfo(${r.port.bufferPort}, ${1 max r.accessWidth}, ${1 max ofsWidth}, ${banksWidths.map(1 max _).mkString("List(",",",")")}, ${bitWidth(mem.tp.typeArgs.head)}, $resids))")
       }
       if (mem.readers.isEmpty) {emit(src"val r0 = AccessHelper.singular(32)")}
 
@@ -316,10 +316,6 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
     case op@FIFODeqInterface(fifo, ens) =>
       emitReadInterface(lhs, fifo, Seq(ens))
-      emit(src"val ${lhs}_active_in = Wire(Bool())")
-      emit(src"val ${lhs}_active_out = Wire(Bool())")
-      emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, ${lhs}_active_in /*(${or(ens.map(appendSuffix(lhs.parent.s.get, _)))})*/)")
-      emit(src"${lhs}_active_out := $fifo.active(${activesMap(lhs)}).out")
     case FIFOBankedEnq(fifo, data, ens) =>
       emitWrite(lhs, fifo, data, Seq.fill(ens.length)(Seq()), Seq(), ens)
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")

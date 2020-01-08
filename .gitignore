@@ -23,6 +23,7 @@ resources/synth/chisel-templates/fringeXSIM/
 *.ipr
 *.iws
 *.idea
+*.vscode
 *.DS_Store
 *.~
 *.o

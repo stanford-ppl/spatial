@@ -44,11 +44,10 @@ public:
     virtual void flushCache(uint32_t kb) = 0;
 
     ~FringeContextBase() {
-        //    delete dut;
+        // delete dut;
     }
 };
 
-// Fringe error codes
 
 // Fringe APIs - implemented only for simulation
 void fringeInit(int argc, char **argv);

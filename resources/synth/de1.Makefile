@@ -11,10 +11,14 @@ endif
 all: hw sw
 
 help:
+
+	@echo "------- INFO -------"
+	@echo "export KEEP_HIERARCHY=1 # add dont_touch annotation to all verilog modules"
+	@echo "export USE_BRAM=1 # add ram_style = block annotation to all verilog modules"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
-	@echo "make           : DE1SoC SW + HW build"
-	@echo "make hw        : Build Chisel for DE1SoC"
-	@echo "make sw        : Build software for DE1SoC"
+	@echo "make           : DE1 SW + HW build"
+	@echo "make hw        : Build Chisel for DE1"
+	@echo "make sw        : Build software for DE1"
 	@echo "make hw-clean  : Delete all generated hw files"
 	@echo "make sw-clean  : Delete all generated sw files"
 	@echo "make clean     : Delete all compiled code"
@@ -22,20 +26,10 @@ help:
 
 sw:
 	cp de1.sw-resources/Makefile cpp/Makefile
-	cp cpp/cpptypes.hpp cpp/datastructures
-	cp cpp/DE1SoC.h cpp/fringeDE1SoC/
-	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
-	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
-	make -C cpp
-	ln -sf cpp/Top .
-	cp verilog-de1soc/program_de1soc.sh ./ && chmod +x program_de1soc.sh
-	rm -rf ./prog
-	mkdir ./prog
-	cd ./prog/ && mkdir verilog
-	cp Top program_de1soc.sh ./prog
-	cp sp.rbf ./prog/verilog/accel.bit.bin
+	make -C cpp -j8
 
 hw:
+	echo "$$(date +%s)" > start.log
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1"
 	cat de1.hw-resources/SRAMVerilogAWS.v >> ${DE1_DIR}/SpatialIP.v
 	cp de1.hw-resources/build/* ${DE1_DIR}

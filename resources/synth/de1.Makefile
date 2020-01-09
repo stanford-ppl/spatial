@@ -26,6 +26,7 @@ help:
 
 sw:
 	cp de1.sw-resources/Makefile cpp/Makefile
+	sed -i 's/ifndef ZYNQ/ifndef DE1/g' ./cpp/TopHost.cpp ./cpp/structs.hpp
 	make -C cpp -j8
 
 hw:

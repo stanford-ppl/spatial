@@ -1,26 +1,31 @@
 CC=g++
 LINK=g++
-CROSS_COMPILE=${QUARTUS_ROOTDIR}/../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/bin/
-# arm-xilinx-linux-gnueabi- 
+# CROSS_COMPILE=${QUARTUS_ROOTDIR}/../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/bin/
+# CPP_HEADER_LIB=${QUARTUS_ROOTDIR}../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/include/c++/${DS5_VER}/
+# arm-xilinx-linux-gnueabi-
+
+CROSS_COMPILE=/usr/bin/arm-linux-gnueabihf-
+
 FRINGE_SRC=../de1.sw-resources
 HOST_SRC=./
 
 SOURCES := $(wildcard ${HOST_SRC}/*.cpp ${FRINGE_SRC}/*.cpp)
 
-INCLUDES +=																					\
-			-I${HOST_SRC}/datastructures 	                \
-			-I$(JAVA_HOME)/include 				            		\
-			-I$(JAVA_HOME)/include/linux 									\
-			-I${FRINGE_SRC} 					  	        				\
-			-I${HOST_SRC} 					  	        					\
+INCLUDES +=										\
+			-I${HOST_SRC} 					  	\
+			-I${HOST_SRC}/datastructures 	    \
+			-I$(JAVA_HOME)/include 	            \
+			-I$(JAVA_HOME)/include/linux        \
+			-I${FRINGE_SRC} 					\
+# 			-I${CPP_HEADER_LIB}
 
 
 OBJECTS=$(SOURCES:.cpp=.o)
 
 DEFINES=$(OBJECTS:.o=.d)
 
-CXXFLAGS=-DDE1 -D__USE_STD_STRING__ -std=c++11
-LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm -static
+CXXFLAGS=-DDE1 -D__USE_STD_STRING__ -std=c++11 -O0 -g -marm -march=armv7-a -mcpu=cortex-a9
+LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm
 
 all: pre-build-checks Top
 

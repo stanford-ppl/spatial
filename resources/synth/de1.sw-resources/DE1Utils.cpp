@@ -63,7 +63,7 @@ int fileToBufHex(unsigned char *buf, char *filename, u32 max_bytes) {
         wordbuf[totalRead++] = word;
         if (totalRead * sizeof(u32) >= max_bytes) {
             EPRINTF("Read %d words (0x%lx bytes), stopping read\n", totalRead,
-                    totalRead * sizeof(u32));
+                    (long unsigned int) totalRead * sizeof(u32));
             break;
         }
     }

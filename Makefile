@@ -38,12 +38,7 @@ install:
 pir:
 	git submodule update --init
 	bin/update_resources.sh
-	cd pir && make install
-
-pir-update:
-	git submodule update pir
-	bin/update_resources.sh
-	cd pir && make update
+	cd pir && make
 
 pir-clean:
 	make -C pir/ clean

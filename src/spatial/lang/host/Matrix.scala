@@ -91,4 +91,12 @@ object Matrix {
   @api def fill[A:Type](rows: I32, cols: I32)(func: => A): Matrix[A] = {
     Matrix.tabulate(rows, cols){(_,_) => func}
   }
+
+  /** Returns an immutable Matrix with the given elements. */
+  @api def fromSeq[A:Type](elements: Seq[Seq[A]]): Matrix[A] = {
+    val rows = elements.size
+    val cols = if (rows==0) 0 else elements.head.size
+    val data = Array.fromSeq(elements.flatten)
+    apply[A](data, rows, cols)
+  }
 }

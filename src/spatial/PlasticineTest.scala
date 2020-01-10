@@ -22,7 +22,7 @@ trait PlasticineTest extends DSLTest { test =>
     case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
   }
 
-  abstract class PIRBackend(args:String="--pir") extends Backend(name, args=args, "", "", "") {
+  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
     override val makeTimeout: Long = 12000 // Timeout for compiling, in seconds
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
@@ -206,8 +206,6 @@ trait PlasticineTest extends DSLTest { test =>
       (if (module) scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p extlink.csv -d link.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") else Pass) >>
       scommand(s"maketst", s"$timer make ideal ${if (fast) "DEBUG=1" else "DEBUG=0"}".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runp2p", timeout=1000000) >>
-      scommand(s"p2pstat", s"python3 bin/simstat.py".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      //scommand(s"p2panot", s"python3 bin/annotate.py".split(" "), timeout=30, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
       (if (runhybrid)
       scommand(s"runproute", s"$timer make proute".split(" "), timeout=10800 * 2, parseProute()(_), MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
@@ -229,10 +227,29 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
+
+  case class PIR(
+    row:Int=20,
+    col:Int=20,
+  ) extends PIRBackend {
+    private val genName = name + "_" + property("project").getOrElse("")
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
+    val runhybrid = checkFlag("hybrid")
+    val fast = checkFlag("fast")
+    def runPasses():Result = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      genpir() >>
+      pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --psim=false --row=$row --col=$col".split(" ").toList)
+    }
+  }
+
   override def backends: Seq[Backend] = 
     Dot +:
     Tst() +:
     Tst(module=true) +:
+    PIR() +:
     SpatialOnly +:
     super.backends
 

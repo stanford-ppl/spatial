@@ -77,6 +77,26 @@ trait HostML {
     (dW, dB, din)
   }
 
+  /*
+   * @param Ws: weights for all layers. Layer[Row[Col[T]]]
+   * @param Bs: bias for all layers. Layer[Col[T]]
+   * @param input: inputs for mlp. NSample[Dim[T]]
+   * @param activation activation function
+   * @return outputs. NSample[OutDim[T]]
+   * */
+  def unstaged_mlp[T:Numeric](
+    Ws:Seq[Seq[Seq[T]]],
+    Bs:Seq[Seq[T]],
+    input:Seq[Seq[T]],
+    activation: T => T,
+  ):Seq[Seq[T]] = {
+    input.map { sample =>
+      (Ws,Bs).zipped.foldLeft(sample) { case (hidden, (w,b)) =>
+        unstaged_denselayer(hidden, w, b, activation)._1
+      }
+    }
+  }
+
   def unstaged_loss_square[T:Fractional](yhat:T, y:T) = {
     val frac = implicitly[Fractional[T]]
     import frac._

@@ -8,17 +8,13 @@ import spatial.lang.types._
 import spatial.metadata.memory._
 
 /** An N-dimensional register file */
-abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) extends LocalMem[A,C] {
+abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) extends LocalMem[A,C] with TensorMem[A]{
   val A: Bits[A] = Bits[A]
   protected def M1: Type[RegFile1[A]] = implicitly[Type[RegFile1[A]]]
   protected def M2: Type[RegFile2[A]] = implicitly[Type[RegFile2[A]]]
   protected def M3: Type[RegFile3[A]] = implicitly[Type[RegFile3[A]]]
   def rank: Int
-  @api def size: I32 = product(dims:_*)
   @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
-  @api def dim0: I32 = dims.head
-  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
-  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
 
   /** Creates an alias of this RegFile with parallel access in the last dimension. */
   @api def par(p: I32): C[A] = {

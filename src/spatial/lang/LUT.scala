@@ -8,9 +8,8 @@ import utils.io.files._
 
 import spatial.node._
 import spatial.lang.types._
-import spatial.lang.api._
 
-abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends LocalMem[A,C] {
+abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends LocalMem[A,C] with TensorMem[A]{
   val A: Bits[A] = Bits[A]
   protected def M1: Type[LUT1[A]] = implicitly[Type[LUT1[A]]]
   protected def M2: Type[LUT2[A]] = implicitly[Type[LUT2[A]]]
@@ -18,16 +17,9 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
   protected def M4: Type[LUT4[A]] = implicitly[Type[LUT4[A]]]
   protected def M5: Type[LUT5[A]] = implicitly[Type[LUT5[A]]]
   def rank: Int
-  /** Returns the total capacity (in elements) of this LUT. */
-  @api def size: I32 = product(dims:_*)
 
   /** Returns the dimensions of this LUT as a Sequence. */
   @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
-  @api def dim0: I32 = dims.indexOrElse(0, I32(1))
-  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
-  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
-  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
-  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 
   /** Returns the value at `addr`.
     * The number of indices should match the LUT's rank.

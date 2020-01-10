@@ -5,9 +5,7 @@ import forge.tags._
 import spatial.node._
 import spatial.lang.types._
 
-import utils.implicits.collections._
-
-abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends Top[C[A]] with RemoteMem[A,C] {
+abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends Top[C[A]] with RemoteMem[A,C] with TensorMem[A] {
   val A: Bits[A] = Bits[A]
 
   protected def M1: Type[DRAM1[A]] = implicitly[Type[DRAM1[A]]]
@@ -17,28 +15,10 @@ abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends
   protected def M5: Type[DRAM5[A]] = implicitly[Type[DRAM5[A]]]
   def rank: Seq[Int]
 
-  /** Returns the total capacity (in elements) of this DRAM. */
-  @api def size: I32 = product(dims:_*)
-
-  /** 
-    * Returns the dimensions of this DRAM as a Sequence.
-    */
   @api def dims: Seq[I32] = Seq.tabulate(rank.length){d => stage(MemDim(this,rank(d))) }
 
   /** Returns dim0 of this DRAM, or else 1 if DRAM is lower dimensional */
-  @api def dim0: I32 = dims.head
-
-  /** Returns dim1 of this DRAM, or else 1 if DRAM is lower dimensional */
-  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
-
-  /** Returns dim2 of this DRAM, or else 1 if DRAM is lower dimensional */
-  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
-
-  /** Returns dim3 of this DRAM, or else 1 if DRAM is lower dimensional */
-  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
-
-  /** Returns dim4 of this DRAM, or else 1 if DRAM is lower dimensional */
-  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
+  @api override def dim0: I32 = dims.head // Why is this not indexOrElse?
 
   /** Returns the 64-bit address of this DRAM */
   @api def address: I64 = stage(DRAMAddress(me))

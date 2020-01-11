@@ -4,7 +4,7 @@ LINK=g++
 # CPP_HEADER_LIB=${QUARTUS_ROOTDIR}../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/include/c++/${DS5_VER}/
 # arm-xilinx-linux-gnueabi-
 
-CROSS_COMPILE=/usr/bin/arm-linux-gnueabihf-
+CROSS_COMPILE=arm-linux-gnueabihf-
 
 FRINGE_SRC=../de1.sw-resources
 HOST_SRC=./
@@ -25,7 +25,7 @@ OBJECTS=$(SOURCES:.cpp=.o)
 DEFINES=$(OBJECTS:.o=.d)
 
 CXXFLAGS=-DDE1 -D__USE_STD_STRING__ -std=c++11 -O0 -g -marm -march=armv7-a -mcpu=cortex-a9
-LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm
+LDFLAGS=-Wl,--hash-style=both -lstdc++ -pthread -lpthread -lm -lrt
 
 all: pre-build-checks Top
 

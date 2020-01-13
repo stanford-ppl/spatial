@@ -57,6 +57,9 @@ abstract class BlackboxImpl[T:Type,A:Type,B:Type](func: Lambda1[A,B]) extends Al
 @op case class SpatialBlackboxImpl[A:Struct,B:Struct](func: Lambda1[A,B])(implicit val tA: Type[A], val tB: Type[B]) extends BlackboxImpl[SpatialBlackbox[A,B],A,B](func)
 @op case class SpatialCtrlBlackboxImpl[A:StreamStruct,B:StreamStruct](func: Lambda1[A,B])(implicit val tA: Type[A], val tB: Type[B]) extends BlackboxImpl[SpatialCtrlBlackbox[A,B],A,B](func)
 
+@op case class FetchBlackboxParam[A: Bits](field: java.lang.String) extends Primitive[A] {
+  override def effects = Effects.Unique
+}
 
 
 

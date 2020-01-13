@@ -4,7 +4,7 @@ import argon._
 import argon.lang._
 
 import emul.{FixedPoint,Number}
-import utils.math.{asSumOfPow2, isSumOfPow2}
+import utils.math.{ReduceTree}
 import forge.tags._
 
 abstract class FixOp[S:BOOL,I:INT,F:INT,R:Type] extends Primitive[R] {
@@ -263,6 +263,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(0.5))  => stage(FixSqrt(a))
     case (_, Literal(-0.5)) => stage(FixRecipSqrt(a))
     case (_, Literal(-1))   => stage(FixRecip(a))
+    case (_, Const(e)) => ReduceTree[Fix[S,I,F]](Seq.fill(e.toInt){a}:_*){_*_}
     case _ => super.rewrite
   }
 }

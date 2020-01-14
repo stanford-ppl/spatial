@@ -223,6 +223,121 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
 }
 
 
+/** Example usage of a Spatial-defined primitive blackbox that takes in parameters.  The input and output types must be defined as @structs.
+  * Compile-time params to blackbox not currently supported but can be added if necessary. Compile time params are not really
+  * required though because ideally the compiler should apply optimizations to the bbox contents, and having parameters
+  * may result in different instantiations of the blackbox requiring different optimizations, and therefore you end up
+  * with two separate modules anyway (i.e. you may as well just use function calls instead of blackboxes).
+  */
+@spatial class SpatialBBoxParams() extends SpatialTest {
+  override def runtimeArgs: Args = "2"
+  type T = FixPt[TRUE,_16,_16]
+
+  @struct case class BBOX_IN(scalar: I32)
+  @struct case class BBOX_OUT(result1: I32, result2: I32, result3: I32)
+
+  @streamstruct case class BBOX_IN_STREAM(scalar: I32)
+  @streamstruct case class BBOX_OUT_STREAM(result1: T)
+
+  def main(args: Array[String]): Unit = {
+    val a = args(0).to[I32]
+    val N = 5
+    val in1 = ArgIn[I32]
+    setArg(in1, a)
+    val outBBox1 = List.fill(3)(ArgOut[I32])
+    val outBBox2 = List.fill(3)(ArgOut[I32])
+    val outCtrlBBox1 = DRAM[T](N)
+    val outCtrlBBox2 = DRAM[T](N)
+
+    val primitiveCfg1 = Map[java.lang.String, AnyVal]("intfield1" -> 2, "intfield2" -> 5, "floatfield1" -> 7.7)
+    val primitiveCfg2 = Map[java.lang.String, AnyVal]("intfield1" -> 5, "intfield2" -> 1, "floatfield1" -> 4.210762)
+    val ctrlCfg1 = Map[java.lang.String, AnyVal]("numel" -> 7, "prod" -> 2.2156, "const" -> 5.1)
+    val ctrlCfg2 = Map[java.lang.String, AnyVal]("numel" -> 10, "prod" -> 5.5, "const" -> 1.25)
+
+    // Must declare blackboxes outside of Accel
+    val testBBox = Blackbox.SpatialPrimitive[BBOX_IN, BBOX_OUT]{ in: BBOX_IN =>
+      val test1 = Blackbox.getParam[Int]("intfield1") * in.scalar
+      val test2 = Blackbox.getParam[Int]("intfield2") + in.scalar
+      val test3 = Blackbox.getParam[T]("floatfield1") * in.scalar.to[T]
+      BBOX_OUT(test1.to[I32], test2.to[I32], test3.to[I32])
+    }
+
+    val testCtrlBBox = Blackbox.SpatialController[BBOX_IN_STREAM, BBOX_OUT_STREAM] { in: BBOX_IN_STREAM =>
+      val result1 = FIFO[T](8)
+      val scalar = in.scalar
+      val x = Reg[T](0)
+      Reduce(x)(Blackbox.getParam[Int]("numel") by 1) { i =>
+        (scalar * i).to[T] * Blackbox.getParam[T]("prod") + Blackbox.getParam[T]("const")
+      }{_+_}
+      result1.enq(x.value)
+      BBOX_OUT_STREAM(result1.deqInterface())
+    }
+    Accel {
+      // Test primitive params
+      val use1 = testBBox(BBOX_IN(in1.value), primitiveCfg1)
+      outBBox1(0) := use1.result1
+      outBBox1(1) := use1.result2
+      outBBox1(2) := use1.result3
+      val use2 = testBBox(BBOX_IN(in1.value), primitiveCfg2)
+      outBBox2(0) := use2.result1
+      outBBox2(1) := use2.result2
+      outBBox2(2) := use2.result3
+
+      val fifo1 = FIFO[Int](8)
+      val outfifo1 = FIFO[T](8)
+      Stream.Foreach(N by 1) { i =>
+        Pipe{ fifo1.enq(i) }
+        val ctrlUse = testCtrlBBox(BBOX_IN_STREAM(fifo1.deqInterface()), ctrlCfg1)
+        Pipe{ outfifo1.enq(ctrlUse.result1) }
+      }
+      outCtrlBBox1 store outfifo1
+
+      val fifo2 = FIFO[Int](8)
+      val outfifo2 = FIFO[T](8)
+      Stream.Foreach(N by 1) { i =>
+        Pipe{ fifo2.enq(i) }
+        val ctrlUse = testCtrlBBox(BBOX_IN_STREAM(fifo2.deqInterface()), ctrlCfg2)
+        Pipe{ outfifo2.enq(ctrlUse.result1) }
+      }
+      outCtrlBBox2 store outfifo2
+    }
+
+    val gold1 = primitiveCfg1("intfield1").asInstanceOf[scala.Int] * args(0).to[I32]
+    val gold2 = primitiveCfg1("intfield2").asInstanceOf[scala.Int].to[I32] + args(0).to[I32]
+    val gold3 = (primitiveCfg1("floatfield1").asInstanceOf[scala.Double].to[T] * args(0).to[T]).to[I32]
+    println(r"got ${getArg(outBBox1(0))} ${getArg(outBBox1(1))} ${getArg(outBBox1(2))}, wanted $gold1 $gold2 $gold3")
+    assert(getArg(outBBox1(0)) == gold1)
+    assert(getArg(outBBox1(1)) == gold2)
+    assert(getArg(outBBox1(2)) == gold3)
+    val gold4 = primitiveCfg2("intfield1").asInstanceOf[scala.Int] * args(0).to[I32]
+    val gold5 = primitiveCfg2("intfield2").asInstanceOf[scala.Int].to[I32] + args(0).to[I32]
+    val gold6 = (primitiveCfg2("floatfield1").asInstanceOf[scala.Double].to[T] * args(0).to[T]).to[I32]
+    println(r"got ${getArg(outBBox2(0))} ${getArg(outBBox2(1))} ${getArg(outBBox2(2))}, wanted $gold4 $gold5 $gold6")
+    assert(getArg(outBBox2(0)) == gold4)
+    assert(getArg(outBBox2(1)) == gold5)
+    assert(getArg(outBBox2(2)) == gold6)
+
+    val golddram1 = Array.tabulate[T](N){i =>
+      val numel = ctrlCfg1("numel").asInstanceOf[scala.Int]
+      val prod = ctrlCfg1("prod").asInstanceOf[scala.Double]
+      val const = ctrlCfg1("const").asInstanceOf[scala.Double]
+      Array.tabulate(numel){j => (i * j).to[T] * prod + const}.reduce{_+_}
+    }
+    printArray(getMem(outCtrlBBox1), "Got:")
+    printArray(golddram1, "Wanted:")
+    assert(getMem(outCtrlBBox1) === golddram1)
+    val golddram2 = Array.tabulate[T](N){i =>
+      val numel = ctrlCfg2("numel").asInstanceOf[scala.Int]
+      val prod = ctrlCfg2("prod").asInstanceOf[scala.Double]
+      val const = ctrlCfg2("const").asInstanceOf[scala.Double]
+      Array.tabulate(numel){j => (i * j).to[T] * prod + const}.reduce{_+_}
+    }
+    printArray(getMem(outCtrlBBox2), "Got:")
+    printArray(golddram2, "Wanted:")
+    assert(getMem(outCtrlBBox2) === golddram2)
+  }
+}
+
 /** Example usage of a Spatial-defined controller blackbox.  The input and output types must be defined as @streamstructs.
   * Compile-time params to blackbox not currently supported but can be added if necessary.  Compile time params are not really
   * required though because ideally the compiler should apply optimizations to the bbox contents, and having parameters
@@ -328,7 +443,7 @@ class SpatialCtrlInline extends SpatialCtrl(false)
     List.tabulate(numInstantiations) { lane =>
       printMatrix(getMatrix(result(lane)), "got:")
       printMatrix(gold, "wanted:")
-      println(r"OK: ${gold == getMatrix(result(lane))}}")
+      println(r"OK: ${gold == getMatrix(result(lane))}")
       assert(gold == getMatrix(result(lane)))
     }
     ()

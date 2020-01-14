@@ -20,6 +20,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
     rhs match {
       case AccelScope(_) => inAccel{ markBlocks(lhs,rhs) }
+      case _:BlackboxImpl[_,_,_] => inBox{ markBlocks(lhs,rhs) }
       case _ => markBlocks(lhs,rhs)
     }
     if (rhs.blocks.nonEmpty) state.logTab -= 1

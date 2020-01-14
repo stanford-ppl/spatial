@@ -225,13 +225,13 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
     if (c.hasStreamAncestor || c.isInBlackboxImpl) and(getReadStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamInNew(bus)) => src"${fifo}.valid"
+      case fifo @ Op(StreamInNew(bus)) => src"$fifo.valid"
     }) else "true.B"
   }
 
   def getStreamBackPressure(c: Sym[_]): String = { 
     if (c.hasStreamAncestor || c.isInBlackboxImpl) and(getWriteStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamOutNew(bus)) => src"${fifo}.ready"
+      case fifo @ Op(StreamOutNew(bus)) => src"$fifo.ready"
     }) else "true.B"
   }
 
@@ -239,24 +239,24 @@ trait ChiselGenCommon extends ChiselCodegen {
   def hasBackPressure(sym: Ctrl): Boolean = (sym.hasStreamAncestor || sym.isInBlackboxImpl) && getWriteStreams(sym).nonEmpty
   def getForwardPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getReadStreams(sym).collect{
-      case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty.D(${sym.s.get.II}-1)"
+      case fifo@Op(StreamInNew(bus)) => src"$fifo.valid"
+      case fifo@Op(FIFONew(_)) => src"(~$fifo.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~$fifo.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
+      case merge@Op(MergeBufferNew(_,_)) => src"~$merge.output.empty.D(${sym.s.get.II}-1)"
       case bbox@Op(_:CtrlBlackboxUse[_,_]) if getUsedFields(bbox, sym).nonEmpty => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
       case b if b.isBound && b.isInstanceOf[StreamStruct[_]] && getUsedFields(b, sym).nonEmpty => src"$b.getForwardPressures(${getUsedFields(b, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getWriteStreams(sym).collect{
-      case fifo@Op(StreamOutNew(bus)) => src"${fifo}.ready"
+      case fifo@Op(StreamOutNew(bus)) => src"$fifo.ready"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.full"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFONew(_)) => src"(~$fifo.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~$fifo.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.output.full($way).D(${sym.s.get.II}-1)"
+            src"~$merge.output.full($way).D(${sym.s.get.II}-1)"
         }
 //      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
@@ -270,16 +270,16 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val bpressure = if (controllerStack.nonEmpty) src"${backpressure}" else "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $bpressure)"
-    else src"getRetimed($name, ${latency}.toInt, $bpressure)"
+    val bpressure = if (controllerStack.nonEmpty) src"$backpressure" else "true.B"
+    if (isBit) src"($name).DS($latency.toInt, rr, $bpressure)"
+    else src"getRetimed($name, $latency.toInt, $bpressure)"
   }
 
   // DL for when we are visiting children but emiting DL on signals that belong to parent
   def DLo[T](name: String, latency: T, smname: String, isBit: Boolean = false): String = {
-    val bpressure = src"${smname}.sm.io.backpressure"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $bpressure)"
-    else src"getRetimed($name, ${latency}.toInt, $bpressure)"
+    val bpressure = src"$smname.sm.io.backpressure"
+    if (isBit) src"($name).DS($latency.toInt, rr, $bpressure)"
+    else src"getRetimed($name, $latency.toInt, $bpressure)"
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {

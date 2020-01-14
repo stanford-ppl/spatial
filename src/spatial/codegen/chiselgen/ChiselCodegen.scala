@@ -39,7 +39,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     val name = s.op match {
       case Some(rhs) => rhs match {
         case _: AccelScope       => s"RootController"
-        case DelayLine(size, data) => data match {
+        case DelayLine(_, data) => data match {
           case Const(_) => src"$data"
           case _ => super.named(s, id)
         }
@@ -57,7 +57,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ => -1
   }
   protected def fracBits(tp: Type[_]): Int = tp match {
-    case FixPtType(s,d,f) => f
+    case FixPtType(_, _,f) => f
     case _ => 0
   }
 
@@ -99,14 +99,14 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   protected def markCChainObjects(b: Block[_]): Unit = {
     b.stms.collect{case x if (x.isCounterChain && x.getOwner.isDefined && x.owner.isOuterStreamLoop) => 
-      forEachChild(x.owner){case (c,i) => cchainCopies += (x -> {cchainCopies.getOrElse(x, List()) ++ List(c)})}
+      forEachChild(x.owner){case (c, _) => cchainCopies += (x -> {cchainCopies.getOrElse(x, List()) ++ List(c)})}
     }
   }
 
   override protected def gen(b: Block[_], withReturn: Boolean = false): Unit = {
     /** Returns list of stms that are not in a broadcast path, and the "weight" of the stm */
     markCChainObjects(b)
-    def printableStms(stms: Seq[Sym[_]]): Seq[StmWithWeight[Sym[_]]] = stms.collect{case x: Sym[_] if (x.parent == Ctrl.Host) => StmWithWeight[Sym[_]](x, 0, Seq[String]()); case x: Sym[_] if !x.isBroadcastAddr => StmWithWeight[Sym[_]](x, x.parOrElse1,cchainCopies.getOrElse(x, Seq[String]()).map{c => src"_copy${c}"})}
+    def printableStms(stms: Seq[Sym[_]]): Seq[StmWithWeight[Sym[_]]] = stms.collect{case x: Sym[_] if (x.parent == Ctrl.Host) => StmWithWeight[Sym[_]](x, 0, Seq[String]()); case x: Sym[_] if !x.isBroadcastAddr => StmWithWeight[Sym[_]](x, x.parOrElse1,cchainCopies.getOrElse(x, Seq[String]()).map{c => src"_copy$c"})}
     def isLive(s: Sym[_], remaining: Seq[Sym[_]]): Boolean = (b.result == s || remaining.exists{x => x.nestedInputs.contains(s) || bufMapping.getOrElse(x, List[BufMapping]()).map{_.mem}.contains(s)})
     // TODO: is branchSfx still required?  Its crashing when s is an inner switch with return type defined
     def branchSfx(s: Sym[_], n: Option[String] = None): String = {if (s.isBranch && !(s.isSwitch && s.isInnerControl)) src""""${n.getOrElse(quote(s))}" -> $s.data""" else src""""${n.getOrElse(quote(s))}" -> $s"""}
@@ -316,7 +316,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case (FixPtType(s,d,f), _) => c.toString + {if (d+f >= 32 && f == 0) "L" else ""} + s".FP($s, $d, $f)"
     case (FltPtType(g,e), _) => c.toString + s".FlP($g, $e)"
     case (_:Bit, c:Bool) => s"${c.value}.B"
-    case (_:Text, c: String) => s"${c}"
+    case (_:Text, c: String) => s"$c"
     case _ => super.quoteConst(tp,c)
   }
 
@@ -334,15 +334,16 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     * kernels.
      */
   protected def arg(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
-    case FixPtType(s,d,f) => s"FixedPoint"
+    case FixPtType(_, _, _) if !node.exists(_.isDeqInterface) => s"FixedPoint"
     case _: Var[_] => "String"
-    case FltPtType(m,e) => s"FloatingPoint"
+    case FltPtType(_, _) => s"FloatingPoint"
     case BitType() => "Bool"
     case tp: Vec[_] => src"Vec[${arg(tp.typeArgs.head)}]"
     case _: Struct[_] => s"UInt"
     case _: StreamStruct[_] => s"StreamStructInterface"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
-    case _ => node match {
+      case _ => node match {
+      case Some(Op(_: FIFODeqInterface[_])) => "FIFODeqInterface"
       case Some(x) if x.isNBuffered => "NBufInterface"
       case Some(Op(_: ArgInNew[_])) => "UInt"
       case Some(Op(_: ArgOutNew[_])) => "MultiArgOut"
@@ -350,8 +351,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: CounterNew[_])) => "CtrObject"
       case Some(Op(_: ForeverNew)) => "CtrObject"
       case Some(Op(_: CounterChainNew)) => "CounterChainInterface"
-      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccumBundle"
-      case Some(Op(x: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccumBundle"
+      case Some(Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => "FixFMAAccumBundle"
+      case Some(Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined) => "FixOpAccumBundle"
       case Some(Op(_: RegNew[_])) => "StandardInterface"
       case Some(Op(_: RegFileNew[_,_])) => "ShiftRegFileInterface"
       case Some(Op(_: LUTNew[_,_])) => "StandardInterface"
@@ -362,26 +363,26 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: LIFONew[_])) => "FIFOInterface"
       case Some(Op(_: DRAMHostNew[_,_])) => "FixedPoint"
       case Some(Op(_: DRAMAccelNew[_,_])) => "DRAMAllocatorIO"
-      case Some(Op(_@StreamInNew(bus))) => 
+      case Some(Op(_@StreamInNew(bus))) =>
         bus match {
           case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
           case BurstAckBus => "DecoupledIO[Bool]"
           case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
           case ScatterAckBus => "DecoupledIO[Bool]"
-          case AxiStream64Bus(tid, tdest) => "AXI4Stream"
-          case AxiStream256Bus(tid, tdest) => "AXI4Stream"
-          case AxiStream512Bus(tid, tdest) => "AXI4Stream"
+          case AxiStream64Bus(_, _) => "AXI4Stream"
+          case AxiStream256Bus(_, _) => "AXI4Stream"
+          case AxiStream512Bus(_, _) => "AXI4Stream"
           case _ => s"DecoupledIO[UInt]"
         }
-      case Some(x@Op(_@StreamOutNew(bus))) => 
+      case Some(Op(_@StreamOutNew(bus))) =>
         bus match {
           case BurstCmdBus => "DecoupledIO[AppCommandDense]"
           case _: BurstFullDataBus[_] => "DecoupledIO[AppStoreData]"
           case GatherAddrBus => "DecoupledIO[AppCommandSparse]"
           case _: ScatterCmdBus[_] => "DecoupledIO[ScatterCmdStream]"
-          case AxiStream64Bus(tid, tdest) => "AXI4Stream"
-          case AxiStream256Bus(tid, tdest) => "AXI4Stream"
-          case AxiStream512Bus(tid, tdest) => "AXI4Stream"
+          case AxiStream64Bus(_, _) => "AXI4Stream"
+          case AxiStream256Bus(_, _) => "AXI4Stream"
+          case AxiStream512Bus(_, _) => "AXI4Stream"
           case _ => s"DecoupledIO[UInt]"
         }
 
@@ -391,9 +392,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
 
   /** Define how set up the IO port for a node on a Chisel Module. */
   protected def port(tp: Type[_], node: Option[Sym[_]] = None): String = tp match {
-    case FixPtType(s,d,f) => s"Input(${remap(tp)})"
+    case FixPtType(_, _, _) => s"Input(${remap(tp)})"
     case _: Var[_] => "String"
-    case FltPtType(m,e) => s"Input(${remap(tp)})"
+    case FltPtType(_, _) => s"Input(${remap(tp)})"
     case BitType() => "Input(Bool())"
     case tp: Vec[_] => src"Vec(${tp.width},${port(tp.typeArgs.head)})"
     case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}.W))"
@@ -409,10 +410,10 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(Op(_: CounterNew[_])) => "CtrObject"
       case Some(x@Op(_: CounterChainNew)) => src"""Flipped(new CounterChainInterface(ModuleParams.getParams("${x}_p").asInstanceOf[(List[Int],List[Int])] ))"""
       case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined && node.get.optimizedRegType.get == AccumFMA) => 
-        val FixPtType(s,d,f) = x.tp.typeArgs.head
+        val FixPtType(_,d,f) = x.tp.typeArgs.head
         src"Flipped(new FixFMAAccumBundle(${x.writers.size}, $d, $f))"
       case Some(x@Op(_: RegNew[_])) if (node.get.optimizedRegType.isDefined) => 
-        val FixPtType(s,d,f) = x.tp.typeArgs.head
+        val FixPtType(_,d,f) = x.tp.typeArgs.head
         src"Flipped(new FixOpAccumBundle(${x.writers.size}, $d, $f))"
       case Some(x@Op(_: RegNew[_])) => src"""Flipped(new StandardInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
       case Some(x@Op(_: RegFileNew[_,_])) => src"""Flipped(new ShiftRegFileInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
@@ -422,19 +423,19 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
       case Some(x@Op(_: FIFORegNew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
       case Some(x@Op(_: MergeBufferNew[_])) => src"""Flipped(new MergeBufferFullIO(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int,Int,Int)] ))"""
       case Some(x@Op(_: LIFONew[_])) => src"""Flipped(new FIFOInterface(ModuleParams.getParams("${x}_p").asInstanceOf[MemParams] ))"""
-      case Some(x@Op(_: DRAMHostNew[_,_])) => "Input(new FixedPoint(true, 64, 0))"
+      case Some(Op(_: DRAMHostNew[_,_])) => "Input(new FixedPoint(true, 64, 0))"
       case Some(x@Op(_: DRAMAccelNew[_,_])) => src"""Flipped(new DRAMAllocatorIO(ModuleParams.getParams("${x}_p").asInstanceOf[(Int, Int)] ))"""
       case Some(x@Op(_@StreamInNew(bus))) => 
         bus match {
           case _: BurstDataBus[_] => src"""Flipped(Decoupled(new AppLoadData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int, Int)] )))"""
           case BurstAckBus => "Flipped(Decoupled(Bool()))"
           case _: GatherDataBus[_] => 
-            val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => (ens.length, bitWidth(e.A.tp)) }
-            s"Flipped(Decoupled(Vec(${par},UInt(${width}.W))))"
+            val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(_, ens)) => (ens.length, bitWidth(e.A.tp)) }
+            s"Flipped(Decoupled(Vec($par,UInt($width.W))))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
-          case AxiStream64Bus(tid, tdest) => "new AXI4Stream(AXI4StreamParameters(64, 8, 32))"
-          case AxiStream256Bus(tid, tdest) => "new AXI4Stream(AXI4StreamParameters(256, 8, 32))"
-          case AxiStream512Bus(tid, tdest) => "new AXI4Stream(AXI4StreamParameters(512, 8, 32))"
+          case AxiStream64Bus(_, _) => "new AXI4Stream(AXI4StreamParameters(64, 8, 32))"
+          case AxiStream256Bus(_, _) => "new AXI4Stream(AXI4StreamParameters(256, 8, 32))"
+          case AxiStream512Bus(_, _) => "new AXI4Stream(AXI4StreamParameters(512, 8, 32))"
           case _ => s"Flipped(Decoupled(UInt(${bus.nbits}.W)))"
         }
       case Some(x@Op(_@StreamOutNew(bus))) => 
@@ -443,9 +444,9 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case _: BurstFullDataBus[_] => src"""Decoupled(new AppStoreData(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case GatherAddrBus => src"""Decoupled(new AppCommandSparse(ModuleParams.getParams("${x}_p").asInstanceOf[(Int,Int)] ))"""
           case _: ScatterCmdBus[_] => src"""Decoupled(new ScatterCmdStream(ModuleParams.getParams("${x}_p").asInstanceOf[StreamParInfo] ))"""
-          case AxiStream64Bus(tid, tdest) => "Flipped(new AXI4Stream(AXI4StreamParameters(64, 8, 32)))"
-          case AxiStream256Bus(tid, tdest) => "Flipped(new AXI4Stream(AXI4StreamParameters(256, 8, 32)))"
-          case AxiStream512Bus(tid, tdest) => "Flipped(new AXI4Stream(AXI4StreamParameters(512, 8, 32)))"
+          case AxiStream64Bus(_, _) => "Flipped(new AXI4Stream(AXI4StreamParameters(64, 8, 32)))"
+          case AxiStream256Bus(_, _) => "Flipped(new AXI4Stream(AXI4StreamParameters(256, 8, 32)))"
+          case AxiStream512Bus(_, _) => "Flipped(new AXI4Stream(AXI4StreamParameters(512, 8, 32)))"
           case _ => s"Decoupled(UInt(${bus.nbits}.W))"
         }
 
@@ -457,21 +458,21 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case x if x.isNBuffered => Some(src"m.io.np")
     case Op(_: MergeBufferNew[_]) => Some(src"(m.io.ways, m.io.par, m.io.bitWidth, m.io.readers)")
     case x if x.isMemPrimitive => Some(src"m.io.p")
-    case Op(_: DRAMAccelNew[_,_]) => Some(src"(${node}.rank, ${node}.appReqCount)")
+    case Op(_: DRAMAccelNew[_,_]) => Some(src"($node.rank, $node.appReqCount)")
     case x if x.isCounterChain => 
       val sfx = if (cchainCopies.contains(x)) src"_copy${cchainCopies(x).head}" else ""
-      Some(src"(${x}$sfx.par, ${x}$sfx.widths)")
+      Some(src"($x$sfx.par, $x$sfx.widths)")
     case x@Op(_@StreamInNew(bus)) => 
       bus match {
-        case _: BurstDataBus[_] => Some(src"(${x}.bits.v, ${x}.bits.w)")
+        case _: BurstDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
         case _ => None
       }
     case x@Op(_@StreamOutNew(bus)) => 
       bus match {
-        case BurstCmdBus => Some(src"(${x}.bits.addrWidth, ${x}.bits.sizeWidth)")
-        case _: BurstFullDataBus[_] => Some(src"(${x}.bits.v, ${x}.bits.w)")
-        case GatherAddrBus => Some(src"(${x}.bits.v, ${x}.bits.addrWidth)")
-        case _: ScatterCmdBus[_] => Some(src"${x}.bits.p")
+        case BurstCmdBus => Some(src"($x.bits.addrWidth, $x.bits.sizeWidth)")
+        case _: BurstFullDataBus[_] => Some(src"($x.bits.v, $x.bits.w)")
+        case GatherAddrBus => Some(src"($x.bits.v, $x.bits.addrWidth)")
+        case _: ScatterCmdBus[_] => Some(src"$x.bits.p")
         case _ => None
       }
 
@@ -482,6 +483,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _ if node.isMem & !node.isArgIn & !node.isDRAM & !node.isStreamIn & !node.isStreamOut => true
     case _ if node.isDRAMAccel => true
     case _ if node.isCtrlBlackbox => true
+    case _ if node.isBound && node.parent.s.exists(_.isBlackboxImpl) => true
     case _ if node.isBlackboxUse => true
     case _ => false
   }

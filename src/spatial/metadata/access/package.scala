@@ -46,6 +46,11 @@ package object access {
       case _ => false
     }
 
+    def isDeqInterface: Boolean = op match {
+      case _: FIFODeqInterface[_] => true
+      case _ => false
+    }
+
     def isStreamStageEnabler: Boolean = op match {
       case _:FIFODeq[_] => true
       case _:FIFORegDeq[_] => true
@@ -113,6 +118,7 @@ package object access {
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
     def isVectorAccess: Boolean = a.op.exists(_.isVectorAccess)
+    def isDeqInterface: Boolean = a.op.exists(_.isDeqInterface)
     def isArgInRead: Boolean = a match {case Op(RegRead(Op(ArgInNew(_)))) => true; case _ => false}
 
     def isStreamStageEnabler: Boolean = a.op.exists(_.isStreamStageEnabler)

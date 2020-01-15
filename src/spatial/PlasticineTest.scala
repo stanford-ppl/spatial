@@ -28,9 +28,10 @@ trait PlasticineTest extends DSLTest { test =>
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
     def compileOnly = checkFlag(s"test.compileOnly")
     def runOnly = checkFlag(s"test.runOnly")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.name}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.name}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.name}/$name/report"
+    def genName = this.name
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/report"
     override def runBackend() = {
       s"${test.name}" should s"run for backend $name" in {
         val name = test.name
@@ -187,16 +188,35 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
+  case object SpatialOnly extends PIRBackend {
+    def runPasses():Result = {
+      genpir() match {
+        case Unknown => Pass
+        case res => res
+      }
+    }
+  }
+
+  case class PIR(
+    row:Int=20,
+    col:Int=20,
+  ) extends PIRBackend {
+    override def genName = name + "_" + property("project").getOrElse("")
+    val fast = checkFlag("fast")
+    def runPasses():Result = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      genpir() >>
+      pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --psim=false --row=$row --col=$col".split(" ").toList)
+    }
+  }
+
   case class Tst(
     row:Int=20,
     col:Int=20,
     module:Boolean = false,
   ) extends PIRBackend {
     override val name = if (module) "MDTst" else "Tst"
-    private val genName = name + "_" + property("project").getOrElse("")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
+    override def genName = name + "_" + property("project").getOrElse("")
     val runhybrid = checkFlag("hybrid")
     val fast = checkFlag("fast")
     def runPasses():Result = {
@@ -208,40 +228,9 @@ trait PlasticineTest extends DSLTest { test =>
       runtst("runp2p", timeout=1000000) >>
       (if (runhybrid)
       scommand(s"runproute", s"$timer make proute".split(" "), timeout=10800 * 2, parseProute()(_), MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"cphybrid", s"cp script_hybrid script".split(" "), timeout=10, parseRunError, RunError.apply, wd=IR.config.genDir+"/tungsten") >>
-      runtst("runhybrid", 1000000)
+      runtst("runhybrid", timeout=1000000)
       else Pass
       )
-    }
-  }
-
-  case object SpatialOnly extends PIRBackend {
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/$name/report"
-    def runPasses():Result = {
-      genpir() match {
-        case Unknown => Pass
-        case res => res
-      }
-    }
-  }
-
-
-  case class PIR(
-    row:Int=20,
-    col:Int=20,
-  ) extends PIRBackend {
-    private val genName = name + "_" + property("project").getOrElse("")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
-    val runhybrid = checkFlag("hybrid")
-    val fast = checkFlag("fast")
-    def runPasses():Result = {
-      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
-      genpir() >>
-      pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --psim=false --row=$row --col=$col".split(" ").toList)
     }
   }
 

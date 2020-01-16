@@ -22,9 +22,9 @@ class fix2fixBox(s1: Boolean, d1: Int, f1: Int, s2: Boolean, d2: Int, f2: Int, r
   val has_dec = d2 > 0
   val up_frac = f2 max 1
   val up_dec = d2 max 1
-  val tmp_frac = Wire(UInt(up_frac.W))
-  val new_frac = Wire(UInt(up_frac.W))
-  val new_dec = Wire(UInt(up_dec.W))
+  val tmp_frac = Wire(UInt(up_frac.W)); tmp_frac := DontCare
+  val new_frac = Wire(UInt(up_frac.W)); new_frac := DontCare
+  val new_dec = Wire(UInt(up_dec.W)); new_dec := DontCare
   if (!has_frac) tmp_frac := 0.U(1.W)
   if (!has_frac) new_frac := 0.U(1.W)
   if (!has_dec)  new_dec := 0.U(1.W)

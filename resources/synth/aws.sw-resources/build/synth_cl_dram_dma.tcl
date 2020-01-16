@@ -1,6 +1,22 @@
+# Amazon FPGA Hardware Development Kit
+#
+# Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Amazon Software License (the "License"). You may not use
+# this file except in compliance with the License. A copy of the License is
+# located at
+#
+#    http://aws.amazon.com/asl/
+#
+# or in the "license" file accompanying this file. This file is distributed on
+# an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or
+# implied. See the License for the specific language governing permissions and
+# limitations under the License.
+
 #Param needed to avoid clock name collisions
 set_param sta.enableAutoGenClkNamePersistence 0
 set CL_MODULE $CL_MODULE
+set VDEFINES $VDEFINES
 
 create_project -in_memory -part [DEVICE_TYPE] -force
 
@@ -33,7 +49,7 @@ read_verilog -sv [glob $ENC_SRC_DIR/*.?v]
 puts "AWS FPGA: Reading AWS Shell design";
 
 #Read AWS Design files
-read_verilog [ list \
+read_verilog -sv [ list \
   $HDK_SHELL_DESIGN_DIR/lib/lib_pipe.sv \
   $HDK_SHELL_DESIGN_DIR/lib/bram_2rw.sv \
   $HDK_SHELL_DESIGN_DIR/lib/flop_fifo.sv \
@@ -104,7 +120,7 @@ puts "AWS FPGA: ([clock format [clock seconds] -format %T]) Start design synthes
 
 update_compile_order -fileset sources_1
 puts "\nRunning synth_design for $CL_MODULE $CL_DIR/build/scripts \[[clock format [clock seconds] -format {%a %b %d %H:%M:%S %Y}]\]"
-eval [concat synth_design -top $CL_MODULE -verilog_define XSDB_SLV_DIS -part [DEVICE_TYPE] -mode out_of_context $synth_options -directive $synth_directive]
+eval [concat synth_design -top $CL_MODULE -verilog_define XSDB_SLV_DIS $VDEFINES -part [DEVICE_TYPE] -mode out_of_context $synth_options -directive $synth_directive]
 
 set failval [catch {exec grep "FAIL" failfast.csv}]
 if { $failval==0 } {

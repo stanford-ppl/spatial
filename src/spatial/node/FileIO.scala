@@ -48,8 +48,12 @@ import spatial.lang._
   override def binds = super.binds + value.input
 }
 
-
 @op case class NumpyArray[A:Type](v: String) extends Op[Tensor1[A]]
 
 @op case class NumpyMatrix[A:Type](v: String) extends Op[Tensor2[A]]
 
+@op case class LoadDRAMWithASCIIText[A:Bits, C[T]](dram: DRAM[A, C], file: BinaryFile)
+  extends Op2[A, Void] {
+  override val A: Bits[A] = Bits[A]
+  override def effects: Effects = Effects.Writes(dram)
+}

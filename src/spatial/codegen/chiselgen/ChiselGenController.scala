@@ -8,6 +8,7 @@ import spatial.metadata.access._
 import spatial.metadata.retiming._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
 import spatial.metadata.types._
 import spatial.util.modeling.scrubNoise
 import spatial.util.spatialConfig
@@ -17,23 +18,6 @@ trait ChiselGenController extends ChiselGenCommon {
   var hwblock: Option[Sym[_]] = None
   // var outMuxMap: Map[Sym[Reg[_]], Int] = Map()
   private var memsWithReset: List[Sym[_]] = List()
-
-  final private def enterCtrl(lhs: Sym[_]): Sym[_] = {
-    if (inHw) ctrls = ctrls :+ lhs
-    val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
-    controllerStack.push(lhs)
-    ensigs = new scala.collection.mutable.ListBuffer[String]
-    if (spatialConfig.enableInstrumentation && inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
-    val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
-    if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
-    else if (lhs.isInnerControl) { depthStats += controllerStack.length }
-    parent
-  }
-
-  final private def exitCtrl(lhs: Sym[_]): Unit = {
-    // Tree stuff
-    controllerStack.pop()
-  }
 
   final private def connectItersAndValids(lhs: Sym[_]) = {
     val cchain = lhs.cchains.head
@@ -115,24 +99,6 @@ trait ChiselGenController extends ChiselGenCommon {
     }
   }
 
-  private def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
-    // Find everything that is used in this scope
-    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
-    val used: Set[Sym[_]] = {lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet
-    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
-    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl) ++ getWriteStreams(lhs.toCtrl)} else Set()
-    val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
-    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
-
-    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
-    dbgs(s"Inputs for $lhs are ($used ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
-    (allUsed diff made).filterNot{s => s.trace.isValue}.toSeq    
-  }
-
-  private def groupInputs(inss: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
-    inss.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map(List(_) -> name) else Seq(ins -> name)}.flatten.toMap
-  }
-
   private def writeKernelClass(lhs: Sym[_], ens: Set[Bit], func: Block[_]*)(contents: => Unit): Unit = {
     val inputs: Seq[Sym[_]] = getInputs(lhs, func:_*)
     // val oldInputs = scopeInputs
@@ -156,13 +122,14 @@ trait ChiselGenController extends ChiselGenCommon {
       emit(src"/** Hierarchy: ${controllerStack.mkString(" -> ")} **/")
       emit(src"/** BEGIN ${lhs.name} $lhs **/")
       val groupedInputs = groupInputs(inputs)
+      val params = if (lhs.isInBlackboxImpl) "PARAMS: Map[String,Any], " else ""
       open(src"class ${lhs}_kernel(")
         groupedInputs.foreach{case (ins, typ) => 
           if (cchainCopies.contains(ins.head)) cchainCopies(ins.head).foreach{c => emit(src"${ins.head}_copy$c: ${arg(ins.head.tp, Some(ins.head))},")}
           else emit(src"list_${ins.head}: List[$typ],")
         }
-        emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
-        // emit(src"parent: ${if (controllerStack.size == 1) "AccelTop" else "SMObject"}")
+        emit(s"$params parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int], breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
+        // emit(src"parent: ${if (controllerStack.size == 1) "AccelUnit" else "SMObject"}")
         // emit("rr: ")
       closeopen(") extends Kernel(parent, cchain, childId, nMyChildren, ctrcopies, ctrPars, ctrWidths) {")
 
@@ -186,26 +153,26 @@ trait ChiselGenController extends ChiselGenCommon {
             emit("val rr = Input(Bool())")
             if (lhs.op.exists(_.R.isBits)) emit(src"val ret = Output(${remap(lhs.op.get.R.tp)})")
           close("})")
-          inputs.filter(!_.isString).zipWithIndex.foreach{case(in,i) => 
+          inputs.filter(!_.isString).foreach{in =>
             if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"def ${in}_copy$c = {io.in_${in}_copy$c}; io.in_${in}_copy$c := DontCare")}
             else emit(src"def $in = {io.in_$in} ${if (ledgerized(in) | in.isCounterChain) src"; io.in_$in := DontCare" else ""}")
           }
 
         close("}")
 
-        val numgrps = math.ceil(inputs.count(!_.isString).toDouble / 100.0)
-        inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  => 
+        inputs.filter(!_.isString).grouped(100).zipWithIndex.foreach{case (inpgrp, grpid)  =>
           open(src"def connectWires$grpid(module: ${lhs}_module)(implicit stack: List[KernelHash]): Unit = {")
-            inpgrp.foreach{ in => 
-            if (ledgerized(in)) {
-              emit(src"$in.connectLedger(module.io.in_$in)")
-              if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
-              else if (in.isMergeBuffer || in.isDRAMAccel) emit(src"module.io.in_$in.output <> $in.output")
-              else if (in.isBreaker) emit(src"module.io.in_$in.rPort <> $in.rPort")
-            } 
-            else if (cchainCopies.contains(in)) cchainCopies(in).foreach{c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output")}
-            else if (in.isCounterChain) emit(src"module.io.in_$in.input <> $in.input; module.io.in_$in.output <> $in.output")
-            else emit(src"module.io.in_$in <> $in")}
+            inpgrp.foreach { in =>
+              if (ledgerized(in)) {
+                emit(src"$in.connectLedger(module.io.in_$in)")
+                if (in.isArgOut || in.isHostIO) emit(src"module.io.in_$in.port.zip($in.port).foreach{case (l,r) => l.ready := r.ready}")
+                else if (in.isMergeBuffer || in.isDRAMAccel) emit(src"module.io.in_$in.output <> $in.output")
+                else if (in.isBreaker) emit(src"module.io.in_$in.rPort <> $in.rPort")
+              }
+              else if (cchainCopies.contains(in)) cchainCopies(in).foreach { c => emit(src"module.io.in_${in}_copy$c.input <> ${in}_copy$c.input; module.io.in_${in}_copy$c.output <> ${in}_copy$c.output") }
+              else if (in.isCounterChain) emit(src"module.io.in_$in.input <> $in.input; module.io.in_$in.output <> $in.output")
+              else emit(src"module.io.in_$in <> $in")
+            }
           close("}")
         }
       }
@@ -225,21 +192,7 @@ trait ChiselGenController extends ChiselGenCommon {
             emit("val rr = io.rr")
         }
         if (lhs.op.exists(_.R.isBits) && !spatialConfig.enableModular) emit(src"val ret = Wire(${remap(lhs.op.get.R.tp)})")
-        if (spatialConfig.enableInstrumentation) {
-          emit("""val cycles = Module(new InstrumentationCounter())""")
-          emit("""val iters = Module(new InstrumentationCounter())""")          
-          emit(src"cycles.io.enable := $baseEn")
-          emit(src"iters.io.enable := risingEdge($done)")
-          if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
-            emit("""val stalls = Module(new InstrumentationCounter())""")
-            emit("""val idles = Module(new InstrumentationCounter())""")          
-            emit(src"stalls.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
-            emit(src"idles.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
-            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles.io.count, iters.io.count, stalls.io.count, idles.io.count)")
-          } else {
-            emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles.io.count, iters.io.count, 0.U, 0.U)")
-          }
-        }
+        createAndTieInstrs(lhs)
 
         // Set up reg chains
         if (!lhs.isOuterStreamControl) {
@@ -268,6 +221,7 @@ trait ChiselGenController extends ChiselGenCommon {
           close("}")
           emit(src"val module = Module(new ${lhs}_concrete(sm.p.depth)); module.io := DontCare")
           val numgrps = math.ceil(inputs.count(!_.isString).toDouble / 100.0).toInt
+          emit("// Connect ports on this kernel to its parent")
           List.tabulate(numgrps){i => emit(src"connectWires$i(module)")}
           if (spatialConfig.enableInstrumentation) emit("Ledger.connectInstrCtrs(instrctrs, module.io.in_instrctrs)")
           emit(src"Ledger.connectBreakpoints(breakpoints, module.io.in_breakpoints)")
@@ -318,7 +272,8 @@ trait ChiselGenController extends ChiselGenCommon {
     val ctrcopies = if (lhs.isOuterStreamControl) nMyChildren else 1
     val ctrPars = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.parsOr1})" else "List(1)"
     val ctrWidths = if (lhs.cchains.nonEmpty) src"List(${lhs.cchains.head.widths})" else "List(32)"
-    emit(src"val $lhs$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $parent, $cchain, $childId, $nMyChildren, $ctrcopies, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs.toList, " else ""}rr)")
+    val params = if (lhs.isInBlackboxImpl) "PARAMS, " else ""
+    emit(src"val $lhs$swobj = new ${lhs}_kernel($chainPassedInputs ${if (inputs.nonEmpty) "," else ""} $params $parent, $cchain, $childId, $nMyChildren, $ctrcopies, $ctrPars, $ctrWidths, breakpoints, ${if (spatialConfig.enableInstrumentation) "instrctrs.toList, " else ""}rr)")
     modifications
     // Wire signals to SM object
     if (!lhs.isOuterStreamControl) {
@@ -338,7 +293,7 @@ trait ChiselGenController extends ChiselGenCommon {
         emit(src"""$lhs$swobj.sm.io.ctrDone := ${if (headchild.isBranch) quote(headchild) + "_obj" else quote(headchild)}.done""")
       } else if (lhs match {case Op(_:StateMachine[_]) if isInner && !lhs.children.exists(_.s.get != lhs) => true; case _ => false }) {
         val x = lhs match {case Op(_@StateMachine(_,_,_,_,nextState)) => nextState.result; case _ => throw new Exception("Unreachable SM Logic")}
-        emit(src"""$lhs$swobj.sm.io.ctrDone := $lhs$swobj.iiDone.D(${x.fullDelay})""")
+        emit(src"""$lhs$swobj.sm.io.ctrDone := $lhs$swobj.iiDone //.D(${x.fullDelay})""")
       } else {
         emit(src"""$lhs$swobj.sm.io.ctrDone := risingEdge($lhs$swobj.sm.io.ctrInc)""")
       }
@@ -360,15 +315,15 @@ trait ChiselGenController extends ChiselGenCommon {
     emit(src"$lhs$swobj.sm.io.break := $myBreak")
 
     if (lhs.op.exists(_.R.isBits)) emit(createWire(quote(lhs), remap(lhs.op.head.R)))
-    val suffix = if (lhs.isOuterStreamLoop) src"_copy${lhs.children.filter(_.s.get != lhs).head.s.get}" else ""
     val noop = if (lhs.cchains.nonEmpty) src"~$lhs.cchain.head.output.noop" else "true.B"
     val parentMask = and(controllerStack.head.enables.map{x => appendSuffix(lhs, x)})
+
     emit(src"$lhs$swobj.mask := $noop & $parentMask")
 
     val sigsIn = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsIn)"
     val sigsOut = if (controllerStack.size == 1) "None" else s"Some(${iodot}sigsOut)"
     emit(src"""$lhs$swobj.configure("$lhs$swobj", $sigsIn, $sigsOut, isSwitchCase = ${lhs.isSwitchCase && lhs.parent.s.isDefined && lhs.parent.s.get.isInnerControl})""")
-      
+
     if (lhs.op.exists(_.R.isBits)) emit(src"$lhs.r := $lhs$swobj.kernel().r")
     else emit(src"$lhs$swobj.kernel()")
 
@@ -415,27 +370,27 @@ trait ChiselGenController extends ChiselGenCommon {
         }.size
         connectDRAMStreams(x)
         forceEmit(src"""val $x = Module(new DRAMAllocator($dim, $reqCount)).io; $x <> DontCare""")
-        forceEmit(src"top.io.heap($id).req := $x.output.heapReq")
+        forceEmit(src"accelUnit.io.heap($id).req := $x.output.heapReq")
         if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${x}_p", ${param(x).get})  """)
-        forceEmit(src"$x.heapResp := top.io.heap($id).resp")
+        forceEmit(src"$x.heapResp := accelUnit.io.heap($id).resp")
       }
       inAccel{
-        emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(top.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
-        emit(src"""retime_counter.io.setup.saturate := true.B; retime_counter.io.input.reset := top.reset.toBool; retime_counter.io.input.enable := true.B;""")
+        emit(src"""val retime_counter = Module(new SingleCounter(1, Some(0), Some(accelUnit.max_latency), Some(1), false)); retime_counter.io <> DontCare // Counter for masking out the noise that comes out of ShiftRegister in the first few cycles of the app""")
+        emit(src"""retime_counter.io.setup.saturate := true.B; retime_counter.io.input.reset := accelUnit.reset.toBool; retime_counter.io.input.enable := true.B;""")
         emit(src"""val rr = getRetimed(retime_counter.io.output.done, 1, true.B) // break up critical path by delaying this """)
-        emit(src"""val breakpoints = Wire(Vec(top.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
-        if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List.fill[InstrCtr](api.numCtrls)(Wire(new InstrCtr()))""")
+        emit(src"""val breakpoints = Wire(Vec(accelUnit.io_numArgOuts_breakpts max 1, Bool())); breakpoints.zipWithIndex.foreach{case(b,i) => b.suggestName(s"breakpoint" + i)}; breakpoints := DontCare""")
+        if (spatialConfig.enableInstrumentation) emit(src"""val instrctrs = List.fill[InstrCtr](api.numCtrls)(Wire(new InstrCtr())); instrctrs.foreach(_ := DontCare)""")
         emit(src"""val done_latch = Module(new SRFF())""")
         hwblock = Some(enterCtrl(lhs))
         instantiateKernel(lhs, Set(), func){
-          emit(src"""$lhs.baseEn := top.io.enable && rr && ~done_latch.io.output""")
-          emit(src"""$lhs.resetMe := getRetimed(top.accelReset, 1)""")
+          emit(src"""$lhs.baseEn := accelUnit.io.enable && rr && ~done_latch.io.output""")
+          emit(src"""$lhs.resetMe := getRetimed(accelUnit.accelReset, 1)""")
           emit(src"""$lhs.mask := true.B""")
-          emit(src"""$lhs.sm.io.parentAck := top.io.done""")
-          emit(src"""$lhs.sm.io.enable := $lhs.baseEn & !top.io.done & ${getForwardPressure(lhs.toCtrl)}""")
+          emit(src"""$lhs.sm.io.parentAck := accelUnit.io.done""")
+          emit(src"""$lhs.sm.io.enable := $lhs.baseEn & !accelUnit.io.done & ${getForwardPressure(lhs.toCtrl)}""")
           emit(src"""done_latch.io.input.reset := $lhs.resetMe""")
           emit(src"""done_latch.io.input.asyn_reset := $lhs.resetMe""")
-          emit(src"""top.io.done := done_latch.io.output""")
+          emit(src"""accelUnit.io.done := done_latch.io.output""")
         }
         writeKernelClass(lhs, Set(), func){
           gen(func)
@@ -443,21 +398,21 @@ trait ChiselGenController extends ChiselGenCommon {
         if (earlyExits.nonEmpty) {
           appPropertyStats += HasBreakpoint
           earlyExits.zipWithIndex.foreach{case (e, i) => 
-            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
-            emit(src"top.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
+            emit(src"accelUnit.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.bits := 1.U")
+            emit(src"accelUnit.io.argOuts(api.${quote(e).toUpperCase}_exit_arg).port.valid := breakpoints($i)")
           }
           emit(src"""done_latch.io.input.set := $lhs.done | breakpoints.reduce{_|_}""")
         } else {
           emit(src"""done_latch.io.input.set := $lhs.done""")
         }
 
-        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(top, instrctrs)")
+        if (spatialConfig.enableInstrumentation) emit(src"Instrument.connect(accelUnit, instrctrs)")
 
         emit("Ledger.finish()")
         exitCtrl(lhs)
       }
 
-    case ctrl: EnControl[_] if !lhs.isFSM => 
+    case ctrl: EnControl[_] if !lhs.isFSM & !lhs.isCtrlBlackbox =>
       enterCtrl(lhs)
       instantiateKernel(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*){}
       writeKernelClass(lhs, ctrl.ens, ctrl.bodies.flatMap{_.blocks.map(_._2)}:_*) {
@@ -542,19 +497,19 @@ trait ChiselGenController extends ChiselGenCommon {
     inGen(out, "Instrument.scala"){
       emitHeader()
       open("object Instrument {")
-        open("def connect(top: AccelTop, instrctrs: List[InstrCtr]): Unit = {")
+        open("def connect(accelUnit: AccelUnit, instrctrs: List[InstrCtr]): Unit = {")
           val printableLines: Seq[StmWithWeight[String]] = instrumentCounters.zipWithIndex.flatMap{case ((s,d), i) => 
             val swobj = if (s.isBranch) "_obj" else ""
             Seq(
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).cycs""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.valid := top.io.enable""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).iters""",1,Seq[String]()),
-              StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.valid := top.io.enable""",1,Seq[String]())
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).cycs""",1,Seq[String]()),
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_cycles_arg).port.valid := accelUnit.io.enable""",1,Seq[String]()),
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).iters""",1,Seq[String]()),
+              StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_iters_arg).port.valid := accelUnit.io.enable""",1,Seq[String]())
             ) ++ {if (hasBackPressure(s.toCtrl) || hasForwardPressure(s.toCtrl)) { Seq(
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).stalls""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.valid := top.io.enable""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).idles""",1,Seq[String]()),
-                StmWithWeight(src"""top.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.valid := top.io.enable""",1,Seq[String]())
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).stalls""",1,Seq[String]()),
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_stalled_arg).port.valid := accelUnit.io.enable""",1,Seq[String]()),
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.bits := instrctrs(${s.toString.toUpperCase}_instrctr).idles""",1,Seq[String]()),
+                StmWithWeight(src"""accelUnit.io.argOuts(api.${s.toString.toUpperCase}_idle_arg).port.valid := accelUnit.io.enable""",1,Seq[String]())
               )} else Nil}
 
           }
@@ -592,7 +547,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit ("""*/""")
     }
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit (src"// Root controller for app: ${config.name}")
       emit ("")
       emit (src"// Widths: ${widthStats.sorted}")

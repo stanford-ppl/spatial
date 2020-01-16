@@ -3,7 +3,7 @@ package spatial.lang.types
 import argon._
 import forge.tags._
 import spatial.lang._
-import spatial.node.{DenseTransfer, MemDenseAlias, SparseTransfer}
+import spatial.node.{DenseTransfer, FrameTransmit, MemDenseAlias, SparseTransfer}
 import utils.implicits.collections._
 
 trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
@@ -52,6 +52,11 @@ trait LocalMem1[A,C[T]<:LocalMem1[T,C]] extends LocalMem[A,C] {
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
   @api def load(dram: DRAM1[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
+  }
+
+  /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def load(frame: Frame1[A]): Void = {
+    stage(FrameTransmit(frame,me,isLoad = true))
   }
 
   /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */

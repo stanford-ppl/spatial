@@ -20,7 +20,9 @@ val base = Seq(
     "org.scala-lang.modules" %% "scala-xml" % "1.0.6", // scala 2.12 and scala test 2.12 depends on 1.06 so sbt select the older version anyway
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
     "org.jpmml" % "pmml-evaluator" % "1.4.8",
-    "javax.xml.bind" % "jaxb-api" % "2.3.0"
+    "javax.xml.bind" % "jaxb-api" % "2.3.0",
+    "org.scalanlp" %% "breeze" % "1.0"
+
     // "com.thoughtworks.xstream" % "xstream" % "1.4.3",
     // These are a bit bulky, leaving them out in favor of a stripped down version for now
     //"org.apache.commons" % "commons-lang3" % "3.3.2",
@@ -167,7 +169,7 @@ lazy val test = project.settings(
   common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
 ).dependsOn(spatial)
 
-lazy val pirTest = project 
+lazy val pirTest = project
 .settings(common)
 .settings(
   scalaSource in Test := baseDirectory.in(spatial).value/"pir/regression"

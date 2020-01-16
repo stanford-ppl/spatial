@@ -7,6 +7,31 @@ import spatial.node._
 trait CppGenFileIO extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op @ LoadDRAMWithASCIIText(dram, file) =>
+      emit(
+        src"${file}.seekg(0, std::ios::end);"
+      )
+      emit(
+        src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();"""
+      )
+      emit(
+        src"char* ${lhs}_temp = (char *) malloc(${lhs}_pos * sizeof(char));"
+      )
+      emit(
+        src"${file}.seekg(0, std::ios::beg);"
+      )
+      emit(
+        src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);"
+      )
+      emit(
+        src"c1->memcpy($dram, &${lhs}_temp[0], ${lhs}_pos * sizeof(char));"
+      )
+      emit(
+        src"free(${lhs}_temp);"
+      )
+//      emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
+//      emit(src"c1->memcpy($dram, &(*$ptr)[0], (*$ptr).size() * sizeof(${rawtp}));")
+
     case OpenBinaryFile(filename, isWr) =>
       val dir = if (isWr) "o" else "i"
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")
@@ -16,25 +41,34 @@ trait CppGenFileIO extends CppGenCommon {
       // Pull raw data out of file
       emit(src"${file}.seekg(0, std::ios::end);")
       emit(src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();""")
+//      if (isASCIITextFile)
+//        emit(src"std::vector<char> ${lhs}_temp = new std::vector((${lhs}_pos)); ")
+//      else
       emit(src"std::vector<char> ${lhs}_temp (${lhs}_pos); ")
       emit(src"${file}.seekg(0, std::ios::beg);")
       emit(src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);")
       val chars = Math.ceil(op.A.nbits.toDouble / 8).toInt
       val rawtp = asIntType(op.A)
-      // Place raw data in appropriately-sized vector with correct bit width
+
+      // Avoid double allocating vectors when the binary file is a large text file
+//      if (isASCIITextFile) {
+//        emit(
+//          src"vector<char>* ${lhs} = &${lhs}_temp;"
+//        )
+//      } else {
+        // Place raw data in appropriately-sized vector with correct bit width
       emit(src"std::vector<${rawtp}>* ${lhs}_raw = new std::vector<${rawtp}>(${lhs}_temp.size()/${chars});")
-      emit(src"std::memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
+      emit(src"memcpy((void*)&((*${lhs}_raw)[0]), &(${lhs}_temp[0]), ${lhs}_temp.size() * sizeof(char));")
       // Convert raw data into appropriate type
       emit(src"${lhs.tp}* ${lhs} = new ${lhs.tp}((*${lhs}_raw).size());")
-      op.A match { 
-        case FixPtType(s,d,f) => 
+      op.A match {
+        case FixPtType(s,d,f) =>
           open(src"for (int ${lhs}_i = 0; ${lhs}_i < (*${lhs}).size(); ${lhs}_i++) {")
-            emit(src"(*${lhs})[${lhs}_i] = ${toApproxFix(src"(*${lhs}_raw)[${lhs}_i]", op.A)};")
+          emit(src"(*${lhs})[${lhs}_i] = ${toApproxFix(src"(*${lhs}_raw)[${lhs}_i]", op.A)};")
           close("}")
-        case _ => 
+        case _ =>
           emit(src"${lhs} = ${lhs}_raw;")
       }
-
 
     case op @ WriteBinaryFile(file, len, value) =>
       val i = value.input
@@ -54,7 +88,6 @@ trait CppGenFileIO extends CppGenCommon {
       
     case CloseBinaryFile(file) =>
       emit(src"$file.close();")
-
 
     case OpenCSVFile(filename, isWr) => 
       val dir = if (isWr) "o" else "i"

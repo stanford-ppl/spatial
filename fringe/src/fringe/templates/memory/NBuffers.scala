@@ -72,7 +72,7 @@ class NBufMem(np: NBufParams) extends Module {
 
   val io = IO( new NBufInterface(np) )
 
-  io.accessActivesOut.zip(io.accessActivesIn).foreach{case (o,i) => o := i}
+  io.active.map(_.out).zip(io.active.map(_.in)).foreach{case (o,i) => o := i}
   io.full := DontCare
   io.almostFull := DontCare
   io.empty := DontCare
@@ -263,7 +263,7 @@ class RegChainPass(val numBufs: Int, val bitWidth: Int, myName: String = "") ext
 
   override def desiredName = myName
   
-  io.accessActivesOut(0) := io.accessActivesIn(0)
+  io.active(0).out := io.active(0).in
   io.full := DontCare
   io.almostFull := DontCare
   io.empty := DontCare

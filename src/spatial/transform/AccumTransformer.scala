@@ -14,6 +14,7 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ transformControl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ transformControl(lhs,rhs) }
     case _ => transformControl(lhs,rhs)
   }
 

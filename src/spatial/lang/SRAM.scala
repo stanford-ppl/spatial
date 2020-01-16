@@ -69,7 +69,11 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}
-  def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .onlyduplicate instead")}
+  def nobank: C[A] = {throw new Exception(s".nobank has been deprecated.  Please use .fullfission instead")}
+  /** Only attempt to bank with N's from the "pow2" category */
+  def nPow2: C[A] = {throw new Exception(s".nPow2 has been deprecated.  Please use .nBest instead")}
+  /** Only attempt to bank with alphas from the "pow2" category */
+  def alphaPow2: C[A] = {throw new Exception(s".alphaPow2 has been deprecated.  Please use .alphaBest instead")}
 
   /** Do not attempt to bank memory at all, and only use bank-by-duplication for all lanes of all readers */
   def fullfission: C[A] = { this.isFullFission = true; me }
@@ -79,18 +83,16 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     *   .duplicateaxes( List( List(), List(0,2), List(0,1,2) ) )
     */
   @stateful def axesfission(opts: Seq[Seq[Int]]): C[A] = {this.bankingEffort = 3.max(this.bankingEffort); this.duplicateOnAxes = opts; me }
+  /** Number of valid schemes to find before quitting a region */
+//  def quitAfter(x: Int): C[A] = { this.quitAfter = x; me }
   /** Do not attempt to bank memory by duplication */
   def nofission: C[A] = { this.isNoFission = true; me }
   /** Only attempt to bank with N's from the "likely" category */
   def nBest: C[A] = { this.nConstraints = this.nConstraints :+ NBestGuess; me }
-  /** Only attempt to bank with N's from the "pow2" category */
-  def nPow2: C[A] = { this.nConstraints = this.nConstraints :+ NPowersOf2; me }
   /** Only attempt to bank with N's from the "relaxed" category */
   def nRelaxed: C[A] = { this.nConstraints = this.nConstraints :+ NRelaxed; me }
   /** Only attempt to bank with alphas from the "likely" category */
   def alphaBest: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaBestGuess; me }
-  /** Only attempt to bank with alphas from the "pow2" category */
-  def alphaPow2: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaPowersOf2; me }
   /** Only attempt to bank with alphas from the "relaxed" category */
   def alphaRelaxed: C[A] = { this.alphaConstraints = this.alphaConstraints :+ AlphaRelaxed; me }
   /** Do not attempt to bank memory with block-cyclic schemes */
@@ -107,9 +109,9 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     */
   def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
   /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will crash. It will also assume only one duplicate */
-  def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): C[A] = { this.explicitBanking = (N, B, alpha); me }
+  def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = (N, B, alpha, P); me }
   /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will NOT crash. It will also assume only one duplicate */
-  def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int]): C[A] = { this.explicitBanking = (N, B, alpha); this.forceExplicitBanking = true; me }
+  def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = (N, B, alpha, P); this.forceExplicitBanking = true; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

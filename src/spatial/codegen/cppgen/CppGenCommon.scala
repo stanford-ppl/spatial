@@ -49,8 +49,9 @@ trait CppGenCommon extends CppCodegen {
   }
 
   protected def asIntType(tp: Type[_]): String = tp match {
-    case FixPtType(s,d,f) => 
-      if (d+f > 64) s"int128_t"
+    case FixPtType(s,d,f) =>
+      if (d+f == 256) s"int256_t"
+      else if (d+f > 64) s"int128_t"
       else if (d+f > 32) s"int64_t"
       else if (d+f > 16) s"int32_t"
       else if (d+f > 8) s"int16_t"
@@ -75,7 +76,8 @@ trait CppGenCommon extends CppCodegen {
     case FixPtType(s,d,f) => 
       val u = if (!s) "u" else ""
       if (f == 0) {
-        if (d > 64) s"${u}int128_t"
+        if (d == 256) s"${u}int256_t"
+        else if (d > 64) s"${u}int128_t"
         else if (d > 32) s"${u}int64_t"
         else if (d > 16) s"${u}int32_t"
         else if (d > 8) s"${u}int16_t"

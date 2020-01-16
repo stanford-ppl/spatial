@@ -5,7 +5,7 @@ Model Technology ModelSim - Intel FPGA Edition vlog 10.5b Compiler 2016.10 Oct  
 Top level modules:
 	Top_tb
 
-} {} {}} /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v {1 {vlog -work work -stats=none /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/Top.v
+} {} {}} /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/SpatialIP.v {1 {vlog -work work -stats=none /local/ssd/home/tianzhao/sp_comp/lite_avalon/simulation/SpatialIP.v
 Model Technology ModelSim - Intel FPGA Edition vlog 10.5b Compiler 2016.10 Oct  5 2016
 -- Compiling module FF
 -- Compiling module SingleCounter

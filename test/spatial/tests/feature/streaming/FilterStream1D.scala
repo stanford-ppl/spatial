@@ -65,7 +65,7 @@ import spatial.dsl._
 import forge.tags._
 
 @struct case class score(idx: Int, v: I32)
-@struct case class composite(rising_idx: Int, rising_v: I32, falling_idx: Int, falling_v: I32, volume: U16, row: U16, p32: U32, p64: U64)
+@struct case class composite(rising_idx: Int, rising_v: I32, falling_idx: Int, falling_v: I32, volume: U16, row: U16, first_val: I16, last_val: I16, p64: U64)
 
 object SpatialHelper {
 
@@ -86,12 +86,16 @@ object SpatialHelper {
     Console.println(s"kernel is ${sharp_kernel.mkString(",")}")
     Pipe.II(1).Foreach(COLS by 1, els_per_pack by 1){(oc, ic) =>
       val c = oc*els_per_pack + ic
+      val first_reg = Reg[I16](0)
+      val last_reg = Reg[I16](0)
       val best_rising = Reg[score](score(0, -999.to[I32]))
       val best_falling = Reg[score](score(0, -999.to[I32]))
       val acc_after_rising = Reg[U16](0)
       val acc_after_falling = Reg[U16](0)
       val sr = RegFile[I16](deriv_window)
       val next = input_fifo.deq()
+      if (c == 0) first_reg := next
+      if (c == COLS * els_per_pack - 1) last_reg := next
       sr <<= next
       acc_after_rising :+= next.as[U16]
       acc_after_falling :+= next.as[U16]
@@ -105,7 +109,7 @@ object SpatialHelper {
         best_falling := score(c,t.to[I32])
       }
       if (c == (COLS*els_per_pack)-1) {
-        result.enq(composite(best_rising.value.idx, best_rising.value.v, best_falling.value.idx, best_falling.value.v, acc_after_rising - acc_after_falling, r.as[U16], 0, 0))
+        result.enq(composite(best_rising.value.idx, best_rising.value.v, best_falling.value.idx, best_falling.value.v, acc_after_rising - acc_after_falling, r.as[U16],first_reg.value, last_reg.value, 0))
         if (last_unit) issue.enq(mux(best_rising.value == score(-1,-1) || r == LINES_TODO-1 || r % rowTileSize == rowTileSize-1, mux((r+1) % rowTileSize == 0, rowTileSize, r % rowTileSize + 1), 0)) // Random math to make sure retiming puts it later
       } 
 
@@ -136,7 +140,7 @@ object SpatialHelper {
     println(r"""Kernel: ${sharp_kernel.mkString("\t")}""")
 
     // Get input data
-    val input_data = loadCSV2D[I16](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.csv"," ","\n")
+    val input_data = loadCSV2D[I16](s"$DATA/slac/chirp-2000_interferedelay1650_photonen6.0_carriertagdiamond_nfibers109_netalon1_1.00_1.00_interference.out.187",",","\n")
 
     // Set up dram
     val COLS = ArgIn[Int]
@@ -211,44 +215,69 @@ object SpatialHelper {
 
     val result_composite_dram = getMem(output_composite_dram)
     println("Results:")
-    println("|  Row           |  Rising Idx   |  Falling Idx  |     Volume      |   Rising V   |   Falling V   |")
+    println("|  Row           |  Rising Idx   |  Falling Idx  |     Volume      |   Rising V   |   Falling V   |  First Val  |  Last Val |")
     for (i <- 0 until LINES_TODO) {
       println(r"|      ${result_composite_dram(i).row}         |" +
               r"     ${result_composite_dram(i).rising_idx}      |" +
               r"      ${result_composite_dram(i).falling_idx}      |" +
               r"      ${result_composite_dram(i).volume}      |"      +
               r"      ${result_composite_dram(i).rising_v}      |"    +
-              r"      ${result_composite_dram(i).falling_v}      |")
+              r"      ${result_composite_dram(i).falling_v}      |"    +
+              r"      ${result_composite_dram(i).first_val}      |"    +
+              r"      ${result_composite_dram(i).last_val}      |")
     }
 
-    val gold_rising_idx = loadCSV1D[Int](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.rising_idx",",")
-    val gold_rising_v = loadCSV1D[I32](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.rising_v",",")
-    val gold_falling_idx = loadCSV1D[Int](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.falling_idx",",")
-    val gold_falling_v = loadCSV1D[I32](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.falling_v",",")
-    val gold_volume = loadCSV1D[U16](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.volume",",")
 
-    if (LINES_TODO == 50) { // Only have regression for 50 lines...
+    // Extract at high precision
+    val gold_all = loadCSV2D[FixPt[TRUE,_32,_32]](s"$DATA/slac/chirp-2000_interferedelay1650_photonen6.0_carriertagdiamond_nfibers109_netalon1_1.00_1.00.187.processed", ",", "\n")
+
+    if (LINES_TODO <= 48) { // Only have regression for 50 lines...
       val got_rising_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_idx}
       val got_rising_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_v}
       val got_falling_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_idx}
       val got_falling_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_v}
       val got_volume = Array.tabulate(LINES_TODO){i => result_composite_dram(i).volume}
+      val got_first_val = Array.tabulate(LINES_TODO){i => result_composite_dram(i).first_val}
+      val got_last_val = Array.tabulate(LINES_TODO){i => result_composite_dram(i).last_val}
 
-      println(r"Correct rising_idx:  ${gold_rising_idx == got_rising_idx}")
-      println(r"Correct rising_v:    ${gold_rising_v == got_rising_v}")
-      println(r"Correct falling_idx: ${gold_falling_idx == got_falling_idx}")
-      println(r"Correct falling_v:   ${gold_falling_v == got_falling_v}")
-      println(r"Correct volume:      ${gold_volume == got_volume}")
+      val gold_rising_idx = Array.tabulate(LINES_TODO){i => gold_all(i, 2).to[Int]}
+      val gold_rising_v = Array.tabulate(LINES_TODO){i => gold_all(i, 5).to[I32]}
+      val gold_falling_idx = Array.tabulate(LINES_TODO){i => gold_all(i, 3).to[Int]}
+      val gold_falling_v = Array.tabulate(LINES_TODO){i => gold_all(i, 6).to[I32]}
+      val gold_volume = Array.tabulate(LINES_TODO){i => gold_all(i, 4).to[U16]}
+      val gold_first_val = Array.tabulate(LINES_TODO){i => gold_all(i, 7).to[I16]}
+      val gold_last_val = Array.tabulate(LINES_TODO){i => gold_all(i, 8).to[I16]}
 
-      assert(gold_rising_idx == got_rising_idx)
-      assert(gold_rising_v == got_rising_v)
-      assert(gold_falling_idx == got_falling_idx)
-      assert(gold_falling_v == got_falling_v)
-      assert(gold_volume == got_volume)
+      def withinPercent[X:Num](a: Array[X], b: Array[X], percent: scala.Double): Bit = {
+        Array.tabulate(a.length){i =>
+          val den = if (b(i).to[Float] == 0) 1 else b(i).to[Float]
+          val pe = 100.0 * abs(a(i).to[Float] - b(i).to[Float])/den
+          if (pe > percent.to[Float]) println(r"el $i pe = $pe")
+          pe < percent.to[Float]
+        }.reduce{_&&_}
+      }
+
+      println(r"Correct rising_idx:  ${withinPercent(gold_rising_idx, got_rising_idx, 5.1)}")
+      println(r"Correct rising_v:    ${withinPercent(gold_rising_v, got_rising_v, 5.1)}")
+      println(r"Correct falling_idx: ${withinPercent(gold_falling_idx, got_falling_idx, 5.1)}")
+      println(r"Correct falling_v:   ${withinPercent(gold_falling_v, got_falling_v, 5.1)}")
+//      println(r"Correct volume:      ${withinPercent(gold_volume, got_volume, 5.1)}")
+      println(r"Correct first_val:      ${withinPercent(gold_first_val, got_first_val, 5.1)}")
+      println(r"Correct last_val:      ${withinPercent(gold_last_val, got_last_val, 5.1)}")
+
+      assert(withinPercent(gold_rising_idx, got_rising_idx, 5.1))
+      assert(withinPercent(gold_rising_v, got_rising_v, 5.1))
+      assert(withinPercent(gold_falling_idx, got_falling_idx, 5.1))
+      assert(withinPercent(gold_falling_v, got_falling_v, 5.1))
+//      assert(withinPercent(gold_volume, got_volume, 5.1))
+      assert(withinPercent(gold_first_val, got_first_val, 5.1))
+      assert(withinPercent(gold_last_val, got_last_val, 5.1))
     }
 
   }
 }
+
+
 
 @spatial class InterleavedFilterStream1D extends SpatialTest {
 
@@ -257,15 +286,16 @@ object SpatialHelper {
         <------------------------  one cycle ---------------------------------------------->
   */
 
-  override def runtimeArgs: Args = "50"
+  override def runtimeArgs: Args = "48"
 
   type T = FixPt[TRUE, _16, _16]
   val colTileSize = 64
   val rowTileSize = 16
   val deriv_window = 40
-  val interleave_factor = 2
-  val bus_bits = 128
-  val line_bits = 1024*16
+  val interleave_factor = 2 // if = 4 doesn't work because cpp backend doesn't handle 256 bit numbers well...
+  type PACK = I128 // Should equal interleave_factor * 64
+  val bus_bits = interleave_factor * 64
+  val line_bits = 1024 * 16
   val pxl_bits = 16
   def main(args: Array[String]): Unit = {
 
@@ -279,23 +309,24 @@ object SpatialHelper {
     println(r"""Kernel: ${sharp_kernel.mkString("\t")}""")
 
     // Get input data
-    val raw_input_data: Matrix[I16] = loadCSV2D[I16](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.csv"," ","\n")
-    assert(args(0).to[Int] % interleave_factor == 0, s"LINES_TODO (${args(0).to[Int]} must be divisible by interleave_factor ${interleave_factor}")
+    val raw_input_data: Matrix[I16] = loadCSV2D[I16](s"$DATA/slac/chirp-2000_interferedelay1650_photonen6.0_carriertagdiamond_nfibers109_netalon1_1.00_1.00_interference.out.187",",","\n")
+   // aoeu assert(args(0).to[Int] % interleave_factor == 0, s"LINES_TODO (${args(0).to[Int]} must be divisible by interleave_factor $interleave_factor")
     val interleave_rows = args(0).to[Int]/interleave_factor // Rows of packed data structure
     val interleave_col_bits = bus_bits / interleave_factor // Bits per line per cycle
     val interleave_cols = line_bits / interleave_col_bits // Cols of packed data structure
     val interleave_line_els = interleave_col_bits / pxl_bits // # of elements of a line per cycle
-    val input_data: Matrix[I128] = (0::interleave_rows, 0::interleave_cols){(i,j) =>
+    val input_data: Matrix[PACK] = (0::interleave_rows, 0::interleave_cols){(i,j) =>
       val pack = Seq.tabulate(interleave_factor){p =>
         val row = i * interleave_factor + p
         val col = j * interleave_line_els
         val els = Seq.tabulate(interleave_line_els){e => raw_input_data(row,col + e)}
+//        Seq.tabulate(interleave_line_els){e => println(r" row $row, col $col, el $e = ${raw_input_data(row,col + e)}")}
         els
       }.flatten
-      Vec.ZeroFirst(pack:_*).asPacked[I128]
+      Vec.ZeroFirst(pack:_*).asPacked[PACK]
     }
 
-    println(r"Packed ${args(0).to[Int]} x ${raw_input_data.cols} matrix -> ${interleave_rows} x ${interleave_cols} matrix with interleave_factor ${interleave_factor}")
+    println(r"Packed ${args(0).to[Int]} x ${raw_input_data.cols} matrix -> $interleave_rows x $interleave_cols matrix with interleave_factor $interleave_factor")
     // Set up dram
     val COLS = ArgIn[Int]
     val ROWS = ArgIn[Int]
@@ -303,7 +334,7 @@ object SpatialHelper {
     setArg(COLS, input_data.cols)
     setArg(ROWS, input_data.rows)
     setArg(LINES_TODO, args(0).to[Int])
-    val input_dram = DRAM[I128](ROWS, COLS)
+    val input_dram = DRAM[PACK](ROWS, COLS)
     setMem(input_dram, input_data)
     val output_composite_dram = DRAM[composite](LINES_TODO)
 
@@ -314,7 +345,7 @@ object SpatialHelper {
     Accel{
       val done = Reg[Bit](false)
       Stream(breakWhen = done).Foreach(*){r =>
-        val raw_input_fifo = FIFO[I128](colTileSize)
+        val raw_input_fifo = FIFO[PACK](colTileSize)
         val input_fifo = List.tabulate(interleave_factor){_ => FIFO[I16](colTileSize)}
         val issue = FIFO[Int](2*rowTileSize).conflictable
         val results = List.tabulate(interleave_factor){_ => FIFO[composite](2*rowTileSize/interleave_factor)}
@@ -330,7 +361,7 @@ object SpatialHelper {
 
         // Stage 1: consume cxp-like stream
         Pipe {
-          val raw: I128 = raw_input_fifo.deq()
+          val raw: PACK = raw_input_fifo.deq()
           input_fifo.zipWithIndex.foreach{case (f,i) =>
             val raw_pack = raw.bits((i+1)*interleave_col_bits - 1 :: i*interleave_col_bits).as[I64] // U${128/interleave_col_bits}
             f.enqVec(raw_pack.asVec[I16])
@@ -369,32 +400,42 @@ object SpatialHelper {
 
     val result_composite_dram = getMem(output_composite_dram)
     println("Results:")
-    println("|  Row           |  Rising Idx   |  Falling Idx  |     Volume      |   Rising V   |   Falling V   |")
+    println("|  Row           |  Rising Idx   |  Falling Idx  |     Volume      |   Rising V   |   Falling V   |  First Val  |  Last Val |")
     for (i <- 0 until LINES_TODO) {
       println(r"|      ${result_composite_dram(i).row}         |" +
               r"     ${result_composite_dram(i).rising_idx}      |" +
               r"      ${result_composite_dram(i).falling_idx}      |" +
               r"      ${result_composite_dram(i).volume}      |"      +
               r"      ${result_composite_dram(i).rising_v}      |"    +
-              r"      ${result_composite_dram(i).falling_v}      |")
+              r"      ${result_composite_dram(i).falling_v}      |"    +
+              r"      ${result_composite_dram(i).first_val}      |"    +
+              r"      ${result_composite_dram(i).last_val}      |")
     }
 
-    val gold_rising_idx = loadCSV1D[Int](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.rising_idx",",")
-    val gold_rising_v = loadCSV1D[I32](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.rising_v",",")
-    val gold_falling_idx = loadCSV1D[Int](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.falling_idx",",")
-    val gold_falling_v = loadCSV1D[I32](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.falling_v",",")
-    val gold_volume = loadCSV1D[U16](s"$DATA/slac/xppc00117_r136_refsub_ipm4_del3.volume",",")
+    // Extract at high precision
+    val gold_all = loadCSV2D[FixPt[TRUE,_32,_32]](s"$DATA/slac/chirp-2000_interferedelay1650_photonen6.0_carriertagdiamond_nfibers109_netalon1_1.00_1.00.187.processed", ",", "\n")
 
-    if (LINES_TODO == 50) { // Only have regression for 50 lines...
+    if (LINES_TODO <= 48) { // Only have regression for 50 lines...
       val got_rising_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_idx}
       val got_rising_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_v}
       val got_falling_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_idx}
       val got_falling_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_v}
       val got_volume = Array.tabulate(LINES_TODO){i => result_composite_dram(i).volume}
+      val got_first_val = Array.tabulate(LINES_TODO){i => result_composite_dram(i).first_val}
+      val got_last_val = Array.tabulate(LINES_TODO){i => result_composite_dram(i).last_val}
+
+      val gold_rising_idx = Array.tabulate(LINES_TODO){i => gold_all(i, 2).to[Int]}
+      val gold_rising_v = Array.tabulate(LINES_TODO){i => gold_all(i, 5).to[I32]}
+      val gold_falling_idx = Array.tabulate(LINES_TODO){i => gold_all(i, 3).to[Int]}
+      val gold_falling_v = Array.tabulate(LINES_TODO){i => gold_all(i, 6).to[I32]}
+      val gold_volume = Array.tabulate(LINES_TODO){i => gold_all(i, 4).to[U16]}
+      val gold_first_val = Array.tabulate(LINES_TODO){i => gold_all(i, 7).to[I16]}
+      val gold_last_val = Array.tabulate(LINES_TODO){i => gold_all(i, 8).to[I16]}
 
       def withinPercent[X:Num](a: Array[X], b: Array[X], percent: scala.Double): Bit = {
         Array.tabulate(a.length){i =>
-          val pe = 100.0 * abs(a(i).to[Float] - b(i).to[Float])/b(i).to[Float]
+          val den = if (b(i).to[Float] == 0) 1 else b(i).to[Float]
+          val pe = 100.0 * abs(a(i).to[Float] - b(i).to[Float])/den
           if (pe > percent.to[Float]) println(r"el $i pe = $pe")
           pe < percent.to[Float]
         }.reduce{_&&_}
@@ -404,13 +445,265 @@ object SpatialHelper {
       println(r"Correct rising_v:    ${withinPercent(gold_rising_v, got_rising_v, 5.1)}")
       println(r"Correct falling_idx: ${withinPercent(gold_falling_idx, got_falling_idx, 5.1)}")
       println(r"Correct falling_v:   ${withinPercent(gold_falling_v, got_falling_v, 5.1)}")
-      println(r"Correct volume:      ${withinPercent(gold_volume, got_volume, 5.1)}")
+//      println(r"Correct volume:      ${withinPercent(gold_volume, got_volume, 5.1)}")
+      println(r"Correct first_val:      ${withinPercent(gold_first_val, got_first_val, 5.1)}")
+      println(r"Correct last_val:      ${withinPercent(gold_last_val, got_last_val, 5.1)}")
 
       assert(withinPercent(gold_rising_idx, got_rising_idx, 5.1))
       assert(withinPercent(gold_rising_v, got_rising_v, 5.1))
       assert(withinPercent(gold_falling_idx, got_falling_idx, 5.1))
       assert(withinPercent(gold_falling_v, got_falling_v, 5.1))
-      assert(withinPercent(gold_volume, got_volume, 5.1))
+//      assert(withinPercent(gold_volume, got_volume, 5.1))
+      assert(withinPercent(gold_first_val, got_first_val, 5.1))
+      assert(withinPercent(gold_last_val, got_last_val, 5.1))
+    }
+
+  }
+}
+
+
+
+@spatial class InterleavedFilterStream1DBBox extends SpatialTest {
+
+  /*    ___________________________________________________________________________________
+       |___64 bits line 0___|___64 bits line 1___|___64 bits line 2___|___64 bits line 3___|
+        <------------------------  one cycle ---------------------------------------------->
+  */
+
+  override def runtimeArgs: Args = "48"
+
+  type T = FixPt[TRUE, _16, _16]
+  val colTileSize = 64
+  val rowTileSize = 16
+  val deriv_window = 40
+  val interleave_factor = 2 // if = 4 doesn't work because cpp backend doesn't handle 256 bit numbers well...
+  type PACK = I128 // Should equal interleave_factor * 64
+  val bus_bits = interleave_factor * 64
+  val line_bits = 1024 * 16
+  val pxl_bits = 16
+
+  @streamstruct case class BBOX_IN(COLS: I32, input: I16, r: I32, LINES_TODO: I32, last_unit: Bit)
+  @streamstruct case class BBOX_OUT(result: composite, issue: Int)
+
+  def main(args: Array[String]): Unit = {
+
+    // // Get reference edges
+    // val ref_file = "../data_fs/reference/chirp-2000_interferedelay1650_photonen9.5_ncalibdelays8192_netalon0_interference.calibration"
+    // // Helpers.build_reference(ref_file)
+    // Helpers.parse_reference(ref_file)
+
+    // Get hard/soft derivative kernels
+    val sharp_kernel = Helpers.build_derivkernel(deriv_window/8, deriv_window)
+    println(r"""Kernel: ${sharp_kernel.mkString("\t")}""")
+
+    // Get input data
+    val raw_input_data: Matrix[I16] = loadCSV2D[I16](s"$DATA/slac/chirp-2000_interferedelay1650_photonen6.0_carriertagdiamond_nfibers109_netalon1_1.00_1.00_interference.out.187",",","\n")
+   // aoeu assert(args(0).to[Int] % interleave_factor == 0, s"LINES_TODO (${args(0).to[Int]} must be divisible by interleave_factor $interleave_factor")
+    val interleave_rows = args(0).to[Int]/interleave_factor // Rows of packed data structure
+    val interleave_col_bits = bus_bits / interleave_factor // Bits per line per cycle
+    val interleave_cols = line_bits / interleave_col_bits // Cols of packed data structure
+    val interleave_line_els = interleave_col_bits / pxl_bits // # of elements of a line per cycle
+    val input_data: Matrix[PACK] = (0::interleave_rows, 0::interleave_cols){(i,j) =>
+      val pack = Seq.tabulate(interleave_factor){p =>
+        val row = i * interleave_factor + p
+        val col = j * interleave_line_els
+        val els = Seq.tabulate(interleave_line_els){e => raw_input_data(row,col + e)}
+        els
+      }.flatten
+      Vec.ZeroFirst(pack:_*).asPacked[PACK]
+    }
+
+    println(r"Packed ${args(0).to[Int]} x ${raw_input_data.cols} matrix -> $interleave_rows x $interleave_cols matrix with interleave_factor $interleave_factor")
+    // Set up dram
+    val COLS = ArgIn[Int]
+    val ROWS = ArgIn[Int]
+    val LINES_TODO = ArgIn[Int]
+    setArg(COLS, input_data.cols)
+    setArg(ROWS, input_data.rows)
+    setArg(LINES_TODO, args(0).to[Int])
+    val input_dram = DRAM[PACK](ROWS, COLS)
+    setMem(input_dram, input_data)
+    val output_composite_dram = DRAM[composite](LINES_TODO)
+
+
+    // Define bbox outside of Accel
+    val computeUnitImpl = Blackbox.SpatialController[BBOX_IN, BBOX_OUT] { in: BBOX_IN =>
+      val deriv_window = sharp_kernel.size
+      val COLS = in.COLS
+      val r = in.r
+      val LINES_TODO = in.LINES_TODO
+      val last_unit = in.last_unit
+      val issue = FIFO[Int](2*rowTileSize/interleave_factor).conflictable
+      val result = FIFO[composite](2*rowTileSize/interleave_factor)
+
+      Pipe.II(1).Foreach(COLS by 1, interleave_line_els by 1){(oc, ic) =>
+        val c = oc*interleave_line_els + ic
+        val best_rising = Reg[score](score(0, -999.to[I32]))
+        val best_falling = Reg[score](score(0, -999.to[I32]))
+        val acc_after_rising = Reg[U16](0)
+        val acc_after_falling = Reg[U16](0)
+        val sr = RegFile[I16](deriv_window)
+        val next = in.input
+        val first_reg = Reg[I16](0)
+        val last_reg = Reg[I16](0)
+        sr <<= next
+        acc_after_rising :+= next.as[U16]
+        acc_after_falling :+= next.as[U16]
+        if (c == 0) first_reg := next
+        if (c == COLS * interleave_line_els - 1) last_reg := next
+        val t = List.tabulate(deriv_window){i => sharp_kernel(i).to[T] * sr(i).to[T]}.reduceTree{_+_}
+        if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] > best_rising.value.v)) {
+          acc_after_rising.reset()
+          best_rising := score(c,t.to[I32])
+        }
+        if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] < best_falling.value.v)) {
+          acc_after_falling.reset()
+          best_falling := score(c,t.to[I32])
+        }
+        if (c == (COLS*interleave_line_els)-1) {
+          result.enq(composite(best_rising.value.idx, best_rising.value.v, best_falling.value.idx, best_falling.value.v, acc_after_rising - acc_after_falling, r.as[U16],first_reg.value, last_reg.value, 0))
+          if (last_unit) issue.enq(mux(best_rising.value == score(-1,-1) || r == LINES_TODO-1 || r % rowTileSize == rowTileSize-1, mux((r+1) % rowTileSize == 0, rowTileSize, r % rowTileSize + 1), 0)) // Random math to make sure retiming puts it later
+        }
+
+        // // DEBUG
+        // if (r == LINES_TODO-1) deriv_fifo.enq(t)
+      }
+      BBOX_OUT(result.deqInterface(), issue.deqInterface())
+    }
+
+
+    // DEBUG
+    val deriv = DRAM[T](COLS)
+
+    Accel{
+      val done = Reg[Bit](false)
+      Stream(breakWhen = done).Foreach(*){r =>
+        val raw_input_fifo = FIFO[PACK](colTileSize)
+        val input_fifo = List.tabulate(interleave_factor){_ => FIFO[I16](colTileSize)}
+        val COLS_FIFO = List.tabulate(interleave_factor){_ => FIFO[Int](rowTileSize)}
+        val r_FIFO = List.tabulate(interleave_factor){_ => FIFO[Int](rowTileSize)}
+        val LINES_TODO_FIFO = List.tabulate(interleave_factor){_ => FIFO[Int](rowTileSize)}
+        val LAST_FIFO = List.tabulate(interleave_factor){_ => FIFO[Bit](rowTileSize)}
+        val packed_results = FIFO[composite](2*rowTileSize)
+
+        // // DEBUG
+        // val deriv_fifo = FIFO[T](32)
+
+        // Stage 0: Load
+        Pipe{
+          if (r < ROWS) {
+            Parallel {
+              List.tabulate(interleave_factor) { i =>
+                COLS_FIFO(i).enq(COLS)
+                r_FIFO(i).enq(r * interleave_factor + i)
+                LINES_TODO_FIFO(i).enq(LINES_TODO)
+                LAST_FIFO(i).enq(i == (input_fifo.size - 1))
+              }
+              raw_input_fifo load input_dram(r, 0 :: COLS)
+            }
+          }
+        }
+
+        // Stage 1: consume cxp-like stream
+          // BBoxes automatically turn off stream ctr optimization, but we want this particular loop to run as fast as possible without bubbles so we make it a Foreach(*) instead of a Pipe
+        Foreach(*) { _ =>
+//        Pipe{
+          val raw: PACK = raw_input_fifo.deq()
+          input_fifo.zipWithIndex.foreach{case (f,i) =>
+            val raw_pack = raw.bits((i+1)*interleave_col_bits - 1 :: i*interleave_col_bits).as[I64] // U${128/interleave_col_bits}
+            f.enqVec(raw_pack.asVec[I16])
+          }
+        }
+
+        // Stage 2: Process (Force II = 1 to squeeze sr write and sr read into one cycle)
+        val bbox = input_fifo.zipWithIndex.map{case (f,i) =>
+          computeUnitImpl(BBOX_IN(COLS_FIFO(i).deqInterface(), f.deqInterface(), r_FIFO(i).deqInterface(), LINES_TODO_FIFO(i).deqInterface(), LAST_FIFO(i).deqInterface()))
+        }
+
+        // Stage 3: Store
+        Pipe{
+          val numel = bbox.last.issue
+          if (numel > 0) {
+            Foreach(numel / interleave_factor by 1){e =>
+              packed_results.enqVec(Vec.ZeroFirst(bbox.map(_.result):_*))
+            }
+            // // DEBUG
+            // deriv store deriv_fifo
+            // Store results
+            output_composite_dram((r*interleave_factor)-((r*interleave_factor)%rowTileSize)::(r*interleave_factor)-((r*interleave_factor)%rowTileSize) + numel) store packed_results
+            if (r*interleave_factor >= (LINES_TODO - interleave_factor)) {
+//              FSM(0)(state => state != 1) { _ => }(state => mux(state == 0 && input_fifo.forall(_.isEmpty), 1, 0))
+              done := true
+            }
+          }
+        }
+      }
+    }
+
+    // // DEBUG
+    // println("Debug info:")
+    // printArray(Array.tabulate(input_data.cols){i => input_data(args(0).to[Int]-1, i)}, r"Row ${args(0)}")
+    // printArray(getMem(deriv), r"Deriv ${args(0)}")
+
+    val result_composite_dram = getMem(output_composite_dram)
+    println("Results:")
+    println("|  Row           |  Rising Idx   |  Falling Idx  |     Volume      |   Rising V   |   Falling V   |  First Val  |  Last Val |")
+    for (i <- 0 until LINES_TODO) {
+      println(r"|      ${result_composite_dram(i).row}         |" +
+              r"     ${result_composite_dram(i).rising_idx}      |" +
+              r"      ${result_composite_dram(i).falling_idx}      |" +
+              r"      ${result_composite_dram(i).volume}      |"      +
+              r"      ${result_composite_dram(i).rising_v}      |"    +
+              r"      ${result_composite_dram(i).falling_v}      |"    +
+              r"      ${result_composite_dram(i).first_val}      |"    +
+              r"      ${result_composite_dram(i).last_val}      |")
+    }
+
+    // Extract at high precision
+    val gold_all = loadCSV2D[FixPt[TRUE,_32,_32]](s"$DATA/slac/chirp-2000_interferedelay1650_photonen6.0_carriertagdiamond_nfibers109_netalon1_1.00_1.00.187.processed", ",", "\n")
+
+    if (LINES_TODO <= 48) { // Only have regression for 50 lines...
+      val got_rising_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_idx}
+      val got_rising_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).rising_v}
+      val got_falling_idx = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_idx}
+      val got_falling_v = Array.tabulate(LINES_TODO){i => result_composite_dram(i).falling_v}
+      val got_volume = Array.tabulate(LINES_TODO){i => result_composite_dram(i).volume}
+      val got_first_val = Array.tabulate(LINES_TODO){i => result_composite_dram(i).first_val}
+      val got_last_val = Array.tabulate(LINES_TODO){i => result_composite_dram(i).last_val}
+
+
+      val gold_rising_idx = Array.tabulate(LINES_TODO){i => gold_all(i, 2).to[Int]}
+      val gold_rising_v = Array.tabulate(LINES_TODO){i => gold_all(i, 5).to[I32]}
+      val gold_falling_idx = Array.tabulate(LINES_TODO){i => gold_all(i, 3).to[Int]}
+      val gold_falling_v = Array.tabulate(LINES_TODO){i => gold_all(i, 6).to[I32]}
+      val gold_volume = Array.tabulate(LINES_TODO){i => gold_all(i, 4).to[U16]}
+      val gold_first_val = Array.tabulate(LINES_TODO){i => gold_all(i, 7).to[I16]}
+      val gold_last_val = Array.tabulate(LINES_TODO){i => gold_all(i, 8).to[I16]}
+
+      def withinPercent[X:Num](a: Array[X], b: Array[X], percent: scala.Double): Bit = {
+        Array.tabulate(a.length){i =>
+          val den = if (b(i).to[Float] == 0) 1 else b(i).to[Float]
+          val pe = 100.0 * abs(a(i).to[Float] - b(i).to[Float])/den
+          if (pe > percent.to[Float]) println(r"el $i pe = $pe")
+          pe < percent.to[Float]
+        }.reduce{_&&_}
+      }
+
+      println(r"Correct rising_idx:  ${withinPercent(gold_rising_idx, got_rising_idx, 5.1)}")
+      println(r"Correct rising_v:    ${withinPercent(gold_rising_v, got_rising_v, 5.1)}")
+      println(r"Correct falling_idx: ${withinPercent(gold_falling_idx, got_falling_idx, 5.1)}")
+      println(r"Correct falling_v:   ${withinPercent(gold_falling_v, got_falling_v, 5.1)}")
+//      println(r"Correct volume:      ${withinPercent(gold_volume, got_volume, 5.1)}")
+      println(r"Correct first_val:      ${withinPercent(gold_first_val, got_first_val, 5.1)}")
+      println(r"Correct last_val:      ${withinPercent(gold_last_val, got_last_val, 5.1)}")
+
+      assert(withinPercent(gold_rising_idx, got_rising_idx, 5.1))
+      assert(withinPercent(gold_rising_v, got_rising_v, 5.1))
+      assert(withinPercent(gold_falling_idx, got_falling_idx, 5.1))
+      assert(withinPercent(gold_falling_v, got_falling_v, 5.1))
+//      assert(withinPercent(gold_volume, got_volume, 5.1))
+      assert(withinPercent(gold_first_val, got_first_val, 5.1))
+      assert(withinPercent(gold_last_val, got_last_val, 5.1))
     }
 
   }

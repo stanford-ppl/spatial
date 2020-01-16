@@ -145,7 +145,6 @@ import spatial.node._
     assert(true)
   }
 
-
   override def checkIR(block: Block[_]): Result = {
     val sram1_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram1_")  => sram }.size
     val sram2_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) if SSTHelper.contains(x.name, "sram2_")  => sram }.size
@@ -172,4 +171,31 @@ import spatial.node._
     super.checkIR(block)
   }
 
+}
+
+
+@spatial class SynchronizedButRandomOffset extends SpatialTest {
+ def main(args: Array[String]): Unit = {
+     Accel {
+      val sram = SRAM[Int](32)
+      Foreach(32 by 1) { i => sram(i) = i}
+      Foreach ( 32 by 1 par 2) { i =>
+        val start = mux(i > 16, 0, 8)
+        val end = mux(i > 16, 16, 24)
+        Foreach ( start until end par 4) { j => // This is synchronized but the offset for j between lanes 0 and 1 of i is random
+          println(sram(j))
+        }
+      }
+     }
+     println("This app only needs to check the IR for two SRAMNews")
+     assert(true)
+  }
+
+  override def checkIR(block: Block[_]): Result = {
+    val sram1_count = block.nestedStms.collect{case  x@Op(sram:SRAMNew[_,_]) => sram }.size
+
+    require(sram1_count ==  2, "Should only have 2 duplicate of sram")
+
+    super.checkIR(block)
+  }
 }

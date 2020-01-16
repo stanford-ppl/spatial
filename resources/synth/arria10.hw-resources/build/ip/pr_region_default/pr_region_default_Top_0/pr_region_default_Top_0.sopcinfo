@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <EnsembleReport
- name="pr_region_default_Top_0"
- kind="pr_region_default_Top_0"
+ name="pr_region_default_SpatialIP_0"
+ kind="pr_region_default_SpatialIP_0"
  version="1.0"
  fabric="QSYS">
  <!-- Format version 17.1 240 (Future versions may contain additional information.) -->
@@ -119,7 +119,7 @@
   <visible>true</visible>
   <valid>true</valid>
  </parameter>
- <module name="Top_0" kind="Top" version="1.0" path="Top_0">
+ <module name="SpatialIP_0" kind="Top" version="1.0" path="SpatialIP_0">
   <!-- Describes a single module. Module parameters are
 the requested settings for a module instance. -->
   <parameter name="deviceFamily">

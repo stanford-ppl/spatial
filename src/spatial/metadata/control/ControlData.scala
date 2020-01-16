@@ -10,6 +10,7 @@ case object Pipelined extends CtrlSchedule
 case object Streaming extends CtrlSchedule
 case object ForkJoin extends CtrlSchedule
 case object Fork extends CtrlSchedule
+case object PrimitiveBox extends CtrlSchedule
 
 /** Transfer type. */
 sealed abstract class TransferType

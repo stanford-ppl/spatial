@@ -5,14 +5,6 @@ set TARGET Zedboard
 set ver [version -short]
 
 switch $TARGET {
-  "ZC706" {
-    set BOARD xilinx.com:zc706:part0:1.4
-    set PART xc7z045ffg900-2
-  }
-  "Zedboard" {
-    set BOARD em.avnet.com:zed:part0:1.3
-    set PART xc7z020clg484-1
-  }
   "ZCU102" {
     # For 2017.4 or later?
     if {[string match 2018* $ver] || [string match 2019* $ver]} {
@@ -24,7 +16,7 @@ switch $TARGET {
     }
   }
   default {
-    puts "$TARGET" is not a valid target! Must either be 'ZC706' or 'Zedboard' or 'ZCU102'
+    puts "$TARGET" is not a valid target! Must either be 'ZCU102'
   }
 }
 

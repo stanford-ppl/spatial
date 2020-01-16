@@ -12,6 +12,7 @@ import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
 
 import scala.collection.immutable.SortedSet
+import spatial.metadata.blackbox._
 
 case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTraversal {
   override def shouldRun: Boolean = spatialConfig.enableRetiming
@@ -47,6 +48,9 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     inInnerScope = true
 
     val scope = block.stms
+
+    // Treat user-injected delay lines as real delay lines now
+//    scope.collect{case x if x.isDelayLine => x.userInjectedDelay = false}
     val lines = findDelayLines(scope)
     lines.foreach{case (reader, line) => addDelayLine(reader, line) }
 
@@ -202,8 +206,6 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
     val scope = block.nestedStms
     val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_))
 
-    import spatial.metadata.access._
-    import spatial.metadata.memory._
     dbgs(s"Retiming block $block:")
     scope.foreach{e => dbgs(s"  ${stm(e)} (${e.fullDelay})") }
     //dbgs(s"Result: ")
@@ -246,7 +248,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   private def transformCtrl[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = {
     // Switches aren't technically inner controllers from PipeRetimer's point of view.
-    if (lhs.isInnerControl && !rhs.isSwitch && inHw) {
+    if ((lhs.isInnerControl || lhs.isSpatialPrimitiveBlackbox) && !rhs.isSwitch && inHw) {
       val retimeEnables = rhs.blocks.map{_ => true }.toList
       val retimePushLaterBlock = rhs.blocks.map{_ => false }.toList
       rhs match {
@@ -263,6 +265,7 @@ case class RetimingTransformer(IR: State) extends MutateTransformer with AccelTr
 
   override def transform[T:Type](lhs: Sym[T], rhs: Op[T])(implicit ctx: SrcCtx): Sym[T] = rhs match {
     case _:AccelScope => inAccel { transformCtrl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox { transformCtrl(lhs,rhs) }
     case _ => transformCtrl(lhs, rhs)
   }
 }

@@ -15,10 +15,10 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
   override def init(): Unit = super.init()
 
   override def rerun(sym: Sym[_], block: Block[_]): Unit = {
-    inHw = true
+    inAccel = true
     totalRuntime = 0
     super.rerun(sym, block)
-    inHw = false
+    inAccel = false
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {

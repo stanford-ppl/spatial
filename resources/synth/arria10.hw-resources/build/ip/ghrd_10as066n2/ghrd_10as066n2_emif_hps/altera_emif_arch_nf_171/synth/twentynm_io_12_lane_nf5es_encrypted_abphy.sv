@@ -530,8 +530,8 @@ assign debug_dqs_gated_a    = u_io_12_lane_bcm.i0.xio_dqs_lgc_top.dqs_out_a[0];
 assign debug_dqs_enable_a   = u_io_12_lane_bcm.i0.xio_dqs_lgc_top.pstamble_reg_a.dqs_en_shrunk;
 assign debug_dqs_gated_b    = u_io_12_lane_bcm.i0.xio_dqs_lgc_top.dqs_out_b[0];
 assign debug_dqs_enable_b   = u_io_12_lane_bcm.i0.xio_dqs_lgc_top.pstamble_reg_b.dqs_en_shrunk;
-assign debug_dq_delayed[0]  = u_io_12_lane_bcm.i0.ioereg_top_0_.ioereg_pnr_x2.dq_in_tree[1];
-assign debug_dq_delayed[1]  = u_io_12_lane_bcm.i0.ioereg_top_0_.ioereg_pnr_x2.dq_in_tree[3];
+assign debug_dq_delayed[0]  = u_io_12_lane_bcm.i0.ioereg_SpatialIP_0_.ioereg_pnr_x2.dq_in_tree[1];
+assign debug_dq_delayed[1]  = u_io_12_lane_bcm.i0.ioereg_SpatialIP_0_.ioereg_pnr_x2.dq_in_tree[3];
 assign debug_dq_delayed[2]  = u_io_12_lane_bcm.i0.ioereg_top_1_.ioereg_pnr_x2.dq_in_tree[1];
 assign debug_dq_delayed[3]  = u_io_12_lane_bcm.i0.ioereg_top_1_.ioereg_pnr_x2.dq_in_tree[3];
 assign debug_dq_delayed[4]  = u_io_12_lane_bcm.i0.ioereg_top_2_.ioereg_pnr_x2.dq_in_tree[1];
@@ -1120,16 +1120,16 @@ defparam u_io_12_lane_bcm.data_buffer__a_rb_burst_length_mode = (dqs_lgc_burst_l
                                                                 (dqs_lgc_burst_length == "burst_length_4") ? "bl4" :
                                                                                                              "bl8" ;
 
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_ddr2_oeb = "ddr3_preamble";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_dpa_enable = "dpa_disabled";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_lock_speed = 4'hF;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_power_down = "power_on";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_power_down_0 = "power_on_0";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_power_down_1 = "power_on_1";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_power_down_2 = "power_on_2";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__a_sync_control = "sync_enabled";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_dfx_mode     = "dfx_disabled";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_dq_select    = (pin_0_data_in_mode == "sstl_in")                     ? "dq_sstl_in"                     :
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_ddr2_oeb = "ddr3_preamble";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_dpa_enable = "dpa_disabled";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_lock_speed = 4'hF;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_power_down = "power_on";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_power_down_0 = "power_on_0";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_power_down_1 = "power_on_1";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_power_down_2 = "power_on_2";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__a_sync_control = "sync_enabled";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_dfx_mode     = "dfx_disabled";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_dq_select    = (pin_0_data_in_mode == "sstl_in")                     ? "dq_sstl_in"                     :
                                                                                        (pin_0_data_in_mode == "loopback_in")                 ? "dq_loopback_in"                 :
                                                                                        (pin_0_data_in_mode == "xor_loopback_in")             ? "dq_xor_loopback_in"             :
                                                                                        (pin_0_data_in_mode == "differential_in")             ? "dq_differential_in"             :
@@ -1137,18 +1137,18 @@ defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_dq_selec
                                                                                        (pin_0_data_in_mode == "differential_in_x12_out")     ? "dq_differential_in_x12_out"     :
                                                                                        (pin_0_data_in_mode == "differential_in_avl_x12_out") ? "dq_differential_in_avl_x12_out" :
                                                                                                                                                "dq_disabled"                    ;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_dqs_select   = (pin_0_dqs_x4_mode == "dqs_x4_a") ? "dqs_sampler_a" :
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_dqs_select   = (pin_0_dqs_x4_mode == "dqs_x4_a") ? "dqs_sampler_a" :
                                                                                        (pin_0_dqs_x4_mode == "dqs_x4_b") ? "dqs_sampler_b" :
                                                                                        (dqs_lgc_dqs_b_en == "true") ? "dqs_sampler_b_a_rise" : "dqs_sampler_a";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_dynoct       = (pin_0_oct_mode == "dynamic")   ? "oct_enabled" : "oct_disabled" ;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_initial_out  = pin_0_initial_out;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_mode_ddr     = pin_0_mode_ddr;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_octrt        = (pin_0_oct_mode == "static_on") ? "static_oct_on" : "static_oct_off" ;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_output_phase = pin_0_output_phase[11:0];
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_0__a_gpio_differential = pin_0_output_phase[12];
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_dynoct       = (pin_0_oct_mode == "dynamic")   ? "oct_enabled" : "oct_disabled" ;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_initial_out  = pin_0_initial_out;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_mode_ddr     = pin_0_mode_ddr;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_octrt        = (pin_0_oct_mode == "static_on") ? "static_oct_on" : "static_oct_off" ;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_output_phase = pin_0_output_phase[11:0];
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_0__a_gpio_differential = pin_0_output_phase[12];
 
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_dfx_mode     = "dfx_disabled";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_dq_select    = (pin_1_data_in_mode == "sstl_in")                     ? "dq_sstl_in"                     :
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_dfx_mode     = "dfx_disabled";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_dq_select    = (pin_1_data_in_mode == "sstl_in")                     ? "dq_sstl_in"                     :
                                                                                        (pin_1_data_in_mode == "loopback_in")                 ? "dq_loopback_in"                 :
                                                                                        (pin_1_data_in_mode == "xor_loopback_in")             ? "dq_xor_loopback_in"             :
                                                                                        (pin_1_data_in_mode == "differential_in")             ? "dq_differential_in"             :
@@ -1156,15 +1156,15 @@ defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_dq_selec
                                                                                        (pin_1_data_in_mode == "differential_in_x12_out")     ? "dq_differential_in_x12_out"     :
                                                                                        (pin_1_data_in_mode == "differential_in_avl_x12_out") ? "dq_differential_in_avl_x12_out" :
                                                                                                                                                "dq_disabled"                    ;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_dqs_select   = (pin_1_dqs_x4_mode == "dqs_x4_a") ? "dqs_sampler_a" :
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_dqs_select   = (pin_1_dqs_x4_mode == "dqs_x4_a") ? "dqs_sampler_a" :
                                                                                        (pin_1_dqs_x4_mode == "dqs_x4_b") ? "dqs_sampler_b" :
                                                                                        (dqs_lgc_dqs_b_en == "true") ? "dqs_sampler_b_a_rise" : "dqs_sampler_a";
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_dynoct       = (pin_1_oct_mode == "dynamic")   ? "oct_enabled" : "oct_disabled" ;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_initial_out  = pin_1_initial_out;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_mode_ddr     = pin_1_mode_ddr;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_octrt        = (pin_1_oct_mode == "static_on") ? "static_oct_on" : "static_oct_off" ;
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_output_phase = pin_1_output_phase[11:0];
-defparam u_io_12_lane_bcm.ioereg_top_0___ioereg_pnr_x2__ioereg_pnr_1__a_gpio_differential = pin_1_output_phase[12];
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_dynoct       = (pin_1_oct_mode == "dynamic")   ? "oct_enabled" : "oct_disabled" ;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_initial_out  = pin_1_initial_out;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_mode_ddr     = pin_1_mode_ddr;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_octrt        = (pin_1_oct_mode == "static_on") ? "static_oct_on" : "static_oct_off" ;
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_output_phase = pin_1_output_phase[11:0];
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___ioereg_pnr_x2__ioereg_pnr_1__a_gpio_differential = pin_1_output_phase[12];
 
 defparam u_io_12_lane_bcm.ioereg_top_1___ioereg_pnr_x2__a_ddr2_oeb = "ddr3_preamble";
 defparam u_io_12_lane_bcm.ioereg_top_1___ioereg_pnr_x2__a_dpa_enable = "dpa_disabled";
@@ -1526,8 +1526,8 @@ defparam u_io_12_lane_bcm.xio_regulator__a_cr_pd = "cr_pd_dis";
 
 
 
-defparam u_io_12_lane_bcm.ioereg_top_0___gpio_wrapper_0__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
-defparam u_io_12_lane_bcm.ioereg_top_0___gpio_wrapper_1__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___gpio_wrapper_0__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
+defparam u_io_12_lane_bcm.ioereg_SpatialIP_0___gpio_wrapper_1__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
 defparam u_io_12_lane_bcm.ioereg_top_1___gpio_wrapper_0__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
 defparam u_io_12_lane_bcm.ioereg_top_1___gpio_wrapper_1__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
 defparam u_io_12_lane_bcm.ioereg_top_2___gpio_wrapper_0__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
@@ -1539,8 +1539,8 @@ defparam u_io_12_lane_bcm.ioereg_top_4___gpio_wrapper_1__gpio_reg__xio_jtag__a_r
 defparam u_io_12_lane_bcm.ioereg_top_5___gpio_wrapper_0__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
 defparam u_io_12_lane_bcm.ioereg_top_5___gpio_wrapper_1__gpio_reg__xio_jtag__a_rb_gpio_or_ddr_sel = "jtag_ddr_sel";
 
-defparam u_io_12_lane_bcm.i0.ioereg_top_0_.interpolator_0.fast_interpolator_sim = fast_interpolator_sim;
-defparam u_io_12_lane_bcm.i0.ioereg_top_0_.interpolator_1.fast_interpolator_sim = fast_interpolator_sim;
+defparam u_io_12_lane_bcm.i0.ioereg_SpatialIP_0_.interpolator_0.fast_interpolator_sim = fast_interpolator_sim;
+defparam u_io_12_lane_bcm.i0.ioereg_SpatialIP_0_.interpolator_1.fast_interpolator_sim = fast_interpolator_sim;
 defparam u_io_12_lane_bcm.i0.ioereg_top_1_.interpolator_0.fast_interpolator_sim = fast_interpolator_sim;
 defparam u_io_12_lane_bcm.i0.ioereg_top_1_.interpolator_1.fast_interpolator_sim = fast_interpolator_sim;
 defparam u_io_12_lane_bcm.i0.ioereg_top_2_.interpolator_0.fast_interpolator_sim = fast_interpolator_sim;

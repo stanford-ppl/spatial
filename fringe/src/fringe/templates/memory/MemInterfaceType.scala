@@ -66,7 +66,7 @@ sealed abstract class MemInterface(val p: MemParams) extends Bundle {
       cxn.rPort.foreach{case p => rPort(p) <> op.rPort(p)}
       cxn.wPort.foreach{case p => wPort(p) <> op.wPort(p)}
       cxn.reset.foreach{p => reset <> op.reset}
-      cxn.accessActivesIn.foreach{p => this.asInstanceOf[FIFOInterface].accessActivesIn(p) <> op.asInstanceOf[FIFOInterface].accessActivesIn(p)}
+//      cxn.accessActivesIn.foreach{p => this.asInstanceOf[FIFOInterface].active(p).in <> op.asInstanceOf[FIFOInterface].active(p).in}
       Ledger.substitute(op.hashCode, this.hashCode)
     }
   }
@@ -140,26 +140,37 @@ class FIFOInterface(p: MemParams) extends MemInterface(p) {
   val empty = Output(Bool())
   val almostEmpty = Output(Bool())
   val numel = Output(UInt(32.W))
-  val accessActivesOut = Vec(p.numActives, Output(Bool()))
-  val accessActivesIn = Vec(p.numActives, Input(Bool()))
+  val active = Vec(p.numActives, new BitLoopback())
 
   def connectAccessActivesIn(p: Int, e: Bool)(implicit stack: List[KernelHash]): Unit = {
     Ledger.connectAccessActivesIn(this.hashCode, p)
-    accessActivesIn(p) := e
+    active(p).in := e
   }
   def connectLedger(op: FIFOInterface)(implicit stack: List[KernelHash]): Unit = {
-    op.full <> full
-    op.almostFull <> almostFull
-    op.empty <> empty
-    op.almostEmpty <> almostEmpty
-    op.numel <> numel
-    op.accessActivesOut <> accessActivesOut
+//    op.full <> full
+//    op.almostFull <> almostFull
+//    op.empty <> empty
+//    op.almostEmpty <> almostEmpty
+//    op.numel <> numel
+//    op.active <> active
+    if (stack.isEmpty) this <> op
+    else {
+      active.map(_.out).zip(op.active.map(_.out)).foreach{case (l,r) => r := l}
+      op.full <> full
+      op.almostFull <> almostFull
+      op.empty <> empty
+      op.almostEmpty <> almostEmpty
+      op.numel <> numel
+
+      // TODO: The cxn hookup may be redundant
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.accessActivesIn.foreach{p => this.asInstanceOf[FIFOInterface].active(p).in <> op.asInstanceOf[FIFOInterface].active(p).in}
+      super.connectLedger(op)
+    }
     this.asInstanceOf[MemInterface].connectLedger(op.asInstanceOf[MemInterface])
   }
 }
 object FIFOInterfaceType extends MemInterfaceType
-
-
 
 class NBufInterface(val np: NBufParams) extends FIFOInterface(np.p) {
   val sEn = Vec(np.numBufs, Input(Bool()))
@@ -168,7 +179,7 @@ class NBufInterface(val np: NBufParams) extends FIFOInterface(np.p) {
   def connectLedger(op: NBufInterface)(implicit stack: List[KernelHash]): Unit = {
     if (stack.isEmpty) this <> op
     else {
-      accessActivesOut.zip(op.accessActivesOut).foreach{case (l,r) => r := l}
+      active.map(_.out).zip(op.active.map(_.out)).foreach{case (l,r) => r := l}
       op.full := full
       op.almostFull := almostFull
       op.empty := empty
@@ -321,4 +332,66 @@ class MultiArgOut(nw: Int) extends Bundle {
   }
 
   override def cloneType(): this.type = new MultiArgOut(nw).asInstanceOf[this.type]
+}
+
+class BitLoopback extends Bundle {
+  val in = Input(Bool())
+  val out = Output(Bool())
+}
+
+
+/** Bundle representing a StreamStruct, where each port has its bits/valid signals inbound and ready signal outbound
+  *
+  * @param setup
+  */
+class StreamStructInterface(setup: Map[String,Int]) extends Bundle {
+  val ports = HVec(setup.toSeq.map{case (_, w) => Decoupled(UInt(w.W))})
+  val actives = Vec(setup.size, new BitLoopback())
+//  actives.foreach{a => a.out := a.in}
+
+  def get(field: String): DecoupledIO[UInt] = {
+    val idx = setup.toSeq.indexWhere(_._1 == field)
+    ports(idx)
+  }
+  def getActive(field: String): BitLoopback = {
+    val idx = setup.toSeq.indexWhere(_._1 == field)
+    actives(idx)
+  }
+
+  def getForwardPressures(fields: String*): Bool = {
+    fields.map{field =>
+      get(field).valid || ~getActive(field).out
+    }.reduce{_&&_}
+  }
+
+  def getBackPressures(fields: String*): Bool = {
+    fields.map{field =>
+      ~get(field).ready
+    }.reduce{_||_}
+  }
+
+  def connectLedger(op: StreamStructInterface)(implicit stack: List[KernelHash]): Unit = {
+    if (stack.isEmpty) this <> op
+    else {
+      val cxn = Ledger.lookup(op.hashCode)
+      cxn.structPort.foreach{p => get(p) <> op.get(p); getActive(p) <> op.getActive(p)}
+      Ledger.substitute(op.hashCode, this.hashCode)
+    }
+  }
+
+  override def cloneType(): this.type = new StreamStructInterface(setup).asInstanceOf[this.type]
+}
+
+/** Bundle representing the basic signals you need for a handshake deq interface on a stateful memory (i.e. FIFO)
+  *
+  * @param w
+  */
+class FIFODeqInterface(w: Int) extends Bundle {
+  val r = UInt(w.W)
+  val ready = Bool()
+  val valid = Bool()
+  val activeIn = Bool()
+  val activeOut = Bool()
+
+  override def cloneType(): this.type = new FIFODeqInterface(w).asInstanceOf[this.type]
 }

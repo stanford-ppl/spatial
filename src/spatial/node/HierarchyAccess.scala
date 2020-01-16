@@ -41,9 +41,6 @@ object Resetter {
   def unapply(x: Sym[_]): Option[(Sym[_],Set[Bit])] = x.op.flatMap(Resetter.unapply)
 }
 
-
-
-
 /** Any access of a memory */
 abstract class Accessor[A:Bits,R:Type] extends EnPrimitive[R] {
   val A: Bits[A] = Bits[A]

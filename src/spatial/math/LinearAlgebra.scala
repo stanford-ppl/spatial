@@ -48,7 +48,7 @@ object LinearAlgebra {
     val NT: I32 = 16 (1 -> 32)
 
     Foreach(M by MT par MP, N by NT par NP){(i,j) =>
-      BlackBox.GEMM(Y, A, B, C, alpha, beta, i, j, P, MT, NT)
+      Blackbox.GEMM(Y, A, B, C, alpha, beta, i, j, P, MT, NT)
     }
     /*def getA(i: Int, j: Int): T = if (transA) A(j,i) else A(i,j)
     def getB(i: Int, j: Int): T = if (transB) B(j,i) else B(i,j)

@@ -10,6 +10,7 @@ import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
+import spatial.metadata.blackbox._
 import spatial.util.spatialConfig
 import spatial.issues.{AmbiguousMetaPipes, PotentialBufferHazard}
 
@@ -17,6 +18,7 @@ import scala.util.Try
 
 import utils.Tree
 import utils.implicits.collections._
+import spatial.metadata.blackbox._
 
 package object control {
 
@@ -160,6 +162,7 @@ package object control {
     def level: CtrlLevel = toCtrl match {
       case ctrl @ Ctrl.Node(sym,_) if sym.isRawOuter && ctrl.mayBeOuterBlock => Outer
       case Ctrl.Host => Outer
+      case Ctrl.SpatialBlackbox(sym) => Inner
       case _         => Inner
     }
 
@@ -201,6 +204,7 @@ package object control {
             case Streaming => Streaming
             case ForkJoin  =>  ForkJoin
             case Fork => Fork
+            case PrimitiveBox => PrimitiveBox
           }
           case (Single, Outer) => actualSchedule match {
             case Sequenced => Sequenced
@@ -208,6 +212,7 @@ package object control {
             case Streaming => Streaming
             case ForkJoin  => ForkJoin
             case Fork => Fork
+            case PrimitiveBox => PrimitiveBox
           }
         }
       }
@@ -441,7 +446,7 @@ package object control {
     @stateful def iterSynchronizationInfo(leaf: Sym[_], iters: Seq[Idx], baseUID: Seq[Int], uid: Seq[Int]): Map[Idx, Int] = {
       import scala.collection.mutable.ArrayBuffer
       import spatial.util.modeling._
-      val map = scala.collection.mutable.HashMap[Idx,Int]()
+      val map = scala.collection.mutable.HashMap[Idx,Option[Int]]()
       // 1) Bundle iters/uids based on the depth of the counter chain they are part of
       val bundledIters = bundleLayers(leaf, iters, iters)
       val bundledUID = bundleLayers(leaf, iters, uid)
@@ -468,7 +473,7 @@ package object control {
         if (firstFork) {
           // 3.1) If first fork occurs at inner controller (including itersRed of OpMemReduce), then iterators are always synchronized
           if (ctrl.isInnerControl || liters.forall(ctrl.memReduceItersRed.contains)) {
-            liters.foreach{iter => map += (iter -> 0)}
+            liters.foreach{iter => map += (iter -> Some(0))}
           }
           // 3.2) If forked POM, check synchronization for ALL children (up to next layer's ctrl if not a looping controller).  I.e. Set forkpoint at this ctrl
           else if (ctrl.isOuterControl && ctrl.willUnrollAsPOM) {
@@ -485,29 +490,38 @@ package object control {
           // 3.5) Otherwise assume we can mark synchronization because firstFork determined we are still synchronized
           liters.foreach{iter => map += (iter -> iterOfs(iter, bundledIters.take(layer), bundledUID.take(layer), bundledBase.take(layer)))}
         } else {
-          liters.foreach{iter => map += (iter -> 0)}
+          liters.foreach{iter => map += (iter -> Some(0))}
         }
         firstFork = false
         layer = layer + 1
       }
-      map.toMap
+      // dbgs(s"itersynch info for $leaf $iters $baseUID $uid = $map")
+      map.collect{case (i, o) if o.isDefined => (i -> o.get)}.toMap
     }
 
     /** Computes the ofs between iter from uid to baseline if applicable, due to iter's cchain having a start value that depends on uid divergence */
-    @stateful def iterOfs(iter: Idx, itersAbove: Seq[Seq[Idx]], uid: Seq[Seq[Int]], base: Seq[Seq[Int]]): Int = {
+    @stateful def iterOfs(iter: Idx, itersAbove: Seq[Seq[Idx]], uid: Seq[Seq[Int]], base: Seq[Seq[Int]]): Option[Int] = {
+      import spatial.util.modeling._
       val startSym = iter.ctrStart
+      val stepSym = iter.ctrStep
       startSym match {
-        case Op(LaneStatic(dep, elems)) =>
+        case Op(LaneStatic(dep, elems)) => // If LaneStatic, just detect difference between startSyms
           val position = itersAbove.flatten.indexOf(dep)
           val upper = elems(uid.flatten.apply(position))
           val lower = elems(base.flatten.apply(position))
-          upper - lower
-        case _ => 0
+          Some(upper - lower)
+        case _ => // Otherwise, check if startSym or stepSym mutates with any diverging iters
+          val startDivergingLayer = itersAbove.zipWithIndex.collectFirst{case (is,j) if is.intersect(mutatingBounds(startSym)).nonEmpty => j}
+          val stepDivergingLayer = itersAbove.zipWithIndex.collectFirst{case (is,j) if is.intersect(mutatingBounds(stepSym)).nonEmpty => j}
+          val startDiverges = if (startDivergingLayer.isDefined) uid(startDivergingLayer.get) != base(startDivergingLayer.get) else false
+          val stepDiverges = if (stepDivergingLayer.isDefined) uid(stepDivergingLayer.get) != base(stepDivergingLayer.get) else false
+          if (startDiverges || stepDiverges) None else Some(0)
       }
     }
 
     /** Returns true if the subtree rooted at ctrl run for the same number of cycles (i.e. iterations) regardless of uid.
-      * entry flag identifies whether the outermost iterator of the cchain should be ignored or not
+      * "entry" flag identifies whether the outermost iterator of the cchain should be ignored or not
+      * "entry" indicates whether the binding Parallel controller is placed as a child of the parallelized LCA or a parent of the parallelized LCA
       */
     @stateful def synchronizedStart(forkedIters: Seq[Idx], entry: Boolean = false, stopAtChild: Option[Sym[_]] = None): Boolean = {
       val meSynch = cchainIsInvariant(forkedIters, entry)
@@ -519,12 +533,11 @@ package object control {
     @stateful def cchainIsInvariant(forkedIters: Seq[Idx], entry: Boolean): Boolean = {
       import spatial.util.modeling._
       if (isFSM || isStreamControl) false
-      else if (isSwitch) {
+      else if (isSwitch && parent.s.get.isOuterControl) { // If this is a switch serving as a controller (i.e. not a dataflow primitive)
         val conditions = s.get match { case Op(Switch(conds,_)) => conds; case _ => Seq() }
         val condMutators = conditions.flatMap(mutatingBounds(_))
         condMutators.intersect(forkedIters).isEmpty
       } else {
-        // TODO: Actually check if cchains vary with forkedIters
         val ctrsToDrop = if (entry) 1 else 0
         cchains.forall{cchain =>
           cchain.counters.drop(ctrsToDrop).forall{ctr => ctr.isFixed(forkedIters)}
@@ -644,6 +657,8 @@ package object control {
     /** True if this controller or symbol has a streaming controller parent. */
     @stateful def hasStreamParent: Boolean = toCtrl.parent.isStreamControl
 
+    @stateful def isInBlackboxImpl: Boolean = ancestors.exists(_.s.exists(_.isBlackboxImpl))
+
     /** True if this controller or symbol has an ancestor which runs forever. */
     def hasForeverAncestor: Boolean = ancestors.exists(_.isForever)
 
@@ -719,13 +734,13 @@ package object control {
 
 
   implicit class SymControlOps(s: Sym[_]) extends ScopeHierarchyOps(Some(s)) {
-    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else s.parent
-    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else s.scope
+    def toCtrl: Ctrl = if (s.isControl) Ctrl.Node(s,-1) else if (s.isBlackboxImpl) Ctrl.SpatialBlackbox(s) else s.parent
+    def toScope: Scope = if (s.isControl) Scope.Node(s,-1,-1) else if (s.isBlackboxImpl) Scope.SpatialBlackbox(s) else s.scope
     def isControl: Boolean = s.op.exists(_.isControl)
     def stopWhen: Option[Sym[_]] = if (s.isControl) Ctrl.Node(s,-1).stopWhen else None
 
     @stateful def children: Seq[Ctrl.Node] = {
-      if (s.isControl) toCtrl.children
+      if (s.isControl || s.isCtrlBlackbox) toCtrl.children
       else throw new Exception(s"Cannot get children of non-controller ${stm(s)}")
     }
 
@@ -777,7 +792,7 @@ package object control {
     def rawParent_=(p: Ctrl): Unit = metadata.add(s, ParentCtrl(p))
 
     def rawChildren: Seq[Ctrl.Node] = {
-      if (!s.isControl) throw new Exception(s"Cannot get children of non-controller.")
+      if (!s.isControl && !s.isCtrlBlackbox) throw new Exception(s"Cannot get children of non-controller.")
       metadata[Children](s).map(_.children).getOrElse(Nil)
     }
     def rawChildren_=(cs: Seq[Ctrl.Node]): Unit = metadata.add(s, Children(cs))
@@ -815,6 +830,7 @@ package object control {
     def toCtrl: Ctrl = scp match {
       case Scope.Node(sym,id,_) => Ctrl.Node(sym,id)
       case Scope.Host           => Ctrl.Host
+      case Scope.SpatialBlackbox(sym) => Ctrl.SpatialBlackbox(sym)
     }
     def toScope: Scope = scp
     def isControl: Boolean = true
@@ -827,6 +843,7 @@ package object control {
 
     def iters: Seq[I32] = Try(scp match {
       case Scope.Host => Nil
+      case Scope.SpatialBlackbox(sym) => Nil
       case Scope.Node(Op(loop: Loop[_]), -1, -1)         => loop.iters
       case Scope.Node(Op(loop: Loop[_]), stage, block)   => loop.bodies(stage).blocks.apply(block)._1
       case Scope.Node(Op(loop: UnrolledLoop[_]), -1, -1) => loop.iters
@@ -867,6 +884,11 @@ package object control {
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
+
+      case Ctrl.SpatialBlackbox(sym) => sym match {
+        case Op(prim: SpatialBlackboxImpl[_,_]) => Seq()
+        case Op(ctrl: SpatialCtrlBlackboxImpl[_,_]) => sym.rawChildren
+      }
     }
 
     @stateful def nestedChildren: Seq[Ctrl.Node] = ctrl match {
@@ -889,6 +911,7 @@ package object control {
 
       // The children of the host controller is all Accel scopes in the program
       case Ctrl.Host => AccelScopes.all
+      case Ctrl.SpatialBlackbox(s) => throw new Exception(s"Not sure how to give nested children for $s yet")
     }
 
     @stateful def siblings: Seq[Ctrl.Node] = parent.children
@@ -896,12 +919,14 @@ package object control {
     def parent: Ctrl = ctrl match {
       case Ctrl.Node(sym,-1) => sym.parent
       case Ctrl.Node(sym, _) => Ctrl.Node(sym, -1)
+      case Ctrl.SpatialBlackbox(sym) => Ctrl.SpatialBlackbox(sym)
       case Ctrl.Host => Ctrl.Host
     }
 
     def scope: Scope = ctrl match {
       case Ctrl.Node(sym,-1) => sym.scope
       case Ctrl.Node(sym, _) => Scope.Node(sym, -1, -1)
+      case Ctrl.SpatialBlackbox(sym) => Scope.SpatialBlackbox(sym)
       case Ctrl.Host         => Scope.Host
     }
 
@@ -919,6 +944,7 @@ package object control {
   implicit class BlkOps(blk: Blk) {
     def toScope: Scope = blk match {
       case Blk.Host      => Scope.Host
+      case Blk.SpatialBlackbox(s)      => Scope.SpatialBlackbox(s)
       case Blk.Node(s,i) => s match {
         case Op(op:Control[_]) =>
           val block = op.blocks(i)
@@ -1279,6 +1305,7 @@ package object control {
 
       val head: Iterator[String] = Seq(lca match {
         case Ctrl.Node(s,id) => "  "*tab + s"${shortStm(s)} ($id) [Level: ${lca.level}, Loop: ${lca.looping}, Schedule: ${lca.schedule}]"
+        case Ctrl.SpatialBlackbox(s) => "  "*tab + s"${shortStm(s)} [Blackbox]"
         case Ctrl.Host       => "  "*tab + "Host"
       }).iterator
       if (lca.isInnerControl) {
@@ -1298,16 +1325,16 @@ package object control {
   }
 
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getReadStreams).toSet ++
     LocalMemories.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg }
-    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+      .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox || mem.isInstanceOf[StreamStruct[_]]}
   }
 
   @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    // ctrl.children.flatMap(getWriteStreams).toSet ++
     LocalMemories.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}
-      .filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg }
-    // .filter{case Op(StreamInNew(bus)) => !bus.isInstanceOf[DRAMBus[_]]; case _ => true}
+      .filter{mem => mem.isStreamOut || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox}
+  }
+
+  @stateful def getUsedFields(bbox: Sym[_], ctrl: Ctrl): Seq[String] = {
+    ctrl.s.get.blocks.flatMap(_.nestedStms.flatMap{case x@Op(FieldDeq(ss, field, _)) if ss == bbox => Some(field); case _ => None})
   }
 }

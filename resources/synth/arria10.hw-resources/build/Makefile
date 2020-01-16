@@ -682,7 +682,7 @@ endif
 .PHONY: quartus_generate_top
 ifneq ($(QUARTUS_TOP_GEN),)
 quartus_generate_top: $(QUARTUS_TOP_GEN)
-	@$(RM) *_top.v
+	@$(RM) *_SpatialIP.v
 	quartus_sh --script=$< $(QUARTUS_TCL_ARGS)
 else
 quartus_generate_top:

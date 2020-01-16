@@ -186,7 +186,7 @@ trait MemoryUnrolling extends UnrollingBase {
         val addrOpt = 
           if (rhs.isInstanceOf[VectorDequeuer[_]] || rhs.isInstanceOf[VectorEnqueuer[_]]) {
             addr.map{a =>
-              (a.map(Seq(_)), Seq(0), Seq.tabulate(a.size){i => (i -> i)}.toMap, Seq.tabulate(a.size){i => (i -> i)}.toMap, Seq(0))
+              (a.map(Seq(_)), Seq(0), Seq.tabulate(a.size){i => i -> i }.toMap, Seq.tabulate(a.size){ i => i -> i }.toMap, Seq(0))
             }
           }
           else {
@@ -301,6 +301,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addDispatch(Nil, 0)
           s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
+          s.originalSym = lhs
           transferSyncMeta(lhs, s)
           mem2.substHotSwap(lhs, s)
           if (inHw) s.progorder = lhs.progorder.get
@@ -324,7 +325,7 @@ trait MemoryUnrolling extends UnrollingBase {
               register(lhs -> elem)
               elem
             }
-          case (UVecReadVec(vec), vecsInSegment, _) =>
+          case (UVecReadVec(vec), _, _) =>
             if (laneIds.size > 1) throw new Exception(s"Vector (pre-unroll) nodes in parallelized (post-unroll) loops currently unsupported!")
             lanes.unifyLanes(laneIds)(lhs, vec)
 
@@ -517,6 +518,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LockDRAMWrite[_,_]     => UWrite[A](stage(LockDRAMBankedWrite(mem.asInstanceOf[LockDRAM1[A]], data, bank, ofs, lock, enss)))
     case _:LockDRAMRead[_,_]     => UVecReadSym[A](stage(LockDRAMBankedRead(mem.asInstanceOf[LockDRAM1[A]], bank, ofs, lock, enss)))
     case _:FIFODeq[_]       => UVecReadSym(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
+    case _:FIFODeqInterface[_]       => USymReadSym(stage(FIFODeqInterface(mem.asInstanceOf[FIFO[A]], enss.head)))
     case _:FIFOVecDeq[_]       => UVecReadVec(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], ArrayBuffer.fill(ofs.size)(enss.head))))
     case _:LIFOPop[_]       => UVecReadSym(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))
     case _:LUTRead[_,_]     => UVecReadSym(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))

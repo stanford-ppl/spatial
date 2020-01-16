@@ -87,6 +87,13 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
       }
       super.transform(lhs, rhs)
 
+    case box@SpatialCtrlBlackboxImpl(func) =>
+      inCtrl(lhs) {
+        dbgs(s"$lhs = $rhs")
+        register(func -> insertPipes(func, lhs).left.get)
+      }
+      super.transform(lhs, rhs)
+
     case _ => super.transform(lhs, rhs)
   }
 

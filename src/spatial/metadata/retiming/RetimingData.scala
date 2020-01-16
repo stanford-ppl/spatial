@@ -48,3 +48,4 @@ case class AAACycle(accesses: Seq[Sym[_]], memory: Sym[_], length: Double) exten
   */
 case class FullDelay(latency: Double) extends Data[FullDelay](Transfer.Mirror)
 
+case class UserInjectedDelay(flag: Boolean) extends Data[UserInjectedDelay](SetBy.Analysis.Self)

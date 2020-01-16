@@ -7,6 +7,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.modeling._
 import utils.implicits.collections._
+import spatial.metadata.blackbox._
 
 case class MemoryReporter(IR: State) extends Pass {
   override def shouldRun: Boolean = config.enInfo
@@ -16,7 +17,7 @@ case class MemoryReporter(IR: State) extends Pass {
   def run(): Unit = {
     import scala.language.existentials
 
-    val mems = LocalMemories.all.map{case Stm(s,d) =>
+    val mems = LocalMemories.all.filter(!_.isCtrlBlackbox).map{case Stm(s,d) =>
       val area = areaModel.areaOf(s, d, inHwScope = true, inReduce = false)
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)

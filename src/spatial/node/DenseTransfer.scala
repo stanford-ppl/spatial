@@ -39,7 +39,7 @@ import spatial.util.spatialConfig
     val A:     Bits[A],
     val Local: Type[Local[A]],
     val Dram:  Type[Dram[A]])
-  extends EarlyBlackBox[Void] {
+  extends EarlyBlackbox[Void] {
     def isStore: Boolean = !isLoad
 
     override def effects: Effects = if (isStore) Effects.Writes(dram) else Effects.Writes(local)

@@ -4,11 +4,11 @@ import chisel3._
 import chisel3.util.Decoupled
 import fringe.globals._
 import fringe._
-import fringe.TopInterface
+import fringe.SpatialIPInterface
 import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Lite, AXI4Probe}
 import fringe.templates.axi4._
 
-class ZynqInterface extends TopInterface {
+class ZynqInterface extends SpatialIPInterface {
   val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
   val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 32)
 

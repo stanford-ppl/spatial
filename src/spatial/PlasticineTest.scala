@@ -11,6 +11,8 @@ trait PlasticineTest extends DSLTest { test =>
 
   protected val cmdlnArgs = sys.env.get("TEST_ARGS").getOrElse("").split(" ").map(_.trim).toList
 
+  private lazy val spatialFlags = sys.env.get("SPATIAL_FLAGS").map { " " + _ }.getOrElse("")
+
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
 
   protected def pirArgs:String = "bash run.sh"
@@ -22,7 +24,7 @@ trait PlasticineTest extends DSLTest { test =>
     case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
   }
 
-  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
+  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args + spatialFlags, "", "", "") {
     override val makeTimeout: Long = 12000 // Timeout for compiling, in seconds
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")

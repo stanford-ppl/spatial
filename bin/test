@@ -1,4 +1,4 @@
-#!env/bin/python
+#!pir/env/bin/python
 
 import os, sys, datetime
 sys.path.insert(0, 'pir/bin')

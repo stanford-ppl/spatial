@@ -118,6 +118,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
+    lazy val areaModelReporter = AreaAnalyzer(state, spatialConfig.target.areaModel, spatialConfig.target.latencyModel, true)
     lazy val dseRuntimeModelGen = RuntimeModelGenerator(state, version = "dse")
     lazy val finalRuntimeModelGen = RuntimeModelGenerator(state, version = "final")
     lazy val pirCodegen    = PIRGenSpatial(state)
@@ -206,7 +207,7 @@ trait Spatial extends Compiler with ParamLoader {
         ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
         ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
-        // (spatialConfig.useAreaModels ? areaModelReporter) ==>
+         (spatialConfig.reportArea ? areaModelReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
         (spatialConfig.enableTsth ? tsthCodegen)
     }
@@ -408,6 +409,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("noAreaModels").action { (_,_) => 
       spatialConfig.useAreaModels = false
     }.text("Only use crude models for estimating area during banking, and do not generate area report.  Use this flag if you do not have the correct python dependencies to run modeling")
+
+    cli.opt[Unit]("reportArea").action { (_,_) =>
+      spatialConfig.reportArea = true
+    }.text("Generate area model report.")
 
     cli.opt[Unit]("instrument").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true

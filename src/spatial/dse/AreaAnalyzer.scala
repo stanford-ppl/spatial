@@ -16,12 +16,15 @@ import argon.node._
 
 import scala.collection.mutable
 
-case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal  {
+case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel, genReport: scala.Boolean = false) extends RerunTraversal with AccelTraversal  {
   private def NoArea: Area = areaModel.NoArea
 
+  var depth = 0
   var totalArea: (Area, String) = (NoArea, "")
   var scopeArea: Seq[Area] = Nil
   var savedArea: Area = _
+
+
 
   override def init(): Unit = if (needsInit) {
     areaModel.init()
@@ -30,6 +33,15 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
     super.init()
   }
 
+  def logAndDbg(x: String): Unit = {
+    if (genReport) {
+      inGen("area_report.rpt"){
+        Console.println("  " * depth + x)
+        emit("  " * depth + x)
+      }
+    }
+    dbgs("  " * depth + x)
+  }
   override def silence(): Unit = {
     super.silence()
     areaModel.silence()
@@ -132,32 +144,43 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
   def areaOfPipe(block: Block[_], par: Int): Area = areaOfBlock(block, isInner = true, par)
 
+  def inCtrl(lhs: Sym[_])(func: => Area): Area = {
+    logAndDbg(s"Controller: $lhs (${lhs.ctx})")
+    depth = depth + 1
+    val area = func
+    depth = depth - 1
+    area
+  }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     val area: Area = rhs match {
       case AccelScope(block) =>
         inAccel{
           savedArea = scopeArea.fold(NoArea){_+_}
           val body = areaOfBlock(block, lhs.isInnerControl, 1)
+          Console.println(s"Total area: $body")
           body
         }
 
       case ParallelPipe(_, block) =>
-        val body = areaOfBlock(block, isInner = false, 1)
-        dbgs(s"Parallel $lhs: ")
-        dbgs(s" - Body: $body")
-        body + areaOf(lhs)
+        inCtrl(lhs) {
+          val body = areaOfBlock(block, isInner = false, 1)
+          logAndDbg(s"$body")
+          body + areaOf(lhs)
+        }
 
       case UnitPipe(_, block, _)     =>
-        val body = areaOfBlock(block, isInner = lhs.isInnerControl, 1)
-        dbgs(s"UnitPipe: $lhs")
-        dbgs(s" - Body: $body")
-        body + areaOf(lhs)
+        inCtrl(lhs) {
+          val body = areaOfBlock(block, isInner = lhs.isInnerControl, 1)
+          logAndDbg(s"$body")
+          body + areaOf(lhs)
+        }
 
       case OpForeach(_, cchain, block, _, _) =>
         val P = cchain.constPars.product
         val body = areaOfBlock(block, lhs.isInnerControl, P)
-        dbgs(s"Foreach: $lhs (P = $P)")
-        dbgs(s" - Body: $body")
+        logAndDbg(s"Foreach: $lhs (P = $P)")
+        logAndDbg(s" - Body: $body")
         body + areaOf(lhs)
 
       case op@OpReduce(_, cchain, _, map, load, reduce, store, _, _, _, _) =>
@@ -181,11 +204,11 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         val cycleArea: Area = areaOfCycle(reduce, 1)
         val storeArea: Area = areaOfCycle(store, 1)
 
-        dbgs(s"Reduce: $lhs (P = $P)")
-        dbgs(s" - Map:    $mapArea")
-        dbgs(s" - Tree:   $treeArea")
-        dbgs(s" - Delays: $treeDelayArea")
-        dbgs(s" - Cycle:  ${loadArea + storeArea + cycleArea}")
+        logAndDbg(s"Reduce: $lhs (P = $P)")
+        logAndDbg(s" - Map:    $mapArea")
+        logAndDbg(s" - Tree:   $treeArea")
+        logAndDbg(s" - Delays: $treeDelayArea")
+        logAndDbg(s" - Cycle:  ${loadArea + storeArea + cycleArea}")
 
         mapArea + treeArea + treeDelayArea + loadArea + cycleArea + storeArea + areaOf(lhs)
 
@@ -205,36 +228,60 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         val cycleArea   = areaOfCycle(reduce, Pr)
         val storeArea   = areaOfCycle(storeAcc, Pr)
 
-        dbgs(s"MemReduce: $lhs (Pm = $Pm, Pr = $Pr)")
-        dbgs(s" - Map:    $mapArea")
-        dbgs(s" - Tree:   $treeArea")
-        dbgs(s" - Delays: $treeDelayArea")
-        dbgs(s" - Cycle:  ${loadResArea + loadAccArea + cycleArea + storeArea}")
+        logAndDbg(s"MemReduce: $lhs (Pm = $Pm, Pr = $Pr)")
+        logAndDbg(s" - Map:    $mapArea")
+        logAndDbg(s" - Tree:   $treeArea")
+        logAndDbg(s" - Delays: $treeDelayArea")
+        logAndDbg(s" - Cycle:  ${loadResArea + loadAccArea + cycleArea + storeArea}")
         mapArea + treeArea + treeDelayArea + loadResArea + loadAccArea + cycleArea + storeArea + areaOf(lhs)
 
       case Switch(selects,body) =>
-        val caseArea = areaOfBlock(body, lhs.isInnerControl, 1)
+        inCtrl(lhs) {
+          val caseArea = areaOfBlock(body, lhs.isInnerControl, 1)
+          val a = caseArea + areaOf(lhs)
+          logAndDbg(s"$a")
+          a
+        }
 
-        dbgs(s"Switch: $lhs (#selects = ${selects.length})")
-        dbgs(s" - Body: $caseArea")
-        caseArea + areaOf(lhs)
+      case SwitchCase(body) =>
+        inCtrl(lhs) {
+          val caseArea = areaOfBlock(body, lhs.isInnerControl, 1)
+          val a = caseArea + areaOf(lhs)
+          logAndDbg(s"$a")
+          a
+        }
 
       case StateMachine(_,_,notDone,action,nextState) =>
-        val notDoneArea   = areaOfBlock(notDone,isInner = true,1)
-        val actionArea    = areaOfBlock(action,lhs.isInnerControl,1)
-        val nextStateArea = areaOfBlock(nextState,isInner = true,1)
+        inCtrl(lhs) {
+          val notDoneArea = areaOfBlock(notDone, isInner = true, 1)
+          val actionArea = areaOfBlock(action, lhs.isInnerControl, 1)
+          val nextStateArea = areaOfBlock(nextState, isInner = true, 1)
+          val a = notDoneArea + actionArea + nextStateArea + areaOf(lhs)
+          logAndDbg(s"$a")
+          a
+        }
 
-        dbgs(s"State Machine: $lhs")
-        dbgs(s" - Cond:   $notDoneArea")
-        dbgs(s" - Action: $actionArea")
-        dbgs(s" - Next:   $nextStateArea")
-        notDoneArea + actionArea + nextStateArea + areaOf(lhs)
+      case UnrolledForeach(_,cchain,block,_,_,_) =>
+        inCtrl(lhs) {
+          val body = areaOfBlock(block, isInner = lhs.isInnerControl, cchain.parsOr1.product)
+          val a = body + areaOf(lhs)
+          logAndDbg(s"$a")
+          a
+        }
+
+      case UnrolledForeach(_,cchain,block,_,_,_) =>
+        inCtrl(lhs) {
+          val body = areaOfBlock(block, isInner = lhs.isInnerControl, cchain.parsOr1.product)
+          val a = body + areaOf(lhs)
+          logAndDbg(s"$a")
+          a
+        }
 
       case _ if inHw =>
         val blocks = rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1))
         val area = areaOf(lhs)
-        dbgs(s"$lhs: $area")
-        blocks.zipWithIndex.foreach{case (blk,i) => dbgs(s" - Block #$i: $blk") }
+        logAndDbg(s" - $lhs: $area")
+//        blocks.zipWithIndex.foreach{case (blk,i) => logAndDbg(s" - Block #$i: $blk") }
         area + blocks.fold(NoArea){_+_}
 
       case _ => areaOf(lhs) + rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1)).fold(NoArea){_+_}

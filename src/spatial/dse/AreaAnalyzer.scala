@@ -15,8 +15,9 @@ import models._
 import argon.node._
 
 import scala.collection.mutable
+import utils.io.files
 
-case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel, genReport: scala.Boolean = false) extends RerunTraversal with AccelTraversal  {
+case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel, genReport: scala.Boolean = false) extends RerunTraversal with AccelTraversal {
   private def NoArea: Area = areaModel.NoArea
 
   var depth = 0
@@ -35,7 +36,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
   def logAndDbg(x: String): Unit = {
     if (genReport) {
-      inGen("area_report.rpt"){
+      inGen(s"${config.genDir}${files.sep}/area/${files.sep}","area_report.rpt"){
         Console.println("  " * depth + x)
         emit("  " * depth + x)
       }
@@ -156,9 +157,11 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
     val area: Area = rhs match {
       case AccelScope(block) =>
         inAccel{
+          if (genReport) config.enGen = true
           savedArea = scopeArea.fold(NoArea){_+_}
           val body = areaOfBlock(block, lhs.isInnerControl, 1)
           Console.println(s"Total area: $body")
+          if (genReport) config.enGen = false
           body
         }
 
@@ -269,7 +272,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
           a
         }
 
-      case UnrolledForeach(_,cchain,block,_,_,_) =>
+      case UnrolledReduce(_,cchain,block,_,_,_) =>
         inCtrl(lhs) {
           val body = areaOfBlock(block, isInner = lhs.isInnerControl, cchain.parsOr1.product)
           val a = body + areaOf(lhs)
@@ -280,7 +283,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
       case _ if inHw =>
         val blocks = rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1))
         val area = areaOf(lhs)
-        logAndDbg(s" - $lhs: $area")
+        logAndDbg(s"$lhs: $area (${lhs.ctx})")
 //        blocks.zipWithIndex.foreach{case (blk,i) => logAndDbg(s" - Block #$i: $blk") }
         area + blocks.fold(NoArea){_+_}
 

@@ -1,24 +1,28 @@
 package spatial.codegen.resourcegen
 
-import scala.collection.mutable
-
 import argon._
 import argon.codegen.FileDependencies
-import spatial.codegen.naming._
 import argon.node._
+import spatial.codegen.naming._
 import spatial.lang._
-import spatial.node._
-import spatial.metadata.access._
-import spatial.metadata.control._
 import spatial.metadata.memory._
-import spatial.metadata.retiming._
-import spatial.metadata.types._
-import spatial.util.spatialConfig
+import spatial.metadata.access._
+import spatial.node._
 import spatial.traversal.AccelTraversal
+import spatial.util.spatialConfig
+import models.AreaEstimator
 
-case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencies with AccelTraversal {
+import scala.collection.mutable
+
+case class ResourceArea(LUT: Double, Reg: Double, BRAM: Double, DSP: Double) {
+  def and(x: ResourceArea): ResourceArea = ResourceArea(x.LUT + LUT, x.Reg + Reg, x.BRAM + BRAM, x.DSP + DSP)
+  override def toString: String = s"LUTs: $LUT, Regs: $Reg, BRAM: $BRAM, DSP: $DSP"
+}
+
+case class ResourceReporter(IR: State, areamodel: AreaEstimator) extends NamedCodegen with FileDependencies with AccelTraversal {
   override val lang: String = "reports"
   override val ext: String = "json"
+  var depth = 0
 
   override protected def emitEntry(block: Block[_]): Unit = {
     gen(block)
@@ -29,37 +33,22 @@ case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencie
     case _ => -1
   }
 
-  var fixOp: Int = 0
 
   override def emitHeader(): Unit = {
     super.emitHeader()
-    emit("{")
   }
 
-  val dataMap = mutable.Map[String, mutable.Map[String, String]]()
+  def inCtrl(lhs: Sym[_])(func: => ResourceArea): ResourceArea = {
+    emit("  " * depth + s"Controller: $lhs (${lhs.ctx})")
+    depth = depth + 1
+    val area = func
+    depth = depth - 1
+    emit("  " * depth + s"$lhs total area: $area")
+    area
+  }
 
   override def emitFooter(): Unit = {
     super.emitFooter()
-    dataMap.foreach {
-      entry => {
-        emit(s"""\t"${entry._1}": {""")
-        val last_index = entry._2.size - 1;
-        entry._2.toList.zipWithIndex.foreach {
-          tup_ind => {
-            val comma = if (tup_ind._2 != last_index) "," else ""
-            emit(s"""\t\t"${tup_ind._1._1}": [${tup_ind._1._2}]${comma}""")
-          }
-        }
-        emit("\t},")
-      }
-    }
-    emit(s"""\t"fixed_ops": $fixOp""")
-    emit("}")
-  }
-
-  def emitMem(lhs: Sym[_], tp: String, dims: Seq[Int], padding: Seq[Int], depth: Int) = {
-    dataMap.getOrElseUpdate(tp, mutable.Map[String, String]()) += (
-      src"${lhs}" -> src"""${bitWidth(lhs.tp.typeArgs.head)}, ${dims}, ${padding}, ${depth}""")
   }
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
@@ -68,94 +57,142 @@ case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencie
     case _ => super.quoteOrRemap(arg)
   }
 
-  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
-    rhs match {
-      case AccelScope(func) => inAccel {
-        spatialConfig.enGen = true
-        gen(func)
-      }
+  /** Returns an approximation of the cost for the given banking strategy. */
+  def estimateMem(mem: Sym[_]): ResourceArea = { //(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): DUPLICATE = {
+    val depth = mem.instance.depth
+    val allDims = mem.constDims
+    val allB = mem.instance.Bs
+    val allAlpha = mem.instance.alphas
+    val allN = mem.instance.nBanks
+    val allP = mem.instance.Ps
+    val nBanks = if (mem.isLUT | mem.isRegFile) allDims else mem.instance.nBanks
+
+    val histR: Map[Int, Int] = mem.readers.toList.flatMap{x => x.residualGenerators}.zip(mem.readers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
+    val histW: Map[Int, Int] = mem.writers.toList.flatMap{x => x.residualGenerators}.zip(mem.writers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
+
+    val histCombined: Map[Int, (Int,Int)] = histR.map{case (width, siz) => width -> (siz, histW.getOrElse(width, 0)) } ++ histW.collect{case (width, siz) if !histR.contains(width) => width -> (0,siz) }
+    val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten
+
+    mem.asInstanceOf[Sym[_]] match {
+      case m:SRAM[_,_] =>
+        val luts = areamodel.estimateMem("LUTs", "SRAMNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val ffs = areamodel.estimateMem("FFs", "SRAMNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val bram = areamodel.estimateMem("RAMB18", "SRAMNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)
+        ResourceArea(luts, ffs, bram, 0)
+      case m:RegFile[_,_] =>
+        val luts = areamodel.estimateMem("LUTs", "RegFileNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val ffs = areamodel.estimateMem("FFs", "RegFileNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val bram = areamodel.estimateMem("RAMB18", "RegFileNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "RegFileNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        ResourceArea(luts, ffs, bram, 0)
+      case m:LineBufferNew[_] =>
+        val luts = areamodel.estimateMem("LUTs", "LineBufferNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val ffs = areamodel.estimateMem("FFs", "LineBufferNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val bram = areamodel.estimateMem("RAMB18", "LineBufferNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "LineBufferNew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        ResourceArea(luts, ffs, bram, 0)
+      case m:FIFONew[_] =>
+        val luts = areamodel.estimateMem("LUTs", "FIFONew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val ffs = areamodel.estimateMem("FFs", "FIFONew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val bram = areamodel.estimateMem("RAMB18", "FIFONew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "FIFONew", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        ResourceArea(luts, ffs, bram, 0)
+      case m:RegNew[_] => ResourceArea(0,1,0,0)
       case _ =>
-        if (inHw) {
-          countResource(lhs, rhs)
-        }
-        rhs.blocks.foreach { blk => gen(blk) }
+        val luts = areamodel.estimateMem("LUTs", "", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val ffs = areamodel.estimateMem("FFs", "", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        val bram = areamodel.estimateMem("RAMB18", "", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "", allDims, bitWidth(mem.tp.typeArgs.head), depth, allB, allN, allAlpha, allP, histRaw)
+        ResourceArea(luts, ffs, bram, 0)
+
     }
   }
 
-  def countResource(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
-    case op: SRAMNew[_, _] =>
-      emitMem(lhs, "bram", lhs.constDims, lhs.padding, lhs.instance.depth)
-    case op: FIFONew[_] =>
-      emitMem(lhs, "bram", lhs.constDims, lhs.padding, lhs.instance.depth)
-    case op: LIFONew[_] =>
-      emitMem(lhs, "bram", lhs.constDims, lhs.padding, lhs.instance.depth)
-    case op: LineBufferNew[_] =>
-      emitMem(lhs, "bram", lhs.constDims, lhs.padding, lhs.instance.depth)
-    case op: RegFileNew[_, _] =>
-      emitMem(lhs, "bram", lhs.constDims, lhs.padding, lhs.instance.depth)
-    case op: RegNew[_] =>
-      emitMem(lhs, "reg", Seq(1), Seq(0), lhs.instance.depth)
-    case op: FIFORegNew[_] =>
-      emitMem(lhs, "reg", Seq(1), Seq(0), lhs.instance.depth)
-    case op: LUTNew[_, _] =>
-      emitMem(lhs, "reg", lhs.constDims, Seq(0), 1)
-    case op: MergeBufferNew[_] =>
-      emitMem(lhs, "reg", lhs.constDims, Seq(0), 1)
+  def estimateArea(block: Block[_]): ResourceArea = {
+    val xs = block.stms.map{
+      case x@Op(_: Control[_]) =>
+        inCtrl(x){
+          x.blocks.map{estimateArea}.fold(ResourceArea(0,0,0,0)){_.and(_)}
+        }
+      case x@Op(_: MemAlloc[_,_]) =>
+        val area = estimateMem(x)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixMul(a,b)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixMul", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixMul", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixMul", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixMul", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixMul", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixDiv(a,b)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixDiv", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixDiv", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixDiv", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixDiv", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixDiv", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixMod(a,b)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixMod", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixMod", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixMod", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixMod", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixMod", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixSub(a,b)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixSub", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixSub", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixSub", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixSub", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixSub", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixAdd(a,b)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixAdd", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixAdd", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixAdd", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixAdd", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixAdd", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixFMA(a,b,c)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixFMA", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixFMA", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixFMA", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixFMA", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixFMA", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x@Op(_@FixToFix(a,b)) =>
+        val l = areamodel.estimateArithmetic("LUTs", "FixToFix", List(0,0, bitWidth(x.tp),0,1))
+        val f = areamodel.estimateArithmetic("FFs", "FixToFix", List(0,0, bitWidth(x.tp),0,1))
+        val br = areamodel.estimateArithmetic("RAMB18", "FixToFix", List(0,0, bitWidth(x.tp),0,1)) + areamodel.estimateArithmetic("RAMB32", "FixToFix", List(0,0, bitWidth(x.tp),0,1))
+        val d = areamodel.estimateArithmetic("DSPs", "FixToFix", List(0,0, bitWidth(x.tp),0,1))
+        val area = ResourceArea(l,f,br, d)
+        emit("  " * depth + s"$x (${x.name}, ${x.rhs}) - $area (${x.ctx}}")
+        area
+      case x =>
+        val area = x.blocks.map(estimateArea).fold(ResourceArea(0,0,0,0)){_.and(_)}
+        if (area != ResourceArea(0,0,0,0)) Console.println(s"Problem collecting area info on $x ${x.rhs}")
+        area
 
-    case FixInv(x) => fixOp += 1
-    case FixAdd(x, y) => fixOp += 1
-    case FixSub(x, y) => fixOp += 1
-    case FixMul(x, y) => fixOp += 1
-    case FixDiv(x, y) => fixOp += 1
-    case FixRecip(x) => fixOp += 1
-    case FixMod(x, y) => fixOp += 1
-    case FixAnd(x, y) => fixOp += 1
-    case FixOr(x, y) => fixOp += 1
-    case FixLst(x, y) => fixOp += 1
-    case FixLeq(x, y) => fixOp += 1
-    case FixXor(x, y) => fixOp += 1
-    case FixSLA(x, y) => fixOp += 1
-    case FixSRA(x, y) => fixOp += 1
-    case FixSRU(x, y) => fixOp += 1
-    case SatAdd(x, y) => fixOp += 1
-    case SatSub(x, y) => fixOp += 1
-    case SatMul(x, y) => fixOp += 1
-    case SatDiv(x, y) => fixOp += 1
-    case UnbMul(x, y) => fixOp += 1
-    case UnbDiv(x, y) => fixOp += 1
-    case UnbSatMul(x, y) => fixOp += 1
-    case UnbSatDiv(x, y) => fixOp += 1
-    case FixNeq(x, y) => fixOp += 1
-    case FixEql(x, y) => fixOp += 1
-    case FixMax(x, y) => fixOp += 1
-    case FixMin(x, y) => fixOp += 1
-    case FixToFlt(x, fmt) => fixOp += 1
-    case FixToText(x,format) => fixOp += 1
-    case TextToFix(x, _) => fixOp += 1
-    case FixRandom(Some(max)) => fixOp += 1
-    case FixRandom(None) => fixOp += 1
-    case FixAbs(x) => fixOp += 1
-    case FixFloor(x) => fixOp += 1
-    case FixCeil(x) => fixOp += 1
-    case FixLn(x) => fixOp += 1
-    case FixExp(x) => fixOp += 1
-    case FixSqrt(x) => fixOp += 1
-    case FixSin(x) => fixOp += 1
-    case FixCos(x) => fixOp += 1
-    case FixTan(x) => fixOp += 1
-    case FixSinh(x) => fixOp += 1
-    case FixCosh(x) => fixOp += 1
-    case FixTanh(x) => fixOp += 1
-    case FixAsin(x) => fixOp += 1
-    case FixAcos(x) => fixOp += 1
-    case FixAtan(x) => fixOp += 1
-    case FixPow(x, exp) => fixOp += 1
-    case FixFMA(m1, m2, add) => fixOp += 1
-    case FixRecipSqrt(x) => fixOp += 1
-    case FixSigmoid(x) => fixOp += 1
 
-    case _ =>
+    }
+    xs.fold(ResourceArea(0,0,0,0)){_.and(_)}
   }
+
+  override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = {
+    rhs match {
+      case AccelScope(func) => inAccel { inCtrl(lhs) {
+        spatialConfig.enGen = true
+        val area = estimateArea(func)
+        emit(s"Total area: $area")
+        spatialConfig.enGen = false
+        area
+      }}
+      case _ =>
+    }
+  }
+
 
 
 }

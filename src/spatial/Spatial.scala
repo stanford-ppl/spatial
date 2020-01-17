@@ -112,13 +112,12 @@ trait Spatial extends Compiler with ParamLoader {
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
-    lazy val resourceReporter = ResourceReporter(state)
+    lazy val resourceReporter = ResourceReporter(state, areamodel)
     lazy val cppCodegen    = CppGen(state)
     lazy val rogueCodegen   = RogueGen(state)
     lazy val treeCodegen   = TreeGen(state)
     lazy val irCodegen     = HtmlIRGenSpatial(state)
     lazy val scalaCodegen  = ScalaGenSpatial(state)
-    lazy val areaModelReporter = AreaAnalyzer(state, spatialConfig.target.areaModel, spatialConfig.target.latencyModel, true)
     lazy val dseRuntimeModelGen = RuntimeModelGenerator(state, version = "dse")
     lazy val finalRuntimeModelGen = RuntimeModelGenerator(state, version = "final")
     lazy val pirCodegen    = PIRGenSpatial(state)
@@ -206,8 +205,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
         ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
-        (spatialConfig.enableResourceReporter ? resourceReporter) ==>
-         (spatialConfig.reportArea ? areaModelReporter) ==>
+        (spatialConfig.reportArea ? resourceReporter) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
         (spatialConfig.enableTsth ? tsthCodegen)
     }

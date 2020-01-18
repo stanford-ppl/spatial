@@ -90,9 +90,12 @@ trait HostML {
     input:Seq[Seq[T]],
     activation: T => T,
   ):Seq[Seq[T]] = {
+    val layer = Ws.size
+    assert(Bs.size == layer, s"Bias has unmatched layer count ${Bs.size} expect ${layer}")
     input.map { sample =>
-      (Ws,Bs).zipped.foldLeft(sample) { case (hidden, (w,b)) =>
-        unstaged_denselayer(hidden, w, b, activation)._1
+      (Ws,Bs,(0 until layer)).zipped.foldLeft(sample) { case (hidden, (w,b,i)) =>
+        val activation_func = if (i == layer - 1) unstaged_identity[T] _ else activation
+        unstaged_denselayer(hidden, w, b, activation_func)._1
       }
     }
   }

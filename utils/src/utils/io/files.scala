@@ -72,6 +72,20 @@ object files {
     pw.close
   }
 
+  /** 
+    * Write a 3-D Seq to CSV
+    */
+  def writeCSVNow3D[A](seq:Seq[Seq[Seq[A]]], filename: String, delim1: String=",", delim2:String="\n", toString:A => String= { x:A => x.toString }): Unit = {
+    import java.io._
+    val pw = new PrintWriter(new File(filename))
+    seq.foreach { seq =>
+      seq.foreach { seq =>
+        pw.write(s"${seq.map(toString).mkString(delim1)}$delim2")
+      }
+    }
+    pw.close
+  }
+
   /**
     * Delete a directory
     */

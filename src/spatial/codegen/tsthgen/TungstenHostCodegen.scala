@@ -27,6 +27,7 @@ trait TungstenHostCodegen extends FileDependencies with CppCodegen {
 #include "repl.h"
 #include "DUT.h"
 #include "cppgenutil.h"
+#include "hostio.h"
 
 using namespace std;
 """);

@@ -23,7 +23,6 @@ trait CommonMain {
 
   // TODO: This should be removed in favor of the check in Top
   def supportedTarget(t: String): Boolean = {
-    scala.Console.println(t)
     t match {
       case "aws"       => true
       case "aws-sim"   => true
@@ -58,7 +57,6 @@ trait CommonMain {
   }
 
   def main(args: Array[String]): Unit = {
-    scala.Console.println("In commonMain")
     val splitArgs = separateChiselArgs(args)
     this.args = splitArgs.testArgs
 

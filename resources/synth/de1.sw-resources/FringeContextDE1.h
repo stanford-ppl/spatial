@@ -165,25 +165,23 @@ public:
     virtual void load()
     {
         // Commands for writing fpga to DE1
-        // list<string> cmds = {
-        //     "echo 0 > /sys/class/fpga-bridge/fpga2hps/enable",
-        //     "echo 0 > /sys/class/fpga-bridge/hps2fpga/enable",
-        //     "echo 0 > /sys/class/fpga-bridge/lwhps2fpga/enable",
-        //     "dd if=SpatialIP.rbf of=/dev/fpga0 bs=1M",
-        //     "echo 1 > /sys/class/fpga-bridge/fpga2hps/enable",
-        //     "echo 1 > /sys/class/fpga-bridge/hps2fpga/enable",
-        //     "echo 1 > /sys/class/fpga-bridge/lwhps2fpga/enable"
-        // };
-        // list<string>::iterator it;
-        // int dnu = -1;
-        // for (it = cmds.begin(); it != cmds.end(); ++it) {
-        //     cout << it->c_str() << endl;
-        //     sleep(0.5);
-        //     dnu = system(it->c_str());
-        // }
+        list<string> cmds = {
+            "echo 0 > /sys/class/fpga-bridge/fpga2hps/enable",
+            "echo 0 > /sys/class/fpga-bridge/hps2fpga/enable",
+            "echo 0 > /sys/class/fpga-bridge/lwhps2fpga/enable",
+            "dd if=SpatialIP.rbf of=/dev/fpga0 bs=1M",
+            "echo 1 > /sys/class/fpga-bridge/fpga2hps/enable",
+            "echo 1 > /sys/class/fpga-bridge/hps2fpga/enable",
+            "echo 1 > /sys/class/fpga-bridge/lwhps2fpga/enable"
+        };
+        list<string>::iterator it;
+        int dnu = -1;
+        for (it = cmds.begin(); it != cmds.end(); ++it) {
+            cout << it->c_str() << endl;
+            sleep(0.5);
+            dnu = system(it->c_str());
+        }
 
-        string cmd = "./prog_fpga ";
-        int dnu = system(cmd.c_str());
         return;
     }
 
@@ -390,7 +388,6 @@ public:
 
     virtual void writeReg(uint32_t reg, uint32_t data)
     {
-        // mysleep(100000000L); /* Half a second in nano's */
         *(fringeScalarBase + reg) = data;
     }
 

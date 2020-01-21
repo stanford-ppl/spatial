@@ -10,7 +10,7 @@ all:
 	quartus_fit --read_settings_files=off --write_settings_files=off ${PROJECT} -c ${PROJECT}
 	quartus_asm --read_settings_files=off --write_settings_files=off ${PROJECT} -c ${PROJECT}
 	quartus_sta ${PROJECT} -c ${PROJECT}
-	quartus_cpf -c --configuration_mode=FPP --option=rbf_option ${PROJECT}.sof sp.rbf
-	
+	quartus_cpf -c --configuration_mode=FPP --option=rbf_option ${PROJECT}.sof SpatialIP.rbf
+
 clean:
 	rm -rf *.rbf *.rpt *.map.* *.fit.* *.report *.summary

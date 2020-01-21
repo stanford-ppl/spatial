@@ -4,7 +4,7 @@
 #define FRINGE_MEM_BASEADDR 0x00000000
 #define FRINGE_SCALAR_BASEADDR 0xFF200000
 #define MEM_SIZE 0x40000000
-#define MAP_LEN 0x10000
+#define MAP_LEN 0x00200000
 
 /* Memory */
 #define DDR_BASE 0x00000000
@@ -72,11 +72,12 @@
 
 /* Error reporting */
 #define EPRINTF(...) fprintf(stderr, __VA_ARGS__)
-#define ASSERT(cond, ...)                                                      \
-  if (!(cond)) {                                                               \
-    EPRINTF("\n");                                                             \
-    EPRINTF(__VA_ARGS__);                                                      \
-    EPRINTF("\n");                                                             \
-    EPRINTF("Assertion (%s) failed in %s, %d\n", #cond, __FILE__, __LINE__);   \
-    assert(0);                                                                 \
-  }
+#define ASSERT(cond, ...)                                                        \
+    if (!(cond))                                                                 \
+    {                                                                            \
+        EPRINTF("\n");                                                           \
+        EPRINTF(__VA_ARGS__);                                                    \
+        EPRINTF("\n");                                                           \
+        EPRINTF("Assertion (%s) failed in %s, %d\n", #cond, __FILE__, __LINE__); \
+        assert(0);                                                               \
+    }

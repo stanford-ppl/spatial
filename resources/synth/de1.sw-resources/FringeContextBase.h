@@ -1,8 +1,9 @@
 #ifndef __FRINGE_CONTEXT_BASE_H__
 #define __FRINGE_CONTEXT_BASE_H__
 
-template<class T>
-class FringeContextBase {
+template <class T>
+class FringeContextBase
+{
 public:
     T *dut;
     std::string path;
@@ -43,11 +44,11 @@ public:
 
     virtual void flushCache(uint32_t kb) = 0;
 
-    ~FringeContextBase() {
+    ~FringeContextBase()
+    {
         // delete dut;
     }
 };
-
 
 // Fringe APIs - implemented only for simulation
 void fringeInit(int argc, char **argv);

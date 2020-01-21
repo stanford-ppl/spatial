@@ -39,33 +39,35 @@ using namespace std;
  */
 
 typedef long unsigned int luint;
+typedef volatile unsigned int vuint;
 
-class FringeContextDE1 : public FringeContextBase<void> {
+class FringeContextDE1 : public FringeContextBase<void>
+{
 
     uint32_t burstSizeBytes;
     int fd;
-    u32 fringeScalarBase;
-    u32 fringeMemBase;
-    u32 fpgaMallocPtr;
+    vuint *fringeScalarBase, fringeMemBase, fpgaMallocPtr;
     u32 fpgaFreeMemSize;
-
     u32 commandReg;
     u32 statusReg;
 
     map<uint32_t, void *> physToVirtMap;
 
-    void *physToVirt(uint32_t physAddr) {
+    void *physToVirt(uint32_t physAddr)
+    {
         map<uint32_t, void *>::iterator iter = physToVirtMap.find(physAddr);
-        if (iter == physToVirtMap.end()) {
+        if (iter == physToVirtMap.end())
+        {
             EPRINTF("Physical address '%lx' not found in physToVirtMap\n. Was this "
                     "allocated before?",
-                    (long unsigned int) physAddr);
+                    (long unsigned int)physAddr);
             exit(-1);
         }
         return iter->second;
     }
 
-    uint32_t virtToPhys(void *virt) {
+    uint32_t virtToPhys(void *virt)
+    {
         uint32_t phys = 0;
 
         // Open the pagemap file for the current process
@@ -73,8 +75,9 @@ class FringeContextDE1 : public FringeContextBase<void> {
         FILE *origmap = pagemap;
 
         // Seek to the page that the buffer is on
-        unsigned long offset = (unsigned long) virt / getpagesize() * PAGEMAP_LENGTH;
-        if (fseek(pagemap, (unsigned long) offset, SEEK_SET) != 0) {
+        unsigned long offset = (unsigned long)virt / getpagesize() * PAGEMAP_LENGTH;
+        if (fseek(pagemap, (unsigned long)offset, SEEK_SET) != 0)
+        {
             fprintf(stderr, "Failed to seek pagemap to proper location\n");
             exit(1);
         }
@@ -90,7 +93,7 @@ class FringeContextDE1 : public FringeContextBase<void> {
 
         // Find the difference from the virt to the page boundary
         unsigned int distance_from_page_boundary =
-                (unsigned long) virt % getpagesize();
+            (unsigned long)virt % getpagesize();
         // Determine how far to seek into memory to find the virt
         phys = (page_frame_number << PAGE_SHIFT) + distance_from_page_boundary;
 
@@ -105,7 +108,8 @@ public:
     uint32_t numArgEarlyExits;
     string bitfile;
 
-    FringeContextDE1(string path = "") : FringeContextBase(path) {
+    FringeContextDE1(string path = "") : FringeContextBase(path)
+    {
         bitfile = path;
 
         numArgIns = 0;
@@ -121,122 +125,138 @@ public:
         fringeMemBase = 0;
         fpgaMallocPtr = 0;
         fpgaFreeMemSize = MEM_SIZE;
-        // open /dev/mem file
+
         int retval = setuid(0);
         ASSERT(retval == 0, "setuid(0) failed\n");
         fd = open("/dev/mem", O_RDWR);
-        if (fd < 1) {
+        if (fd < 1)
+        {
             perror("error opening /dev/mem\n");
         }
 
         // Initialize pointers to fringeScalarBase
-        void *ptr = nullptr;
-        ptr = mmap(
-                NULL, MAP_LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-                FRINGE_SCALAR_BASEADDR);
-        fringeScalarBase = (u32) ptr;
-        EPRINTF("placing fringeScalarBase at %lx\n", (luint) fringeScalarBase);
+        vuint *ptr = (vuint *)mmap(
+            NULL, MAP_LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+            FRINGE_SCALAR_BASEADDR);
+        fringeScalarBase = ptr;
+        EPRINTF("placing fringeScalarBase at %lx\n", (luint)fringeScalarBase);
 
         // Initialize pointer to fringeMemBase
-        ptr = mmap(NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-                   FRINGE_MEM_BASEADDR);
-        fringeMemBase = (u32) ptr;
-        EPRINTF("placing fringeMemBase at %lx\n", (luint) fringeMemBase);
-        fpgaMallocPtr = fringeMemBase;
+        // ptr = (vuchar*) mmap(NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+        //            FRINGE_MEM_BASEADDR);
+        // fringeMemBase = (u32) ptr;
+        cout << "TODO: Need to allocate memory base!" << endl;
+        // EPRINTF("placing fringeMemBase at %lx\n", (luint) fringeMemBase);
+        // fpgaMallocPtr = fringeMemBase;
     }
 
-
-    uint32_t getFPGAVirt(uint32_t physAddr) {
+    uint32_t getFPGAVirt(uint32_t physAddr)
+    {
         uint32_t offset = physAddr - FRINGE_MEM_BASEADDR;
         return (uint32_t)(fringeMemBase + offset);
     }
 
-    uint32_t getFPGAPhys(uint32_t virtAddr) {
+    uint32_t getFPGAPhys(uint32_t virtAddr)
+    {
         uint32_t offset = virtAddr - fringeMemBase;
         return (uint32_t)(FRINGE_MEM_BASEADDR + offset);
     }
 
-    virtual void load() {
+    virtual void load()
+    {
         // Commands for writing fpga to DE1
-        list<string> cmds = {
-            "echo 0 > /sys/class/fpga-bridge/fpga2hps/enable",
-            "echo 0 > /sys/class/fpga-bridge/hps2fpga/enable",
-            "echo 0 > /sys/class/fpga-bridge/lwhps2fpga/enable",
-            "dd if=SpatialIP.rbf of=/dev/fpga0 bs=1M",
-            "echo 1 > /sys/class/fpga-bridge/fpga2hps/enable",
-            "echo 1 > /sys/class/fpga-bridge/hps2fpga/enable",
-            "echo 1 > /sys/class/fpga-bridge/lwhps2fpga/enable"
-        };
-        list<string>::iterator it;
-        int dnu = -1;
-        for (it = cmds.begin(); it != cmds.end(); ++it) {
-            cout << it->c_str() << endl;
-            sleep(0.5);
-            dnu = system(it->c_str());
-        }
+        // list<string> cmds = {
+        //     "echo 0 > /sys/class/fpga-bridge/fpga2hps/enable",
+        //     "echo 0 > /sys/class/fpga-bridge/hps2fpga/enable",
+        //     "echo 0 > /sys/class/fpga-bridge/lwhps2fpga/enable",
+        //     "dd if=SpatialIP.rbf of=/dev/fpga0 bs=1M",
+        //     "echo 1 > /sys/class/fpga-bridge/fpga2hps/enable",
+        //     "echo 1 > /sys/class/fpga-bridge/hps2fpga/enable",
+        //     "echo 1 > /sys/class/fpga-bridge/lwhps2fpga/enable"
+        // };
+        // list<string>::iterator it;
+        // int dnu = -1;
+        // for (it = cmds.begin(); it != cmds.end(); ++it) {
+        //     cout << it->c_str() << endl;
+        //     sleep(0.5);
+        //     dnu = system(it->c_str());
+        // }
 
-//        string cmd = "prog_fpga " + bitfile;
-//        int dnu = system(cmd.c_str());
+        string cmd = "./prog_fpga ";
+        int dnu = system(cmd.c_str());
         return;
     }
 
-    size_t alignedSize(uint32_t alignment, size_t size) {
-        if ((size % alignment) == 0) {
+    size_t alignedSize(uint32_t alignment, size_t size)
+    {
+        if ((size % alignment) == 0)
+        {
             return size;
-        } else {
+        }
+        else
+        {
             return size + alignment - (size % alignment);
         }
     }
 
-    virtual uint32_t malloc(size_t bytes) {
+    virtual uint32_t malloc(size_t bytes)
+    {
 
         size_t paddedSize = alignedSize(burstSizeBytes, bytes);
         ASSERT(paddedSize <= fpgaFreeMemSize,
-               "FPGA Out-Of-Memory: requested %lu, available %lu\n", (luint) paddedSize,
-               (luint) fpgaFreeMemSize);
+               "FPGA Out-Of-Memory: requested %lu, available %lu\n", (luint)paddedSize,
+               (luint)fpgaFreeMemSize);
 
-        uint32_t virtAddr = (uint32_t) fpgaMallocPtr;
+        uint32_t virtAddr = (uint32_t)fpgaMallocPtr;
 
-        for (int i = 0; i < paddedSize / sizeof(u32); i++) {
-            u32 *addr = (u32 *) (virtAddr + i * sizeof(u32));
+        for (int i = 0; i < paddedSize / sizeof(u32); i++)
+        {
+            u32 *addr = (u32 *)(virtAddr + i * sizeof(u32));
             *addr = 4081516 + i;
         }
         fpgaMallocPtr += paddedSize;
         fpgaFreeMemSize -= paddedSize;
         uint32_t physAddr = getFPGAPhys(virtAddr);
-        EPRINTF("[malloc] virtAddr = %lx, physAddr = %lx\n", (luint) virtAddr, (luint) physAddr);
+        EPRINTF("[malloc] virtAddr = %lx, physAddr = %lx\n", (luint)virtAddr, (luint)physAddr);
         return physAddr;
     }
 
-    virtual void free(uint32_t buf) { EPRINTF("[free] devmem = %lx\n", (luint) buf); }
+    virtual void free(uint32_t buf) { EPRINTF("[free] devmem = %lx\n", (luint)buf); }
 
-    virtual void memcpy(uint32_t devmem, void *hostmem, size_t size) {
+    virtual void memcpy(uint32_t devmem, void *hostmem, size_t size)
+    {
         EPRINTF("[memcpy HOST -> FPGA] devmem = %lx, hostmem = %p, size = %lu\n",
-                (luint) devmem, hostmem, (luint) size);
+                (luint)devmem, hostmem, (luint)size);
 
-        void *dst = (void *) getFPGAVirt(devmem);
+        void *dst = (void *)getFPGAVirt(devmem);
         std::memcpy(dst, hostmem, size);
     }
 
-    virtual void memcpy(void *hostmem, uint32_t devmem, size_t size) {
+    virtual void memcpy(void *hostmem, uint32_t devmem, size_t size)
+    {
 
         EPRINTF("[memcpy FPGA -> HOST] hostmem = %p, devmem = %lx, size = %lu\n",
-                hostmem, (long unsigned int) devmem, (long unsigned int) size);
-        void *src = (void *) getFPGAVirt(devmem);
+                hostmem, (long unsigned int)devmem, (long unsigned int)size);
+        void *src = (void *)getFPGAVirt(devmem);
         std::memcpy(hostmem, src, size);
     }
 
-    void flushCache(uint32_t kb) {
+    void flushCache(uint32_t kb)
+    {
         int cacheSizeWords =
-                kb * (1 << 10) / sizeof(int); // 512kB on DE1, 1MB on DE1
+            kb * (1 << 10) / sizeof(int); // 512kB on DE1, 1MB on DE1
         int arraySize = cacheSizeWords * 10;
-        int *dummyBuf = (int *) std::malloc(arraySize * sizeof(int));
-        EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", (void *) dummyBuf,
-                (long unsigned int) getFPGAPhys((uint32_t) dummyBuf), arraySize);
-        for (int i = 0; i < arraySize; i++) {
-            if (i == 0) {
+        int *dummyBuf = (int *)std::malloc(arraySize * sizeof(int));
+        EPRINTF("[memcpy] dummyBuf = %p, (phys = %lx), arraySize = %d\n", (void *)dummyBuf,
+                (long unsigned int)getFPGAPhys((uint32_t)dummyBuf), arraySize);
+        for (int i = 0; i < arraySize; i++)
+        {
+            if (i == 0)
+            {
                 dummyBuf[i] = 10;
-            } else {
+            }
+            else
+            {
                 dummyBuf[i] = dummyBuf[i - 1] * 2;
             }
         }
@@ -244,20 +264,24 @@ public:
                 arraySize - 1, dummyBuf[arraySize - 1]);
     }
 
-    void dumpRegs() {
+    void dumpRegs()
+    {
         fprintf(stderr, "---- DUMPREGS ----\n");
-        for (int i = 0; i < 100; i++) {
-            fprintf(stderr, "reg[%d] = %08lx\n", i, (long unsigned int) readReg(i));
+        for (int i = 0; i < 100; i++)
+        {
+            fprintf(stderr, "reg[%d] = %08lx\n", i, (long unsigned int)readReg(i));
         }
         fprintf(stderr, "---- END DUMPREGS ----\n");
     }
 
-    void debugs() {
+    void debugs()
+    {
         dumpRegs();
         fprintf(stderr, "---- Let the debugging begin ----\n");
 
         // Deq the debug FIFO into registers
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 5; i++)
+        {
             // Pulse deq signal
             writeReg(0 + 2, 1);
             mysleep(10000000000L);
@@ -270,7 +294,8 @@ public:
         fprintf(stderr, "---- End debugging ----\n");
     }
 
-    void mysleep(unsigned long nanosec) {
+    void mysleep(unsigned long nanosec)
+    {
         struct timespec delay;
 
         delay.tv_sec = 0;
@@ -278,7 +303,8 @@ public:
         nanosleep(&delay, NULL);
     }
 
-    virtual void run() {
+    virtual void run()
+    {
         EPRINTF("[run] Begin..\n");
         uint32_t status = 0;
         double timeout = 60; // seconds
@@ -294,15 +320,18 @@ public:
 
         double startTime = getTime();
         int num = 0;
-        while ((status == 0)) {
+        while ((status == 0))
+        {
             status = readReg(statusReg);
             num++;
-            if (num % 10000000 == 0) {
+            if (num % 10000000 == 0)
+            {
                 double endTime = getTime();
                 EPRINTF("Elapsed time: %lf ms, status = %08x\n", endTime - startTime,
-                        (unsigned int) status);
+                        (unsigned int)status);
                 dumpAllRegs();
-                if (endTime - startTime > timeout * 1000) {
+                if (endTime - startTime > timeout * 1000)
+                {
                     timed_out = 1;
                     fprintf(stderr, "TIMEOUT, %lf seconds elapsed..\n",
                             (endTime - startTime) / 1000);
@@ -310,13 +339,16 @@ public:
                 }
             }
         }
+
         double endTime = getTime();
         fprintf(stderr, "Design done, ran for %lf ms, status = %08x\n",
                 endTime - startTime, status);
         writeReg(commandReg, 0);
         // dumpAllRegs();
-        while (status == 1) {
-            if (timed_out == 1) {
+        while (status == 1)
+        {
+            if (timed_out == 1)
+            {
                 break;
             }
             status = readReg(statusReg);
@@ -333,96 +365,112 @@ public:
 
     virtual void setNumArgOutInstrs(uint32_t number) { numArgOutInstrs = number; }
 
-    virtual void setArg(uint32_t arg, uint32_t data, bool isIO) {
+    virtual void setArg(uint32_t arg, uint32_t data, bool isIO)
+    {
         writeReg(arg + 2, data);
     }
 
-    virtual uint32_t getArg64(uint32_t arg, bool isIO) {
+    virtual uint32_t getArg64(uint32_t arg, bool isIO)
+    {
         return getArg(arg, isIO);
     }
 
-    virtual uint32_t getArgIn(uint32_t arg, bool isIO) {
+    virtual uint32_t getArgIn(uint32_t arg, bool isIO)
+    {
         return readReg(2 + arg);
     }
 
-    virtual uint32_t getArg(uint32_t arg, bool isIO) {
+    virtual uint32_t getArg(uint32_t arg, bool isIO)
+    {
         if (numArgIns == 0)
             return readReg(3 + arg);
         else
             return readReg(2 + arg);
     }
 
-    virtual void writeReg(uint32_t reg, uint32_t data) {
-        mysleep(100000000L); /* Half a second in nano's */
-        Xil_Out32(fringeScalarBase + reg, data);
+    virtual void writeReg(uint32_t reg, uint32_t data)
+    {
+        // mysleep(100000000L); /* Half a second in nano's */
+        *(fringeScalarBase + reg) = data;
     }
 
-    virtual uint32_t readReg(uint32_t reg) {
-        uint32_t value = Xil_In32(fringeScalarBase + reg);
+    virtual uint32_t readReg(uint32_t reg)
+    {
+        uint32_t value = *(fringeScalarBase + reg);
         return value;
     }
 
-    void dumpAllRegs() {
+    void dumpAllRegs()
+    {
         int argIns = numArgIns == 0 ? 1 : numArgIns;
         int argOuts =
-                (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0)
+            (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0)
                 ? 1
                 : numArgOuts;
         int debugRegStart =
-                2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
+            2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
         int totalRegs = argIns + argOuts + numArgOutInstrs + numArgEarlyExits + 2 +
                         NUM_DEBUG_SIGNALS;
 
-        for (int i = 0; i < totalRegs; i++) {
+        for (int i = 0; i < totalRegs; i++)
+        {
             uint32_t value = readReg(i);
-            if (i < debugRegStart) {
+            if (i < debugRegStart)
+            {
                 if (i == 0)
                     EPRINTF(" ******* Non-debug regs *******\n");
-                EPRINTF("\tR%d: %016lx (%08lu)\n", i, (luint) value, (luint) value);
-            } else {
+                EPRINTF("\tR%d: %016lx (%08lu)\n", i, (luint)value, (luint)value);
+            }
+            else
+            {
                 if (i == debugRegStart)
                     EPRINTF("\n\n ******* Debug regs *******\n");
                 EPRINTF("\tR%d %s: %016lx (%08lu)\n", i,
-                        signalLabels[i - debugRegStart], (luint) value, (luint) value);
+                        signalLabels[i - debugRegStart], (luint)value, (luint)value);
             }
         }
     }
 
-    void dumpNonDebugRegs() {
+    void dumpNonDebugRegs()
+    {
         int argIns = numArgIns == 0 ? 1 : numArgIns;
         int argOuts =
-                (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0)
+            (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0)
                 ? 1
                 : numArgOuts;
         int debugRegStart =
-                2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
+            2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
 
-        for (int i = 0; i < debugRegStart; i++) {
+        for (int i = 0; i < debugRegStart; i++)
+        {
             uint32_t value = readReg(i);
-            if (i < debugRegStart) {
+            if (i < debugRegStart)
+            {
                 if (i == 0)
                     EPRINTF(" ******* Non-debug regs *******\n");
-                EPRINTF("\tR%d: %016lx (%08lu)\n", i, (luint) value, (luint) value);
+                EPRINTF("\tR%d: %016lx (%08lu)\n", i, (luint)value, (luint)value);
             }
         }
     }
 
-    void dumpDebugRegs() {
+    void dumpDebugRegs()
+    {
         //    int numDebugRegs = 224;
         EPRINTF(" ******* Debug regs *******\n");
         int argInOffset = numArgIns == 0 ? 1 : numArgIns;
         int argOutOffset =
-                (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0)
+            (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0)
                 ? 1
                 : numArgOuts;
         EPRINTF("argInOffset: %d\n", argInOffset);
         EPRINTF("argOutOffset: %d\n", argOutOffset);
-        for (int i = 0; i < NUM_DEBUG_SIGNALS; i++) {
+        for (int i = 0; i < NUM_DEBUG_SIGNALS; i++)
+        {
             if (i % 16 == 0)
                 EPRINTF("\n");
             uint32_t value = readReg(argInOffset + argOutOffset + numArgOutInstrs +
                                      numArgEarlyExits + 2 + i);
-            EPRINTF("\t%s: %016lx (%08lu)\n", signalLabels[i], (luint) value, (luint) value);
+            EPRINTF("\t%s: %016lx (%08lu)\n", signalLabels[i], (luint)value, (luint)value);
         }
         EPRINTF(" **************************\n");
     }

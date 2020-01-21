@@ -29,6 +29,7 @@ sw:
 	cp de1.sw-resources/Makefile cpp/Makefile
 	sed -i 's/ifndef ZYNQ/ifndef DE1/g' ./cpp/TopHost.cpp ./cpp/structs.hpp
 	make -C cpp -j8
+	tar -czf $(APPNAME).tar.gz -C ${DE1_DIR} SpatialIP.rbf -C ../cpp Top -C ../de1.sw-resources/utils set_perms run.sh
 
 hw:
 	echo "$$(date +%s)" > start.log
@@ -38,13 +39,6 @@ hw:
 	sed -i 's/SRFF/SRFF_sp/g' ${DE1_DIR}/SpatialIP.v
 	make -C ${DE1_DIR} -j8
 	echo "$$(date +%s)" > end.log
-
-# 	cp -r hw-resources/simulation verilog-de1/
-# 	cp -r hw-resources/* verilog-de1/
-# 	cp verilog-de1/SpatialIP.v verilog-de1/Computer_System/synthesis/submodules
-# 	cd verilog-de1 && chmod +x compile.sh && ./compile.sh
-# 	echo "sp.rbf generated. Please copy it to your working dir on FPGA ARM"
-# 	cp verilog-de1/sp.rbf ./
 
 hw-clean:
 	rm -rf ${DE1_DIR}

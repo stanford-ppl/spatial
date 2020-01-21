@@ -15,6 +15,9 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
 
     genIO {
       emit("""
+#ifndef __HOSTIO_H__
+#define __HOSTIO_H__
+
 #include <iostream>
 
 """)
@@ -31,6 +34,8 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
         emit(s"$a();")
       }
       close(src"}")
+
+      emit(s"""#endif /* __HOSTIO_H__ */""")
     }
     allocated.clear
     super.emitFooter

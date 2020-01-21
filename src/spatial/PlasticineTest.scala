@@ -226,7 +226,7 @@ trait PlasticineTest extends DSLTest { test =>
       genpir() >>
       pirpass("gentst", s"${if (module) "--module" else ""} --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=$row --col=$col".split(" ").toList) >>
       (if (module) scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p extlink.csv -d link.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") else Pass) >>
-      scommand(s"maketst", s"$timer make ideal ${if (fast) "DEBUG=1" else "DEBUG=0"}".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"maketst", s"$timer make ideal -j16 ${if (fast) "DEBUG=1" else "DEBUG=0"}".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runp2p", timeout=1000000) >>
       (if (runhybrid)
       scommand(s"runproute", s"$timer make proute".split(" "), timeout=10800 * 2, parseProute()(_), MakeError.apply, wd=IR.config.genDir+"/tungsten") >>

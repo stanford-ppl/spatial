@@ -46,7 +46,7 @@ class DE1Like extends ZynqLike {
     fringe.io.heap <> accel.io.heap
     accel.io.enable := fringe.io.enable
     fringe.io.done := accel.io.done
-    fringe.reset := !reset.toBool
+    fringe.reset := reset.toBool
     accel.reset := fringe.io.reset
 
     io

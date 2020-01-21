@@ -2,6 +2,7 @@ DE1_DIR=verilog-de1
 
 APPNAME=$(shell basename $(shell pwd))
 BIGIP_SCRIPT=bigIP.tcl
+PROJECT=DE1_SoC_Computer
 timestamp := $(shell /bin/date "+%Y-%m-%d---%H-%M-%S")
 ifndef CLOCK_FREQ_MHZ
 export CLOCK_FREQ_MHZ=125
@@ -34,7 +35,9 @@ hw:
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1"
 	cat de1.hw-resources/SRAMVerilogAWS.v >> ${DE1_DIR}/SpatialIP.v
 	cp de1.hw-resources/build/* ${DE1_DIR}
-	sed -i 's/SRFF/SRFF_sp/g' verilog-de1/SpatialIP.v
+	sed -i 's/SRFF/SRFF_sp/g' ${DE1_DIR}/SpatialIP.v
+	make -C ${DE1_DIR} -j8
+	echo "$$(date +%s)" > end.log
 
 # 	cp -r hw-resources/simulation verilog-de1/
 # 	cp -r hw-resources/* verilog-de1/
@@ -44,7 +47,7 @@ hw:
 # 	cp verilog-de1/sp.rbf ./
 
 hw-clean:
-	rm -rf verilog-de1soc
+	rm -rf ${DE1_DIR}
 	rm -rf ./prog
 
 sw-clean:

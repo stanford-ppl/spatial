@@ -1,6 +1,6 @@
 import spatial.dsl._
 
-@spatial object ArgInOutTest extends SpatialApp {
+@spatial object ArgInOutTestVCS extends SpatialApp {
   def main(args: Array[String]): Unit = {
     val a = ArgIn[Int32]
     val b = ArgOut[Int32]

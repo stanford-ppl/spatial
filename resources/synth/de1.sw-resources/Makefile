@@ -1,8 +1,5 @@
 CC=g++
 LINK=g++
-# CROSS_COMPILE=${QUARTUS_ROOTDIR}/../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/bin/
-# CPP_HEADER_LIB=${QUARTUS_ROOTDIR}../embedded/ds-5/sw/gcc/arm-linux-gnueabihf/include/c++/${DS5_VER}/
-# arm-xilinx-linux-gnueabi-
 
 CROSS_COMPILE=arm-linux-gnueabihf-
 

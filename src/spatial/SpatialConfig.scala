@@ -36,6 +36,7 @@ class SpatialConfig extends Config {
   var enableOptimizedReduce: Boolean = true
   var distributeStreamCtr: Boolean = true
   var useAreaModels: Boolean = true
+  var reportArea: Boolean = false
   var enableForceBanking: Boolean = false
   var groupUnrolledAccess: Boolean = false
   var enableParallelBinding: Boolean = true

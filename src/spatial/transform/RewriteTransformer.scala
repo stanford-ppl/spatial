@@ -129,6 +129,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+    case _:SpatialBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
 
     case FixMul(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
       val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))

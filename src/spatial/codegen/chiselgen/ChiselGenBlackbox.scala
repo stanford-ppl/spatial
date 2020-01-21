@@ -188,7 +188,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
           emit("import emul.ResidualGenerator._")
           emit("import fringe.templates.euresys._")
           emit("import api._")
-          open(src"class $lhs()(implicit stack: List[KernelHash]) extends Module() {")
+          open(src"class $lhs(PARAMS: Map[String, Any])(implicit stack: List[KernelHash]) extends Module() {")
           open(src"val io = IO(new Bundle {")
           emit(s"val sigsIn = Input(new InputKernelSignals(1,1,List(1),List(32)))")
           emit("val rr = Input(Bool())")
@@ -213,7 +213,20 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
     case SpatialBlackboxUse(bbox, inputs) =>
       val inports: Struct[_] = inputs.tp.asInstanceOf[Struct[_]]
       val outports: Struct[_] = lhs.tp.asInstanceOf[Struct[_]]
-      emit(src"val ${lhs}_bbox = Module(new $bbox())")
+
+      val params = if (lhs.getBboxInfo.isDefined) {
+        lhs.bboxInfo.params.map{case (k,v) =>
+//          def stQuote(x: Any) = if (x.isInstanceOf[String]) s"\"$x\"" else s"$x"
+          val vs = v match {
+            case Const(x) => s"$x"
+            case x: scala.Int => x.toString
+            case x: scala.Double => x.toString
+            case x: scala.Float => x.toString
+          }
+          s""""$k" -> $vs.toFloat"""}.mkString("Map(",",",")"
+        )
+      } else "Map()"
+      emit(src"val ${lhs}_bbox = Module(new $bbox($params))")
       inports.fields.foreach { case (field, _) =>
         val (start, end) = getField(inports, field)
         emit(src"${lhs}_bbox.io.$field := $inputs($start,$end).r")
@@ -236,7 +249,7 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
           emitHeader()
           open(src"class ${lhs}_kernel(")
           emit(s"in: ${arg(func.input.tp)},")
-          emit(s"parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
+          emit(s"PARAMS: Map[String,Any], parent: Option[Kernel], cchain: List[CounterChainInterface], childId: Int, breakpoints: Vec[Bool], ${if (spatialConfig.enableInstrumentation) "instrctrs: List[InstrCtr], " else ""}rr: Bool")
           closeopen(s") extends Kernel(parent, cchain, childId, $nMyChildren, 1, List(1), List(32)) {")
 
           // Poor man's createSMObject
@@ -304,10 +317,23 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       val inports: StreamStruct[_] = inputs.tp.asInstanceOf[StreamStruct[_]]
       val outports: StreamStruct[_] = lhs.tp.asInstanceOf[StreamStruct[_]]
       enterCtrl(lhs)
+      val params = if (lhs.getBboxInfo.isDefined) {
+        lhs.bboxInfo.params.map{case (k,v) =>
+//          def stQuote(x: Any) = if (x.isInstanceOf[String]) s"\"$x\"" else s"$x"
+          val vs = v match {
+            case Const(x) => s"$x"
+            case x: scala.Int => x.toString
+            case x: scala.Double => x.toString
+            case x: scala.Float => x.toString
+          }
+          s""""$k" -> $vs.toFloat"""}.mkString("Map(",",",")"
+        )
+      } else "Map()"
+
       val instrs = if (spatialConfig.enableInstrumentation) "List(), " else "" // TODO
 
       val idx = lhs.parent.s.get.children.indexWhere { x => x.s.get == lhs }
-      emit(src"val ${lhs}_bbox = new ${bbox}_kernel($inputs, Some(me), List(), $idx, breakpoints, $instrs rr)")
+      emit(src"val ${lhs}_bbox = new ${bbox}_kernel($inputs, $params, Some(me), List(), $idx, breakpoints, $instrs rr)")
       emit(src"""${lhs}_bbox.sm.io.ctrDone := risingEdge(${lhs}_bbox.sm.io.ctrInc)""")
       emit(src"${lhs}_bbox.backpressure := ${getBackPressure(lhs.toCtrl)} | ${lhs}_bbox.sm.io.doneLatch")
       emit(src"${lhs}_bbox.forwardpressure := true.B | ${lhs}_bbox.sm.io.doneLatch // Always has forward pressure because it is an outer?")
@@ -316,6 +342,15 @@ trait ChiselGenBlackbox extends ChiselGenCommon {
       emit(src"${lhs}_bbox.mask := ${and(ens.map{x => appendSuffix(lhs, x)})}")
       emit(src"""${lhs}_bbox.configure("$lhs", Some(io.sigsIn), Some(io.sigsOut), false)""")
       emit(src"val $lhs = ${lhs}_bbox.kernel()")
+
+    case FetchBlackboxParam(field) =>
+      emit(src"""val $lhs = Wire(${lhs.tp})""")
+      // TODO: Assumes numeric values in map for now
+      val (s,d,f) = lhs.tp match {
+        case FixPtType(s,d,f) => (s,d,f)
+      }
+      emit(src"""$lhs := PARAMS("$field").asInstanceOf[scala.Float].FP($s, $d, $f).r""")
+
 
     case _ => super.gen(lhs, rhs)
   }

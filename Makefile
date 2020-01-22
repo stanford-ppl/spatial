@@ -1,4 +1,4 @@
-.PHONY: all resources apps test pir
+.PHONY: all resources apps test pir models
 all: apps
 
 ###-----------------------------------###
@@ -35,7 +35,7 @@ install:
 ###-----------------------------------###
 ## Update pir libs.                    ##
 ###-----------------------------------###
-pir:
+pir: models
 	git submodule update --init
 	bin/update_resources.sh
 	cd pir && make

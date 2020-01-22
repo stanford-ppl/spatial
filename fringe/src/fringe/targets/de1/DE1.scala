@@ -21,6 +21,9 @@ class DE1Like extends ZynqLike {
     // Fringe <-> DRAM connections
     // TODO: Fringe Memory
     io.M_AXI <> fringe.io.M_AXI
+    scala.Console.println(
+      io.M_AXI.foreach(a4i => a4i.ARADDR)
+    )
 
     // TODO: Probe
     io.TOP_AXI <> fringe.io.TOP_AXI

@@ -13,7 +13,7 @@ class DE1Like extends ZynqLike {
 
     // Avalon Fringe
     val blockingDRAMIssue = false // Allow only one in-flight request, block until response comes back
-    val fringe = Module(new FringeDE1(blockingDRAMIssue, io.avalonLiteParams, io.avalonBurstParams))
+    val fringe = Module(new FringeDE1(blockingDRAMIssue, io.avalonLiteParams, io.axiParams))
 
     // Fringe <-> Host connections
     fringe.io.S_AVALON <> io.S_AVALON

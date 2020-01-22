@@ -10,8 +10,8 @@ import spatial.dsl._
     setMem(inDRAM, inData)
 
     Accel {
-      val mem = SRAM[Int](len/2)
-      Foreach(len by memLen) { i =>
+      val mem = SRAM[Int](memLen)
+      Sequential.Foreach(len by memLen) { i =>
         mem load inDRAM(i :: i + memLen)
         Foreach(memLen by 1) { j =>
           mem(j) = mem(j) + 3

@@ -2,13 +2,13 @@ package fringe.targets.de1
 
 import chisel3._
 import chisel3.util.{Decoupled, DecoupledIO}
-import fringe.{AppStreams, Fringe, HeapIO}
+import fringe.{AppStreams, Fringe, HeapIO, globals}
 import fringe.globals._
 import fringe.templates.axi4._
 
 class FringeDE1(blockingDRAMIssue: Boolean,
                 avalonLiteParams: AvalonBundleParameters,
-                avalonParams: AvalonBundleParameters)
+                axiParams: AXI4BundleParameters)
     extends Module {
 
   val numRegs: Int = NUM_ARG_INS + NUM_ARG_OUTS + NUM_ARG_IOS + 2
@@ -22,9 +22,9 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   val io = IO(new Bundle {
     val S_AVALON = new AvalonSlave(avalonLiteParams)
 
-    // TODO: Add M_AXI Later...
+    // TODO: Add M_AVALON Later...
     val M_AXI: Vec[AXI4Inlined] =
-      Vec(NUM_CHANNELS, new AXI4Inlined(avalonParams))
+      Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 
     // TODO: Add Avalon probes for board debugging.
     //  For now just add AXI to stop firrtl panicing
@@ -43,7 +43,7 @@ class FringeDE1(blockingDRAMIssue: Boolean,
       Vec(NUM_ARG_OUTS, Flipped(Decoupled(UInt(TARGET_W.W))))
     val argEchos = Output(Vec(NUM_ARG_OUTS, UInt(TARGET_W.W)))
 
-    // TODO: Accel memory IO
+    // TODO: Accel Avalon memory IO
     val memStreams = new AppStreams(LOAD_STREAMS,
                                     STORE_STREAMS,
                                     GATHER_STREAMS,
@@ -57,7 +57,7 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   io <> DontCare
 
   // Common Fringe
-  val fringeCommon = Module(new Fringe(blockingDRAMIssue, avalonParams))
+  val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
   fringeCommon.io.raddr := io.S_AVALON.address
   fringeCommon.io.wen := io.S_AVALON.write
   fringeCommon.io.waddr := io.S_AVALON.address
@@ -78,8 +78,6 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   // Fringe connections
   io.enable := fringeCommon.io.enable
   fringeCommon.io.done := io.done
-
-  // TODO: This might be an inverted signal...
   fringeCommon.reset := reset.toBool
   io.reset := fringeCommon.io.reset
 
@@ -89,4 +87,17 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   // TODO: Do memStream management
   io.memStreams <> fringeCommon.io.memStreams
   io.heap <> fringeCommon.io.heap
+
+  // TODO: This might work better with an Avalon stream...
+  // AXI bridge
+  io.M_AXI.zipWithIndex.foreach {
+    case (maxi, i) =>
+      val axiBridge = Module(new MAGToAXI4Bridge(axiParams))
+      axiBridge.io.in <> fringeCommon.io.dram(i)
+      maxi <> axiBridge.io.M_AXI
+  }
+  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
+    io.M_AXI.foreach(_.AWVALID := false.B)
+    io.M_AXI.foreach(_.ARVALID := false.B)
+  }
 }

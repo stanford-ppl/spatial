@@ -2,6 +2,7 @@ package spatial.transform.unrolling
 
 import argon._
 import spatial.metadata.access._
+import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.lang._
 import spatial.node._
@@ -254,6 +255,8 @@ trait MemoryUnrolling extends UnrollingBase {
           Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), locks, ens2), vecIds.toList, 0))
         }
 
+        dbgs(s"banked is $banked")
+
         // hack for issue #90
         val newOfs = mems.map{case UnrollInstance(m,_,_,p,_,_) => (m,p)}.take(i).count(_ == (mem2,port))
         
@@ -301,6 +304,7 @@ trait MemoryUnrolling extends UnrollingBase {
           s.originalSym = lhs
           transferSyncMeta(lhs, s)
           mem2.substHotSwap(lhs, s)
+          if (inHw) s.progorder = lhs.progorder.get
           if (lhs.getIterDiff.isDefined) s.iterDiff = lhs.iterDiff
           dbgs(s"  ${stm(s)}"); //strMeta(s)
         }

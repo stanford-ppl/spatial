@@ -34,9 +34,22 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   private var validBits: Set[Bit] = Set.empty
   def withValids[T](valids: Seq[Bit])(blk: => T): T = {
     val prevValids = validBits
-    validBits = valids.toSet // TODO: Should this be ++= ?
+    validBits = if (!_passEns) valids.toSet else prevValids ++ valids.toSet
+    // TODO: Should this be ++= ?
     val result = blk
     validBits = prevValids
+    result
+  }
+
+  /**
+   * Hack: passing enable for Switch and SwitchCase for PIR since they don't have enable in IR
+   */
+  private var _passEns: Boolean = false
+  def withPassEns[T](passEns:Boolean)(blk: => T): T = {
+    val saved = _passEns
+    _passEns = passEns
+    val result = blk
+    _passEns = saved
     result
   }
 
@@ -122,8 +135,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A], mop: Boolean)(implicit ctx: SrcCtx): Sym[_] = {
-    // By default, use a unit unroller (only one lane)
-    inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
+    val passEns = rhs match {
+      case rhs:Switch[_] if spatialConfig.enablePIR => true
+      case rhs:SwitchCase[_] if spatialConfig.enablePIR => true
+      case rhs => false
+    }
+    withPassEns(passEns) {
+      // By default, use a unit unroller (only one lane)
+      inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
+    }
   }
 
   /** Duplicate the given controller based on the global Unroller helper instance lanes.

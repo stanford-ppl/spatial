@@ -176,8 +176,17 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
 
  }
 
+  private var _progorder = 0
+  def setProgramOrder(lhs:Sym[_]) = {
+    lhs.progorder = _progorder
+    _progorder += 1
+  }
+  def resetProgramOrder = { _progorder = 0 }
+
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
-    case _:AccelScope => inAccel{ super.visit(lhs, rhs) }
+    case _:AccelScope => 
+      inAccel{ super.visit(lhs, rhs) }
+      resetProgramOrder
     case _:BlackboxImpl[_,_,_] => inBox{ super.visit(lhs, rhs) }
 
     case ctrl: Control[_] => 
@@ -196,9 +205,12 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
         case _ =>
       }
       findCycles(lhs, ctrl)
+      setProgramOrder(lhs)
       super.visit(lhs,rhs)
       
-    case _ => super.visit(lhs, rhs)
+    case _ => 
+      if (inHw) setProgramOrder(lhs)
+      super.visit(lhs, rhs)
   }
 
 }

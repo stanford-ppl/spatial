@@ -41,12 +41,21 @@ using namespace std;
       }
   	  emit(s"""exit(1);""")
     close("}")
+    open("void genLink() {")
+      emit(s"""Top* top = new Top;""")
+      emit(s"""Module DUT({top}, "DUT");""")
+      emit(s"""REPL repl(&DUT, std::cout);""")
+      emit(s"""repl.Command("source script_link");""")
+      emit(s"""delete top;""")
+  	  emit(s"""exit(1);""")
+    close("}")
 
     open("int main(int argc, char **argv) {");
       emit("vector<string> *args = new vector<string>(argc-1);")
       open("for (int i=1; i<argc; i++) {")
         emit("(*args)[i-1] = std::string(argv[i]);")
         emit(src"""if (std::string(argv[i]) == "--help" | std::string(argv[i]) == "-h") {printHelp();}""")
+        emit(src"""if (std::string(argv[i]) == "--gen-link" | std::string(argv[i]) == "-l") {genLink();}""")
       close("}")
       gen(block)
       emit(s"""cout << "Complete Simulation" << endl;""")

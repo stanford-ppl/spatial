@@ -43,3 +43,54 @@ import spatial.dsl._
     assert(checkGold(result, gold))
   }
 }
+
+class OuterDRAMLock_0 extends OuterDRAMLock(op=1)
+class OuterDRAMLock_1 extends OuterDRAMLock(op=2)
+
+@spatial abstract class OuterDRAMLock(
+  d:scala.Int = 14,
+  N:scala.Int = 128,
+  ts:scala.Int = 32,
+  op:scala.Int = 2,
+  ip:scala.Int = 16,
+) extends SpatialTest {
+  def main(args: Array[String]): Unit = {
+
+    val lockDRAM = LockDRAM[I32](d)
+    setMem(lockDRAM, Array.tabulate[I32](N){i => 0})
+    Accel{
+      val lockDRAMUnit = Lock[I32](op)
+
+      Sequential.Foreach(4 by 1 par 1) { i =>
+        Foreach(d by 1) { j => lockDRAM(j) = 0 } // W1
+        Foreach(N by ts par op) { j =>
+          Foreach(ts by 1 par ip) { k =>
+            val addr = (j + k) % d
+            val id = addr // % 5
+
+            val lock = lockDRAMUnit.lock(id) 
+            val old = lockDRAM(addr, lock) // R1
+            val next = old + j + k
+            lockDRAM(addr, lock) = next // W2
+          }
+        }
+      }
+    }
+
+    val goldSeq = List.tabulate(N){j => j}.grouped(d).toList.reduce { (a,b) => 
+      List.tabulate(math.max(a.size,b.size)) { j => a(j) + b.lift(j).getOrElse(0) }
+    }
+    val gold = Array.fromSeq[I32](goldSeq.map { _.to[I32] })
+
+    val result = getMem(lockDRAM)
+
+    println(s"Result: ")
+    printArray(result)
+
+    println(s"Gold: ")
+    printArray(gold)
+
+    val cksum = approxEql(result, gold,0)
+    assert(cksum)
+  }
+}

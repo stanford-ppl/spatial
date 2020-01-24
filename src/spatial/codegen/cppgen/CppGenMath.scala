@@ -95,6 +95,7 @@ trait CppGenMath extends CppGenCommon {
     case FixAbs(x)  => emit(src"${lhs.tp} $lhs = fabs($x);")
 
     case FltAbs(x)  => emit(src"${lhs.tp} $lhs = fabs($x);")
+    case FltLn(x)  => emit(src"${lhs.tp} $lhs = log($x);")
     // case FltLog(x)  => x.tp match {
     //   case DoubleType() => emit(src"${lhs.tp} $lhs = log($x);")
     //   case FloatType()  => emit(src"${lhs.tp} $lhs = log($x);")

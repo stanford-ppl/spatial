@@ -34,6 +34,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
       case StreamInNew(init) => genAccel(lhs, rhs)
       case StreamOutNew(init) => genAccel(lhs, rhs)
       case DRAMHostNew(dims,zero) => genAccel(lhs, rhs)
+      case LockDRAMHostNew(dims,zero) => genAccel(lhs, rhs)
       case rhs if (inHw) => genAccel(lhs, rhs)
       case rhs => rhs.blocks.foreach(ret)
     }

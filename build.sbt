@@ -17,11 +17,11 @@ val base = Seq(
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % scalatestVersion,	 // Testing
     "com.github.scopt" %% "scopt" % "3.7.0",             // Command line args
-    "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
+    "org.scala-lang.modules" %% "scala-xml" % "1.0.6", // scala 2.12 and scala test 2.12 depends on 1.06 so sbt select the older version anyway
     "com.github.pureconfig" %% "pureconfig" % "0.9.2",
     "org.jpmml" % "pmml-evaluator" % "1.4.8",
-    "org.scalanlp" %% "breeze" % "1.0",
-    "javax.xml.bind" % "jaxb-api" % "2.3.0"
+    "javax.xml.bind" % "jaxb-api" % "2.3.0",
+    "org.scalanlp" %% "breeze" % "1.0"
 
     // "com.thoughtworks.xstream" % "xstream" % "1.4.3",
     // These are a bit bulky, leaving them out in favor of a stripped down version for now

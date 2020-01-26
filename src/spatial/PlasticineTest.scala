@@ -9,9 +9,9 @@ import scala.io.Source
 
 trait PlasticineTest extends DSLTest { test =>
 
-  protected val cmdlnArgs = sys.env.get("TEST_ARGS").getOrElse("").split(" ").map(_.trim).toList
+  protected lazy val cmdlnArgs = sys.env.get("TEST_ARGS").map { " " + _ }.getOrElse("")
 
-  private lazy val spatialFlags = sys.env.get("SPATIAL_FLAGS").map { " " + _ }.getOrElse("")
+  private lazy val pirCliArgs = sys.env.get("PIR_ARGS").map { " " + _ }.toList
 
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
 
@@ -24,7 +24,7 @@ trait PlasticineTest extends DSLTest { test =>
     case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
   }
 
-  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args + spatialFlags, "", "", "") {
+  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args + cmdlnArgs, "", "", "") {
     override val makeTimeout: Long = 12000 // Timeout for compiling, in seconds
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
@@ -96,7 +96,7 @@ trait PlasticineTest extends DSLTest { test =>
 
     def pirpass(pass:String, args:List[String]) = {
       var cmd = pirArgList ++ args
-      cmd ++= cmdlnArgs
+      cmd ++= pirCliArgs
       val timeout = 100000
       scommand(pass, cmd, timeout, parsepir _, RunError.apply)
     }

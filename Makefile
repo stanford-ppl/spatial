@@ -78,7 +78,7 @@ resources:
 ## Update the models package.          ##
 ###-----------------------------------###
 models:
-	sbt "; project models; publishLocal"
+	sbt "; project utils; publishLocal; project models; publishLocal"
 
 ###-----------------------------------###
 ## Update the utils package.          ##

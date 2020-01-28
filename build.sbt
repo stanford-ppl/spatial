@@ -8,7 +8,7 @@ trapExit := false
 val base = Seq(
   organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
-  version := "1.2-SNAPSHOT",
+  version := "1.1-SNAPSHOT",
   licenses += ("MIT", url("https://opensource.org/licenses/MIT")),
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
 

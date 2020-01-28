@@ -1,6 +1,9 @@
 package spatial.tests.feature.banking
 
+import spatial.node._
 import spatial.dsl._
+import argon.Block
+import argon.Op
 
 @spatial class Bank1D extends SpatialTest {
   override def dseModelArgs: Args = "16 16 16 16 16"
@@ -88,10 +91,10 @@ import spatial.dsl._
     val RESULT2 = ArgOut[Int]
 
     Accel {
-      val x = SRAM[Int](128)               // N = 9, B = 4, alpha = 3
+      val x = SRAM[Int](128).nofission.onlyblockcyclic.nRelaxed               // N = 9, B = 4, alpha = 3
       Foreach(128 by 1){i => x(i) = i}
       RESULT1 := Reduce(Reg[Int])(128 by 4 par 3){i => x(i+1) + x(i+2) + x(i+3)}{_+_}
-      val y = SRAM[Int](128).noduplicate.noblockcyclic // N = 16, B = 1, alpha = 1
+      val y = SRAM[Int](128).nofission.noblockcyclic // N = 16, B = 1, alpha = 1
       Foreach(128 by 1){i => y(i) = i}
       RESULT2 := Reduce(Reg[Int])(128 by 4 par 3){i => y(i+1) + y(i+2) + y(i+3)}{_+_}
     }
@@ -132,6 +135,7 @@ import spatial.dsl._
           comm1.enq(true)
           comm2.enq(true)
         }
+        // Both reads to problem could happen on same cycle, so it should not merge the two instances
         Pipe{
           dummy := comm1.deq().to[Int]
           out1 := problem(i*8 + 7)
@@ -151,6 +155,16 @@ import spatial.dsl._
     println(r"Answers: $got1 =?= $gold1, $got2 =?= $gold2")
     assert(got1 == gold1 && got2 == gold2)
   }
+
+  override def checkIR(block: Block[_]): Result = {
+    val problem_count = block.nestedStms.collect{case x@Op(sram:SRAMNew[_,_]) => sram }.size
+
+    require(problem_count == 2, "Should only have 2 duplicates of problem SRAM")
+
+    super.checkIR(block)
+  }
+
+
 }
 
 
@@ -164,8 +178,8 @@ import spatial.dsl._
     setArg(in, 1)
 
     Accel {
-      val mem1 = SRAM[Int](64).noduplicate
-      val mem2 = SRAM[Int](64).noduplicate
+      val mem1 = SRAM[Int](64).nofission
+      val mem2 = SRAM[Int](64).nofission
       mem1 load dram1
       Foreach(64 by 8){i => 
         if (in.value == 1) { // Make LCA an inner SwitchCase to confuse banking analyzer

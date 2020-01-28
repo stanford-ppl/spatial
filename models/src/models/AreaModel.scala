@@ -1,13 +1,10 @@
 package models
 
+import java.io.{File, FileInputStream}
 import scala.collection.mutable.{HashMap, Set}
-import java.nio._
-import java.nio.{ file => javafile }
 import org.jpmml.evaluator._
 import scala.collection.JavaConverters._
-import _root_.java.io.File
 import org.dmg.pmml.FieldName
-import utils.math._
 import utils.math.isPow2
 
 class AreaEstimator {
@@ -46,6 +43,17 @@ class AreaEstimator {
   def shutdown(wait: Long = 0): Unit = {
     openedModels.clear()
     failedModels.clear()
+  }
+
+  private def getModel(model: String) = {
+    val spatial_home = sys.env("SPATIAL_HOME")
+    val model_path = spatial_home + "/models/resources/" + model
+    val file_exists = (new File(model_path)).exists
+    if (file_exists) {
+      new FileInputStream(model_path)
+    } else {
+      null
+    }
   }
 
   // Old way of estimating node area
@@ -161,7 +169,8 @@ class AreaEstimator {
       if (hist.grouped(3).exists{x => x(0) == 0 && (x(1) + x(2) > 0)}) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] histogram ($hist) contains entries connected to 0 banks, which is likely wrong!")
       val values = allB ++ allN ++ allAlpha ++ List(bitWidth) ++ allDims ++ hist ++ List(depth) ++ allP
       val modelName = nodetype + "_" + prop + ".pmml"
-      val model = getClass.getClassLoader.getResourceAsStream(modelName)
+      //val model = getClass.getClassLoader.getResourceAsStream(modelName)
+      val model = getModel(modelName)
       val model_exists = {model != null}
       val tryEvaluator: Option[Evaluator] = try { 
           if (model_exists && !failedModels.contains((nodetype,prop))) Some(openedModels.getOrElseUpdate((nodetype,prop), {
@@ -170,6 +179,7 @@ class AreaEstimator {
           e.verify()
           e
         })) else None} catch {case x:Throwable => None}
+      if (model != null) model.close()
       if (tryEvaluator.isDefined) {
         val evaluator = tryEvaluator.get
 
@@ -204,7 +214,8 @@ class AreaEstimator {
   def estimateArithmetic(prop: String, nodetype: String, values: Seq[Int]): Double = {
     if (useML) {
       val modelName = nodetype + "_" + prop + ".pmml"
-      val model = getClass.getClassLoader.getResourceAsStream(modelName)
+      //val model = getClass.getClassLoader.getResourceAsStream(modelName)
+      val model = getModel(modelName)
       val model_exists = {model != null}
       val tryEvaluator: Option[Evaluator] = try { 
           if (model_exists && !failedModels.contains((nodetype,prop))) Some(openedModels.getOrElseUpdate((nodetype,prop), {
@@ -213,6 +224,7 @@ class AreaEstimator {
           e.verify()
           e
         })) else None} catch {case x:Throwable => None}
+      if (model != null) model.close()
       if (tryEvaluator.isDefined) {
         val evaluator = tryEvaluator.get
 

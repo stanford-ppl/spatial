@@ -10,6 +10,8 @@ all: hw sw
 	tar -czf TopVCS.tar.gz -C verilog-vcs accel.bit.bin -C ../cpp Top
 
 help:
+	@echo "------- INFO -------"
+	@echo "export FRINGELESS=1 # do not compile Fringe module into SpatialIP.v"
 	@echo "------- SUPPORTED MAKE TARGETS -------"
 	@echo "make             : VCS SW + HW build"
 	@echo "make proto       : VCS SW + HW for huge apps."
@@ -28,7 +30,7 @@ proto: hw-proto sw
 	tar -czf TopVCS.tar.gz -C verilog-vcs accel.bit.bin -C ../cpp Top
 
 sw:
-	cp scripts/vcs.mk cpp/Makefile
+	cp vcs.sw-resources/Makefile cpp/Makefile
 	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
 	cp cpp/cppDeliteArrayStructs.h cpp/datastructures 2>/dev/null || :
@@ -37,9 +39,15 @@ sw:
 
 hw:
 	echo "$$(date +%s)" > start.log
-	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi 
-	sbt "runMain top.Instantiator --verilog --testArgs vcs"
+	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
+ifeq ($(FRINGELESS),1)
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs fringeless";
+	mv verilog-fringeless verilog-vcs
+else
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs vcs"
+endif
 	cp -r vcs.hw-resources/* verilog-vcs
+	cp *.v verilog-vcs 2>/dev/null || : # hack for grabbing any blackboxes that may have been dumped here
 	touch in.txt
 	make -C verilog-vcs
 	ln -sf verilog-vcs verilog

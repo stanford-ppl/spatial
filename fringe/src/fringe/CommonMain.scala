@@ -27,9 +27,11 @@ trait CommonMain {
     case "aws-sim"   => true
     case "zynq"      => true
     case "zcu"       => true
+    case "fringeless" => true
     case "zedboard"       => true
     case "verilator" => true
     case "vcs"       => true
+    case "cxp"       => true
     case "xsim"      => true
     case "de1soc"    => true
     case "arria10"   => true

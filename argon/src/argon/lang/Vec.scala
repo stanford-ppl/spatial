@@ -15,8 +15,10 @@ import argon.node._
   private implicit val evv: A <:< Bits[A] = A.box
 
   // TODO[4]: These are all quite expensive for large vectors
+  @api def size: Int = elems.size
   @api def elems: List[A] = List.tabulate(width){i => this.apply(i) }
   @api def map[B:Bits](func: A => B): Vec[B] = Vec.ZeroFirst(elems.map(func):_*)
+  @api def zipWithIndex[B:Bits](func: (A,Int) => B): Vec[B] = Vec.ZeroFirst(elems.zipWithIndex.map{case (e,i) => func(e,i)}:_*)
   @api def zip[B:Bits,R:Bits](that: Vec[B])(func: (A,B) => R): Vec[R] = {
     if (that.width != this.width) {
       implicit val tV: Vec[R] = Vec.bits[R](width)
@@ -104,6 +106,13 @@ import argon.node._
     * Returns a new vector formed by the concatenation of this and that.
     */
   @api def ++(that: Vec[A]): Vec[A] = Vec.concat(Seq(this,that))
+
+    /**
+    * Converts a vector of type B to type A by packing all of the bits together (msb is in element index 0)
+    */
+    @api def asPacked[B:Bits]: B = {
+      stage(VecAsData[B,A](this, Bits[B]))
+    }
 
   /**
     * Returns a new vector with this vector's elements in reverse order.

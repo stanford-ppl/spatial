@@ -23,17 +23,18 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/zedboard.mk cpp/Makefile
+	cp zedboard.sw-resources/Makefile cpp/Makefile
 	make -C cpp -j8
 	tar -czf $(APPNAME).tar.gz -C ${ZYNQ_V_DIR} accel.bit.bin parClockFreq.sh -C ../cpp Top -C ../zedboard.sw-resources/utils set_perms setClocks.sh run.sh
 
 hw:
 	echo "$$(date +%s)" > start.log
-	sbt "runMain top.Instantiator --verilog --testArgs zedboard"
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs zedboard"
 	mv ${BIGIP_SCRIPT} ${ZYNQ_V_DIR}/
-	cat zedboard.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/Top.v
-	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/Top.v; fi
+	cat zedboard.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/SpatialIP.v
+	if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* keep_hierarchy = \"yes\" *) module/g" ${ZYNQ_V_DIR}/SpatialIP.v; fi
 	cp zedboard.hw-resources/build/* ${ZYNQ_V_DIR}
+	cp *.v ${ZYNQ_V_DIR} 2>/dev/null || :
 	mv ${ZYNQ_V_DIR}/fsbl.elf._ ${ZYNQ_V_DIR}/fsbl.elf
 	mv ${ZYNQ_V_DIR}/u-boot.elf._ ${ZYNQ_V_DIR}/u-boot.elf
 	make -C ${ZYNQ_V_DIR}

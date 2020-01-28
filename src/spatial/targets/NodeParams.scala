@@ -9,6 +9,8 @@ import spatial.util.spatialConfig
 import spatial.metadata.control._
 import spatial.metadata.types._
 import spatial.metadata.memory._
+import spatial.metadata.blackbox._
+import spatial.metadata.retiming._
 import scala.math.log
 
 trait NodeParams {
@@ -29,14 +31,19 @@ trait NodeParams {
           val log2correction = if (nbits(d) < 6) 1 else 0
           (op.name + "Mul", Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.1875 + 1)/log(2), "drain" -> 0.1875*nbits(d), "correction" -> log2correction))
         case _ => 
-          val log2correction = if (nbits(d) < 33) 1 else 0
+          val log2correction = if (nbits(d) < 32) 1 else 0
           (op.name, Seq("b" -> nbits(d), "layers" -> log(nbits(d) * 0.03125 + 1)/log(2), "drain" -> nbits(d)/32, "correction" -> log2correction))
       }
     case op:FixOp[_,_,_,_] => (op.name, Seq("b" -> op.fmt.nbits))
 
     case op:FltOp[_,_,_]   => (op.name, Nil)
 
+    case _@DelayLine(d,_) => ("DelayLine", Seq("d" -> {if (s.userInjectedDelay) d else 0}))
+
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
+
+    case op@SpatialBlackboxUse(bbox,_) => ("SpatialBlackbox", Seq("lat" -> bbox.bodyLatency.headOption.getOrElse(0.0).toInt))
+    case op:VerilogBlackbox[_,_] => ("VerilogBlackbox", Seq("lat" -> s.bboxInfo.latency))
 
     case _:SRAMRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMAsyncRead", Nil)
     case _:SRAMBankedRead[_,_] if spatialConfig.enableAsyncMem => ("SRAMBankedAsyncRead", Nil)

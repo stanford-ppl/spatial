@@ -29,7 +29,7 @@ import spatial.lang._
   override def effects: Effects = super.effects andAlso Effects.Simple
 }
 
-@op case class UnitPipe(ens: Set[Bit], block: Block[Void]) extends Pipeline[Void] {
+@op case class UnitPipe(ens: Set[Bit], block: Block[Void], stopWhen: Option[Reg[Bit]]) extends Pipeline[Void] {
   override def iters = Nil
   override def bodies = Seq(PseudoStage(Nil -> block))
   override def cchains = Nil

@@ -157,7 +157,7 @@ trait ChiselGenMath extends ChiselGenCommon {
         case Some(_) => s"$x"
         case None => "4096"
       }
-      emit(s"val ${quote(lhs)}_bitsize = fringe.utils.log2Up($size) max 1")
+      emit(s"val ${quote(lhs)}_bitsize = _root_.utils.math.log2Up($size) max 1")
       emit(src"""val ${lhs}_rng = Module(new PRNG($seed)); ${lhs}_rng.suggestName("$lhs")""")
       val en = if (lhs.parent.s.isDefined) src"$datapathEn" else "true.B"
       emit(src"${lhs}_rng.io.en := $en")
@@ -254,6 +254,11 @@ trait ChiselGenMath extends ChiselGenCommon {
     // case FltCeil(a) => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := Mux($a.raw_frac === 0.U, $a.r, Cat($a.raw_dec + 1.U, 0.U(${fracBits(a)}.W)))")
     case DataAsBits(data) => 
       emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.zipWithIndex.foreach{case (dab, i) => dab := $data(i)}")
+    case DataAsVec(data) =>
+      val elwidth = bitWidth(lhs.tp.typeArgs.head)
+      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.zipWithIndex.foreach{case (dab, i) => dab := $data((i+1)*$elwidth-1,i*$elwidth)}")
+    case VecAsData(data, fmt) =>
+      emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := chisel3.util.Cat($data.reverse.map(_.r))")
     case BitsAsData(data, fmt) => 
       emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := chisel3.util.Cat($data.reverse)")
     // case FltInvSqrt(x) => x.tp match {

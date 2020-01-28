@@ -27,6 +27,10 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
     }
   }
 
+  def sanityCheckBlock(block: Block[_]): Unit = {
+
+  }
+
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case GetReg(_) if inHw =>
       error(lhs.ctx, "Reading ArgOuts within Accel is disallowed.")
@@ -40,60 +44,10 @@ case class UserSanityChecks(IR: State, enable: Boolean) extends AbstractSanityCh
       error(lhs.ctx)
       IR.logError()
 
-    case AccelScope(block) => inAccel {
-      val (stms,rawInputs) = block.nestedStmsAndInputs
+    case AccelScope(block) => inAccel { sanityCheckBlock(block) }
 
-      val specialized = stms.collect{
-        case sym @ Op(VarRead(v)) if !stms.contains(v) =>
-          error(sym.ctx, s"Variables cannot be used within the Accel scope.")
-          error("Use an ArgIn, HostIO, or DRAM to pass values from the host to the accelerator.")
-          error(sym.ctx, showCaret = true)
-          IR.logError()
-          sym
-
-        case sym @ Op(VarNew(init)) =>
-          error(sym.ctx, s"Variables cannot be created within the Accel scope.")
-          error("Use a local accelerator memory like SRAM or Reg instead.")
-          error(sym.ctx)
-          IR.logError()
-          sym
-
-        case sym @ Op(VarAssign(v, x)) if !stms.contains(v) =>
-          error(sym.ctx, s"Variables cannot be assigned within the Accel scope.")
-          error("Use an ArgOut, HostIO, or DRAM to pass values from the accelerator to the host.")
-          error(sym.ctx, showCaret = true)
-          IR.logError()
-          sym
-
-        case sym @ Op(ArrayApply(Def(InputArguments()), _)) =>
-          error(sym.ctx, "Input arguments cannot be accessed in Accel scope.")
-          error("Use an ArgIn or HostIO to pass values from the host to the accelerator.")
-          error(sym.ctx, showCaret = true)
-          IR.logError()
-          sym
-      }
-      val inputs = rawInputs.filterNot{
-        case _:Var[_] => false    // Don't give two errors for Vars
-        case _ => true
-      }
-
-      val illegalUsed = disallowedInputs(stms diff specialized, inputs.iterator, allowArgInference = true)
-
-      if (illegalUsed.nonEmpty) {
-        error("One or more values were defined on the host but used in Accel without explicit transfer.")
-        error("Use DRAMs with setMem to transfer data to the accelerator.")
-        illegalUsed.take(5).foreach{case (in,use) =>
-          error(in.ctx, s"Value ${in.name.getOrElse("defined here")}")
-          error(in.ctx)
-          error(use.ctx,s"First use in Accel occurs here.", noError = true)
-          error(use.ctx)
-        }
-        if (illegalUsed.size > 5) error(s"(${illegalUsed.size - 5} values elided)")
-        IR.logError()
-      }
-
-      super.visit(lhs,rhs)
-    }
+    case SpatialBlackboxImpl(block) => inBox { sanityCheckBlock(block) }
+    case SpatialCtrlBlackboxImpl(block) => inBox { sanityCheckBlock(block) }
 
     case op: OpMemReduce[_,_] =>
       if (op.map.result == op.accum) {

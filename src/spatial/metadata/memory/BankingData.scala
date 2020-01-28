@@ -18,36 +18,60 @@ import utils.implicits.collections._
 sealed abstract class Banking {
   def nBanks: Int
   def stride: Int
-  def dims: Seq[Int]
+  def axes: Seq[Int]
   def alphas: Seq[Int]
   def Ps: Seq[Int]
-  def darkVolume: Int
+  def hiddenVolume: Int
+  def numChecks: Int // Diagnostic for required number of ISL calls to verify scheme
+  def solutionVolume: Int // Diagnostic for volume of solution space that scheme came from
   @api def bankSelect[I:IntLike](addr: Seq[I]): I
 }
 
+case class UnspecifiedBanking(axes: Seq[Int]) extends Banking {
+  override def nBanks: Int = 1
+  override def stride: Int = 1
+  override def alphas: Seq[Int] = axes.map{_ => 1}
+  override def Ps: Seq[Int] = axes.map{_ => 1}
+  override def hiddenVolume: Int = 0
+  override def numChecks: Int = 1
+  override def solutionVolume: Int = 1
+  override def toString: String = {
+    s"Dims {${axes.mkString(",")}}: Unspecified Banking"
+  }
+  @api def bankSelects[T:IntLike](mem: Sym[_], addr: Seq[T]): Seq[T] = addr
+  @api def bankOffset[T:IntLike](mem: Sym[_], addr: Seq[T]): T = addr.last
+  @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
+    import spatial.util.IntLike._
+    addr.sumTree
+  }
+}
+
 /** Banking address function (alpha*A / B) mod N. */
-case class ModBanking(N: Int, B: Int, alpha: Seq[Int], dims: Seq[Int], P: Seq[Int], dv: Int) extends Banking {
+case class ModBanking(N: Int, B: Int, alpha: Seq[Int], axes: Seq[Int], P: Seq[Int], sv: Int = 1, checks: Int = 0) extends Banking {
   override def nBanks: Int = N
   override def stride: Int = B
   override def alphas: Seq[Int] = alpha
   override def Ps: Seq[Int] = P
-  override def darkVolume: Int = dv
+  override def hiddenVolume: Int = {
+    val hang = P.map{_ % N}.min
+    if (hang == 0) 0 else B*(N-P.map{_ % N}.min)
+  }
+  override def numChecks: Int = checks
+  override def solutionVolume: Int = sv
 
   @api def bankSelect[I:IntLike](addr: Seq[I]): I = {
     import spatial.util.IntLike._
-    dbgs(s"BANKSELECT $addr zip $alpha (_*_).sum / $B mod $N = ${(alpha.zip(addr).map{case (a,i) => a*i })}")
     (alpha.zip(addr).map{case (a,i) => a*i }.sumTree / B) % N
   }
   override def toString: String = {
     val name = if (B == 1) "Cyclic" else "Block Cyclic"
-    s"Dims {${dims.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}>"
+    s"Dims {${axes.mkString(",")}}: $name: N=$N, B=$B, alpha=<${alpha.mkString(",")}>, P=<${P.mkString(",")}> ($solutionVolume solutions, $numChecks checks)"
   }
 }
 object ModBanking {
-  def Unit(rank: Int, dims: Seq[Int]) = ModBanking(1, 1, Seq.fill(rank)(1), dims, Seq.fill(rank)(1), 0)
-  def Simple(banks: Int, dims: Seq[Int], stride: Int, darkVolume: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride), darkVolume)
+  def Unit(rank: Int, dims: Seq[Int]) = ModBanking(1, 1, Seq.fill(rank)(1), dims, Seq.fill(rank)(1))
+  def Simple(banks: Int, dims: Seq[Int], stride: Int) = ModBanking(banks, 1, Seq.fill(dims.size)(1), dims, Seq.fill(dims.size)(stride))
 }
-
 
 /** Helper structure for holding metadata for buffer ports
   * The mux port is the time multiplexed slot the associated access has in reference to all other accesses
@@ -92,10 +116,9 @@ case class Instance(
   cost:     Double,                    // Cost estimate of this configuration
   ports:    Map[AccessMatrix,Port], // Buffer ports
   padding:  Seq[Int],               // Padding for memory based on banking
-  darkVolume: Int,                  // Number of elements inaccessible due to B > 1
   accType:  AccumType               // Type of accumulator for instance
 ) {
-  def toMemory: Memory = Memory(banking, depth, padding, darkVolume, accType)
+  def toMemory: Memory = Memory(banking, depth, padding, accType)
 
   def accesses: Set[Sym[_]] = accessMatrices.map(_.access)
   def accessMatrices: Set[AccessMatrix] = reads.flatten ++ writes.flatten
@@ -147,7 +170,7 @@ case class Instance(
 
 }
 object Instance {
-  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})),1,0,Map.empty,Seq.fill(rank)(0),0,AccumType.None)
+  def Unit(rank: Int) = Instance(Set.empty,Set.empty,Set.empty,None,Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})),1,0,Map.empty,Seq.fill(rank)(0),AccumType.None)
 }
 
 
@@ -158,13 +181,12 @@ case class Memory(
   banking: Seq[Banking],  // Banking information
   depth:   Int,           // Buffer depth
   padding: Seq[Int],      // Padding on each dim
-  darkVolume: Int,        // Number of elements inaccessible due to B > 1
   accType: AccumType      // Flags whether this instance is an accumulator
 ) {
   var resourceType: Option[MemoryResource] = None
   @stateful def resource: MemoryResource = resourceType.getOrElse(spatialConfig.target.defaultResource)
 
-  def updateDepth(d: Int): Memory = Memory(banking, d, padding, darkVolume, accType)
+  def updateDepth(d: Int): Memory = Memory(banking, d, padding, accType)
   def nBanks: Seq[Int] = banking.map(_.nBanks)
   def Ps: Seq[Int] = banking.map(_.Ps).flatten
   def Bs: Seq[Int] = banking.map(_.stride)
@@ -172,7 +194,7 @@ case class Memory(
   def totalBanks: Int = banking.map(_.nBanks).product
   def bankDepth(dims: Seq[Int]): Int = {
     banking.map{bank =>
-      val size = if (dims.nonEmpty) bank.dims.map{i => dims(i) }.product else 1
+      val size = if (dims.nonEmpty) bank.axes.map{ i => dims(i) }.product else 1
       Math.ceil(size.toDouble / bank.nBanks)    // Assumes evenly divided
     }.product.toInt
   }
@@ -192,19 +214,14 @@ case class Memory(
       val b = banking.head.stride
       val alpha = banking.head.alphas
       val P = banking.head.Ps
-      val banksInFence = allLoops(P,alpha,b,Nil).map(_%n).sorted
-      val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-      val degenerate = hist.map(_._2).max
       val ofschunk = (0 until D).map{t =>
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
         ofsdim_t * w.slice(t+1,D).zip(P.slice(t+1,D)).map{case (x,y) => math.ceil(x/y).toInt}.product
       }.sumTree
-      val intrablockofs = (0 until D).map{t => 
-        addr(t)
-      }.sumTree % degenerate // Appears to work, but may not if bank degenerates are not adjacent
-      ofschunk * degenerate + intrablockofs
+      val intrablockofs = addr.zip(alpha).map{case(x,y) => x*y}.sumTree % b
+      ofschunk * b + intrablockofs
     }
     else if (banking.lengthIs(D)) {
       val b = banking.map(_.stride)
@@ -213,30 +230,22 @@ case class Memory(
 
       val ofschunk = (0 until D).map{t =>
         val n = banking.map(_.nBanks).apply(t)
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
-        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-        val degenerate = hist.map(_._2).max
         val xt = addr(t)
         val p = P(t)
         val ofsdim_t = xt / p
         val prevDimsOfs = (t+1 until D).map{i => 
-          val n_i = banking.map(_.nBanks).apply(i)
-          val banksInFence_i = allLoops(Seq(P(i)),Seq(alphas(i)),b(i),Nil).map(_%n_i).sorted
-          val hist_i = banksInFence_i.distinct.map{x => (x -> banksInFence_i.count(_ == x))}
-          val degenerate_i = hist_i.map(_._2).max
-          math.ceil(w(i)/P(i)).toInt * degenerate_i
+          math.ceil(w(i)/P(i)).toInt
         }.product
-        ofsdim_t * prevDimsOfs * degenerate
+        ofsdim_t * prevDimsOfs
       }.sumTree
-      val intrablockofs = (0 until D).map{t => 
-        val n = banking.map(_.nBanks).apply(t)
-        val banksInFence = allLoops(Seq(P(t)),Seq(alphas(t)),b(t),Nil).map(_%n).sorted
-        val hist = banksInFence.distinct.map{x => (x -> banksInFence.count(_ == x))}
-        val degenerate = hist.map(_._2).max
-        // TODO: Want to mathematically prove addr(t) % degenerate resolves uniquely, but for now it seems to just work
-        addr(t) % degenerate 
-      }.sumTree 
-      ofschunk + intrablockofs
+      val intrablockofs = (0 until D).map{t =>
+        val bAbove = b.slice(t+1,D).product
+        bAbove * ((addr(t) * alpha(t)) % b(t))
+      }.sumTree
+      ofschunk * b.product + intrablockofs
+    }
+    else if (banking.lengthIs(0)) {
+      addr.head // Hack for LockDRAM, which has no banking so return addr as offset
     }
     else {
       // TODO: Bank address for mixed dimension groups
@@ -245,7 +254,7 @@ case class Memory(
   }
 }
 object Memory {
-  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})), 1, Seq.fill(rank)(0), 0, AccumType.None)
+  def unit(rank: Int): Memory = Memory(Seq(ModBanking.Unit(rank, Seq.tabulate(rank){i => i})), 1, Seq.fill(rank)(0), AccumType.None)
 }
 
 
@@ -275,14 +284,6 @@ case class Duplicates(d: Seq[Memory]) extends Data[Duplicates](Transfer.Mirror)
   * Default: undefined
   */
 case class Padding(dims: Seq[Int]) extends Data[Padding](SetBy.Analysis.Self)
-
-/** Number of physical addresses in memory that are inaccessible (due to B > 1)
-  * Option:  sym.getDarkVolume
-  * Getter:  sym.darkVolume
-  * Setter:  sym.darkVolume = (Int)
-  * Default: undefined
-  */
-case class DarkVolume(b: Int) extends Data[DarkVolume](SetBy.Analysis.Self)
 
 
 /** Map of a set of memory dispatch IDs for each unrolled instance of an access node.
@@ -367,6 +368,22 @@ case class NoBlockCyclic(flag: Boolean) extends Data[NoBlockCyclic](SetBy.User)
   */
 case class OnlyBlockCyclic(flag: Boolean) extends Data[OnlyBlockCyclic](SetBy.User)
 
+/** Flag set by the user to specify if only certain NStrictnesses should be checked
+  *
+  * Getter:  sym.nConstraints
+  * Setter:  sym.nConstraints = (true | false)
+  * Default: false
+  */
+case class NConstraints(typs: Seq[NStrictness]) extends Data[NConstraints](SetBy.User)
+
+/** Flag set by the user to specify if only certain AlphaStrictnesses should be checked
+  *
+  * Getter:  sym.alphaConstraints
+  * Setter:  sym.alphaConstraints = (true | false)
+  * Default: false
+  */
+case class AlphaConstraints(typs: Seq[AlphaStrictness]) extends Data[AlphaConstraints](SetBy.User)
+
 /** Flag set by the user for list of Bs to search for block cyclic banking schema
   *
   * Getter:  sym.blockCyclicBs
@@ -379,8 +396,8 @@ case class BlockCyclicBs(bs: Seq[Int]) extends Data[BlockCyclicBs](SetBy.User)
   * Used in cases where it could be tricky or impossible to find hierarchical scheme but 
   * user knows that a flat scheme exists or is a simpler search
   *
-  * Getter:  sym.isOnlyDuplicate
-  * Setter:  sym.isOnlyDuplicate = (true | false)
+  * Getter:  sym.isFullFission
+  * Setter:  sym.isFullFission = (true | false)
   * Default: false
   */
 case class OnlyDuplicate(flag: Boolean) extends Data[OnlyDuplicate](SetBy.User)
@@ -398,8 +415,8 @@ case class DuplicateOnAxes(opts: Seq[Seq[Int]]) extends Data[DuplicateOnAxes](Se
 /** Flag set by the user to disable bank-by-duplication based on the compiler-defined cost-metric. 
   * This assumes that it will find at least one valid (either flat or hierarchical) bank scheme
   *
-  * Getter:  sym.isNoDuplicate
-  * Setter:  sym.isNoDuplicate = (true | false)
+  * Getter:  sym.isNoFission
+  * Setter:  sym.isNoFission = (true | false)
   * Default: false
   */
 case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
@@ -413,6 +430,16 @@ case class NoDuplicate(flag: Boolean) extends Data[NoDuplicate](SetBy.User)
   * Default: false
   */
 case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
+
+/** Flag set by the user to force banking analysis to merge buffers even if the 
+  * compiler thinks it is unsafe.  Use for cases such as where counter start for different lanes
+  * is lane-dependent but known to be such that there are no bank conflicts between lanes
+  *
+  * Getter:  sym.isMustMerge
+  * Setter:  sym.isMustMerge = (true | false)
+  * Default: false
+  */
+case class MustMerge(flag: Boolean) extends Data[MustMerge](SetBy.User)
 
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
@@ -442,11 +469,13 @@ case class BankingEffort(effort: Int) extends Data[BankingEffort](SetBy.User)
 
 /** Class for holding the priority of a particular banking option (lower is better) */
 abstract trait SearchPriority {
-  val P: Int
+  @stateful def P: Int
 }
 
 /** Container for describing a set of banking options */
-case class BankingOptions(view: BankingView, N: NStrictness, alpha: AlphaStrictness, regroup: RegroupDims)
+case class BankingOptions(view: BankingView, N: NStrictness, alpha: AlphaStrictness, regroup: RegroupDims) {
+  def undesired: Boolean = N.isRelaxed || alpha.isRelaxed
+}
 
 /** Put each read access matrix in its own group, forcing compiler to only bank for writers and make a new duplicate for
   * every read`
@@ -457,7 +486,7 @@ object RegroupHelper {
   def regroupNone: List[RegroupDims] = List(RegroupDims(List()))
 }
 case class RegroupDims(dims: List[Int]) extends SearchPriority {
-  val P = dims.size
+  @stateful def P = dims.size
 }
 
 /** Enumeration of banking views.  Hierarchical means each dimension gets its own bank address.  Flat means all
@@ -469,12 +498,12 @@ sealed trait BankingView extends SearchPriority {
   def complementView: Seq[Int]
 } 
 case class Flat(rank: Int) extends BankingView {
-  val P = 0
+  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 0 else 1
   def expand(): Seq[List[Int]] = Seq(List.tabulate(rank){i => i})
   def complementView: Seq[Int] = List()
 }
 case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends BankingView {
-  val P = 1
+  @stateful def P: Int = if (spatialConfig.prioritizeFlat) 1 else 0
   def expand(): Seq[List[Int]] = {
     if (view.isDefined) Seq.tabulate(rank){i => i}.collect{case i if view.get.contains(i) => List(i)}
     else Seq.tabulate(rank){i => List(i)}
@@ -484,18 +513,22 @@ case class Hierarchical(rank: Int, view: Option[List[Int]] = None) extends Banki
 
 /** Enumeration of how to search for possible number of banks */
 sealed trait NStrictness extends SearchPriority {
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int]
+  def isRelaxed: Boolean
 }
 case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
-  val P = 9
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
+  @stateful def P = 9
+  def isRelaxed = false
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
-  val P = 1
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
+  @stateful def P = 1
+  def isRelaxed = false
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(isPow2(_)).toList
 }
 case object NBestGuess extends NStrictness {
-  val P = 0
+  @stateful def P = 0
+  def isRelaxed = false
   private def factorize(number: Int): List[Int] = {
     List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
   }
@@ -506,13 +539,15 @@ case object NBestGuess extends NStrictness {
     list
   }
 
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = { 
-    numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product).filter{x => x < max && x >= min}.sorted
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = {
+    val pow2 = Seq.tabulate(max-min){i => i}.collect{case i if isPow2(i) || isMersenne(i) || withinNOfMersenne(spatialConfig.mersenneRadius, i).isDefined => i}
+    (numAccesses.flatMap(factorize(_)) ++ factorize(stagedDims.product) ++ pow2).filter{x => x <= max && x >= min}.distinct.sorted
   }
 }
 case object NRelaxed extends NStrictness {
-  val P = 2
-  def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).filter(!isPow2(_)).toList
+  @stateful def P = 2
+  def isRelaxed = true
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = (min to max).toList
 }
 
 /** Enumeration of how to search for possible alpha vectors
@@ -526,28 +561,33 @@ case object NRelaxed extends NStrictness {
   * 3) Everything else
   */
 sealed trait AlphaStrictness extends SearchPriority {
-  /** Creates all alpha vectors comprising of only values in the valids list */
+  import utils.math._
+  /** Creates all alpha vectors comprising of only values in the valids list and which are coprime */
   def selectAs(valids: Seq[Int], dim: Int, prev: Seq[Int], rank: Int): Iterator[Seq[Int]] = {
     if (dim < rank) {
-      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }
+      valids.iterator.flatMap{aD => selectAs(valids, dim+1, prev :+ aD, rank) }.filter(coprime)
     }
-    else valids.iterator.map{aR => prev :+ aR }
+    else valids.iterator.map{aR => prev :+ aR }.filter(coprime)
   }
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]]
+  def isRelaxed: Boolean
 }
 case class UserDefinedAlpha(alphas: Seq[Int]) extends AlphaStrictness {
-  val P = 9
+  @stateful def P = 9
+  def isRelaxed = false
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = Iterator(axes.map(alphas))
 }
 case object AlphaPowersOf2 extends AlphaStrictness {
-  val P = 1
+  @stateful def P = 1
+  def isRelaxed = false
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
-    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0).uniqueModN(N).filter{x => x >= 0 && x <= N}
+    val possibleAs = (0 to 2*N).filter(x => isPow2(x) || x == 1 || x == 0 || x == N).uniqueModN(N).filter{x => x >= 0 && x <= N}
     selectAs(possibleAs, 1, Nil, rank)
   }
 }
 case object AlphaBestGuess extends AlphaStrictness {
-  val P = 0
+  @stateful def P = 0
+  def isRelaxed = false
   private def factorize(number: Int): List[Int] = {
     List.tabulate(number){i => i + 1}.collect{case i if number % i == 0 => i} 
   }
@@ -560,15 +600,19 @@ case object AlphaBestGuess extends AlphaStrictness {
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = { 
     val accessBased = Seq.tabulate(factorize(N).length){i => factorize(N).combinations(i+1).toList}.flatten.map(_.product).uniqueModN(N)
     val dimBased = Seq.tabulate(stagedDims.length){i => stagedDims.combinations(i+1).toList}.flatten.map(_.product).filter(_ <= N).uniqueModN(N)
-    val possibleAs = (List(0,1) ++ accessBased ++ dimBased).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank)
+    val coprimes = Seq.tabulate(N){i => i}.collect{case i if coprime(Seq(i,N)) => i}
+    val pow2OrEasy = Seq.tabulate(N){i => i}.collect{case i if isPow2(i) || isSumOfPow2(i) => i}
+    val possibleAs = (List(0,1) ++ pow2OrEasy ++ accessBased ++ dimBased ++ coprimes).filter{x => x >= 0 && x <= N}
+    val combos = selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.sortBy(_.sum).toIterator // Should find a better way to get distinct
+    combos
   }
 }
 case object AlphaRelaxed extends AlphaStrictness {
-  val P = 2
+  @stateful def P = 2
+  def isRelaxed = true
   def expand(rank: Int, N: Int, stagedDims: Seq[Int], axes: Seq[Int]): Iterator[Seq[Int]] = {
     val possibleAs = (0 to 2*N).uniqueModN(N).filter{x => x >= 0 && x <= N}
-    selectAs(possibleAs, 1, Nil, rank).filterNot(_.forall(x => isPow2(x) || x == 1))
+    selectAs(possibleAs, 1, Nil, rank).toSeq.distinct.toIterator
   }
 }
 
@@ -578,7 +622,7 @@ case object AlphaRelaxed extends AlphaStrictness {
   * Setter:  sym.explicitBanking = (Seq[Int], Seq[Int], Seq[Int])
   * Default: None
   */
-case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int])) extends Data[ExplicitBanking](SetBy.User)
+case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])) extends Data[ExplicitBanking](SetBy.User)
 
 /** Flag set by the user to specify that a banking scheme must be used even if it is unsafe
   *

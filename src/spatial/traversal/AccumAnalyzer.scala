@@ -9,6 +9,7 @@ import spatial.metadata.memory._
 import spatial.metadata.retiming._
 import spatial.metadata.types._
 import spatial.util.modeling._
+import utils.implicits.collections._
 
 case class AccumAnalyzer(IR: State) extends AccelTraversal {
 
@@ -19,6 +20,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
     }
     rhs match {
       case AccelScope(_) => inAccel{ markBlocks(lhs,rhs) }
+      case _:BlackboxImpl[_,_,_] => inBox{ markBlocks(lhs,rhs) }
       case _ => markBlocks(lhs,rhs)
     }
     if (rhs.blocks.nonEmpty) state.logTab -= 1
@@ -44,18 +46,18 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
         case IterAnd(is) => is
         case _ => writer.scopes.flatMap(_.iters).toSet
       }
-      if (iters.size > 0) Some(LCA(iters.map(_.parent))) else None
+      if (iters.nonEmpty) Some(LCA(iters.map(_.parent))) else None
     }
 
     // Find sets of cycles which are entirely disjoint
     warCycles.foreach{case (c1, i) =>
       val overlapping = warCycles.filter{case (c2,j) => i != j && (c1.symbols intersect c2.symbols).nonEmpty }
 
-      def externalUses(s: Sym[_]): Set[Sym[_]] = if (s.isVoid) Set.empty else {
+      def externalUses(s: Sym[_]): Seq[Sym[_]] = if (s.isVoid) Seq() else {
         // Only use data dependencies
         val consumers = s.consumers.filter(_.nonBlockInputs.contains(s))
-        consumers diff c1.symbols
-      }
+        consumers diff c1.symbols.toSet
+      }.toSortedSeq
 
       // Intermediate accumulator values are allowed to be consumed by writes
       // as long as the value is not actually visible until the end of the accumulation
@@ -66,7 +68,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
 
       val isDisjoint      = overlapping.isEmpty
 
-      val isClosedCycle   = (c1.symbols diff intermediates.toSet).forall{s => externalUses(s).isEmpty }
+      val isClosedCycle   = (c1.symbols.toSet diff intermediates.toSet).forall{s => externalUses(s).isEmpty }
       val noIntermediates = intermediates.forall{s => externalUses(s).isEmpty }
       val noEscaping      = c1.memory.accumType == AccumType.Reduce || noIntermediates
       val noVisibleIntermediates = isClosedCycle && noEscaping

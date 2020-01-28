@@ -2,10 +2,10 @@ package fringe.targets.de1soc
 
 import chisel3._
 import fringe.globals._
-import fringe.TopInterface
+import fringe.SpatialIPInterface
 import fringe.templates.axi4.{AXI4BundleParameters, AvalonSlave, AvalonStream}
 
-class DE1SoCInterface extends TopInterface {
+class DE1SoCInterface extends SpatialIPInterface {
   private val axiLiteParams = new AXI4BundleParameters(16, DATA_WIDTH, 1)
   val axiParams = new AXI4BundleParameters(DATA_WIDTH, 512, 6)
 

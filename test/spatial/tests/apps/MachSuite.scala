@@ -866,7 +866,7 @@ import utils.io.files._
       Foreach(length+1 by 1 par row_par){ r =>
 
         // If running multiple rows in parallel, ensure a later row does not scan an element until previous row has populated it
-        val this_body = r % row_par
+        val this_body = (r % row_par)*2
 
         // Compute cost for each element in row
         Sequential.Foreach(-this_body until length+1 by 1) { c =>
@@ -1166,10 +1166,10 @@ import utils.io.files._
     setMem(npoints_dram, npoints_data)
 
     Accel{
-      val dvec_x_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
-      val dvec_y_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
-      val dvec_z_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
-      val npoints_sram = SRAM[Int](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE)
+      val dvec_x_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density).hierarchical
+      val dvec_y_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density).hierarchical
+      val dvec_z_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density).hierarchical
+      val npoints_sram = SRAM[Int](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE).hierarchical
       val force_x_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
       val force_y_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
       val force_z_sram = SRAM[T](BLOCK_SIDE,BLOCK_SIDE,BLOCK_SIDE,density)
@@ -1327,7 +1327,7 @@ import utils.io.files._
       // Scan string portions
       val global_matches = Sequential.Reduce(Reg[Int](0))(STRING_SIZE by (STRING_SIZE/outer_par) by STRING_SIZE/outer_par par outer_par) {chunk => 
         val num_matches = Reg[Int](0)
-        Pipe{num_matches := 0}
+        num_matches := 0
         val string_sram = SRAM[Int8](32411) // Conveniently sized
         string_sram load string_dram(chunk::chunk + (STRING_SIZE/outer_par) + (PATTERN_SIZE-1) par par_load)
         val q = Reg[Int](0)
@@ -1337,13 +1337,11 @@ import utils.io.files._
             // whileCond := (q > 0) && (pattern_sram(i) != pattern_sram(q))
             if ((q > 0) && (string_sram(i) != pattern_sram(q))) q := kmp_next(q)
           }{state => mux((q > 0) && (string_sram(i) != pattern_sram(q)), 0, 1)}
-          Pipe{if (pattern_sram(q) == string_sram(i)) { q :+= 1 }}
+          if (pattern_sram(q) == string_sram(i)) { q :+= 1 }
           if (q >= PATTERN_SIZE) {
-            Pipe{
-              num_matches :+= 1
-              val bump = kmp_next(q - 1)
-              q := bump
-            }
+            num_matches :+= 1
+            val bump = kmp_next(q - 1)
+            q := bump
           }
         }
         num_matches
@@ -1890,32 +1888,29 @@ import utils.io.files._
       a_sram load data_dram
 
       def hist(exp: I32, s: SRAM1[Int]): Unit = {
-        Foreach(NUM_BLOCKS by 1) { blockID => 
-          Sequential.Foreach(4 by 1) {i => 
-            val a_indx = blockID * EL_PER_BLOCK + i
-            // val a_indx = Reg[Int](0)
-            // a_indx := blockID * EL_PER_BLOCK + i
-            val shifted = Reg[Int](0)
-            shifted := s(a_indx) // TODO: Allow just s(a_indx) >> exp syntax
-            // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
-            Foreach(exp by 1) { k => shifted := shifted.value >> 1}
-            val bucket_indx = (shifted.value & 0x03)*NUM_BLOCKS + blockID + 1
-            // println(" hist bucket(" + bucket_indx + ") = " + bucket_sram(bucket_indx) + " + 1")
-            // println(r"shifted started with ${s(a_indx)} (from ${a_indx}), now is ${shifted.value}, + $blockID")
-            if (bucket_indx < 2048) {bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1}
-          }
+        Foreach(NUM_BLOCKS by 1, 4 by 1) { (blockID, i) => 
+          val a_indx = blockID * EL_PER_BLOCK + i
+          // val a_indx = Reg[Int](0)
+          // a_indx := blockID * EL_PER_BLOCK + i
+          val shifted = Reg[Int](0).buffer
+          shifted := s(a_indx) // TODO: Allow just s(a_indx) >> exp syntax
+          // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
+          Foreach(exp by 1) { k => shifted := shifted.value >> 1}
+          // val shifted = s(a_indx) >> exp
+          val bucket_indx = (shifted.value & 0x03)*NUM_BLOCKS + blockID + 1
+          // println(" hist bucket(" + bucket_indx + ") = " + bucket_sram(bucket_indx) + " + 1")
+          // println(r"shifted started with ${s(a_indx)} (from ${a_indx}), now is ${shifted.value}, + $blockID")
+          if (bucket_indx < 2048) {bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1}
         }
       }
 
       def local_scan(): Unit = {
-        Foreach(SCAN_RADIX by 1) { radixID => 
-          Sequential.Foreach(1 until SCAN_BLOCK by 1) { i => // Loop carry dependency
-            val bucket_indx = radixID*SCAN_BLOCK.to[Int] + i
-            val prev_val = Reg[Int](0)
-            Pipe{ prev_val := bucket_sram(bucket_indx - 1) }
-            Pipe{ bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + prev_val }
-            // println(r"local_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${prev_val}")
-          }
+        Foreach(SCAN_RADIX by 1, 1 until SCAN_BLOCK) { (radixID, i) => 
+          val bucket_indx = radixID*SCAN_BLOCK.to[Int] + i
+          val prev_val = Reg[Int](0)
+          prev_val := bucket_sram(bucket_indx - 1)
+          bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + prev_val
+          // println(r"local_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${prev_val}")
         }
       }
 
@@ -1930,29 +1925,27 @@ import utils.io.files._
       }
 
       def last_step_scan(): Unit = {
-        Foreach(SCAN_RADIX by 1) { radixID => 
-          Foreach(SCAN_BLOCK by 1) { i => 
-            val bucket_indx = radixID * SCAN_BLOCK + i
-            bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + sum_sram(radixID)
-            // println(r"last_step_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${sum_sram(radixID)}")
-          }
+        Foreach(SCAN_RADIX by 1, SCAN_BLOCK by 1) { (radixID, i) => 
+          val bucket_indx = radixID * SCAN_BLOCK + i
+          bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + sum_sram(radixID)
+          // println(r"last_step_scan: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + ${sum_sram(radixID)}")
         }
       }
 
       def update(exp: I32, s1: SRAM1[Int], s2: SRAM1[Int]): Unit = {
 
-        Foreach(NUM_BLOCKS by 1) { blockID => 
-          Sequential.Foreach(4 by 1) { i => 
-            val shifted = Reg[Int](0)
-            shifted := s1(blockID*EL_PER_BLOCK + i) // TODO: Allow just s(a_indx) >> exp syntax
-            // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
-            Foreach(exp by 1) { k => shifted := shifted >> 1}
-            val bucket_indx = (shifted & 0x3)*NUM_BLOCKS + blockID
-            val a_indx = blockID * EL_PER_BLOCK + i
+        Foreach(NUM_BLOCKS by 1, 4 by 1) { (blockID, i) => 
+          val shifted = Reg[Int](0).buffer
+          shifted := s1(blockID*EL_PER_BLOCK + i) // TODO: Allow just s(a_indx) >> exp syntax
+          // Reduce(shifted)(exp by 1) { k => shifted >> 1}{(a,b) => b}
+          Foreach(exp by 1) { k => shifted := shifted >> 1}
+          val bucket_indx = (shifted & 0x3)*NUM_BLOCKS + blockID
+          val a_indx = blockID * EL_PER_BLOCK + i
+          Pipe{
             s2(bucket_sram(bucket_indx)) = s1(a_indx)
             bucket_sram(bucket_indx) = bucket_sram(bucket_indx) + 1
-            // println(r"update: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + 1")
           }
+          // println(r"update: bucket_sram(${bucket_indx}) = ${bucket_sram(bucket_indx)} + 1")
         }
       }
 
@@ -1972,17 +1965,14 @@ import utils.io.files._
 
         if (valid_buffer == a) {
           // println("s1 = a, s2 = b")
-          Sequential{
-            Pipe{update(exp, a_sram, b_sram)}
-            Pipe{valid_buffer := b}
-          }
+            update(exp, a_sram, b_sram)
+            valid_buffer := b
         } else {
           // println("s1 = b, s2 = a")
-          Sequential{
-            Pipe{update(exp, b_sram, a_sram)}
-            Pipe{valid_buffer := a}
-          }
+            update(exp, b_sram, a_sram)
+            valid_buffer := a
         }
+
 
       }
 
@@ -2678,12 +2668,12 @@ import utils.io.files._
             val even = odd ^ span
 
             val rtemp = data_real_sram(even) + data_real_sram(odd)
-            Pipe{data_real_sram(odd) = data_real_sram(even) - data_real_sram(odd)}
-            Pipe{data_real_sram(even) = rtemp}
+            data_real_sram(odd) = data_real_sram(even) - data_real_sram(odd)
+            data_real_sram(even) = rtemp
 
             val itemp = data_img_sram(even) + data_img_sram(odd)
-            Pipe{data_img_sram(odd) = data_img_sram(even) - data_img_sram(odd)}
-            Pipe{data_img_sram(even) = itemp}
+            data_img_sram(odd) = data_img_sram(even) - data_img_sram(odd)
+            data_img_sram(even) = itemp
             
             val rootindex = (Reduce(Reg[Int](1))(0 until log){i => 2.to[Int]}{_*_} * even) & (FFT_SIZE - 1).to[Int]
             if (rootindex > 0.to[Int]) {
@@ -2746,8 +2736,8 @@ import utils.io.files._
     setMem(work_y_dram, data_y)
 
     Accel{
-      val work_x_sram = SRAM[T](8,stride)
-      val work_y_sram = SRAM[T](8,stride)
+      val work_x_sram = SRAM[T](8,stride).effort(0)
+      val work_y_sram = SRAM[T](8,stride).effort(0)
       val smem = SRAM[T](8*8*9)
 
       work_x_sram load work_x_dram
@@ -2756,7 +2746,7 @@ import utils.io.files._
       val reversed_LUT = LUT[Int](8)(0,4,2,6,1,5,3,7)
 
       def twiddles8(tid: I32, i: Int, N: Int): Unit = {
-        Sequential.Foreach(1 until 8 by 1) { j => 
+        Foreach(1 until 8 by 1) { j => 
           val phi = -TWOPI*(i.to[T]*reversed_LUT(j).to[T] / N.to[T])
           val phi_shifted = phi + TWOPI/2
           val beyond_left = phi_shifted < -TWOPI.to[T]/4
@@ -2765,44 +2755,44 @@ import utils.io.files._
           val phi_x = cos_taylor(phi_bounded) * mux(beyond_left || beyond_right, 1.to[T], -1.to[T]) // cos(real phi)
           val phi_y = sin_taylor(phi_bounded) * mux(beyond_left || beyond_right, 1.to[T], -1.to[T]) // sin(real phi)
           val temp_x = work_x_sram(j, tid)
-          Pipe{work_x_sram(j, tid) = temp_x * phi_x - work_y_sram(j, tid) * phi_y}
-          Pipe{work_y_sram(j, tid) = temp_x * phi_y + work_y_sram(j, tid) * phi_x}
+          work_x_sram(j, tid) = temp_x * phi_x - work_y_sram(j, tid) * phi_y
+          work_y_sram(j, tid) = temp_x * phi_y + work_y_sram(j, tid) * phi_x
         }
       }
 
       def FFT2(tid: I32, id0: Int, id1: Int):Unit = {
         val temp_x = work_x_sram(id0, tid)
         val temp_y = work_y_sram(id0, tid)
-        Pipe{work_x_sram(id0, tid) = temp_x + work_x_sram(id1, tid)}
-        Pipe{work_y_sram(id0, tid) = temp_y + work_y_sram(id1, tid)}
-        Pipe{work_x_sram(id1, tid) = temp_x - work_x_sram(id1, tid)}
-        Pipe{work_y_sram(id1, tid) = temp_y - work_y_sram(id1, tid)}
+        work_x_sram(id0, tid) = temp_x + work_x_sram(id1, tid)
+        work_y_sram(id0, tid) = temp_y + work_y_sram(id1, tid)
+        work_x_sram(id1, tid) = temp_x - work_x_sram(id1, tid)
+        work_y_sram(id1, tid) = temp_y - work_y_sram(id1, tid)
       }
 
       def FFT4(tid: I32, base: Int):Unit = {
         val exp_LUT = LUT[T](2)(0, -1)
-        Sequential.Foreach(0 until 2 by 1) { j => 
-          Pipe{FFT2(tid, base+j.to[I32], 2+base+j.to[I32])}
+        Foreach(0 until 2 by 1) { j => 
+          FFT2(tid, base+j.to[I32], 2+base+j.to[I32])
         }
         val temp_x = work_x_sram(base+3,tid)
-        Pipe{work_x_sram(base+3,tid) = temp_x * exp_LUT(0) - work_y_sram(base+3,tid)*exp_LUT(1)}
-        Pipe{work_y_sram(base+3,tid) = temp_x * exp_LUT(1) - work_y_sram(base+3,tid)*exp_LUT(0)}
-        Sequential.Foreach(0 until 2 by 1) { j => 
-          Pipe{FFT2(tid, base+2*j.to[I32], 1+base+2*j.to[I32])}
+        work_x_sram(base+3,tid) = temp_x * exp_LUT(0) - work_y_sram(base+3,tid)*exp_LUT(1)
+        work_y_sram(base+3,tid) = temp_x * exp_LUT(1) - work_y_sram(base+3,tid)*exp_LUT(0)
+        Foreach(0 until 2 by 1) { j => 
+          FFT2(tid, base+2*j.to[I32], 1+base+2*j.to[I32])
         }
       }
 
       def FFT8(tid: I32):Unit = {
-        Sequential.Foreach(0 until 4 by 1) { i => 
-          Pipe{FFT2(tid, i, 4+i.to[I32])}
+        Foreach(0 until 4 by 1) { i => 
+          FFT2(tid, i, 4+i.to[I32])
         }
-        Sequential.Foreach(0 until 3 by 1) { i => 
+        Foreach(0 until 3 by 1) { i => 
           val exp_LUT = LUT[T](2,3)( 1,  0, -1,
                                       -1, -1, -1)
           val temp_x = work_x_sram(5+i.to[I32], tid)
           val mul_factor = mux(i.to[I32] == 1, 1.to[T], M_SQRT1_2)
-          Pipe{work_x_sram(5+i.to[I32], tid) = (temp_x * exp_LUT(0,i) - work_y_sram(5+i.to[I32],tid) * exp_LUT(1,i))*mul_factor}
-          Pipe{work_y_sram(5+i.to[I32], tid) = (temp_x * exp_LUT(1,i) + work_y_sram(5+i.to[I32],tid) * exp_LUT(0,i))*mul_factor}
+          work_x_sram(5+i.to[I32], tid) = (temp_x * exp_LUT(0,i) - work_y_sram(5+i.to[I32],tid) * exp_LUT(1,i))*mul_factor
+          work_y_sram(5+i.to[I32], tid) = (temp_x * exp_LUT(1,i) + work_y_sram(5+i.to[I32],tid) * exp_LUT(0,i))*mul_factor
         }
         // FFT4
         Sequential.Foreach(0 until 2 by 1) { ii =>
@@ -2822,12 +2812,12 @@ import utils.io.files._
       val shuffle_rhs_LUT = LUT[Int](8)(0,1,4,5,2,3,6,7)
 
       // Loop 2
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 66
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = hi*8+lo // * here but >> above????
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           val lhs_factor = shuffle_lhs_LUT(i)
           val rhs_factor = shuffle_rhs_LUT(i)
           smem(lhs_factor*sx + offset) = work_x_sram(rhs_factor, tid)
@@ -2835,12 +2825,12 @@ import utils.io.files._
       }
 
       // Loop 3
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 8
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = lo*66 + hi
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           val lhs_factor = shuffle_lhs_LUT(i)
           val rhs_factor = shuffle_lhs_LUT(i) // [sic]
           work_x_sram(lhs_factor, tid) = smem(rhs_factor*sx+offset)
@@ -2848,12 +2838,12 @@ import utils.io.files._
       }
 
       // Loop 4
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 66
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = hi*8+lo // * here but >> above????
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           val lhs_factor = shuffle_lhs_LUT(i)
           val rhs_factor = shuffle_rhs_LUT(i)
           smem(lhs_factor*sx + offset) = work_y_sram(rhs_factor, tid)
@@ -2861,12 +2851,12 @@ import utils.io.files._
       }
 
       // Loop 5
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 8
         val hi = tid.to[I32] >> 3;
         val lo = tid.to[I32] & 7;
         val offset = lo*66+hi
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           work_y_sram(i, tid) = smem(i.to[I32]*sx+offset)
         }
       }
@@ -2879,12 +2869,12 @@ import utils.io.files._
       }
 
       // Loop 7
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 72
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = hi*8 + lo
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           val lhs_factor = shuffle_lhs_LUT(i)
           val rhs_factor = shuffle_rhs_LUT(i)
           smem(lhs_factor * sx + offset) = work_x_sram(rhs_factor, tid)
@@ -2892,12 +2882,12 @@ import utils.io.files._
       }
 
       // Loop 8
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 8
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = hi*72 + lo
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           val lhs_factor = shuffle_lhs_LUT(i)
           val rhs_factor = shuffle_lhs_LUT(i) // [sic]
           work_x_sram(lhs_factor, tid) = smem(rhs_factor * sx + offset)
@@ -2905,12 +2895,12 @@ import utils.io.files._
       }
 
       // Loop 9
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 72
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = hi*8 + lo
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           val lhs_factor = shuffle_lhs_LUT(i)
           val rhs_factor = shuffle_rhs_LUT(i)
           smem(lhs_factor * sx + offset) = work_y_sram(rhs_factor, tid)
@@ -2918,12 +2908,12 @@ import utils.io.files._
       }
 
       // Loop 10
-      Sequential.Foreach(THREADS by 1) { tid => 
+      Foreach(THREADS by 1) { tid => 
         val sx = 8
         val hi = tid.to[I32] >> 3
         val lo = tid.to[I32] & 7
         val offset = hi*72 + lo
-        Sequential.Foreach(8 by 1) { i => 
+        Foreach(8 by 1) { i => 
           work_y_sram(i, tid) = smem(i.to[I32] * sx + offset)
         }
       }
@@ -2935,12 +2925,12 @@ import utils.io.files._
         val tmem_x = SRAM[T](8)
         val tmem_y = SRAM[T](8)
         Foreach(8 by 1) { i => 
-          Pipe{tmem_x(reversed_LUT(i)) = work_x_sram(i, tid)}
-          Pipe{tmem_y(reversed_LUT(i)) = work_y_sram(i, tid)}
+          tmem_x(reversed_LUT(i)) = work_x_sram(i, tid)
+          tmem_y(reversed_LUT(i)) = work_y_sram(i, tid)
         }
         Foreach(8 by 1) { i => 
-          Pipe{work_x_sram(i, tid) = tmem_x(i)}
-          Pipe{work_y_sram(i, tid) = tmem_y(i)}
+          work_x_sram(i, tid) = tmem_x(i)
+          work_y_sram(i, tid) = tmem_y(i)
         }
       }
 

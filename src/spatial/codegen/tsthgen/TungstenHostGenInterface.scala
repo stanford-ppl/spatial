@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.codegen.cppgen._
+import spatial.metadata.bounds.Expect
 
 trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
 
@@ -16,14 +17,42 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
       emit("""
 #include <iostream>
 
-std::stringstream stopsim;
-
 """)
+    }
+
+  }
+
+  val allocated = scala.collection.mutable.ListBuffer[String]()
+
+  override def emitFooter = {
+    genIO {
+      open(src"void AllocAllMems() {")
+      allocated.foreach { a =>
+        emit(s"$a();")
+      }
+      close(src"}")
+    }
+    allocated.clear
+    super.emitFooter
+  }
+
+  def genIO(block: => Unit):Unit = {
+    inGen(out, "hostio.h") {
+      block
     }
   }
 
-  def genIO(block: => Unit) = {
-    inGen(out, "hostio.h") {
+  def genAlloc(lhs:Sym[_], inFunc:Boolean)(block: => Unit):Unit = {
+    if (inFunc) {
+      val func = s"Alloc${lhs}" 
+      allocated += func
+      emit(src"$func();")
+      genIO {
+        open(src"void $func() {")
+        block
+        close(src"}")
+      }
+    } else {
       block
     }
   }
@@ -65,38 +94,37 @@ std::stringstream stopsim;
         // Make sure allocated address is burst aligned
         emit(src"""void* $lhs;""")
       }
-      emit(src"$lhs = malloc(sizeof($tp) * ${dims.map(quote).mkString("*")} + ${bytePerBurst});")
-      emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
-      emit(src"""cout << "Allocate mem of size ${dims.map(quote).mkString("*")} at " << ($tp*)${lhs} << endl;""")
+      val cdims = dims.map { case Expect(c) => c; case d => quote(d) }
+      genAlloc(lhs, dims.forall { _.isConst }) { 
+        emit(src"$lhs = malloc(sizeof($tp) * ${cdims.mkString("*")} + ${bytePerBurst});")
+        emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
+        emit(src"""cout << "Allocate ${lhs.name.getOrElse(lhs)} of size "<< ${cdims.mkString(""" << " * " << """)} << " at " << ($tp*)${lhs} << " (" << (long)$lhs << ")" << endl;""")
+      }
+
+    case LockDRAMHostNew(dims, _) =>
+      val tp = lhs.tp.typeArgs.head
+      genIO {
+        // Make sure allocated address is burst aligned
+        emit(src"""void* $lhs;""")
+      }
+      val cdims = dims.map { case Expect(c) => c; case d => quote(d) }
+      genAlloc(lhs, dims.forall { _.isConst }) { 
+        emit(src"$lhs = malloc(sizeof($tp) * ${cdims.mkString("*")} + ${bytePerBurst});")
+        emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
+        emit(src"""cout << "Allocate ${lhs.name.getOrElse(lhs)} of size "<< ${cdims.mkString(""" << " * " << """)} << " at " << ($tp*)${lhs} << " (" << (long)$lhs << ")" << endl;""")
+      }
 
     case SetMem(dram, data) =>
-      //val rawtp = asIntType(dram.tp.typeArgs.head)
-      //val f = fracBits(dram.tp.typeArgs.head)
-      //if (f > 0) {
-        //emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
-        //open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
-        //emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
-        //close("}")
-        //emit(src"memcpy($dram, &(*${dram}_rawified)[0], (*${dram}_rawified).size() * sizeof(${rawtp}));")
-      //}
-      //else {
-        emit(src"memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
-      //}
+      emit(src"memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
 
     case GetMem(dram, data) =>
-      //val rawtp = asIntType(dram.tp.typeArgs.head)
-      //val f = fracBits(dram.tp.typeArgs.head)
-      //if (f > 0) {
-        //emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
-        //emit(src"memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
-        //open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
-        //emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
-        //emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
-        //close("}")
-      //}
-      //else {
-        emit(src"memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
-      //}
+      emit(src"memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+
+    case SetLockMem(dram, data) =>
+      emit(src"memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+
+    case GetLockMem(dram, data) =>
+      emit(src"memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
 
     case _ => super.gen(lhs, rhs)
   }

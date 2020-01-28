@@ -11,10 +11,14 @@ import spatial.util.spatialConfig
 import spatial.traversal.banking._
 import spatial.metadata.memory._
 import spatial.lang._
+import spatial.lang.types._
 import spatial.metadata.memory.LocalMemories
+import spatial.metadata.blackbox._
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator) extends Codegen { // Printing with Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()
+  private val fullyBanked: BankingStrategy = FullyBanked()
+  private val customBanked: BankingStrategy = CustomBanked()
 
   override val ext: String = "html"
   override val lang: String = "banking"
@@ -47,10 +51,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
   }
 
   private def report[C[_]](mem: Sym[_], conf: MemoryConfigurer[C], t: Double, totalTime: Double): Unit = {
-    val (totalCost: Double, winningScheme) = conf.schemesInfo.map{scheme => 
-      val cost = scheme._2.map(_._4.head).sum
-      (cost, scheme._1.toString)
-    }.toList.sortBy(_._1).headOption.getOrElse((0.0, ""))
+    val totalCost: Double = conf.schemesInfo.map{case (inst, schemes) => schemes.map(_._2.map(_._4.head).sum).toList.sorted.headOption.getOrElse(0.0)}.sum
     emit("")
     val coll = "data-role=\"collapsible\""
     emit("""<TABLE BORDER="1" CELLPADDING="1" CELLSPACING="0"><td>""")
@@ -59,38 +60,50 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
     emit(s"""<div $coll><h4> </h4>""")
       emit(s"""<TABLE BORDER="3" CELLPADDING="10" CELLSPACING="10">""")
       emit(s"""<br><font size = "2">Sym $mem: ${mem.ctx} <font color="grey">- ${mem.ctx.content.getOrElse("<???>")}</font></font>""")
-      emit(s"""<br><font size = "2">Search time: ${t}ms</font>""")
-      emit(s"""<br><font size = "2">Winning scheme: ${winningScheme}</font>""")
-
       emit(s"""<br><br><font size = "2">Effort:    ${mem.bankingEffort}</font>""")
       emit(s"""<br><font size = "2">BankingViews:   ${conf.bankViews}</font>""")
       emit(s"""<br><font size = "2">NStrictness:   ${conf.nStricts}</font>""")
       emit(s"""<br><font size = "2">AlphaStrictness:   ${conf.aStricts}</font>""")
       emit(s"""<br><font size = "2">DimensionDuplication: ${conf.dimensionDuplication}</font>""")
-      emit(s"<br><font size=4>Found ${conf.schemesInfo.toList.size} Alternative Schemes</font>")
-      emit(s"""<div $coll><h5> </h5>""")
-        conf.schemesInfo.foreach{scheme => 
+      conf.schemesInfo.toList.sortBy(_._1).foreach{case (inst, schemes) => 
+        val (partialCost: Double, winningScheme) = schemes.map{scheme => 
           val cost = scheme._2.map(_._4.head).sum
-          emit("<br>")
-          emit(s"""<p><div style="padding: 10px; border: 1px;display:inline-block;background-color: #ccc">""")
-          emit(f"""<br><font size = "3"><b>Scheme cost ${cost}%.2f%%: ${scheme._1}</b></font>""")
-          emit(s"""<br>${scheme._2.toList.size} duplicates""")
-          scheme._2.foreach{dup => 
-            val banking = dup._1
-            val histRaw = dup._2
-            val aux = dup._3
-            val breakdown:Seq[Double] = dup._4
-            val hist = 
-              if (histRaw.size > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ histRaw.grouped(3).map{b => s"""<div style="border: 1px solid;padding: 5px">${b(0)}</div> <div style="border: 1px solid;padding: 5px">${b(1)}</div><div style="border: 1px solid;padding: 5px">${b(2)}</div>"""} ++ Seq("</div>")).mkString(" ")
-              else ""
-            emit(s"""<br>Banking Decision: $banking""")
-            emit(s"""<br><br>Aux Nodes: ${aux.mkString(",")}""")
-            emit(s"""<br>${hist}""")
-            emit(f"<br>Breakdown: Mem = LUTs <b>${breakdown(1)}%.2f</b> FFs <b>${breakdown(2)}%.2f</b> BRAMs <b>${breakdown(3)}%.2f</b>, Aux Nodes = LUTs <b>${breakdown(4)}%.2f</b> FFs <b>${breakdown(5)}%.2f</b> BRAMs <b>${breakdown(6)}%.2f</b>")
-          }
-          emit(s"""</div></p>""")
-        }
-      emit("</div>")
+          (cost, scheme._1.toString)
+        }.toList.sortBy(_._1).headOption.getOrElse((0.0, ""))
+
+        emit(s"""<br><br><font size = "4">Instance $inst, Partial Cost: ${partialCost}</font> """)
+        emit(s"""<div $coll><h5> </h5><div style="background-color=#BECBFE"> """)
+          emit(s"""<br><font size = "2">Winning scheme: ${winningScheme}</font>""")
+          emit(s"<br><font size=4>Found ${schemes.size} Alternative Schemes</font>")
+          emit(s"""<div $coll><h5> </h5><div style="background-color=#d0b4b4"> """)
+            schemes.foreach{scheme => 
+              val cost = scheme._2.map(_._4.head).sum
+              emit("<br>")
+              emit(s"""<p><div style="padding: 10px; border: 1px;display:inline-block;background-color: #ccc">""")
+              emit(f"""<br><font size = "3"><b>scheme cost ${cost}%.2f%%: ${scheme._1}</b></font>""")
+              emit(s"""<div $coll><h5> </h5><div style="background-color=#d0b4b4"> """)
+              emit(s"""<br>${scheme._2.toList.size} duplicates""")
+              scheme._2.foreach{dup => 
+                val banking = dup._1
+                val histRaw = dup._2
+                val aux = dup._3
+                val breakdown:Seq[Double] = dup._4
+                val hist = 
+                  if (histRaw.size > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ histRaw.grouped(3).map{b => s"""<div style="border: 1px solid;padding: 5px">${b(0)}</div> <div style="border: 1px solid;padding: 5px">${b(1)}</div><div style="border: 1px solid;padding: 5px">${b(2)}</div>"""} ++ Seq("</div>")).mkString(" ")
+                  else ""
+                emit(s"""<br>Banking Decision: $banking""")
+                emit(s"""<br><br>Aux Nodes: ${aux.mkString(",")}""")
+                emit(s"""<br>${hist}""")
+                emit(f"<br>Breakdown: Mem = LUTs <b>${breakdown(1)}%.2f</b> FFs <b>${breakdown(2)}%.2f</b> BRAMs <b>${breakdown(3)}%.2f</b>, Aux Nodes = LUTs <b>${breakdown(4)}%.2f</b> FFs <b>${breakdown(5)}%.2f</b> BRAMs <b>${breakdown(6)}%.2f</b>")
+              }
+              emit("</div></div>")
+              emit(s"""</div></p>""")
+            }
+          emit("</div></div>")
+          emit("</div>")
+
+        emit("</div></div>")
+      }
     emit(s"""</TABLE></div></td></TABLE>""")
     emit(s"""<br>""")
     emit("")
@@ -112,29 +125,28 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
 
   protected def configurer[C[_]](mem: Sym[_]): MemoryConfigurer[C] = (mem match {
     case m:SRAM[_,_]    => new MemoryConfigurer(m, strategy)
-    case m:RegFile[_,_] => new MemoryConfigurer(m, strategy)
-    case m:LUT[_,_]     => new MemoryConfigurer(m, strategy)
+    case m:RegFile[_,_] => new MemoryConfigurer(m, fullyBanked)
+    case m:LUT[_,_]     => new MemoryConfigurer(m, fullyBanked)
+    case m:Reg[_]       => new MemoryConfigurer(m, fullyBanked)
+    case m:FIFOReg[_]       => new MemoryConfigurer(m, fullyBanked)
     case m:LineBuffer[_] => new MemoryConfigurer(m, strategy)
     case m:FIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
-    case m:MergeBuffer[_] => new FIFOConfigurer(m, strategy)
+    case m:MergeBuffer[_] => new MemoryConfigurer(m, customBanked)
     case m:LIFO[_]      => new FIFOConfigurer(m, strategy)  // No buffering
-    case m:Reg[_]       => new MemoryConfigurer(m, strategy)
-    case m:FIFOReg[_]       => new MemoryConfigurer(m, strategy)
     case m:StreamIn[_]  => new MemoryConfigurer(m, strategy)
     case m:StreamOut[_] => new MemoryConfigurer(m, strategy)
+    case m:LockSRAM[_,_] => new MemoryConfigurer(m, customBanked)
     case _ => throw new Exception(s"Don't know how to bank memory of type ${mem.tp}")
   }).asInstanceOf[MemoryConfigurer[C]]
 
   def run(): Unit = {
-    val memories = LocalMemories.all.toSeq
+    val memories = LocalMemories.all.toSeq.filter(!_.isCtrlBlackbox)
     val entries = memories.map{m =>  //Seq[(Long, Sym[_], MemoryConfigurer, Double)]
       val startTime = System.currentTimeMillis()
       val conf = configurer(m)
       conf.configure()
       val t = System.currentTimeMillis() - startTime
-      val totalCost = conf.schemesInfo.map{scheme => 
-        scheme._2.map(_._4.head).sum
-      }.toList.sorted.headOption.getOrElse(0.0)
+      val totalCost: Double = conf.schemesInfo.map{case (inst, schemes) => schemes.map(_._2.map(_._4.head).sum).toList.sorted.headOption.getOrElse(0.0)}.sum
       (t, m, conf, totalCost)
     }
     val totalTime = entries.map(_._1).sum

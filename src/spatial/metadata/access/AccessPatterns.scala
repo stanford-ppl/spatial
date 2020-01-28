@@ -234,8 +234,9 @@ case class AddressPattern(
       // Create new rand if necessary.  It depends on the iterators inside "others" as well as (TODO?) any iterators from a more-outer uid lane
       val rand: Seq[(Idx, Int)] = if (others.nonEmpty) Seq((boundVar[I32],1)) else Nil
 
-      val xs_all: Seq[Idx] = affine_comps.map(_._2) ++ rs.map(_._1) ++ starts ++ rand.map(_._1)
-      val as_all: Seq[Int] = affine_comps.map(_._1.b) ++ rs.map(_._2) ++ starts.indices.map{_ => 1} ++ rand.map(_._2)
+      // Updated lockstepness check takes care of starts
+      val xs_all: Seq[Idx] = affine_comps.map(_._2) ++ rs.map(_._1) ++ /*starts ++*/ rand.map(_._1)
+      val as_all: Seq[Int] = affine_comps.map(_._1.b) ++ rs.map(_._2) ++ /*starts.indices.map{_ => 1} ++*/ rand.map(_._2)
       if (rand.isEmpty) Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, allIters) )
       else Some( SparseVector(xs_all.zip(as_all).toMap, bx.b, allIters ++ Map[Idx, Seq[Idx]](rand.head._1 -> others.map(_._2).toSeq)) )
     }

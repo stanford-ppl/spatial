@@ -1,19 +1,9 @@
 package spatial.codegen.chiselgen
 
-
 import argon._
-import argon.codegen.Codegen
 import spatial.lang._
 import spatial.node._
-import spatial.metadata.bounds._
-import spatial.metadata.access._
-import spatial.metadata.retiming._
 import spatial.metadata.control._
-import spatial.metadata.memory._
-import spatial.metadata.types._
-import spatial.util.modeling.scrubNoise
-import spatial.util.spatialConfig
-
 
 trait ChiselGenCounter extends ChiselGenCommon {
 

@@ -79,8 +79,8 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
             open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
           case _ => open(src"while(hasItems_$lhs) {")
         }        
-        iters(i).zipWithIndex.foreach { case (iter, j) => emit(src"val $iter = FixedPoint.fromInt(1)") }
-        valids(i).zipWithIndex.foreach { case (valid, j) => emit(src"val $valid = Bool(true,true)") }
+        iters(i).foreach { iter => emit(src"val $iter = FixedPoint.fromInt(1)") }
+        valids(i).foreach { valid => emit(src"val $valid = Bool(true,true)") }
       }
       else {
         lhs match {
@@ -175,7 +175,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         close("}")
       }
 
-    case UnitPipe(ens, func) =>
+    case UnitPipe(ens, func, _) =>
       emitControlObject(lhs, ens, func) {
         emitControlBlock(lhs, func)
         emitControlDone(lhs)
@@ -188,7 +188,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids,stopWhen) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids,_) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)
@@ -196,7 +196,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids,stopWhen) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)
@@ -217,7 +217,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case SwitchCase(body) => // Controlled by Switch
+    case SwitchCase(_) => // Controlled by Switch
 
     case StateMachine(ens, start, notDone, action, nextState) =>
       emitControlObject(lhs, ens, notDone, action, nextState){

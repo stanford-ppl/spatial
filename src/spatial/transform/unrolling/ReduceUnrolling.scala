@@ -76,7 +76,7 @@ trait ReduceUnrolling extends UnrollingBase {
           }
         }
       }
-    })){lhs2 => transferData(lhs,lhs2) }
+    }, stopWhen)){lhs2 => transferData(lhs,lhs2) }
     pipe.unrollBy = mapLanes.Ps.product
     dbgs(s"Created unit pipe ${stm(pipe)}")
     pipe
@@ -112,7 +112,7 @@ trait ReduceUnrolling extends UnrollingBase {
         dbgs("Unrolling unit pipe reduce")
         stage(UnitPipe(enables, stageBlock{
           unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, isInner = false)
-        }))
+        }, stopWhen))
       }
       else {
         dbgs("Unrolling inner reduce")

@@ -19,7 +19,7 @@ help:
 	@echo "------- END HELP -------"
 
 sw:
-	cp scripts/de1soc.mk cpp/Makefile
+	cp de1.sw-resources/Makefile cpp/Makefile
 	cp cpp/cpptypes.hpp cpp/datastructures
 	cp cpp/DE1SoC.h cpp/fringeDE1SoC/
 	cp cpp/Structs.h cpp/datastructures 2>/dev/null || :
@@ -34,11 +34,11 @@ sw:
 	cp sp.rbf ./prog/verilog/accel.bit.bin
 
 hw:
-	sbt "runMain top.Instantiator --verilog --testArgs de1soc"
-	sed -i 's/SRFF/SRFF_sp/g' verilog-de1soc/Top.v
+	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1soc"
+	sed -i 's/SRFF/SRFF_sp/g' verilog-de1soc/SpatialIP.v
 	cp -r hw-resources/simulation verilog-de1soc/
 	cp -r hw-resources/* verilog-de1soc/
-	cp verilog-de1soc/Top.v verilog-de1soc/Computer_System/synthesis/submodules
+	cp verilog-de1soc/SpatialIP.v verilog-de1soc/Computer_System/synthesis/submodules
 	cd verilog-de1soc && chmod +x compile.sh && ./compile.sh
 	echo "sp.rbf generated. Please copy it to your working dir on FPGA ARM"
 	cp verilog-de1soc/sp.rbf ./

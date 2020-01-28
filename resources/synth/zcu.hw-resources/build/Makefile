@@ -12,7 +12,7 @@ $(error CLOCK_FREQ_MHZ is not set!)
 endif
 
 accel.bit.bin: accel.bit parClockFreq.sh
-	bash convert_bitstream accel.bit accel.bit.bin
+	bash convert_bitstream accel.bit accel.bit.bin ZCU102
 
 accel.bit: bd
 	time vivado -mode batch -source vivado.tcl -tclargs ${CLOCK_FREQ_MHZ} 2>&1 | tee vivado_synthesis.log
@@ -21,7 +21,7 @@ reports:
 	time vivado -mode batch -source getReports.tcl -tclargs ${CLOCK_FREQ_MHZ} 2>&1 | tee vivado_reports.log
 
 bd: pre-build-checks design_1.v
-	sed -i 's/design_1_Top_0_0/Top/' design_1.v
+	sed -i 's/design_1_SpatialIP_0_0/SpatialIP/' design_1.v
 	sed -i 's/(\*/\/\/ (\*/' design_1.v
 
 design_1.v:

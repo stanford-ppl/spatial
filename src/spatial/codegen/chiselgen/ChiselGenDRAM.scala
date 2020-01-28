@@ -19,7 +19,9 @@ trait ChiselGenDRAM extends ChiselGenCommon {
       connectDRAMStreams(lhs)
       forceEmit(src"// scoped in dram is ${scoped.mkString(",")} ")
       forceEmit(src"val $lhs = Wire(new FixedPoint(true, 64, 0))")
-      forceEmit(src"$lhs.r := top.io.argIns(api.${argHandle(lhs)}_ptr)")
+      forceEmit(src"$lhs.r := accelUnit.io.argIns(api.${argHandle(lhs)}_ptr)")
+
+    case FrameHostNew(size,_,_) =>
 
     case DRAMAccelNew(dim) =>
 
@@ -28,7 +30,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent.s.get
-          val invEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+          val invEnable = src"""${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}"""
           val d = dims.map{ quote(_) + ".r" }.mkString(src"List[UInt](", ",", ")")
           emit(src"${dram}.connectAlloc($id, $d, $invEnable)")
           requesters += (lhs -> id)
@@ -49,7 +51,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
         case _@Op(DRAMAccelNew(_)) =>
           val id = requesters.size
           val parent = lhs.parent.s.get
-          val invEnable = src"""${DL(src"$datapathEn & $iiDone", lhs.fullDelay, true)}"""
+          val invEnable = src"""${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)}"""
           emit(src"${dram}.connectDealloc($id, $invEnable)")
           requesters += (lhs -> id)
         case _ =>
@@ -69,7 +71,7 @@ trait ChiselGenDRAM extends ChiselGenCommon {
 
   override def emitPostMain(): Unit = {
 
-    inGen(out, s"IOModule.$ext") {
+    inGen(out, s"AccelWrapper.$ext") {
       emit("// Heap")
       emit(src"val io_numAllocators = scala.math.max(1, ${accelDrams.size})")
     }

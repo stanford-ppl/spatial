@@ -5,49 +5,45 @@ import argon.node._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
+import spatial.metadata.retiming._
+import spatial.metadata.blackbox._
 import spatial.metadata.control._
 import spatial.metadata.memory._
-import spatial.metadata.retiming._
-import spatial.metadata.types._
 import spatial.util.spatialConfig
 
-trait ChiselGenCommon extends ChiselCodegen { 
+import scala.collection.mutable.HashMap
 
-  /* Set of controllers that we've already emited control signals for.  Sometimes a RegRead
-   * can sit in an outer controller and be used by a controller that is a descendent of the 
-   * other controllers in this outer controller 
-  **/
-  private var initializedControllers = Set.empty[Sym[_]]
+trait ChiselGenCommon extends ChiselCodegen { 
 
   // // List of inputs for current controller, in order to know if quote(mem) is the mem itself or the interface
   // var scopeInputs = List[Sym[_]]()
 
   // Mapping for DRAMs, since DRAMs and their related Transfer nodes don't necessarily appear in consistent order
-  val loadStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  val storeStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  val gatherStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
-  val scatterStreams = scala.collection.mutable.HashMap[Sym[_], (String, Int)]()
+  val loadStreams: HashMap[Sym[_], (String, Int)] = HashMap()
+  val storeStreams: HashMap[Sym[_], (String, Int)] = HashMap()
+  val gatherStreams: HashMap[Sym[_], (String, Int)] = HashMap()
+  val scatterStreams: HashMap[Sym[_], (String, Int)] = HashMap()
 
   // Statistics counters
-  var ctrls = List[Sym[_]]()
+  var ctrls: List[Sym[_]] = List()
   val widthStats = new scala.collection.mutable.ListBuffer[Int]
   val depthStats = new scala.collection.mutable.ListBuffer[Int]
-  var appPropertyStats = Set[AppProperties]()
+  var appPropertyStats: Set[AppProperties] = Set()
 
   // Interface
-  var argOuts = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argIOs = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argIns = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var argOutLoopbacks = scala.collection.mutable.HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
-  var accelDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
-  var hostDrams = scala.collection.mutable.HashMap[Sym[_], Int]()
+  var argOuts = HashMap[Sym[_], Int]()
+  var argIOs = HashMap[Sym[_], Int]()
+  var argIns = HashMap[Sym[_], Int]()
+  var argOutLoopbacks = HashMap[Int, Int]() // info about how to wire argouts back to argins in Fringe
+  var accelDrams = HashMap[Sym[_], Int]()
+  var hostDrams = HashMap[Sym[_], Int]()
   /* List of break or exit nodes */
   protected var earlyExits: List[Sym[_]] = List()
   /* List of instrumentation counters and their respective depth in the hierarchy*/
   protected var instrumentCounters: List[(Sym[_], Int)] = List()
 
   /* Mapping between FIFO/LIFO/FIFOReg accesses and the "activity" lane they occupy" */
-  protected var activesMap = scala.collection.mutable.HashMap[Sym[_], Int]()
+  protected var activesMap = HashMap[Sym[_], Int]()
 
   protected def instrumentCounterIndex(s: Sym[_]): Int = {
     if (spatialConfig.enableInstrumentation) {
@@ -72,14 +68,49 @@ trait ChiselGenCommon extends ChiselCodegen {
     }
   }
 
+  final protected def enterCtrl(lhs: Sym[_]): Sym[_] = {
+    if (inHw) ctrls = ctrls :+ lhs
+    val parent = if (controllerStack.isEmpty) lhs else controllerStack.head
+    controllerStack.push(lhs)
+    ensigs = new scala.collection.mutable.ListBuffer[String]
+    if (spatialConfig.enableInstrumentation && inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
+    val cchain = if (lhs.cchains.isEmpty) "" else s"${lhs.cchains.head}"
+    if (lhs.isOuterControl)      { widthStats += lhs.children.filter(_.s.get != lhs).toList.length }
+    else if (lhs.isInnerControl) { depthStats += controllerStack.length }
+    parent
+  }
+
+  final protected def exitCtrl(lhs: Sym[_]): Unit = {
+    // Tree stuff
+    controllerStack.pop()
+  }
+
+  protected def getInputs(lhs: Sym[_], func: Block[_]*): Seq[Sym[_]] = {
+    // Find everything that is used in this scope
+    // Only use the non-block inputs to LHS since we already account for the block inputs in nestedInputs
+    val used: Set[Sym[_]] = ({lhs.nonBlockInputs.toSet ++ func.flatMap{block => block.nestedInputs } ++ lhs.readMems} &~ lhs.cchains.toSet).filterNot(_.isBlackboxImpl)
+    val usedStreamsInOut: Set[Sym[_]] = RemoteMemories.all.filter{x => x.consumers.exists(_.ancestors.map(_.s).contains(Some(lhs)))}
+    val usedStreamMems: Set[Sym[_]] = if (lhs.hasStreamAncestor) {getReadStreams(lhs.toCtrl) ++ getWriteStreams(lhs.toCtrl)} else Set()
+    val bufMapInputs: Set[Sym[_]] = bufMapping.getOrElse(lhs, List[BufMapping]()).map{_.mem}.toSet
+    val allUsed = used ++ bufMapInputs ++ usedStreamsInOut ++ usedStreamMems
+
+    val made: Set[Sym[_]] = lhs.op.map{d => d.binds }.getOrElse(Set.empty) &~ RemoteMemories.all
+    dbgs(s"Inputs for $lhs are ($used ++ $bufMapInputs ++ $usedStreamsInOut ++ $usedStreamMems) diff $made ++ ${RemoteMemories.all}")
+    (allUsed diff made).filterNot{s => s.trace.isValue}.toSeq
+  }
+
+  protected def groupInputs(inss: Seq[Sym[_]]): Map[Seq[Sym[_]], String] = {
+    inss.groupBy{in => arg(in.tp, Some(in))}.map{case (name, ins) => if (ins.exists(cchainCopies.contains)) ins.map(List(_) -> name) else Seq(ins -> name)}.flatten.toMap
+  }
+
   protected def iodot: String = if (spatialConfig.enableModular) "io." else ""
   protected def dotio: String = if (spatialConfig.enableModular) ".io" else ""
   protected def cchainOutput: String = if (spatialConfig.enableModular) "io.sigsIn.cchainOutputs.head" else "cchain.head.output"
   protected def cchainCopyOutput(ii: Int): String = if (spatialConfig.enableModular) s"io.sigsIn.cchainOutputs($ii)" else s"cchain($ii).output"
   protected def ifaceType(mem: Sym[_]): String = mem match {
-        case _ if (mem.isNBuffered) => src".asInstanceOf[NBufInterface]"
-        case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined && mem.optimizedRegType.get == AccumFMA) => src".asInstanceOf[FixFMAAccumBundle]"
-        case Op(_: RegNew[_]) if (mem.optimizedRegType.isDefined) => src".asInstanceOf[FixOpAccumBundle]"
+        case _ if mem.isNBuffered => src".asInstanceOf[NBufInterface]"
+        case Op(_: RegNew[_]) if mem.optimizedRegType.isDefined && mem.optimizedRegType.get == AccumFMA => src".asInstanceOf[FixFMAAccumBundle]"
+        case Op(_: RegNew[_]) if mem.optimizedRegType.isDefined => src".asInstanceOf[FixOpAccumBundle]"
         case Op(_: RegNew[_]) => src".asInstanceOf[StandardInterface]"
         case Op(_: RegFileNew[_,_]) => src".asInstanceOf[ShiftRegFileInterface]"
         case Op(_: LUTNew[_,_]) => src".asInstanceOf[StandardInterface]"
@@ -99,6 +130,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected def mask: String = s"${iodot}sigsIn.mask"
   protected def ctrDone: String = s"${iodot}sigsIn.ctrDone"
   protected def iiDone: String = s"${iodot}sigsIn.iiDone"
+  protected def iiIssue: String = s"${iodot}sigsIn.iiIssue"
   protected def backpressure: String = s"${iodot}sigsIn.backpressure"
   protected def forwardpressure: String = s"${iodot}sigsIn.forwardpressure"
 
@@ -147,6 +179,24 @@ trait ChiselGenCommon extends ChiselCodegen {
     case _ => (-1, -1)
   }
 
+  protected def createAndTieInstrs(lhs: Sym[_]): Unit = {
+    if (spatialConfig.enableInstrumentation) {
+      emit(src"""val cycles_$lhs = Module(new InstrumentationCounter())""")
+      emit(src"""val iters_$lhs = Module(new InstrumentationCounter())""")
+      emit(src"cycles_$lhs.io.enable := $baseEn")
+      emit(src"iters_$lhs.io.enable := risingEdge($done)")
+      if (hasBackPressure(lhs.toCtrl) || hasForwardPressure(lhs.toCtrl)) {
+        emit(src"""val stalls_$lhs = Module(new InstrumentationCounter())""")
+        emit(src"""val idles_$lhs = Module(new InstrumentationCounter())""")
+        emit(src"stalls_$lhs.io.enable := $baseEn & ~(${getBackPressure(lhs.toCtrl)})")
+        emit(src"idles_$lhs.io.enable := $baseEn & ~(${getForwardPressure(lhs.toCtrl)})")
+        emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles_$lhs.io.count, iters_$lhs.io.count, stalls_$lhs.io.count, idles_$lhs.io.count)")
+      } else {
+        emit(src"Ledger.tieInstrCtr(instrctrs.toList, ${lhs.toString.toUpperCase}_instrctr, cycles_$lhs.io.count, iters_$lhs.io.count, 0.U, 0.U)")
+      }
+    }
+  }
+
   protected def createWire(name: String, payload: String): String = {
     src"""val $name = Wire($payload).suggestName(""" + "\"\"\"" + src"$name" + "\"\"\"" + ")"
   }
@@ -155,52 +205,60 @@ trait ChiselGenCommon extends ChiselCodegen {
   //   if the input FIFO is empty but not trying to dequeue, and if the output FIFO is full but
   //   not trying to enqueue
   def FIFOForwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.readers.filter(_.parent.s.get == sym.s.get)).collect{
-      case a@Op(x: FIFOBankedDeq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
-      case a@Op(x: FIFORegDeq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
+    or(fifo.readers.filter(_.parent.s.get == sym.s.get).collect{
+      case a@Op(x: FIFOBankedDeq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFODeqInterface[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFORegDeq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x@FieldDeq(struct, field, ens)) => src"""$struct.getActive("$field").out"""
     })
   }
 
+  // TODO: Not sure if FIFOBackwardActive is actually needed
   def FIFOBackwardActive(sym: Ctrl, fifo: Sym[_]): String = {
-    or((fifo.writers.filter(_.parent.s.get == sym.s.get)).collect{
-      case a@Op(x: FIFOBankedEnq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
-      case a@Op(x: FIFORegEnq[_]) => src"${fifo}.accessActivesOut(${activesMap(a)})"
+    or(fifo.writers.filter(_.parent.s.get == sym.s.get).collect{
+      case a@Op(x: FIFOBankedEnq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFODeqInterface[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x: FIFORegEnq[_]) => src"$fifo.active(${activesMap(a)}).out"
+      case a@Op(x@FieldDeq(struct, field, ens)) => src"""$struct.getActive("$field").out"""
     })
   }
 
   def getStreamForwardPressure(c: Sym[_]): String = { 
-    if (c.hasStreamAncestor) and(getReadStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamInNew(bus)) => src"${fifo}.valid"
+    if (c.hasStreamAncestor || c.isInBlackboxImpl) and(getReadStreams(c.toCtrl).collect {
+      case fifo @ Op(StreamInNew(bus)) => src"$fifo.valid"
     }) else "true.B"
   }
 
   def getStreamBackPressure(c: Sym[_]): String = { 
-    if (c.hasStreamAncestor) and(getWriteStreams(c.toCtrl).collect {
-      case fifo @ Op(StreamOutNew(bus)) => src"${fifo}.ready"
+    if (c.hasStreamAncestor || c.isInBlackboxImpl) and(getWriteStreams(c.toCtrl).collect {
+      case fifo @ Op(StreamOutNew(bus)) => src"$fifo.ready"
     }) else "true.B"
   }
 
-  def hasForwardPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getReadStreams(sym).nonEmpty
-  def hasBackPressure(sym: Ctrl): Boolean = sym.hasStreamAncestor && getWriteStreams(sym).nonEmpty
+  def hasForwardPressure(sym: Ctrl): Boolean = (sym.hasStreamAncestor || sym.isInBlackboxImpl) && getReadStreams(sym).nonEmpty
+  def hasBackPressure(sym: Ctrl): Boolean = (sym.hasStreamAncestor || sym.isInBlackboxImpl) && getWriteStreams(sym).nonEmpty
   def getForwardPressure(sym: Ctrl): String = {
-    if (sym.hasStreamAncestor) and(getReadStreams(sym).collect{
-      case fifo@Op(StreamInNew(bus)) => src"${fifo}.valid"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.empty | ~(${FIFOForwardActive(sym, fifo)}))"
-      case merge@Op(MergeBufferNew(_,_)) => src"~${merge}.output.empty"
+    if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getReadStreams(sym).collect{
+      case fifo@Op(StreamInNew(bus)) => src"$fifo.valid"
+      case fifo@Op(FIFONew(_)) => src"(~$fifo.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~$fifo.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
+      case merge@Op(MergeBufferNew(_,_)) => src"~$merge.output.empty.D(${sym.s.get.II}-1)"
+      case bbox@Op(_:CtrlBlackboxUse[_,_]) if getUsedFields(bbox, sym).nonEmpty => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
+      case b if b.isBound && b.isInstanceOf[StreamStruct[_]] && getUsedFields(b, sym).nonEmpty => src"$b.getForwardPressures(${getUsedFields(b, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
   def getBackPressure(sym: Ctrl): String = {
-    if (sym.hasStreamAncestor) and(getWriteStreams(sym).collect{
-      case fifo@Op(StreamOutNew(bus)) => src"${fifo}.ready"
+    if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getWriteStreams(sym).collect{
+      case fifo@Op(StreamOutNew(bus)) => src"$fifo.ready"
       // case fifo@Op(FIFONew(_)) if s"${fifo.tp}".contains("IssuedCmd") => src"~${fifo}.full"
-      case fifo@Op(FIFONew(_)) => src"(~${fifo}.full | ~(${FIFOBackwardActive(sym, fifo)}))"
-      case fifo@Op(FIFORegNew(_)) => src"(~${fifo}.full | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFONew(_)) => src"(~$fifo.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
+      case fifo@Op(FIFORegNew(_)) => src"(~$fifo.full.D(${sym.s.get.II}-1) | ~(${FIFOBackwardActive(sym, fifo)}))"
       case merge@Op(MergeBufferNew(_,_)) =>
         merge.writers.filter{ c => c.parent.s == sym.s }.head match {
           case enq@Op(MergeBufferBankedEnq(_, way, _, _)) =>
-            src"~${merge}.output.full($way)"
+            src"~$merge.output.full($way).D(${sym.s.get.II}-1)"
         }
+//      case bbox@Op(_:CtrlBlackboxUse[_,_]) => src"$bbox.getBackPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
   }
 
@@ -212,24 +270,24 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
-    val bpressure = if (controllerStack.nonEmpty) src"${backpressure}" else "true.B"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $bpressure)"
-    else src"getRetimed($name, ${latency}.toInt, $bpressure)"
+    val bpressure = if (controllerStack.nonEmpty) src"$backpressure" else "true.B"
+    if (isBit) src"($name).DS($latency.toInt, rr, $bpressure)"
+    else src"getRetimed($name, $latency.toInt, $bpressure)"
   }
 
   // DL for when we are visiting children but emiting DL on signals that belong to parent
   def DLo[T](name: String, latency: T, smname: String, isBit: Boolean = false): String = {
-    val bpressure = src"${smname}.sm.io.backpressure"
-    if (isBit) src"(${name}).DS(${latency}.toInt, rr, $bpressure)"
-    else src"getRetimed($name, ${latency}.toInt, $bpressure)"
+    val bpressure = src"$smname.sm.io.backpressure"
+    if (isBit) src"($name).DS($latency.toInt, rr, $bpressure)"
+    else src"getRetimed($name, $latency.toInt, $bpressure)"
   }
 
   protected def appendSuffix(ctrl: Sym[_], y: Sym[_]): String = {
     if (ctrl.parent.s.isDefined) {
       val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
       y match {
-        case x if (x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x))) => src"${x}_chain_read_${getSlot(ctrl)}"
-        case x if (x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x))) => src"${x}_copy$ctrl"
+        case x if x.isBound && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(quote(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
+        case x if x.isBound && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(quote(x)) => src"${x}_copy$ctrl"
         case x => src"$x" 
       }
     } else src"$y"
@@ -239,8 +297,8 @@ trait ChiselGenCommon extends ChiselCodegen {
     if (ctrl.parent.s.isDefined) {
       val madeEns = ctrl.parent.s.get.op.map{d => d.binds }.getOrElse(Set.empty).filterNot(_.isCounterChain).map(quote)
       y match {
-        case x if (x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x)) => src"${x}_chain_read_${getSlot(ctrl)}"
-        case x if (x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x)) => src"${x}_copy$ctrl"
+        case x if x.startsWith("b") && getSlot(ctrl) > 0 && ctrl.parent.s.get.isOuterPipeLoop & madeEns.contains(x) => src"${x}_chain_read_${getSlot(ctrl)}"
+        case x if x.startsWith("b") && ctrl.parent.s.get.isOuterStreamLoop & madeEns.contains(x) => src"${x}_copy$ctrl"
         case x => src"$x" 
       }
     } else src"$y"
@@ -270,7 +328,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   def or(ens: Seq[String]): String = if (ens.isEmpty) "false.B" else ens.mkString(" | ")
 
   protected def createMemObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"m_${lhs}.scala"){
+    inGen(out, src"m_$lhs.scala"){
       emitHeader()
       open(src"class $lhs {")
         contents
@@ -279,11 +337,11 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       close("}")
     }
-    emit(src"val ${lhs} = (new $lhs).m.io${ifaceType(lhs)}")
+    emit(src"val $lhs = (new $lhs).m.io${ifaceType(lhs)}")
   }
 
   protected def createBusObject(lhs: Sym[_])(contents: => Unit): Unit = {
-    inGen(out, src"bus_${lhs}.scala"){
+    inGen(out, src"bus_$lhs.scala"){
       emitHeader()
       open(src"class $lhs {")
         contents
@@ -292,7 +350,7 @@ trait ChiselGenCommon extends ChiselCodegen {
         }
       close("}")
     }
-    emit(src"val ${lhs} = new $lhs")
+    emit(src"val $lhs = new $lhs")
   }
 
   protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean): Unit = {
@@ -320,7 +378,7 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
   protected def createStreamCChainObject(lhs: Sym[_], ctrs: Seq[Sym[_]]): Unit = {
     forEachChild(lhs.owner){case (c,i) => 
-      createCChainObject(lhs, ctrs, src"_copy${c}")
+      createCChainObject(lhs, ctrs, src"_copy$c")
     }
   }
 
@@ -334,45 +392,42 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   protected def connectDRAMStreams(dram: Sym[_]): Unit = {
     dram.loadStreams.foreach{f =>
-      forceEmit(src"val ${f.addrStream} = top.io.memStreams.loads(${loadStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.addrStream} = accelUnit.io.memStreams.loads(${loadStreams.size}).cmd // StreamOut")
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
-      forceEmit(src"val ${f.dataStream} = top.io.memStreams.loads(${loadStreams.size}).data // StreamIn")
+      forceEmit(src"val ${f.dataStream} = accelUnit.io.memStreams.loads(${loadStreams.size}).data // StreamIn")
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", loadStreams.size))
+      loadStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", loadStreams.size))
     }
     dram.storeStreams.foreach{f =>
-      forceEmit(src"val ${f.addrStream} = top.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.addrStream} = accelUnit.io.memStreams.stores(${storeStreams.size}).cmd // StreamOut")
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
-      forceEmit(src"val ${f.dataStream} = top.io.memStreams.stores(${storeStreams.size}).data // StreamOut")
+      forceEmit(src"val ${f.dataStream} = accelUnit.io.memStreams.stores(${storeStreams.size}).data // StreamOut")
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
-      forceEmit(src"val ${f.ackStream}  = top.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
+      forceEmit(src"val ${f.ackStream}  = accelUnit.io.memStreams.stores(${storeStreams.size}).wresp // StreamIn")
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream; RemoteMemories += f.ackStream
       val par = f.dataStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", storeStreams.size))
+      storeStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", storeStreams.size))
     }
     dram.gatherStreams.foreach{f =>
-      forceEmit(src"val ${f.addrStream} = top.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.addrStream} = accelUnit.io.memStreams.gathers(${gatherStreams.size}).cmd // StreamOut")
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
-      forceEmit(src"val ${f.dataStream} = top.io.memStreams.gathers(${gatherStreams.size}).data // StreamIn")
+      forceEmit(src"val ${f.dataStream} = accelUnit.io.memStreams.gathers(${gatherStreams.size}).data // StreamIn")
       // if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.dataStream}_p", ${param(f.dataStream).get})  """)
       RemoteMemories += f.addrStream; RemoteMemories += f.dataStream
       val par = f.dataStream.readers.head match { case Op(e@StreamInBankedRead(strm, ens)) => ens.length }
-      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", gatherStreams.size))
+      gatherStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", gatherStreams.size))
     }
     dram.scatterStreams.foreach{f =>
-      forceEmit(src"val ${f.addrStream} = top.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
+      forceEmit(src"val ${f.addrStream} = accelUnit.io.memStreams.scatters(${scatterStreams.size}).cmd // StreamOut")
       if (spatialConfig.enableModular) forceEmit(src"""ModuleParams.addParams("${f.addrStream}_p", ${param(f.addrStream).get})  """)
-      forceEmit(src"val ${f.ackStream} = top.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
+      forceEmit(src"val ${f.ackStream} = accelUnit.io.memStreams.scatters(${scatterStreams.size}).wresp // StreamOut")
       RemoteMemories += f.addrStream; RemoteMemories += f.ackStream
       val par = f.addrStream.writers.head match { case Op(e@StreamOutBankedWrite(_, _, ens)) => ens.length }
-      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, ${par}, 0)""", scatterStreams.size))
+      scatterStreams += (f -> (s"""StreamParInfo(${bitWidth(dram.tp.typeArgs.head)}, $par, 0)""", scatterStreams.size))
     }
-
-
   }
-
 }
 
 

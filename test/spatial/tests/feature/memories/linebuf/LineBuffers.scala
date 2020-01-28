@@ -5,6 +5,7 @@ import spatial.dsl._
 @spatial class LineBufs extends SpatialTest {
 
   def main(args: Array[String]): Unit = {
+    println(s"REMEMBER: This app relies on the pipe binding transformer!")
     val init_dram = DRAM[I32](10,24)
     val init = (0::10,0::24){(i,j) => i*24 + j}
     val last_dram = DRAM[I32](3,24)
@@ -60,7 +61,7 @@ import spatial.dsl._
       last_dram3 store sram3
 
       val lb4 = LineBuffer.strided[I32](8,26,2)
-      val sram4 = SRAM[I32](7,25)
+      val sram4 = SRAM[I32](7,25).flat
       Foreach(12 by 2){i => 
         lb4 load init4_dram(i::i+2, 0::25)
         // Foreach(2 by 1, 25 by 1 par 1){(r,j) => 

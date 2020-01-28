@@ -1,11 +1,11 @@
 package fringe.targets.de1soc
 
-import fringe.{AbstractAccelTop, BigIP, TopInterface}
+import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 import fringe.targets.{BigIPSim, DeviceTarget}
 
 class DE1SoC extends DeviceTarget {
   def makeBigIP: BigIP = new BigIPSim
-  override def topInterface(reset: Reset, accel: AbstractAccelTop): TopInterface = {
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new DE1SoCInterface)
 
     throw new Exception(s"Top Interface is unimplemented for DE1SoC")

@@ -2,7 +2,7 @@
 package fringe.test
 
 import fringe.templates.memory.FixFMAAccum
-import fringe.utils.log2Up
+import _root_.utils.math .log2Up
 
 import chisel3.iotesters.PeekPokeTester
 

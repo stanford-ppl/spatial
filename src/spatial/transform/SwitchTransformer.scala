@@ -72,6 +72,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ super.transform(lhs,rhs) }
 
     case IfThenElse(cond,thenBlk,elseBlk) if inHw =>
       dbgs(s"Transforming $lhs ($cond ? $thenBlk : $elseBlk")

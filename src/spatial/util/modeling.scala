@@ -20,12 +20,20 @@ import scala.collection.immutable.SortedSet
 
 object modeling {
 
-  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
+  @stateful def mutatingBounds(x: Sym[_], visited: Set[Sym[_]] = Set(), bounds: Set[Sym[_]] = Set()): Seq[Sym[_]] = {
+    val (newBounds, toCheck) = x.inputs.partition(_.isBound)
+    val toCheckExpanded = toCheck.toSeq.flatMap{y: Sym[_] => if (y.isSingleton) y.writers.toSeq else Seq(y)}.toSet diff visited // TODO: Also trace nonSingleton but conflictable mems?
+    val nextBounds = bounds ++ newBounds
+    if (toCheckExpanded.nonEmpty) toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}.toSortedSeq
+    else nextBounds.toSortedSeq
+  }
+
+  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = frontier.flatMap{x: Sym[_] =>
     if (scope.contains(x) && !nodes.contains(x)) {
       consumersDfs(x.consumers, nodes + x, scope)
     }
     else nodes
-  }
+  }.toSortedSeq
 
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
@@ -36,12 +44,12 @@ object modeling {
   /** Returns all nodes on all paths from start --> end, including start and end
     * If there are no such paths, returns an empty set.
     */
-  def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: Set[Sym[_]]): Set[Sym[_]] = {
+  def getAllNodesBetween(start: Sym[_], end: Sym[_], scope: Set[Sym[_]]): Seq[Sym[_]] = {
     def inputsDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]]): Set[Sym[_]] = frontier.flatMap{x: Sym[_] =>
       if (scope.contains(x)) {
         if (x == start) nodes + x
         else if (x.isMem) {
-          val w = (x.writers.toSet intersect scope).filterNot(nodes.contains)
+          val w = (x.writers.toSet intersect scope) diff nodes
           inputsDfs(w, nodes + x)
         }
         else {
@@ -50,7 +58,7 @@ object modeling {
       }
       else Set.empty[Sym[_]]
     }
-    inputsDfs(Set(end),Set(end))
+    inputsDfs(Set(end),Set(end)).toSortedSeq
   }
 
   @stateful def target: HardwareTarget = spatialConfig.target
@@ -79,10 +87,10 @@ object modeling {
     verbose: Boolean = false
   ): (Double, Double) = {
     val (latencies, cycles) = latenciesAndCycles(block, verbose = verbose)
-    val scope = latencies.keySet
     val latency = latencies.values.fold(0.0){(a,b) => Math.max(a,b) }
     // TODO: Safer way of determining if THIS cycle is the reduceType
-    val interval = (cycles.map{c => c.length} + 0).max
+    dbgs(s"cycles are $cycles")
+    val interval = cycles.map{c => c.length}.sorted.reverse.headOption.getOrElse(0.0)
     // Combine segmented cycleSyms
     val segmentedInterval = cycles.filter(_.memory.segmentMapping.size > 1).filter(_.isInstanceOf[WARCycle])
                                   .groupBy(_.memory)
@@ -94,7 +102,7 @@ object modeling {
   }
 
 
-  @stateful def latenciesAndCycles(block: Block[_], verbose: Boolean = false): (Map[Sym[_],Double], Set[Cycle]) = {
+  @stateful def latenciesAndCycles(block: Block[_], verbose: Boolean = false): (Map[Sym[_],Double], Seq[Cycle]) = {
     val (schedule, result) = blockNestedScheduleAndResult(block)
     pipeLatencies(result, schedule, verbose = verbose)
   }
@@ -103,18 +111,18 @@ object modeling {
   case class AccumTriple(mem: Sym[_], read: Sym[_], write: Sym[_])
 
   case class ScopeAccumInfo(
-    readers: Map[Sym[_],Set[Sym[_]]], // Memory -> readers
-    writers: Map[Sym[_],Set[Sym[_]]], // Memory -> writers
-    accums:  Set[AccumTriple],
-    cycles:  mutable.Map[Sym[_], mutable.Set[AccumTriple]]
+    readers: Map[Sym[_],Seq[Sym[_]]], // Memory -> readers
+    writers: Map[Sym[_],Seq[Sym[_]]], // Memory -> writers
+    accums:  Seq[AccumTriple],
+    cycles:  mutable.Map[Sym[_], Seq[AccumTriple]]
   )
 
   @stateful def findAccumCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): ScopeAccumInfo = {
-    val scope = schedule.toSet
-    val cycles = mutable.HashMap[Sym[_],mutable.Set[AccumTriple]]()
+    val scope = schedule
+    val cycles = mutable.HashMap[Sym[_],Seq[AccumTriple]]()
     def addCycle(sym: Sym[_], triple: AccumTriple): Unit = {
-      val set = cycles.getOrElseAdd(sym, () => mutable.HashSet.empty)
-      set += triple
+      if (cycles.contains(sym)) cycles(sym) = cycles(sym) :+ triple
+      else cycles(sym) = Seq(triple)
     }
 
     val readers = scope.collect{
@@ -130,18 +138,24 @@ object modeling {
       case writer @ VectorWriter(mem,_,_,_) => AccessPair(mem, writer)
     }
 
+    def brokenByRetimeGate(x1: Sym[_], x2: Sym[_], schedule: Seq[Sym[_]]): Boolean = {
+      ((schedule.indexOf(x1) < schedule.indexOf(x2)) && (schedule.take(schedule.indexOf(x2)).drop(schedule.indexOf(x1)).exists(_.isRetimeGate))) ||
+      ((schedule.indexOf(x2) < schedule.indexOf(x1)) && (schedule.take(schedule.indexOf(x1)).drop(schedule.indexOf(x2)).exists(_.isRetimeGate))      )
+    }
+
+
     val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
     val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
-    val memories = readersByMem.keySet intersect writersByMem.keySet
+    val memories = (readersByMem.keySet intersect writersByMem.keySet).filter(!_.isLockSRAM)
     dbgs(s"Memories with both reads and writes in this scope: $memories")
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
-      rds.cross(wrs).flatMap{case (rd, wr) =>
+      rds.cross(wrs).collect{case (rd, wr) if !brokenByRetimeGate(rd,wr,schedule) =>
+      // rds.cross(wrs).flatMap{case (rd, wr) =>
         lazy val triple = AccumTriple(mem, rd, wr)
-        val path = getAllNodesBetween(rd, wr, scope)
+        val path = getAllNodesBetween(rd, wr, scope.toSet)
         path.foreach{sym => addCycle(sym, triple) }
-
         if (verbose && path.nonEmpty) {
           dbgs("Found cycle between: ")
           dbgs(s"  ${stm(wr)}")
@@ -150,8 +164,9 @@ object modeling {
         }
 
         if (path.nonEmpty) Some(triple) else None
-      }
-    }
+      }.flatten
+    }.toSortedSeq
+    dbgs(s"Done finding cycles")
 
     ScopeAccumInfo(readersByMem, writersByMem, accums, cycles)
   }
@@ -161,12 +176,13 @@ object modeling {
     schedule: Seq[Sym[_]],
     oos:      Map[Sym[_],Double] = Map.empty,
     verbose:  Boolean = false
-  ): (Map[Sym[_],Double], Set[Cycle]) = {
+  ): (Map[Sym[_],Double], Seq[Cycle]) = {
 
-    val scope = schedule.toSet
+    val scope = schedule
 
+    dbgs(s"Working on pipeLatencies of result $result, schedule $schedule")
     val paths  = mutable.HashMap[Sym[_],Double]() ++ oos
-    val cycles = mutable.HashMap[Sym[_],Set[Sym[_]]]()
+    val cycles = mutable.HashMap[Sym[_],Seq[Sym[_]]]()
 
     val accumInfo = findAccumCycles(schedule,verbose)
     val accums      = accumInfo.accums
@@ -176,8 +192,8 @@ object modeling {
 
     def debugs(x: => Any): Unit = if (verbose) dbgs(x)
 
-    def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): Set[WARCycle] = {
-      val scope = schedule.toSet
+    def findPseudoWARCycles(schedule: Seq[Sym[_]], verbose: Boolean = false): Seq[WARCycle] = {
+      val scope = schedule
 
       val readers = scope.collect{
         case reader @ Reader(mem,_,_)     => AccessPair(mem, reader)
@@ -194,35 +210,35 @@ object modeling {
 
       val readersByMem = readers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | writers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
       val writersByMem = writers.groupBy(_.mem).filter{x => !x._1.isArgIn && (x._2.size > 1 | readers.map(_.mem).contains(x._1))}.mapValues(_.map(_.access))
-      val memories = readersByMem.keySet intersect writersByMem.keySet
+      val memories = (readersByMem.keySet intersect writersByMem.keySet).toSortedSeq
       memories.flatMap{mem =>
         dbgs(s"pseudo cycles for $mem:")
         val rds = readersByMem(mem)
         val wrs = writersByMem(mem)
-        rds.cross(wrs).collect{case (rd, wr) if (paths(rd) < paths(wr) && !accums.contains(AccumTriple(mem, rd, wr))) =>
+        rds.cross(wrs).collect{case (rd, wr) if paths(rd) < paths(wr) && !accums.contains(AccumTriple(mem, rd, wr)) =>
           val cycleLengthExact = paths(wr).toInt - paths(rd).toInt + latencyOf(rd, true)
           dbgs(s" - $rd $wr cycle = $cycleLengthExact")
 
           // TODO[2]: FIFO/Stack operations need extra cycle for status update?
           val cycleLength = if (rd.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
-          WARCycle(rd, wr, mem, Set(rd,wr,mem), cycleLength)
+          WARCycle(rd, wr, mem, Seq(rd,wr,mem), cycleLength)
         }
       }
 
     }
 
     def fullDFS(cur: Sym[_]): Double = {
-      def precedingWrites: Set[Sym[_]] = {
+      def precedingWrites: Seq[Sym[_]] = {
         cur.readMem.map{mem => 
           val parentScope = cur.parent.innerBlocks.flatMap(_._2.stms)
-          val writers = parentScope.filter(_.writtenMem == Some(mem)).toSet
+          val writers = parentScope.filter(_.writtenMem contains mem).toSet
           parentScope.zipWithIndex.collect{case (x,i) if i < parentScope.indexOf(cur) => x}.toSet intersect writers
-        }.getOrElse(Set.empty)
+        }.getOrElse(Seq()).toSortedSeq
       }
       cur match {
         case Op(d) if scope.contains(cur) =>
           // Handles effect scheduling, even though there's no data to pass
-          val deps = scope intersect (cur.allDeps.toSet ++ precedingWrites)
+          val deps = scope intersect (cur.allDeps ++ precedingWrites)
 
           if (deps.nonEmpty) {
             val dlys = deps.map{e => paths.getOrElseAdd(e, () => fullDFS(e)) }
@@ -232,9 +248,9 @@ object modeling {
             // (For now, all cases are just the max of all inputs)
             val critical = d match {case _ => dlys.max }
 
-            val cycleSyms = deps intersect cycles.keySet
+            val cycleSyms = deps.toSet intersect cycles.keySet
             if (cycleSyms.nonEmpty) {
-              cycles(cur) = cycleSyms.flatMap(cycles) + cur
+              cycles(cur) = cycleSyms.toSortedSeq.flatMap(cycles) :+ cur
               debugs(s"cycle deps of $cur: ${cycles(cur)}")
             }
 
@@ -261,7 +277,7 @@ object modeling {
     // This can create extra registers, but decreases the initiation interval of the cycle
     def reverseDFS(cur: Sym[_], cycle: Set[Sym[_]]): Unit = cur match {
       case s: Sym[_] if cycle contains cur =>
-        val forward = s.consumers intersect scope
+        val forward = s.consumers.toSortedSeq intersect scope
         if (forward.nonEmpty) {
           debugs(s"${stm(s)} [${paths.getOrElse(s,0L)}]")
 
@@ -282,47 +298,53 @@ object modeling {
       case _ => // Do nothing
     }
 
+    /** If these accesses were banked as part of the same group, then we don't need to treat them as a true AAA cycle */
+    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = {
+      // TODO: Poor man's way of checking if two accesses were part of the same banking group is to check if they came
+      //       from the same pre-unrolled symbol.  Must actually check banking group of each access, perhaps by adding
+      //       some kind of bank group hash metadata.
+      accesses.forallPairs{case (a,b) => a.originalSym.isDefined && a.originalSym == b.originalSym}
+    }
 
-    def pushMultiplexedAccesses(accessors: Map[Sym[_],Set[Sym[_]]]) = accessors.flatMap{case (mem,accesses) =>
-      if (accesses.nonEmpty && verbose){
+    def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.filter{case (_, accesses) => !bankedTogether(accesses)}.flatMap{case (mem,accesses) =>
+      if (accesses.nonEmpty && verbose) {
         dbgs(s"Multiplexed accesses for memory $mem: ")
-        accesses.foreach{access => dbgs(s"  ${stm(access)}") }
+        accesses.foreach { access => dbgs(s"  ${stm(access)}") }
       }
 
       // NOTE: After unrolling there should be only one mux index per access
       // unless the common parent is a Switch
       val instances = if (mem.getDuplicates.isDefined) mem.duplicates.length else 0
-      (0 to instances-1).map{id =>
+      (0 to instances - 1).map { id =>
         val accs = accesses.filter(_.dispatches.values.exists(_.contains(id))).filter(!_.op.get.isInstanceOf[FIFOPeek[_]])
 
-        val muxPairs = accs.map{access =>
+        val muxPairs = accs.map { access =>
           val muxes = access.ports(0).values.map(_.muxPort)
-          (access, paths.getOrElse(access,0.0), muxes.maxOrElse(0))
-        }.toSeq
-
-        val length = muxPairs.map(_._3).maxOrElse(0) - muxPairs.map(_._3).minOrElse(0) + 1
+          (access, paths.getOrElse(access, 0.0), muxes.maxOrElse(0))
+        }
+        val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
 
         // Keep accesses with the same mux index together, even if they have different delays
-        // TODO[1]: This isn't quite right - should order by common parent instead?
-        val groupedMuxPairs = muxPairs.groupBy(_._3)  // Group by maximum mux port
-        val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy{pairs => pairs.map(_._2).max }
+        // TODO: This whole analysis seems suspicious but it works.  Probably worth redoing it though since it probably adds unnecessary latency
+        val groupedMuxPairs = muxPairs.groupBy(_._3) // Group by maximum mux port
+        val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy { pairs => pairs.map(_._2).max }
         var writeStage = 0.0
-        orderedMuxPairs.foreach{pairs =>
+        orderedMuxPairs.foreach { pairs =>
           val dlys = pairs.map(_._2) :+ writeStage
-          val writeDelay = dlys.max 
+          val writeDelay = dlys.max
           writeStage = writeDelay + 1
-          pairs.foreach{case (access, dly, _) =>
+          pairs.foreach { case (access, _, _) =>
             val oldPath = paths(access)
-            dbgs(s"Pushing ${stm(access)} by ${writeDelay-oldPath} to $writeDelay due to muxing.")
-            if (writeDelay-oldPath > 0) {
+            dbgs(s"Pushing ${stm(access)} by ${writeDelay - oldPath} to $writeDelay due to muxing.")
+            if (writeDelay - oldPath > 0) {
               paths(access) = writeDelay
-              dbgs(s"  Also pushing these by ${writeDelay-oldPath}:")
+              dbgs(s"  Also pushing these by ${writeDelay - oldPath}:")
               // Attempted fix for issue #54. Not sure how this interacts with cycles
-              val affectedNodes = consumersDfs(access.consumers, Set(), scope) intersect scope
-              affectedNodes.foreach{case x if (paths.contains(x)) => 
-                  dbgs(s"  $x")
-                  paths(x) = paths(x) + (writeDelay-oldPath)
-                case _ =>
+              val affectedNodes = consumersDfs(access.consumers, Set(), scope.toSet) intersect scope
+              affectedNodes.foreach { case x if paths.contains(x) =>
+                dbgs(s"  $x")
+                paths(x) = paths(x) + (writeDelay - oldPath)
+              case _ =>
               }
             }
           }
@@ -332,12 +354,36 @@ object modeling {
       }
     }
 
+    // TODO: Segmentation pushing and break pushing can all be implemented by injecting RetimeGate nodes
+    def pushRetimeGates(): Unit = {
+      val gateNodes = schedule.collect{case x if x.isRetimeGate => x}
+//      if (gateNodes.size > 1) error(s"Currently only one retimeGate() is allowed per block!")
+      if (gateNodes.nonEmpty) {
+        val orderedNodes = gateNodes.head.parent.innerBlocks.flatMap(_._2.stms)
+        val gates = Seq(0) ++ orderedNodes.zipWithIndex.collect { case (x, i) if x.isRetimeGate => i } ++ Seq(orderedNodes.length)
+        dbgs(s"Found gate nodes at indices $gates")
+        gates.drop(1).dropRight(1).zipWithIndex.foreach { case (gatePos, idx) =>
+          val gateStart = gates(idx)
+          val gateStop = gates(idx + 2)
+          val prevNodes = orderedNodes.slice(gateStart, gatePos)
+          val aftNodes = orderedNodes.slice(gatePos + 1, gateStop)
+          val latestPrev = prevNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.lastOption.getOrElse(0.0)
+          val earliestAft = aftNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.headOption.getOrElse(1.0)
+          dbgs(s"Latest node between $gateStart - $gatePos = $latestPrev, Earliest node between $gatePos - $gateStop = $earliestAft")
+          if (latestPrev >= earliestAft) {
+            val push = latestPrev - earliestAft + 2
+            aftNodes.collect { case x if paths.contains(x) => dbgs(s" - Pushing $x from ${paths(x)} by $push"); paths(x) = paths(x) + push }
+          }
+        }
+      }
+    }
+
     def pushSegmentationAccesses(): Unit = {
       accums.foreach{case AccumTriple(mem, reader, writer) => 
         if (reader.segmentMapping.nonEmpty && reader.segmentMapping.values.head > 0 && paths.contains(reader)) {
           dbgs(s"pushing segmentation access for $mem, $reader, $writer.. metadata ${reader.segmentMapping}")
           // Find any writer of previous segment
-          val prevWriter = accums.collectFirst{case AccumTriple(m,_,w) if (scope.contains(w) && (m == mem) && (w.segmentMapping.values.head == reader.segmentMapping.values.head-1)) => w}
+          val prevWriter = accums.collectFirst{case AccumTriple(m,_,w) if scope.contains(w) && (m == mem) && (w.segmentMapping.values.head == reader.segmentMapping.values.head-1) => w}
           dbgs(s"Found writer $prevWriter in segment ${reader.segmentMapping.values.head-1}")
           // Find latency where this previous writer occurs
           val baseLatency = if (paths.contains(prevWriter.get)) paths(prevWriter.get) else 0
@@ -345,10 +391,10 @@ object modeling {
           // Place reader at this latency
           val originalReadLatency = paths(reader)
           paths(reader) = baseLatency + 2 /*sram load latency*/
-          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope) intersect scope) diff Set(reader)
+          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope.toSet) intersect scope).toSortedSeq diff Seq(reader)
           dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
           // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
-          affectedNodes.foreach{case x if (paths.contains(x)) => 
+          affectedNodes.foreach{case x if paths.contains(x) =>
             val relativeLatency = paths(x) - originalReadLatency
             dbgs(s"  $x - Originally at ${paths(x)}, relative latency from read of $relativeLatency")
             paths(x) = baseLatency + relativeLatency + 2
@@ -359,7 +405,7 @@ object modeling {
 
     def pushBreakNodes(regWrite: Sym[_]): Unit = {
       val reg = regWrite match {case Op(_@RegWrite(x,_,_)) => x; case _ => throw new Exception(s"Cannot break loop with non-reg ($regWrite)")}
-      if (regWrite.ancestors.exists(_.stopWhen == Some(reg))) {
+      if (regWrite.ancestors.exists(_.stopWhen.contains(reg))) {
         val parentScope = regWrite.parent.innerBlocks.flatMap(_._2.stms)
         val toPush = parentScope.zipWithIndex.collect{case (x,i) if i > parentScope.indexOf(regWrite) => x}.toSet
         toPush.foreach{
@@ -381,9 +427,9 @@ object modeling {
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
         warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
-        val affectedNodes = (consumersDfs(r.consumers, Set(), scope) intersect scope) ++ Set(r)
+        val affectedNodes = (consumersDfs(r.consumers, Set(), scope.toSet) intersect scope) :+ r
         affectedNodes.foreach{
-          case x if (paths.contains(x)) => 
+          case x if paths.contains(x) =>
             dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")
             paths(x) = paths(x) + dist
           case _ => 
@@ -395,7 +441,7 @@ object modeling {
     debugs(s"Computing pipeLatencies for scope:")
     schedule.foreach{ e => debugs(s"  ${stm(e)}") }
 
-    accumReads.foreach{reader => cycles(reader) = Set(reader) }
+    accumReads.foreach{reader => cycles(reader) = Seq(reader) }
 
     if (scope.nonEmpty) {
       // Perform forwards pass for normal data dependencies
@@ -405,12 +451,12 @@ object modeling {
       accumWrites.toList.zipWithIndex.foreach{case (writer,i) =>
         val cycle = cycles.getOrElse(writer, Set.empty)
         dbgs(s"Cycle #$i: write: $writer, cycle: ${cycle.mkString(", ")}")
-        reverseDFS(writer, cycle)
+        reverseDFS(writer, cycle.toSet)
       }
     }
 
     val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
-      val symbols = cycles(writer)
+      val symbols = cycles(writer).toSortedSeq
       val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
 
       // TODO[2]: FIFO/Stack operations need extra cycle for status update?
@@ -422,7 +468,7 @@ object modeling {
 
     val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
     val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    val allCycles: Set[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSet      
+    val allCycles: Seq[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSortedSeq
 
     if (verbose) {
       if (allCycles.nonEmpty) {
@@ -441,10 +487,11 @@ object modeling {
       case x if x.isWriter && x.writtenMem.isDefined => 
         if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
         if (x.writtenMem.get.isReg) protectRAWCycle(x)
-      case _ => 
+      case x =>
     }
 
     pushSegmentationAccesses()
+    pushRetimeGates()
 
     (paths.toMap, allCycles)
   }
@@ -462,7 +509,7 @@ object modeling {
     latencies:  Map[Sym[_], Double],
     hierarchy:  Int,
     delayLines: Map[Sym[_], SortedSet[ValueDelay]],
-    cycles:     Set[Sym[_]],
+    cycles:     Seq[Sym[_]],
     createLine: Option[(Int, Sym[_], SrcCtx) => Sym[_]]
   ): Seq[(Sym[_], ValueDelay)] = {
     dbgs(s"computing delay lines for $scope $latencies $delayLines $cycles")

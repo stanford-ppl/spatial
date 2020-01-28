@@ -1,12 +1,12 @@
 package spatial.transform
 
 import argon._
-import argon.node._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.retiming._
+import spatial.metadata.access._
 import spatial.traversal.AccelTraversal
 import spatial.util.spatialConfig
 
@@ -14,6 +14,7 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ transformControl(lhs,rhs) }
+    case _:BlackboxImpl[_,_,_] => inBox{ transformControl(lhs,rhs) }
     case _ => transformControl(lhs,rhs)
   }
 
@@ -48,14 +49,24 @@ case class AccumTransformer(IR: State) extends MutateTransformer with AccelTrave
 
   def optimizeAccumulators[R](block: Block[R]): Block[R] = {
     val stms = block.stms
+    // Partition stms into those that are part of cycles to-be-replaced and those that are not
     val (cycles, nonCycles) = stms.partition{s => s.isInCycle && s.reduceCycle.cycleID > -1 }
-
+    // Find the writer nodes in the cycles (i.e. nodes that mark the end of an atomic reduction chain to-be-replaced)
+    val cycleWriters = cycles.filter(_.isWriter)
+    // Find memories that are being accumulated into
+    val cycleMems = cycleWriters.map(_.writtenMem.get)
+    // Build mapping between each memory and the index in the IR where its accumulating write happens
+    val cycleEnds = cycleWriters.zip(cycleMems).map{case (w,m) => (m -> stms.indexOf(w))}.toMap
+    // Initialize Seq of nodes that will be placed before and after specialization replacements
     var beforeCycles: Seq[Sym[_]] = Nil
     var afterCycles: Seq[Sym[_]] = Nil
-    nonCycles.foreach{s =>
+    dbgs(s"Placing nodes as either before or after cycles: $cycles")
+    stms.zipWithIndex.collect{case (s,i) if nonCycles.contains(s) =>
       val usesCycle = (s.inputs intersect cycles).nonEmpty
+      val readsAfterAccum = (s.inputs intersect cycleMems).nonEmpty && (s.inputs.exists{case inp if cycleEnds.contains(inp) => i > cycleEnds(inp); case _ => false})
       val downstreamFromCycle = (s.inputs intersect afterCycles).nonEmpty
-      if (usesCycle || downstreamFromCycle) afterCycles = afterCycles :+ s
+      dbgs(s"  - ${stm(s)}: Uses nodes in cycle: ${usesCycle}, Reads after accumulating write: $readsAfterAccum, Is downstream of cycle: $downstreamFromCycle")
+      if (usesCycle || readsAfterAccum || downstreamFromCycle) afterCycles = afterCycles :+ s
       else beforeCycles = beforeCycles :+ s
     }
 

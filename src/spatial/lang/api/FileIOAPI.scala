@@ -69,34 +69,40 @@ trait FileIOAPI { this: Implicits =>
   /** Writes the given Array to the file at `filename` using the given `delimiter`.
     * If no delimiter is given, defaults to comma.
     **/
-  @api def writeCSV1D[T:Type](array: Tensor1[T], filename: Text, delim: Text = Text(",")): Void = {
+  @api def writeCSV1D[T:Type](array: Tensor1[T], filename: Text, delim: Text = Text(","), format:Option[String]=None): Void = {
     val file = openCSV(filename, write = true)
-    writeTokens(file, delim, array.length){i => array(i).toText }
+    writeTokens(file, delim, array.length){i => array(i) match {
+      case e:Fix[_,_,_] => e.toText(format)
+      case e:Flt[_,_] => e.toText(format)
+      case e => e.toText
+    } }
     closeCSV(file)
   }
 
   /** Writes the given Tensor2 to the file at `filename` using the given element delimiter.
     * If no element delimiter is given, defaults to comma.
     **/
-  @api def writeCSV2D[T:Type](matrix: Tensor2[T], filename: Text, delim1: Text = Text(","), delim2: Text = Text("\n")): Void = {
+  @api def writeCSV2D[T:Type](matrix: Tensor2[T], filename: Text, delim1: Text = Text(","), delim2: Text = Text("\n"), format:Option[String]=None): Void = {
     val file = openCSV(filename, write = true)
     Foreach(0 until matrix.rows){ i =>
-      writeTokens(file, delim1, matrix.cols){j => matrix(i,j).toText }
+      writeTokens(file, delim1, matrix.cols){j => matrix(i,j) match {
+        case e:Fix[_,_,_] => e.toText(format)
+        case e:Flt[_,_] => e.toText(format)
+        case e => e.toText
+      } }
       writeTokens(file, delim2, 1){_ => Text("") }
     }
     closeCSV(file)
   }
 
   @rig def openBinary(filename: Text, write: Boolean): BinaryFile = stage(OpenBinaryFile(filename, write))
-  @rig def readBinary[A:Num](file: BinaryFile): Tensor1[A] = stage(ReadBinaryFile(file))
+  @rig def readBinary[A:Num](file: BinaryFile, isASCIITextFile: Boolean = false): Tensor1[A] = stage(ReadBinaryFile(file))
   @rig def writeBinary[A:Num](file: BinaryFile, len: I32)(func: I32 => A): Void = {
     val i = boundVar[I32]
     val f = stageLambda1(i){ func(i) }
     stage(WriteBinaryFile(file, len, f))
   }
   @rig def closeBinary(file: BinaryFile): Void = stage(CloseBinaryFile(file))
-
-
 
   /** Loads the given binary file at `filename` as an Array. */
   @api def loadBinary[T:Num](filename: Text): Tensor1[T] = {
@@ -119,4 +125,13 @@ trait FileIOAPI { this: Implicits =>
   /** Creates a placeholder for a numpy matrix as an @Tensor2.**/
   @api def loadNumpy2D[T:Num](name: String): Tensor2[T] = stage(NumpyMatrix(name))
 
+
+  /** Returns a 1-D DRAM preloaded with a raw text file.
+    * We assume that the text file is sufficiently large.
+    * Hence, we cannot */
+  @api def loadDRAMWithASCIIText[T:Num](filename: Text, dram: DRAM1[T]): Void = {
+    val file = openBinary(filename, write = false)
+    stage(LoadDRAMWithASCIIText(dram, file))
+    closeBinary(file)
+  }
 }

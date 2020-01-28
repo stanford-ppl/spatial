@@ -34,11 +34,32 @@ import scala.collection.mutable.Queue
   /** Creates a conditional enqueue (write) port to this FIFO of `data` enabled by `en`. **/
   @api def enq(data: A, en: Bit): Void = stage(FIFOEnq(this,data,Set(en)))
 
+  /** Creates a vector enqueue (write) port with multiple elements in parallel to this FIFO of `data`. **/
+  @api def enqVec(data: Vec[A]): Void = this.enqVec(data, true)
+
+  /** Creates a vector enqueue (write) port to this FIFO of `data` enabled by `en`. **/
+  @api def enqVec(data: Vec[A], en: Bit): Void = stage(FIFOVecEnq(this,data,Seq(I32(0)),Set(en)))
+
+  /** Creates a vector dequeue (write) port with multiple elements in parallel to this FIFO of `data`. **/
+  @api def deqVec(numel: scala.Int): Vec[A] = this.deqVec(Seq.tabulate(numel){i => I32(i)}, true)
+
+  /** Creates a conditional vector dequeue (write) port to this FIFO of `data` enabled by `en`. **/
+  @api def deqVec(addr: Seq[I32], en: Bit): Vec[A] = {
+    implicit val VA: Vec[A] = Vec.bits[A](addr.size) 
+    stage(FIFOVecDeq(this,addr,Set(en)))
+  }
+
   /** Creates a dequeue (destructive read) port to this FIFO. **/
   @api def deq(): A = this.deq(true)
 
   /** Creates a conditional dequeue (destructive read) port to this FIFO enabled by `en`. **/
   @api def deq(en: Bit): A = stage(FIFODeq(this,Set(en)))
+
+  /** Creates a dequeue interface, to be used with Blackboxes and StreamStructs */
+  @api def deqInterface(): A = this.deqInterface(true)
+
+  /** Creates a dequeue interface with en mask included, to be used with Blackboxes and StreamStructs */
+  @api def deqInterface(en: Bit): A = stage(FIFODeqInterface(this,Set(en)))
 
   /** Creates a non-destructive read port to this FIFO. **/
   @api def peek(): A = stage(FIFOPeek(this,Set.empty))
@@ -49,7 +70,7 @@ import scala.collection.mutable.Queue
     */
   def conflictable: FIFO[A] = { this.shouldIgnoreConflicts = true; me }
   /** Do not attempt to bank memory by duplication */
-  def noduplicate: FIFO[A] = { this.isNoDuplicate = true; me }
+  def noduplicate: FIFO[A] = { this.isNoFission = true; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(FIFODeq(this,ens))

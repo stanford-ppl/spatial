@@ -34,9 +34,22 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   private var validBits: Set[Bit] = Set.empty
   def withValids[T](valids: Seq[Bit])(blk: => T): T = {
     val prevValids = validBits
-    validBits = valids.toSet // TODO: Should this be ++= ?
+    validBits = if (!_passEns) valids.toSet else prevValids ++ valids.toSet
+    // TODO: Should this be ++= ?
     val result = blk
     validBits = prevValids
+    result
+  }
+
+  /**
+   * Hack: passing enable for Switch and SwitchCase for PIR since they don't have enable in IR
+   */
+  private var _passEns: Boolean = false
+  def withPassEns[T](passEns:Boolean)(blk: => T): T = {
+    val saved = _passEns
+    _passEns = passEns
+    val result = blk
+    _passEns = saved
     result
   }
 
@@ -62,7 +75,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
 
   /** Lanes tracking duplications in this scope */
-  var lanes: Unroller = UnitUnroller("Accel", false)
+  var lanes: Unroller = UnitUnroller("Accel", isInnerLoop = false)
   
   /** Mapping between each lane of an Unroller to sequence of Syms to be grouped in that lane (PoM only) */
   var laneMapping: Map[(Unroller, Int), Seq[Block[_]]] = Map.empty
@@ -89,7 +102,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   def crossSection(cchain: CounterChain, addr: List[Int]): CounterChain = {
     import argon.lang._
 
-    val ctrs2 = cchain.counters.zip(addr).map{case (ctr, i) => 
+    val ctrs2 = cchain.counters.zip(addr).map{case (ctr, i) =>
       // TODO: x.getIntValue.getOrElse(c.toInt) is only necessary if we allow dse to retune parameters (currently not the case)
       val start = ctr.start.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr start a constant or mark controller with Pipe.MOP!")}
       val step = ctr.step.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr step a constant or mark controller with Pipe.MOP!")}
@@ -122,8 +135,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   def unrollCtrl[A:Type](lhs: Sym[A], rhs: Op[A], mop: Boolean)(implicit ctx: SrcCtx): Sym[_] = {
-    // By default, use a unit unroller (only one lane)
-    inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
+    val passEns = rhs match {
+      case rhs:Switch[_] if spatialConfig.enablePIR => true
+      case rhs:SwitchCase[_] if spatialConfig.enablePIR => true
+      case rhs => false
+    }
+    withPassEns(passEns) {
+      // By default, use a unit unroller (only one lane)
+      inLanes(UnitUnroller(lhs.fullname,lhs.isInnerControl)){ mirror(lhs,rhs) }
+    }
   }
 
   /** Duplicate the given controller based on the global Unroller helper instance lanes.
@@ -144,7 +164,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
           }
         }
         val lhs2 = stage(ParallelPipe(enables,block))
-        lanes.unify(lhs, lhs2)        
+        lanes.unify(lhs, lhs2)
     }
     else if (!inHw) {
       dbgs(s"$lhs = $rhs [duplicate 1/1] in lane 0")
@@ -153,16 +173,15 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     }
     else {
       dbgs(s"$lhs = $rhs [duplicate 1/1] in lanes $lanes")
-      val first = lanes.foreach{p => duplicate() }
-      // val first = lanes.inLane(0){ duplicate() }
-
-      lanes.unify(lhs, first)
+      if (rhs.R.isInstanceOf[Void]) lanes.unify(lhs,lanes.foreach{p => duplicate()})
+      else lanes.unify(lhs, lanes.map{p => duplicate()}.head)
     }
 
   }
 
   final override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+    case _:SpatialCtrlBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
     case _ =>
       val duplicates: List[Sym[_]] = unroll(lhs, rhs)
       if (duplicates.length == 1) duplicates.head.asInstanceOf[Sym[A]]
@@ -183,8 +202,20 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   override def mirrorNode[A](rhs: Op[A]): Op[A] = rhs match {
-    case e:Enabled[_] => e.mirrorEn(f, enables).asInstanceOf[Op[A]]
-    case _ => super.mirrorNode(rhs)
+    case u@UnitPipe(ens, block, stopWhen) if stopWhen.isDefined => UnitPipe(f(enables ++ ens), f(block), Some(memories(stopWhen.get,0).asInstanceOf[Reg[Bit]])).asInstanceOf[Op[A]]
+//    case d@FieldDeq(struct, field, ens) =>
+//      val st = struct.asInstanceOf[StreamStruct[_]]
+//      println(s"${struct.tp}  ${st.tp}")
+//      implicit val A: Bits[A] = st.fields.collectFirst{case (n,t) if n == field => t}.get.asInstanceOf[Bits[A]]
+//      val a = f(struct)
+//      println(s"$a")
+//      FieldDeq(f(struct), field, f(ens)) // TODO: Figure out why mirroring this node complains about casting Void to StreamStruct
+    case e:Enabled[_] => (e mirrorEn(f, enables)).asInstanceOf[Op[A]]
+    case LaneStatic(iter, resolutions) if unrollNum.getOrElse(iter.asInstanceOf[Idx], Seq()).size == 1 =>
+      val i = iter.asInstanceOf[Idx]
+      LaneStatic[FixPt[TRUE,_32,_0]](iter.asInstanceOf[FixPt[TRUE,_32,_0]], Seq(resolutions(unrollNum(i).head))).asInstanceOf[Op[A]]
+      // resolutions(unrollNum(i).head).asInstanceOf[Op[A]]
+    case x => super.mirrorNode(rhs)
   }
   override def updateNode[A](node: Op[A]): Unit = node match {
     case e:Enabled[_] => e.updateEn(f, enables)
@@ -223,7 +254,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def P: Int = if (vectorize) 1 else Ps.product
     def V: Int = if (vectorize) Ps.product else 1
     def N: Int = Ps.length
-    def size: Int = if (__doLanes.size != 0) __doLanes.size else P
+    def size: Int = if (__doLanes.nonEmpty) __doLanes.size else P
     def prods: List[Int] = List.tabulate(N){i => Ps.slice(i+1,N).product }
 
     // The lane id of each unrolled lane. Norally it will be a list of Seqs with single element. If
@@ -318,7 +349,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def map[A](block: Lane => A): List[A] = if (__doLanes.nonEmpty) __doLanes.map{p => inLane(List(p)){ block(List(p)) } } else ulanes.map { lane => inLane(lane) { block(lane) } }
 
 
-    def foreach(block: Lane => Unit): Unit = { dbgs(s"dolanes ${__doLanes}"); map(block) }
+    def foreach(block: Lane => Unit): Unit = { map(block) }
 
     def mapFirst[A](block: => A):A = inLane(ulanes.head) { block }
 
@@ -436,6 +467,10 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
           } 
         }
       } else {
+        if (spatialConfig.enablePIR) {
+          error(s"TODO: Plasticine doesn't support POM yet")
+          IR.logError()
+        }
         List.tabulate(P){p => 
           val uid = parAddr(p)
           uid.zipWithIndex.map{case (q,i) => 

@@ -5,11 +5,16 @@ import argon.lang._
 import argon.codegen.{Codegen, FileDependencies}
 import spatial.metadata._
 import spatial.metadata.memory._
+import spatial.metadata.bounds._
+import spatial.metadata.control._
 import spatial.node._
 
 import scala.collection.mutable
 
 case class Lhs(sym:Sym[_], postFix:Option[String]=None)
+object Lhs {
+  def apply(sym:Sym[_], postFix:String):Lhs = Lhs(sym,Some(postFix))
+}
 
 trait PIRFormatGen extends Codegen {
 
@@ -28,6 +33,18 @@ trait PIRFormatGen extends Codegen {
       case (Some(name), None) => rhsStr += src""".name("${name}")"""
       case (None, Some(postFix)) => rhsStr += src""".name("${postFix}")"""
       case (None, None) => 
+    }
+    lhs.sym.count.foreach { c =>
+      rhsStr += src".count($c)"
+    }
+    lhs.sym.barrier.foreach { id =>
+      rhsStr += src".barrier($id)"
+    }
+    lhs.sym.waitFors.foreach { ids =>
+      rhsStr += src".waitFors($ids)"
+    }
+    lhs.sym.progorder.foreach { c =>
+      rhsStr += src".progorder($c)"
     }
     emitStm(lhs, tpStr, rhsStr)
   }

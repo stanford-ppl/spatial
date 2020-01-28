@@ -1,11 +1,15 @@
-#!/usr/bin/env python
+#!pir/env/bin/python3
 
 import sys
 sys.path.insert(0, 'pir/bin')
-import logger
+from logger import Logger
 
 def main():
-    logger.main()
+    cmd = "--logdir=pir/logs/"
+    cmd += " --spatial_dir=./"
+    cmd += " --pir_dir=./pir"
+    args = sys.argv[1:] + (cmd.split(" "))
+    Logger(args)
 
 if __name__ == "__main__":
     main()

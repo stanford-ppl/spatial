@@ -15,10 +15,10 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
   override def init(): Unit = super.init()
 
   override def rerun(sym: Sym[_], block: Block[_]): Unit = {
-    inHw = true
+    inAccel = true
     totalRuntime = 0
     super.rerun(sym, block)
-    inHw = false
+    inAccel = false
   }
 
   override protected def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
@@ -26,12 +26,6 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
     lhs.latency = nodeRuntime
     lhs.II = nodeII
     totalRuntime = totalRuntime + nodeRuntime
-  }
-
-  private def latencyOfNode(sym: Sym[_]): Double = latencyModel.latencyOf(sym, inCycle)
-
-  private def latencyOfBlock(b: Block[_], parMask: Boolean = false): Seq[Double] = {
-    Seq(0) // ???
   }
 
   private def ctrlHeader(lhs: Sym[_]): Unit = {
@@ -74,7 +68,7 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
       }
       (total, II)
 
-    case UnitPipe(_, block) if lhs.isInnerControl =>
+    case UnitPipe(_, block, _) if lhs.isInnerControl =>
       val (latency, blockII) = latencyAndInterval(block)
       val II = lhs.userII.getOrElse(blockII)
       val total = latency + latencyOf(lhs)
@@ -82,7 +76,7 @@ case class PerformanceAnalyzer(IR: State) extends AccelTraversal with RerunTrave
       dbgs(s"Inner Pipe $lhs: $total cycles [II: $II]")
       (total, II)
 
-    case UnitPipe(_, block) if lhs.isOuterControl =>
+    case UnitPipe(_, block, _) if lhs.isOuterControl =>
       visitBlock(block)
       val stages = lhs.children.map(_.sym.latency)
       val IIs    = lhs.children.map(_.sym.II)

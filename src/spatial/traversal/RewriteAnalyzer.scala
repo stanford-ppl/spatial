@@ -38,7 +38,8 @@ case class RewriteAnalyzer(IR: State) extends AccelTraversal {
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case AccelScope(_) => inAccel{ super.visit(lhs,rhs) }
-    case FixAdd(a, mul @ Op(FixMul(_,_))) => 
+    case _:BlackboxImpl[_,_,_] => inBox{ super.visit(lhs,rhs) }
+    case FixAdd(a, mul @ Op(FixMul(_,_))) =>
       val forwardOnlyPattern = mul.consumers.size == 1
       val consumerPattern = specializationFusePattern(lhs, mul, a)
       lhs.canFuseAsFMA = inHw && (forwardOnlyPattern || consumerPattern) && lhs.isInnerReduceOp == mul.isInnerReduceOp && spatialConfig.fuseAsFMA

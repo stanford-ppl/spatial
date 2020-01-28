@@ -48,6 +48,7 @@ trait InternalAliases extends argon.lang.ExternalAliases {
   lazy val Tensor5 = spatial.lang.host.Tensor5
   type CSVFile = spatial.lang.host.CSVFile
   type BinaryFile = spatial.lang.host.BinaryFile
+
 }
 
 /** Aliases for external use (application writers).
@@ -74,6 +75,10 @@ trait ExternalAliases extends InternalAliases {
   lazy val DRAM5 = spatial.lang.DRAM5
   lazy val DRAM = spatial.lang.DRAM
 
+  type Frame[A,C[T]] = spatial.lang.Frame[A,C]
+  type Frame1[A] = spatial.lang.Frame1[A]
+  lazy val Frame = spatial.lang.Frame
+
   type SRAM[A,C[T]] = spatial.lang.SRAM[A,C]
   type SRAM1[A] = spatial.lang.SRAM1[A]
   type SRAM2[A] = spatial.lang.SRAM2[A]
@@ -96,6 +101,8 @@ trait ExternalAliases extends InternalAliases {
   type RegFile3[A] = spatial.lang.RegFile3[A]
   lazy val RegFile = spatial.lang.RegFile
 
+  lazy val Blackbox = spatial.lang.Blackbox
+
   type MergeBuffer[A] = spatial.lang.MergeBuffer[A]
   lazy val MergeBuffer = spatial.lang.MergeBuffer
   type LineBuffer[A] = spatial.lang.LineBuffer[A]
@@ -109,6 +116,14 @@ trait ExternalAliases extends InternalAliases {
 
   type Reg[A] = spatial.lang.Reg[A]
   type FIFOReg[A] = spatial.lang.FIFOReg[A]
+
+  type LockSRAM[A,C[T]] = spatial.lang.LockSRAM[A,C]
+  lazy val LockSRAM = spatial.lang.LockSRAM
+  type LockDRAM[A,C[T]] = spatial.lang.LockDRAM[A,C]
+  lazy val LockDRAM = spatial.lang.LockDRAM
+  type Lock[A] = spatial.lang.Lock[A]
+  lazy val Lock = spatial.lang.Lock
+
   lazy val Reg = spatial.lang.Reg
   lazy val FIFOReg = spatial.lang.FIFOReg
   lazy val ArgIn = spatial.lang.ArgIn
@@ -123,7 +138,6 @@ trait ExternalAliases extends InternalAliases {
 
   // --- Primitives
 
-
   type Counter[F] = spatial.lang.Counter[F]
   lazy val Counter = spatial.lang.Counter
 
@@ -132,6 +146,8 @@ trait ExternalAliases extends InternalAliases {
 
   type Wildcard = spatial.lang.Wildcard
 
+  type StreamStruct[A] = spatial.lang.StreamStruct[A]
+  lazy val StreamStruct = spatial.lang.StreamStruct
 }
 
 /** Remaining aliases that shadow original Scala types. */
@@ -156,6 +172,10 @@ trait ShadowingAliases extends ExternalAliases {
   lazy val Matrix = spatial.lang.host.Matrix
 
   type Tuple2[A,B] = argon.lang.Tup2[A,B]
+
+  type AxiStream256 = spatial.lang.AxiStream256
+  lazy val AxiStream256Bus = spatial.lang.AxiStream256Bus
+  val AxiStream256Data = spatial.lang.AxiStream256Data
 
   type Unit = argon.lang.Void
 

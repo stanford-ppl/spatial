@@ -3,7 +3,7 @@ package fringe.templates.dramarbiter
 import chisel3._
 import chisel3.util._
 import fringe.templates.memory._
-import fringe.utils.log2Up
+import _root_.utils.math.log2Up
 
 class FIFOVec[T <: Data](t: T, depth: Int, v: Int) extends Module {
   assert(isPow2(depth))

@@ -115,7 +115,8 @@ trait ScalaGenFixPt extends ScalaGenBits {
       case FixToFlt(x, fmt) =>
         emit(src"val $lhs = $x.toFloatPoint(FltFormat(${fmt.mbits - 1},${fmt.ebits}))")
 
-      case FixToText(x) => emit(src"val $lhs = $x.toString")
+      case FixToText(x, None) => emit(src"val $lhs = $x.toString")
+      case FixToText(x, Some(format)) => emit(src"""val $lhs = f"$$$x$format"""")
 
       case TextToFix(x, _) =>
         val FixPtType(s, i, f) = lhs.tp

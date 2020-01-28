@@ -5,6 +5,9 @@
 # Note: in older version of the SDK (prior to 1.3.0), running this command was sometimes needed
 # to stop/restart the EDMA driver
 # sudo rmmod edma-drv && sudo insmod /home/centos/src/project_data/aws-fpga/sdk/linux_kernel_drivers/edma/edma-drv.ko
+#
+# Now, to remove and re-add the xdma driver and reset the device file mappings, run:
+# sudo rmmod xdma && sudo insmod /home/centos/src/project_data/aws-fpga/sdk/linux_kernel_drivers/xdma/xdma.ko
 
 # Note: to clear the image, use:    sudo fpga-clear-local-image -S 0
 

@@ -76,3 +76,11 @@ case class DephasedAccess(accesses: Set[Sym[_]]) extends Data[DephasedAccess](Se
   */
 case class HotSwapPairings(pairings: Map[Sym[_], Set[Sym[_]]]) extends Data[HotSwapPairings](SetBy.Analysis.Self)
 
+
+/** Metadata that links a FrameHostNew node to its AxiStreamBus StreamIn/Out object
+  *
+  * Getter: sym.interfaceStream
+  * Setter: sym.interfaceStream = Sym[_]
+  * Default: Map()
+  */
+case class InterfaceStream(stream: Sym[_]) extends Data[InterfaceStream](SetBy.Analysis.Self)

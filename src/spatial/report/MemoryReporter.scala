@@ -7,6 +7,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.modeling._
 import utils.implicits.collections._
+import spatial.metadata.blackbox._
 
 case class MemoryReporter(IR: State) extends Pass {
   override def shouldRun: Boolean = config.enInfo
@@ -16,7 +17,7 @@ case class MemoryReporter(IR: State) extends Pass {
   def run(): Unit = {
     import scala.language.existentials
 
-    val mems = LocalMemories.all.map{case Stm(s,d) =>
+    val mems = LocalMemories.all.filter(!_.isCtrlBlackbox).map{case Stm(s,d) =>
       val area = areaModel.areaOf(s, d, inHwScope = true, inReduce = false)
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)
@@ -48,14 +49,13 @@ case class MemoryReporter(IR: State) extends Pass {
         emit("\n")
         emit(s"Instance Summary: ")
         duplicates.zipWithIndex.foreach{case (inst,id) =>
-          val Memory(banking,depth,padding,darkVolume,isAccum) = inst
+          val Memory(banking,depth,padding,isAccum) = inst
           val banks  = banking.map(_.nBanks).mkString(", ")
           val format = if (banks.length == 1) "Flat" else "Hierarchical"
           emit(s"  #$id: Banked")
           emit(s"     Resource: ${inst.resource.name}")
           emit(s"     Depth:    $depth")
           emit(s"     Padding:  $padding")
-          emit(s"     DarkVolume:  $darkVolume")
           emit(s"     Accum:    $isAccum")
           emit(s"     Banks:    $banks <$format>")
           banking.foreach{grp => emit(s"       $grp") }

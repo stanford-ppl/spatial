@@ -1,4 +1,4 @@
-	pr_region_default_Top_0 u0 (
+	pr_region_default_SpatialIP_0 u0 (
 		.clock                  (_connected_to_clock_),                  //   input,    width = 1,       clock.clk
 		.io_M_AXI_0_AWID        (_connected_to_io_M_AXI_0_AWID_),        //  output,    width = 6,  io_M_AXI_0.awid
 		.io_M_AXI_0_AWUSER      (_connected_to_io_M_AXI_0_AWUSER_),      //  output,   width = 32,            .awuser

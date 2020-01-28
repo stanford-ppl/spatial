@@ -29,4 +29,8 @@ object Ctrl {
     def master: Ctrl = Host
     def mayBeOuterBlock: Boolean = true
   }
+  case class SpatialBlackbox(sym: Sym[_]) extends Ctrl(Some(sym), 0) {
+    def master: Ctrl = Node(sym, 0)
+    def mayBeOuterBlock: Boolean = false
+  }
 }

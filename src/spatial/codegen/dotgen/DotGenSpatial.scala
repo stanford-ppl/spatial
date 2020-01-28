@@ -1,101 +1,97 @@
 package spatial.codegen.dotgen
 
 import argon._
-import argon.node._
-import spatial.metadata.memory._
-import spatial.metadata.access._
 import spatial.lang._
-import spatial.node._
-import spatial.metadata._
 import spatial.metadata.control._
-import spatial.util.spatialConfig
+import spatial.metadata.memory._
+import spatial.node._
 
 trait DotGenSpatial extends DotCodegen {
 
   override def inputs(lhs:Sym[_]):Seq[Sym[_]] = lhs match {
     case Def(_:DRAMAddress[_,_]) => Nil
-    case lhs if lhs.isDRAM => 
+    case _ if lhs.isDRAM =>
       super.inputs(lhs) ++ 
       lhs.consumers.filter { c => 
         c.isTileStore || (c match { case Def(SetMem(_,_)) => true; case _ => false })
       }
-    case lhs if lhs.isStreamIn => super.inputs(lhs) ++ lhs.consumers.filter { _.isTileTransfer } ++ lhs.writers
-    case lhs if lhs.isMem => super.inputs(lhs) ++ lhs.writers
-    case Writer(mem, data, addr, ens) => super.inputs(lhs).filterNot { _ == mem }
-    case BankedWriter(mem, data, bank, ofs, ens) => super.inputs(lhs).filterNot { _ == mem }
+    case _ if lhs.isStreamIn => super.inputs(lhs) ++ lhs.consumers.filter { _.isTileTransfer } ++ lhs.writers
+    case _ if lhs.isMem => super.inputs(lhs) ++ lhs.writers
+    case Writer(mem, _, _, _) => super.inputs(lhs).filterNot { _ == mem }
+    case BankedWriter(mem, _, _, _, _) => super.inputs(lhs).filterNot { _ == mem }
     case Def(SetMem(dram, _)) => super.inputs(lhs).filterNot(_ == dram)
-    case lhs if lhs.isTileStore => super.inputs(lhs).filterNot { i => i.isDRAM || i.isStreamIn }
-    case lhs if lhs.isTileTransfer => super.inputs(lhs).filterNot { _.isStreamIn }
+    case _ if lhs.isTileStore => super.inputs(lhs).filterNot { i => i.isDRAM || i.isStreamIn }
+    case _ if lhs.isTileTransfer => super.inputs(lhs).filterNot { _.isStreamIn }
     case Def(_:ArrayNew[_]) => super.inputs(lhs) ++ lhs.consumers.filter { case Def(_:GetMem[_,_]) => true; case _ => false }
-    case Def(GetMem(dram, data)) => super.inputs(lhs).filterNot { _ == data }
+    case Def(GetMem(_, data)) => super.inputs(lhs).filterNot { _ == data }
     case _ => super.inputs(lhs)
   }
 
   override def nodeAttr(lhs:Sym[_]):Map[String,String] = super.nodeAttr(lhs) ++ (lhs match {
-    case lhs:SRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs:RegFile[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs:LUT[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs if lhs.isReg => "color" -> "chartreuse2" :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs if lhs.isFIFO | lhs.isFIFOReg | lhs.isStreamIn | lhs.isStreamOut => 
+    case _:SRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:LockSRAM[_,_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:MergeBuffer[_]    => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:Lock[_]    => "color" -> "crimson" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:RegFile[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:LUT[_,_] => "color" -> "forestgreen" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _ if lhs.isReg => "color" -> "chartreuse2" :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _ if lhs.isFIFO | lhs.isFIFOReg | lhs.isStreamIn | lhs.isStreamOut =>
                               "color" -> "gold"        :: "style" -> "filled" :: "shape" -> "box" :: Nil
-    case lhs:DRAM[_,_]    => "color" -> "blueviolet"  :: "style" -> "filled" :: "shape" -> "box" :: Nil
+    case _:DRAM[_,_]    => "color" -> "blueviolet"  :: "style" -> "filled" :: "shape" -> "box" :: Nil
     case _ => Nil
   })
 
-  override def label(lhs:Sym[_]) = {
-    var l = lhs match {
-      case lhs if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
-      case lhs if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
-      case Def(UnrolledReduce(ens, cchain, func, iters, valids, _)) =>
-        super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-      case Def(UnrolledForeach(ens, cchain, func, iters, valids, _)) =>
-        super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-      case lhs if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
-      case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=${par}"
-      case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
-      case _ => super.label(lhs)
-    }
-    l
+  override def label(lhs:Sym[_]): String = lhs match {
+    case _ if lhs.isBound => src"${lhs.parent.s.map{ s => s"$s."}.getOrElse("")}${super.label(lhs)}"
+    case _ if lhs.isMem => super.label(lhs) + src"\n${lhs.ctx}"
+    case Def(UnrolledReduce(_, cchain, _, _, _, _)) =>
+      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+    case Def(UnrolledForeach(_, cchain, _, _, _, _)) =>
+      super.label(lhs) + src"\npars=${cchain.pars}" + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+    case _ if lhs.isControl => super.label(lhs) + src"\n${lhs.ctx}"// + lhs.ctx.content.map{ c => s"\n$c" }.getOrElse("")
+    case Def(CounterNew(_,_,_,par)) => super.label(lhs) + src"\npar=$par"
+    case Def(DRAMAddress(dram)) => super.label(lhs) + src"\ndram=${label(dram)}"
+    case _ => super.label(lhs)
   }
 
   override def inputGroups(lhs:Sym[_]):Map[String, Seq[Sym[_]]] = lhs match {
     // Accesses
-    case Def(SRAMBankedWrite(mem, data, bank, ofs, enss)) => 
+    case Def(SRAMBankedWrite(_, data, bank, ofs, enss)) =>
       super.inputGroups(lhs) + ("data" -> data) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
-    case Def(SRAMBankedRead(mem, bank, ofs, enss)) => 
+    case Def(SRAMBankedRead(_, bank, ofs, enss)) =>
       super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
-    case Def(LUTBankedRead(mem, bank, ofs, enss)) => 
+    case Def(LUTBankedRead(_, bank, ofs, enss)) =>
       super.inputGroups(lhs) + ("bank" -> bank.flatten) + ("ofs" -> ofs) + ("enss" -> enss.flatten)
-    case Def(StreamInBankedRead(mem, enss)) =>
+    case Def(StreamInBankedRead(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.flatten)
-    case Def(StreamOutBankedWrite(mem, data, enss)) => 
+    case Def(StreamOutBankedWrite(_, data, enss)) =>
       super.inputGroups(lhs) + ("data" -> data) + ("enss" -> enss.flatten)
-    case Def(FIFOBankedDeq(mem, enss)) =>
+    case Def(FIFOBankedDeq(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.flatten)
-    case Def(FIFOBankedEnq(mem, data, enss)) => 
+    case Def(FIFOBankedEnq(_, data, enss)) =>
       super.inputGroups(lhs) + ("data" -> data) + ("enss" -> enss.flatten)
-    case Def(FIFOIsEmpty(mem, enss)) => 
+    case Def(FIFOIsEmpty(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
-    case Def(FIFOIsFull(mem, enss)) => 
+    case Def(FIFOIsFull(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
-    case Def(FIFOIsAlmostEmpty(mem, enss)) => 
+    case Def(FIFOIsAlmostEmpty(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
-    case Def(FIFOIsAlmostFull(mem, enss)) => 
+    case Def(FIFOIsAlmostFull(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
-    case Def(FIFONumel(mem, enss)) => 
+    case Def(FIFONumel(_, enss)) =>
       super.inputGroups(lhs) + ("enss" -> enss.toSeq)
     // Controller
-    case Def(UnitPipe(ens, func)) =>
+    case Def(UnitPipe(ens, _,_)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
-    case Def(ParallelPipe(ens, func)) =>
+    case Def(ParallelPipe(ens, _)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
-    case Def(UnrolledForeach(ens,cchain,func,iters,valids, _)) =>
+    case Def(UnrolledForeach(ens,_,_,_,_, _)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
-    case Def(UnrolledReduce(ens,cchain,func,iters,valids, _)) =>
+    case Def(UnrolledReduce(ens,_,_,_,_, _)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
-    case Def(Switch(selects, body)) =>
-      super.inputGroups(lhs) + ("selects" -> selects.toSeq)
-    case Def(StateMachine(ens, start, notDone, action, nextState)) =>
+    case Def(Switch(selects, _)) =>
+      super.inputGroups(lhs) + ("selects" -> selects)
+    case Def(StateMachine(ens, _, _, _, _)) =>
       super.inputGroups(lhs) + ("ens" -> ens.toSeq)
     //case Def(IfThenElse(cond, thenp, elsep)) =>
     case _ => super.inputGroups(lhs)

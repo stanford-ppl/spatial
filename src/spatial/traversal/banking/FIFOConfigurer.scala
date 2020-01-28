@@ -19,7 +19,7 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
 
   override def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
-    (a.access == b.access && a.unroll != b.unroll) ||
+    (a.access == b.access && (a.unroll != b.unroll || a.access.isVectorAccess)) ||
       lca.isPipeLoop || lca.isOuterStreamLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
       lca.isParallel
@@ -29,7 +29,8 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
     groups.zipWithIndex.flatMap{case (group,muxPort) =>
       // TODO: Broadcast possible for FIFOs?
       import scala.math.Ordering.Implicits._
-      group.toSeq.sortBy(_.unroll).zipWithIndex.map{case (matrix,muxOfs) =>
+      val (vec,uroll) = group.partition(_.access.isVectorAccess)
+      val urollMap = uroll.toSeq.sortBy(_.unroll).zipWithIndex.map{case (matrix,muxOfs) =>
         val port = Port(
           bufferPort = Some(0),
           muxPort    = muxPort,
@@ -39,6 +40,18 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
         )
         matrix -> port
       }
+      // Assumes only one vector access will be in each group.  Can this be wrong?
+      val vecMap = vec.toSeq.sortBy(_.unroll).map{matrix => 
+        val port = Port(
+          bufferPort = Some(0),
+          muxPort    = muxPort,
+          muxOfs     = 0,
+          castgroup  = Seq.fill(vec.size)(0),
+          broadcast  = Seq.fill(vec.size)(0)
+        )
+        matrix -> port
+      }
+      urollMap ++ vecMap
     }.toMap
   }
 
@@ -59,11 +72,14 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
       val dimensionDuplication: Seq[RegroupDims] = RegroupHelper.regroupNone
       val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
       val attemptDirectives: Seq[BankingOptions] = bankingOptionsIds.map{ addr => BankingOptions(Flat(rank), nStricts(addr(0)), aStricts(addr(1)), dimensionDuplication(addr(2))) }
-    
-      val bankings = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
+
+      val bankings: Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]] = strategy.bankAccesses(mem, rank, rdGroups, wrGroups, attemptDirectives, depth = 1).head._2
+      val oneBanking = bankings.map{case(acgrps, opts) => (acgrps -> opts.head)}
+
       if (bankings.nonEmpty) {
-        val banking = bankings.head._2
-        val bankingCosts = cost(banking, depth = 1, rdGroups, wrGroups)._4.head
+        val banking = bankings.head._2.head
+
+        val bankingCosts = cost(oneBanking.head._2, depth = 1, rdGroups, wrGroups)._4.head
         val ports = computePorts(rdGroups) ++ computePorts(wrGroups)
 
         Right(Seq(Instance(
@@ -76,7 +92,6 @@ class FIFOConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit s
           cost     = bankingCosts,
           ports    = ports,
           padding  = mem.getPadding.getOrElse(Seq(0)),
-          darkVolume = banking.head.darkVolume,
           accType  = AccumType.None
         )))
       }

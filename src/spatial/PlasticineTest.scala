@@ -5,33 +5,35 @@ import argon.DSLTest
 import spatial.util.spatialConfig
 import utils.io.files._
 import scala.reflect.runtime.universe._
+import scala.io.Source
 
 trait PlasticineTest extends DSLTest { test =>
 
   protected val cmdlnArgs = sys.env.get("TEST_ARGS").getOrElse("").split(" ").map(_.trim).toList
 
+  private lazy val spatialFlags = sys.env.get("SPATIAL_FLAGS").map { " " + _ }.getOrElse("")
+
   protected val pshPath = buildPath(IR.config.cwd, "pir", "bin", "psh")
 
-  protected def pirArgs:List[String] = 
-    "bash" ::
-    "run.sh" ::
-    //"--dot=true" ::
-    //"--debug=true" ::
-    Nil
+  protected def pirArgs:String = "bash run.sh"
+
+  protected def pirArgList:List[String] = pirArgs.split(" ").toList
 
   def timer = System.getProperty("os.name") match {
     case "Mac OS X" => s"""gtime -f Runtime:%E"""
     case "Linux" => s"""/usr/bin/time -f Runtime:%E"""
   }
 
-  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args, "", "", "") {
+  abstract class PIRBackend(args:String="--pir --dot") extends Backend(name, args=args + spatialFlags, "", "", "") {
+    override val makeTimeout: Long = 12000 // Timeout for compiling, in seconds
     override val name = this.getClass.getSimpleName.replace("$","")
     override def shouldRun: Boolean = checkFlag(s"test.${name}") || checkFlag(s"test.PIR")
     def compileOnly = checkFlag(s"test.compileOnly")
     def runOnly = checkFlag(s"test.runOnly")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.name}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.name}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.name}/$name/report"
+    def genName = this.name
+    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/report"
     override def runBackend() = {
       s"${test.name}" should s"run for backend $name" in {
         val name = test.name
@@ -93,14 +95,14 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def pirpass(pass:String, args:List[String]) = {
-      var cmd = pirArgs ++ args
+      var cmd = pirArgList ++ args
       cmd ++= cmdlnArgs
-      val timeout = 3000
+      val timeout = 100000
       scommand(pass, cmd, timeout, parsepir _, RunError.apply)
     }
 
     def runpir() = {
-      var cmd = pirArgs :+
+      var cmd = pirArgList :+
       "--load=false" :+
       "--mapping=false" :+
       "--codegen=false"
@@ -108,7 +110,7 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def mappir(args:String, fifo:Int=20) = {
-      var cmd = pirArgs :+
+      var cmd = pirArgList :+
       "--load=true" :+
       "--ckpt=1" :+
       "--mapping=true" :+
@@ -119,33 +121,9 @@ trait PlasticineTest extends DSLTest { test =>
       pirpass("mappir", cmd)
     }
 
-    def genpsim(fifo:Int=20) = {
-      var gentracecmd = pirArgs :+
-      "--load=true" :+
-      "--ckpt=0" :+
-      "--codegen=true" :+
-      "--end-id=5" :+
-      //"--trace=true" :+
-      "--psim=true" :+
-      "--run-psim=false"
-      gentracecmd ++= args.split(" ").map(_.trim).toList
-      gentracecmd ++= cmdlnArgs
-      var genpsimcmd = pirArgs :+
-      "--load=true" :+
-      "--ckpt=2" :+
-      "--codegen=true" :+
-      s"--fifo-depth=$fifo" :+
-      "--psim=true" :+
-      "--run-psim=false"
-      genpsimcmd ++= args.split(" ").map(_.trim).toList
-      genpsimcmd ++= cmdlnArgs
-      val timeout = 3000
-      //pirpass("gentrace", gentracecmd)
-      pirpass("genpsim", genpsimcmd)
-    }
-
     def parseMake(line:String) = {
       if (line.contains("error") || line.contains("exception")) Fail
+      else if (line.contains("Runtime")) Pass
       else Unknown
     }
 
@@ -166,79 +144,22 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runtst(args:String="", fifo:Int=20) = {
-      var gentstcmd = pirArgs :+
-      "--load=true" :+
-      "--ckpt=2" :+
-      "--codegen=true" :+
-      s"--fifo-depth=$fifo" :+
-      "--tungsten=true" :+
-      "--psim=false" :+
-      "--run-psim=false"
-      gentstcmd ++= args.split(" ").map(_.trim).toList
-      gentstcmd ++= cmdlnArgs
-      val timeout = 3000
-      scommand(s"gentst", gentstcmd, timeout, parsepir _, RunError.apply) >>
-      scommand(s"maketst", "time make".split(" "), timeout, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
-      scommand(s"runtst", "time ./tungsten".split(" "), timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+    def runtst(name:String="runtst", timeout:Int=6000) = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      val res = scommand(name, s"$timer ./tungsten $runArg".split(" "), timeout=timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      res match {
+        case Unknown => Pass
+        case res => res
+      }
     }
 
-    def parseProute(vcLimit:Int)(line:String) = {
+    def parseProute(vcLimit:Int=4)(line:String) = {
       val usedVc = if (line.contains("Used") && line.contains("VCs")) {
         Some(line.split("Used ")(1).split("VCs")(0).trim.toInt)
       } else None
       usedVc.fold[Result](Unknown) { usedVc =>
         if (vcLimit == 0 && usedVc > 0) Fail else Pass
       }
-    }
-
-    def runproute(row:Int=16, col:Int=8, vlink:Int=2, slink:Int=4, time:Int = -1, iter:Int=1000, vcLimit:Int=4, stopScore:Int= -1) = {
-      var cmd = s"${buildPath(IR.config.cwd, "pir", "plastiroute", "plastiroute")}" :: 
-      "-n" :: s"${IR.config.genDir}/plastisim/node.csv" ::
-      "-l" :: s"${IR.config.genDir}/plastisim/link.csv" ::
-      "-v" :: s"${IR.config.genDir}/plastisim/summary.csv" ::
-      "-g" :: s"${IR.config.genDir}/plastisim/proute.dot" ::
-      "-o" :: s"${IR.config.genDir}/plastisim/final.place" ::
-      "-T" :: "checkerboard" ::
-      "-a" :: "route_min_directed_valient" ::
-      "-r" :: s"$row" ::
-      "-c" :: s"$col" ::
-      "-x" :: s"$vlink" ::
-      "-e" :: s"$slink" ::
-      "-S" :: s"$time" ::
-      "-q" :: s"$vcLimit" ::
-      "-E" :: s"$stopScore" ::
-      "-s0" ::
-      s"-i$iter" ::
-      Nil
-      cmd ++= "-p100 -t1 -d100".split(" ").map(_.trim).toList
-      val timeout = 10800 * 2 // 6 hours
-      val name = "runproute"
-      scommand(name, cmd, timeout, parseProute(vcLimit) _, RunError.apply)
-    }
-
-    def parsePsim(line:String) = {
-      if (line.contains("Simulation complete at cycle:")) {
-        println(line)
-        Pass
-      }
-      else if (line.contains("DEADLOCK") || line.contains("TIMEOUT")) Fail
-      else Unknown
-    }
-
-    def runpsim(name:String="runpsim", flit:Int=512, linkTp:String="B", placefile:String="") = {
-      var cmd = s"${buildPath(IR.config.cwd, "pir", "plastisim", "plastisim")}" :: 
-      "-f" :: s"${IR.config.genDir}/plastisim/psim.conf" ::
-      s"-i$flit" ::
-      "-l" :: s"$linkTp" ::
-      "-q1" ::
-      Nil
-      if (placefile != "") {
-        cmd :+= "-p"
-        cmd :+= placefile
-      }
-      val timeout = 10800 * 4 // 12 hours
-      scommand(name, cmd, timeout, parsePsim _, RunError.apply)
     }
 
     def psh(ckpt:String) = {
@@ -249,107 +170,6 @@ trait PlasticineTest extends DSLTest { test =>
       command(s"psh", cmd, timeout, { case _ => Unknown}, RunError.apply)
     }
 
-  }
-
-  object Asic extends PIRBackend {
-    def runPasses():Result = {
-      val mapres = genpir() >>
-      runpir() >>
-      mappir("--net=asic")
-      val psimres = mapres >> genpsim() >> runpsim()
-      val tstres = mapres >> runtst()
-      psimres >> tstres
-    }
-  }
-
-  case object P2PNoSim extends PIRBackend {
-    val row:Int=14
-    val col:Int=14
-    override def shouldRun: Boolean = super.shouldRun || checkFlag(s"test.P2PNoSim")
-    override val name = s"P2PNoSim"
-    def runPasses():Result = {
-      genpir() >>
-      runpir() >>
-      mappir(s"--net=p2p --row=$row --col=$col")
-    }
-  }
-
-  case class P2P(
-    row:Int=16,
-    col:Int=8,
-  ) extends PIRBackend {
-    override def shouldRun: Boolean = super.shouldRun || checkFlag(s"test.P2P")
-    override val name = s"P${row}x${col}"
-    def runPasses():Result = {
-      var mapres = genpir() >>
-      runpir() >>
-      mappir(s"--net=p2p --row=$row --col=$col") 
-      val psimres = mapres >> genpsim() >> runpsim()
-      //val tstres = mapres >> runtst()
-      psimres //>> tstres
-    }
-  }
-
-  case class Hybrid(
-    row:Int=16,
-    col:Int=8,
-    vlink:Int=2,
-    slink:Int=4,
-    time:Int= -1,
-    scheduled:Boolean=false,
-    iter:Int=1000,
-    vcLimit:Int=4,
-    linkTp:String="B",
-    flit:Int=512,
-    fifo:Int=100,
-  ) extends PIRBackend {
-    override def shouldRun: Boolean = super.shouldRun || checkFlag(s"test.Hybrid")
-    override val name = {
-      var n = s"H${row}x${col}v${vlink}s${slink}"
-      if (time != -1) n += s"t${time}"
-      if (vcLimit != 4) n += s"c${vcLimit}"
-      if (scheduled) n += s"w"
-      if (linkTp != "B") n += s"${linkTp}"
-      if (flit != 512) n += s"f${flit}"
-      n
-    }
-    def runPasses():Result = {
-      genpir() >>
-      runpir() >>
-      mappir(s"--row=$row --col=$col --pattern=checkerboard --vc=$vcLimit --scheduled=${scheduled}", fifo=fifo) >>
-      genpsim() >>
-      runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=vcLimit) >>
-      runpsim(placefile=s"${IR.config.genDir}/plastisim/final.place", linkTp=linkTp, flit=flit)
-    }
-  }
-
-  case class Static(
-    row:Int=16,
-    col:Int=8,
-    vlink:Int=2,
-    slink:Int=4,
-    time:Int= -1,
-    scheduled:Boolean=false,
-    iter:Int=1000,
-    linkTp:String="B",
-    fifo:Int=100,
-  ) extends PIRBackend {
-    override def shouldRun: Boolean = super.shouldRun || checkFlag(s"test.Static")
-    override val name = {
-      var n = s"S${row}x${col}v${vlink}s${slink}"
-      if (time != -1) n += s"t${time}"
-      if (scheduled) n += s"w"
-      if (linkTp != "B") n += s"${linkTp}"
-      n
-    }
-    def runPasses():Result = {
-      genpir() >>
-      runpir() >>
-      mappir(s"--row=$row --col=$col --pattern=checkerboard --vc=0 --scheduled=${scheduled}", fifo=fifo) >>
-      genpsim() >>
-      runproute(row=row, col=col, vlink=vlink, slink=slink, iter=iter, vcLimit=0, stopScore=25) >>
-      runpsim(placefile=s"${IR.config.genDir}/plastisim/final.place", linkTp=linkTp)
-    }
   }
 
   case object Dot extends Backend(
@@ -370,76 +190,58 @@ trait PlasticineTest extends DSLTest { test =>
     }
   }
 
-  case object Tst extends PIRBackend {
-    private val genName = name + "_" + property("project").getOrElse("")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
-    val row:Int=14
-    val col:Int=14
+  case object SpatialOnly extends PIRBackend {
     def runPasses():Result = {
-      val result = genpir() >>
-      pirpass("gentst", s"--mapping=true --codegen=true --net=inf --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
-      runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
+      genpir() match {
+        case Unknown => Pass
+        case res => res
       }
     }
   }
 
-  case object MDTst extends PIRBackend(args="--pir --dot") {
-    private val genName = name + "_" + property("project").getOrElse("")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
+  case class PIR(
+    row:Int=20,
+    col:Int=20,
+  ) extends PIRBackend {
+    override def genName = name + "_" + property("project").getOrElse("")
+    val fast = checkFlag("fast")
     def runPasses():Result = {
-      val result = genpir() >>
-      pirpass("gentst", s"--module --mapping=true --codegen=true --net=inf --tungsten --psim=false".split(" ").toList) >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
-      runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
-      }
-    }
-  }
-
-  case object HTst extends PIRBackend(args="--pir --dot") {
-    private val genName = name + "_" + property("project").getOrElse("")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
-    def runPasses():Result = {
-      val result = genpir() >>
-      pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=14 --col=14 --run-proute".split(" ").toList) >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
-      runtimeArgs.cmds.foldLeft(result) { case (result, args) =>
-        result >> scommand(s"runtst", s"$timer ./tungsten $args".split(" "), timeout=2000, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
-      }
-    }
-  }
-
-  case object MDHTst extends PIRBackend(args="--pir --dot") {
-    private val genName = name + "_" + property("project").getOrElse("")
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${this.genName}/$name/report"
-    def runPasses():Result = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
       genpir() >>
-      pirpass("gentst", s"--module --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=14 --col=14".split(" ").toList) >>
-      scommand(s"maketst", s"$timer make".split(" "), timeout=3000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten")
+      pirpass("gentst", s"--mapping=true --codegen=true --net=hybrid --psim=false --row=$row --col=$col".split(" ").toList)
+    }
+  }
+
+  case class Tst(
+    row:Int=20,
+    col:Int=20,
+    module:Boolean = false,
+  ) extends PIRBackend {
+    override val name = if (module) "MDTst" else "Tst"
+    override def genName = name + "_" + property("project").getOrElse("")
+    val runhybrid = checkFlag("hybrid")
+    val fast = checkFlag("fast")
+    def runPasses():Result = {
+      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+      genpir() >>
+      pirpass("gentst", s"${if (module) "--module" else ""} --mapping=true --codegen=true --net=hybrid --tungsten --psim=false --row=$row --col=$col".split(" ").toList) >>
+      (if (module) scommand(s"gen_link", s"$timer python ../tungsten/bin/gen_link.py -p extlink.csv -d link.csv".split(" "), timeout=10, parseMake, MakeError.apply, wd=IR.config.genDir+"/plastisim") else Pass) >>
+      scommand(s"maketst", s"$timer make ideal ${if (fast) "DEBUG=1" else "DEBUG=0"}".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runp2p", timeout=1000000) >>
+      (if (runhybrid)
+      scommand(s"runproute", s"$timer make proute".split(" "), timeout=10800 * 2, parseProute()(_), MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      runtst("runhybrid", timeout=1000000)
+      else Pass
+      )
     }
   }
 
   override def backends: Seq[Backend] = 
-    Asic +:
-    P2PNoSim +:
-    P2P(row=14,col=14) +:
-    Hybrid(row=14,col=14,vlink=4,slink=4) +: 
-    Static(row=14,col=14,vlink=4,slink=4) +: 
     Dot +:
-    Tst +:
-    MDTst +:
-    HTst +:
-    MDHTst +:
+    Tst() +:
+    Tst(module=true) +:
+    PIR() +:
+    SpatialOnly +:
     super.backends
 
 }

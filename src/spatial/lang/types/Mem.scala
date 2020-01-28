@@ -3,13 +3,33 @@ package spatial.lang.types
 import argon._
 import forge.tags._
 import spatial.lang._
-import spatial.node.{DenseTransfer, MemDenseAlias, SparseTransfer}
+import spatial.node.{DenseTransfer, FrameTransmit, MemDenseAlias, SparseTransfer}
+import utils.implicits.collections._
 
 trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   val evMem: C[A] <:< Mem[A,C]
   implicit val A: Bits[A]
 
   override protected val __neverMutable: Boolean = false
+}
+
+trait TensorMem[A] {
+
+  /** Returns the total capacity (in elements) of this memory. */
+  @api def size: I32 = product(dims:_*)
+
+  /** Returns the dimensions of this memory as a Sequence. */
+  @api def dims: Seq[I32]
+  /** Returns dim0 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim0: I32 = dims.indexOrElse(0, I32(1))
+  /** Returns dim1 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
+  /** Returns dim2 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
+  /** Returns dim3 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
+  /** Returns dim4 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 }
 
 trait RemoteMem[A,C[_]] extends Mem[A,C] {
@@ -34,6 +54,16 @@ trait LocalMem1[A,C[T]<:LocalMem1[T,C]] extends LocalMem[A,C] {
     stage(DenseTransfer(dram,me,isLoad = true))
   }
 
+  /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def load(frame: Frame1[A]): Void = {
+    stage(FrameTransmit(frame,me,isLoad = true))
+  }
+
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM1[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign = true))
+  }
+
   /** Creates a sparse gather from the given region of DRAM to this on-chip memory. */
   @api def gather(dram: DRAMSparseTile[A]): Void = {
     stage(SparseTransfer(dram,me,isGather=true))
@@ -46,6 +76,11 @@ trait LocalMem2[A,C[T]<:LocalMem2[T,C]] extends LocalMem[A,C] {
   @api def load(dram: DRAM2[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
   }
+
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM2[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
+  }
 }
 trait LocalMem3[A,C[T]<:LocalMem3[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
@@ -53,6 +88,10 @@ trait LocalMem3[A,C[T]<:LocalMem3[T,C]] extends LocalMem[A,C] {
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
   @api def load(dram: DRAM3[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
+  }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM3[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
   }
 }
 trait LocalMem4[A,C[T]<:LocalMem4[T,C]] extends LocalMem[A,C] {
@@ -62,6 +101,10 @@ trait LocalMem4[A,C[T]<:LocalMem4[T,C]] extends LocalMem[A,C] {
   @api def load(dram: DRAM4[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
   }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM4[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
+  }
 }
 trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
   private implicit def C: Type[C[A]] = this.selfType
@@ -69,6 +112,10 @@ trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
   /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
   @api def load(dram: DRAM5[A]): Void = {
     stage(DenseTransfer(dram,me,isLoad = true))
+  }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM5[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
   }
 }
 
@@ -246,4 +293,25 @@ trait Mem5[A,M1[T],M2[T],M3[T],M4[T],M5[T]] extends Mem[A,M5] {
 
   /** Creates a view of a 5-dimensional, dense region of this memory. */
   @api def apply(x: Rng, q: Rng, p: Rng, r: Rng, c: Rng): M5[A] = stage(MemDenseAlias[A,M5,M5](me, Seq(x, q, p, r, c)))
+}
+
+trait ReadMem1[A] {
+  @api def apply(pos: I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
+}
+trait ReadMem2[A] {
+  @api def apply(row: I32, col: I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
+}
+trait ReadMem3[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
+}
+trait ReadMem4[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3:I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
+}
+trait ReadMem5[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3:I32, d4:I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }

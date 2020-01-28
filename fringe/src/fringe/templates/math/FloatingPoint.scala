@@ -14,6 +14,8 @@ class FloatingPoint(val m: Int, val e: Int) extends Bundle {
   def apply(msb: Int, lsb: Int): UInt = this.number(msb,lsb)
   def apply(bit: Int): Bool = this.number(bit)
 
+  def toSeq: Seq[FloatingPoint] = Seq(this)
+
   // Properties
   val number = UInt((m + e).W)
 

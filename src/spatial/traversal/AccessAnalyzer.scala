@@ -18,7 +18,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
   private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective start value
   private var loops: Map[Idx,Sym[_]] = Map.empty        // Map of loop iterators to defining loop symbol
-  private var scopes: Map[Idx,Set[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
+  private var scopes: Map[Idx,Seq[Sym[_]]] = Map.empty  // Map of loop iterators to all symbols defined in that scope
   private var mostRecentWrite: Map[Reg[_], Sym[_]] = Map.empty
 
   private def inLoop(loop: Sym[_], is: Seq[Idx], istarts: Seq[Ind[_]], block: Block[_]): Unit = {
@@ -235,22 +235,24 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     * }
     * will have access pattern (8*i + j)
     */
-  private def setStreamingPattern(mem: Sym[_], access: Sym[_]): Unit = {
-    dbgs(s"${stm(access)} [STREAMING]")
+  private def setStreamingPattern(mem: Sym[_], access: Sym[_], lanes: Int = 1): Unit = {
+    dbgs(s"${stm(access)} [STREAMING VECTOR SIZE $lanes]")
 
-    val is = accessIterators(access, mem)
-    val ps = is.map(_.ctrPar.toInt)
-    val as = Array.tabulate(is.length){d => ps.drop(d+1).product }
-    val offset = Sum.single(0)
-    val components = as.zip(is).map{case (a,i) => AffineProduct(Sum.single(a),i) }
-    val ap = makeAddressPattern(is, components, offset, NotSet)
+    val pattern = Seq.tabulate(lanes){ lane => 
+      val is = accessIterators(access, mem)
+      val ps = is.map(_.ctrPar.toInt)
+      val as = Array.tabulate(is.length){d => ps.drop(d+1).product }
+      val offset = Sum.single(lane)
+      val components = as.zip(is).map{case (a,i) => AffineProduct(Sum.single(a),i) }
+      val ap = makeAddressPattern(is, components, offset, NotSet)
 
-    val pattern = Seq(ap)
+      ap
+    }
 
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
-    val matrices = getUnrolledMatrices(mem, access, Nil, pattern, Nil)
+    val matrices = pattern.flatMap{p => getUnrolledMatrices(mem, access, Nil, Seq(p), Nil)}
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
@@ -294,10 +296,12 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
 
     case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
     case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
+    case VectorEnqueuer(mem,data,_,_) => setStreamingPattern(mem, lhs, data.asInstanceOf[Vec[_]].size)
+    case VectorDequeuer(mem,adr,_) =>  setStreamingPattern(mem, lhs, adr.size)
     case Reader(mem,adr,_)   => 
       lhs match {
         case Op(RegRead(reg)) if !reg.isRemoteMem => 
-          val reachingWrite = reachingWritesToReg(lhs, reg.writers.toSet)
+          val reachingWrite = reachingWritesToReg(lhs, reg.writers)
           if (reachingWrite.size == 1 && reachingWrite.head.accumType == AccumType.Unknown) {
             val data = reachingWrite.head match {
               case Op(x: Enqueuer[_]) => x.data

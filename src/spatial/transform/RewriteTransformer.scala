@@ -19,6 +19,8 @@ import forge.tags._
 import emul.FixedPoint
 
 import utils.math.{isPow2,log2,gcd}
+import spatial.util.math._
+import utils.math.{isSumOfPow2,asSumOfPow2,isMersenne,withinNOfMersenne}
 
 /** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
@@ -37,26 +39,47 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     add.inCycle == mul.inCycle || specialAccum || spatialConfig.forceFuseFMA
   }
 
-  def selectMod[S,I,F](x: FixPt[S,I,F], y: Int): FixPt[S,I,F] = {
-    implicit val S: BOOL[S] = x.fmt.s
-    implicit val I: INT[I] = x.fmt.i
-    implicit val F: INT[F] = x.fmt.f
-    if (log2(y.toDouble) == 0) x.from(0)
-    // TODO: Consider making a node like case class BitRemap(data: Bits[_], remap: Seq[Int], outType: Bits[T]) that wouldn't add to retime latency
-    else x & (scala.math.pow(2,log2(y.toDouble))-1).to[Fix[S,I,F]] 
+  def rewriteMul[S,I,F](a: Fix[S,I,F], q: Int, mul1: Int, mul2: Int, dir: String): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    dir match {
+      case "add" if q > 0 => stage(FixAdd(stage(FixMul(a, Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(mul2)))))
+      case "sub" if q > 0 => stage(FixSub(stage(FixMul(a, Type[Fix[S,I,F]].from(mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(mul2)))))
+      case "add" if q < 0 => stage(FixAdd(stage(FixMul(a, Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(-mul2)))))
+      case "sub" if q < 0 => stage(FixSub(stage(FixMul(a, Type[Fix[S,I,F]].from(-mul1))), stage(FixMul(a, Type[Fix[S,I,F]].from(-mul2)))))
+      case _ => throw new Exception(s"Something very bad happened while trying to rewrite $a * $q!  ($mul1 $mul2 $dir)")
+    }
   }
 
-  def constMod[S,I,F](x: FixPt[S,I,F], y: Seq[Int]): FixPt[S,I,F] = {
-    implicit val S: BOOL[S] = x.fmt.s
-    implicit val I: INT[I] = x.fmt.i
-    implicit val F: INT[F] = x.fmt.f
-    if (y.size==1) {
-      x.from(y.head)
-    } else {
-      val b = boundVar[FixPt[S,I,F]]
-      b.vecConst = y
-      b
+  // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
+  def rewriteModWithMersenne[S,I,F](a: Fix[S,I,F], mod: Int): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
+    val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
+    dbgs(s"Rewriting $a mod $mod with $levels bitshifts")
+    val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
+    temps(0) = stage(FixAdd[S,I,F](stage(FixSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
+    List.tabulate(levels.size-1) { level =>
+      temps(level+1) = stage(FixAdd[S,I,F](
+                                stage(FixSRA(temps(level),levels(level+1))),
+                                stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
+                          )
     }
+    val boundaries = if (mod == 3) Seq(3,6) else Seq.tabulate(3){i => mod*(i+1)}
+    stage(PriorityMux(boundaries.map{b => temps.last < b}, boundaries.map{b => temps.last - (b - mod)}))
+  }
+
+  def rewriteMod[S,I,F](a: Fix[S,I,F], mod: Int, closestMersenne: Int): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    val bigmod = rewriteModWithMersenne(a, closestMersenne)
+    dbgs(s"Rewriting $a mod $mod as a function of $closestMersenne")
+    val boundaries = Seq.tabulate(closestMersenne / mod){i => mod*(i+1)}
+    stage(PriorityMux(boundaries.map{b => bigmod < Type[Fix[S,I,F]].from(b)}, boundaries.map{b => bigmod - Type[Fix[S,I,F]].from(b - mod)}))
   }
 
   def writeReg[A](lhs: Sym[_], reg: Reg[_], data: Bits[A], ens: Set[Bit]): Void = {
@@ -103,46 +126,21 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
   }
 
-  def static(lin: scala.Int, iter: Num[_], y: scala.Int): Boolean = {
-    if (iter.counter.ctr.isStaticStartAndStep) {
-      val Final(step) = iter.counter.ctr.step
-      val par = iter.counter.ctr.ctrPar.toInt
-      val g = gcd(par*step*lin,y)
-      if (g == 1) false // Residue set of lin % y is {0,1,...,y-1}
-      else if (g % y == 0) true // Residue set of lin % y is {0}
-      else false // Residue set of lin % y is {0, g, 2g, ..., y-g}
-    }
-    else false
-  }
-
-  def residual(lin: scala.Int, iter: Num[_], ofs: scala.Int, y: scala.Int): ResidualGenerator = {
-    if (iter.getCounter.isDefined && iter.counter.ctr.isStaticStartAndStep) {
-      val Final(start) = iter.counter.ctr.start
-      val Final(step) = iter.counter.ctr.step
-      val par = iter.counter.ctr.ctrPar.toInt
-      val lanes = iter.counter.lanes
-      if (y != 0) {
-        val A = gcd(par * step * lin, y)
-        val B = lanes.map { lane => (((start + ofs + lane * step * lin) % y) + y) % y }
-        dbgs(s"Residual Generator for lane $lanes with step $step, lin $lin and start $start + $ofs under mod $y = $A, $B")
-        ResidualGenerator(A, B, y)
-      } else {
-        val A = par * step * lin
-        val B = lanes.map { lane => start + ofs + lane * step * lin }
-        ResidualGenerator(A, B, y)
-      }
-    }
-    else ResidualGenerator(1, 0, y)
-  }
-
-  def getPosMod(lin: scala.Int, x: Num[_], ofs: scala.Int, mod: scala.Int) = {
-    val res = residual(lin, x, ofs, mod)
-    res.resolvesTo.get
-  }
-
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
+    case _:SpatialBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
+
+    case FixMul(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
+      val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))
+      transferDataToAllNew(lhs){ rewriteMul(a,q.toInt,mul1,mul2,dir).asInstanceOf[A] }
+
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
+      transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }
+
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).isDefined =>
+      transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).get).asInstanceOf[A] }
+
 
     case RegWrite(F(reg), F(data), F(en)) => data match {
       // Look for very specific FixFMA pattern and replace with FixFMAAccum node (Issue #63).. This gives error about not wanting to match Node[Fix[S,I,F]] <: Node[Any] because Op is type R and not +R
@@ -172,136 +170,37 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
 
     case FixMod(F(x), F(Final(y))) if inHw => 
-      x match {
-        // Assume chained arithmetic will have been constant propped by now
-        case Op(FixAdd(F(xx), Final(ofs))) => 
-          if (xx.getCounter.isDefined && static(1, xx, y)) {
-            val posMod = getPosMod(1, xx, ofs, y)  
-            transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(1, xx, ofs, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(1, xx, ofs, y)
-            m
-          }
-        // Assume chained arithmetic will have been constant propped by now
-        case Op(FixAdd(Final(ofs), F(xx))) => 
-          if (xx.getCounter.isDefined && static(1, xx, y)) {
-            val posMod = getPosMod(1, xx, ofs, y)  
-            transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(1, xx, ofs, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(1, xx, ofs, y)
-            m
-          }
-        // Assume chained arithmetic will have been constant propped by now
-        case Op(FixSub(F(xx), Final(ofs))) => 
-          if (xx.getCounter.isDefined && static(1, xx, y)) {
-            val posMod = getPosMod(1, xx, -ofs, y)  
-            transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(1, xx, -ofs, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(1, xx, -ofs, y)
-            m
-          }
-        case Op(FixMul(Final(lin), F(xx))) => 
-          if (xx.getCounter.isDefined && static(lin, xx, y)) {
-            val posMod = getPosMod(lin, xx, 0, y)  
-            transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(lin, xx, 0, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(lin, xx, 0, y)
-            m
-          }
-        case Op(FixMul(F(xx), Final(lin))) => 
-          if (xx.getCounter.isDefined && static(lin, xx, y)) {
-            val posMod = getPosMod(lin, xx, 0, y)  
-            transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(lin, xx, 0, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(lin, xx, 0, y)
-            m
-          }
-        case Op(FixFMA(Final(lin), F(xx), Final(ofs))) => 
-          if (xx.getCounter.isDefined && static(lin, xx, y)) {
-            val posMod = getPosMod(lin, xx, ofs, y)  
-            transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(lin, xx, ofs, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(lin, xx, ofs, y)
-            m
-          }
-        case Op(FixFMA(F(xx), Final(lin), Final(ofs))) => 
-          if (xx.getCounter.isDefined && static(lin, xx, y)) {
-            val posMod = getPosMod(lin, xx, ofs, y)  
-            transferDataToAllNew(lhs){ constMod(xx, posMod).asInstanceOf[Sym[A]] }
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(lin, xx, ofs, y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = residual(lin, xx, ofs, y)
-            m
-          }
-        case _ =>
-          if (x.getCounter.isDefined && static(1, x, y)) {
-            val posMod = getPosMod(1, x, 0, y)  
-            transferDataToAllNew(lhs){ constMod(x, posMod).asInstanceOf[Sym[A]] }
-          } else if (x.getCounter.isDefined && isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = residual(1, x, 0, y)
-            m     
-          } else if (isPow2(y)) {
-            val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
-            dbgs(s"Cannot statically determine $x % $y")
-            m.modulus = y
-            m.residual = ResidualGenerator(1,0,y)
-            m     
-          } else {
-            val m = super.transform(lhs,rhs)
-            m.residual = ResidualGenerator(1,0,y)
-            m
-          }
+      val (iter, add, mul) = x match {
+        case Op(FixAdd(F(xx), Final(ofs))) => (xx, ofs, 1)
+        case Op(FixAdd(Final(ofs), F(xx))) => (xx, ofs, 1)
+        case Op(FixSub(F(xx), Final(ofs))) => (xx, -ofs, 1)
+        case Op(FixMul(Final(lin), F(xx))) => (xx, 0, lin)
+        case Op(FixMul(F(xx), Final(lin))) => (xx, 0, lin)
+        case Op(FixFMA(Final(lin), F(xx), Final(ofs))) => (xx, ofs, lin)
+        case Op(FixFMA(F(xx), Final(lin), Final(ofs))) => (xx, ofs, lin)
+        case _ => (x, 0, 1)
+      }
+
+      if (iter.getCounter.isDefined && staticMod(mul, iter, y)) {
+        // Convert FixMod node into a Const or Const vec
+        val posMod = getPosMod(mul, iter, add, y)
+        transferDataToAllNew(lhs){ constMod(iter, posMod).asInstanceOf[Sym[A]] }
+      } else if (iter.getCounter.isDefined && isPow2(y)) {
+        val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
+        dbgs(s"Cannot statically determine $x % $y")
+        m.modulus = y
+        m.residual = residual(1, iter, add, y)
+        m     
+      } else if (isPow2(y)) {
+        val m = transferDataToAllNew(lhs){ selectMod(x, y).asInstanceOf[Sym[A]] }
+        dbgs(s"Cannot statically determine $x % $y")
+        m.modulus = y
+        m.residual = ResidualGenerator(1,0,y)
+        m     
+      } else {
+        val m = super.transform(lhs,rhs)
+        m.residual = residual(1, iter, add, y)
+        m
       }
 
     // 1 / sqrt(b)  ==> invsqrt(b)
@@ -320,7 +219,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       super.transform(lhs,rhs)
 
     // m1*m2 + add --> fma(m1,m2,add)
-    case FixAdd((mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
+    case FixAdd(F(mul@Op(FixMul(m1,m2))), F(add: Fix[s,i,f])) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>
       transferDataToAllNew(lhs){ fixFMA(m1,m2,add).asInstanceOf[Sym[A]] }  // TODO: Set residual
 
     case FixAdd(F(add: Fix[s,i,f]), F(mul@Op(FixMul(m1,m2)))) if lhs.canFuseAsFMA && specializationFuse(lhs, mul) =>

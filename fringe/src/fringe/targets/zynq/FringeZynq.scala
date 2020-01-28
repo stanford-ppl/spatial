@@ -64,6 +64,7 @@ class FringeZynq(
   })
 
   io <> DontCare
+
   // Common Fringe
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
   fringeCommon.io <> DontCare
@@ -74,7 +75,18 @@ class FringeZynq(
   fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   // AXI-lite bridge
-  if (target.isInstanceOf[targets.zynq.Zynq]) {
+  if (target.isInstanceOf[targets.kcu1500.KCU1500]) {
+    val axiLiteBridge = Module(new AXI4LiteToRFBridgeKCU1500(ADDR_WIDTH, DATA_WIDTH))
+    axiLiteBridge.io.S_AXI <> io.S_AXI
+
+    fringeCommon.reset := reset.toBool
+    fringeCommon.io.raddr := axiLiteBridge.io.raddr
+    fringeCommon.io.wen   := axiLiteBridge.io.wen
+    fringeCommon.io.waddr := axiLiteBridge.io.waddr
+    fringeCommon.io.wdata := axiLiteBridge.io.wdata
+    axiLiteBridge.io.rdata := fringeCommon.io.rdata
+  }
+  else if (target.isInstanceOf[targets.zynq.Zynq]) {
     val axiLiteBridge = Module(new AXI4LiteToRFBridge(ADDR_WIDTH, DATA_WIDTH))
     axiLiteBridge.io.S_AXI <> io.S_AXI
 
@@ -120,6 +132,9 @@ class FringeZynq(
     axiBridge.io.in <> fringeCommon.io.dram(i)
     maxi <> axiBridge.io.M_AXI
   }
-
-
+  // TODO: This was an attempt to resolve issue #276 but it didn't work
+  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
+    io.M_AXI.foreach(_.AWVALID := false.B)
+    io.M_AXI.foreach(_.ARVALID := false.B)
+  }
 }

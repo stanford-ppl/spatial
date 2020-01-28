@@ -2,7 +2,6 @@ package spatial.lang.api
 
 import argon._
 import forge.tags._
-
 import spatial.node._
 
 trait TransferAPI { this: Implicits with MathAPI =>
@@ -26,12 +25,32 @@ trait TransferAPI { this: Implicits with MathAPI =>
   }
 
   /** Transfers the given @Array of `data` from the host's memory to `dram`'s region of accelerator DRAM. **/
+  @api def setFrame[A:Bits,C[T]](frame: Frame[A,C], data: Tensor1[A]): Void = stage(SetFrame(frame,data))
+
+  /** Transfers `dram`'s region of accelerator Frame to the host's memory and returns the result as an Array. **/
+  @api def getFrame[A:Bits,C[T]](frame: Frame[A,C]): Tensor1[A] = {
+    val array = Tensor1.empty[A](frame.size)
+    stage(GetFrame(frame, array))
+    array
+  }
+
+  /** Transfers the given @Array of `data` from the host's memory to `dram`'s region of accelerator DRAM. **/
   @api def setMem[A:Bits,C[T]](dram: DRAM[A,C], data: Tensor1[A]): Void = stage(SetMem(dram,data))
 
   /** Transfers `dram`'s region of accelerator DRAM to the host's memory and returns the result as an Array. **/
   @api def getMem[A:Bits,C[T]](dram: DRAM[A,C]): Tensor1[A] = {
     val array = Tensor1.empty[A](dram.dims.prodTree)
     stage(GetMem(dram, array))
+    array
+  }
+
+  /** Transfers the given @Array of `data` from the host's memory to `dram`'s region of accelerator LockDRAM. **/
+  @api def setMem[A:Bits,C[T]](dram: LockDRAM[A,C], data: Tensor1[A]): Void = stage(SetLockMem(dram,data))
+
+  /** Transfers `dram`'s region of accelerator DRAM to the host's memory and returns the result as an Array. **/
+  @api def getMem[A:Bits,C[T]](dram: LockDRAM[A,C]): Tensor1[A] = {
+    val array = Tensor1.empty[A](dram.dims.prodTree)
+    stage(GetLockMem(dram, array))
     array
   }
 

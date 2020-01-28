@@ -307,9 +307,9 @@ set_global_assignment -name SDC_FILE hps_sgmii.sdc
 set_global_assignment -name SDC_FILE fpga_niosii.sdc
 set_global_assignment -name SDC_FILE fpga_pr.sdc
 set_global_assignment -name SDC_FILE fpga_dp.sdc
-set_global_assignment -name VERILOG_FILE Top.v
+set_global_assignment -name VERILOG_FILE SpatialIP.v
 set_global_assignment -name QIP_FILE ghrd_10as066n2/ghrd_10as066n2.qip
-set_global_assignment -name VERILOG_FILE ghrd_a10_top.v
+set_global_assignment -name VERILOG_FILE ghrd_a10_SpatialIP.v
 set_global_assignment -name VERILOG_FILE ip/debounce/debounce.v
 set_global_assignment -name VERILOG_FILE ip/edge_detect/altera_edge_detector.v
 set_global_assignment -name QSYS_FILE ghrd_10as066n2.qsys
@@ -339,7 +339,7 @@ set_global_assignment -name IP_FILE ip/pr_region_alternate/pr_region_alternate_c
 set_global_assignment -name IP_FILE ip/pr_region_alternate/pr_region_alternate_sysid_qsys_0.ip
 set_global_assignment -name IP_FILE ip/pr_region_alternate/pr_region_alternate_Top_DUT_0.ip
 set_global_assignment -name QSYS_FILE pr_region_alternate.qsys
-set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_Top_0.ip
+set_global_assignment -name IP_FILE ip/pr_region_default/pr_region_default_SpatialIP_0.ip
 set_global_assignment -name IP_FILE ip/ghrd_10as066n2/ghrd_10as066n2_axi_bridge_0.ip
 set_global_assignment -name IP_FILE ip/ghrd_10as066n2/ghrd_10as066n2_pr_region_controller_0.ip
 set_global_assignment -name IP_FILE ip/ghrd_10as066n2/ghrd_10as066n2_avlmm_pr_freeze_bridge_1.ip

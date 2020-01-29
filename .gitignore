@@ -9,6 +9,7 @@ target/
 /out*/
 /gen/
 /poly/emptiness
+gen*
 
 resources/files_list
 resources/synth/cpp-templates/fringeDE1SoC/

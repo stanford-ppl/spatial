@@ -328,10 +328,10 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   private def overlapsAddress(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val substRules = divergedIters(a, b, mem)
     val keyRules: scala.collection.immutable.Map[Idx,(Idx,Int)]  = accessIterators(a.access, mem).zipWithIndex.collect{
-      case(iter,i) if (substRules.contains(iter) && substRules(iter).isDefined) => 
+      case(iter,i) if substRules.contains(iter) && substRules(iter).isDefined =>
         if (substRules(iter).get != 0) dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally lockstepped iterator, $iter, with offset ${substRules(iter).get}") 
-        (iter -> (iter, substRules(iter).get))
-      case(iter,i) if (substRules.contains(iter) && !substRules(iter).isDefined && a.matrix.keys.contains(iter)) => 
+        iter -> (iter, substRules(iter).get)
+      case(iter,i) if substRules.contains(iter) && !substRules(iter).isDefined && a.matrix.keys.contains(iter) =>
         dbgs(s"      WARNING: ${a.access} {${a.unroll}} - ${b.access} {${b.unroll}} have totally dephased iterator, $iter")
         return true
         // (iter -> (boundVar[I32], 0))
@@ -426,7 +426,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     */
   def requireConcurrentPortAccess(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val lca = LCA(a.access, b.access)
-    val controllerLCA = lca.ancestors.collectFirst{case x if (x.isInnerControl && !x.isSwitch) => x} // Outermost controller that is inner controller
+    val controllerLCA = lca.ancestors.collectFirst{case x if x.isInnerControl && !x.isSwitch => x} // Outermost controller that is inner controller
     (a.access == b.access && a.unroll != b.unroll) ||
       lca.isInnerPipeLoop ||
       (lca.isInnerSeqControl && lca.isFullyUnrolledLoop) ||
@@ -448,9 +448,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   /** Returns an approximation of the cost for the given banking strategy. */
   def cost(banking: Seq[Banking], depth: Int, rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): DUPLICATE = {
     // Partition based on direct/xbar banking (TODO: Determine partial xBars here)
-    val histR: Map[Int, Int] = rdGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
-    val histW: Map[Int, Int] = wrGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => (width -> accs.size)}
-    val histCombined: Map[Int, (Int,Int)] = histR.map{case (width, siz) => (width -> (siz, histW.getOrElse(width, 0)))} ++ histW.collect{case (width, siz) if !histR.contains(width) => (width -> (0,siz))}
+    val histR: Map[Int, Int] = rdGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => width -> accs.size }
+    val histW: Map[Int, Int] = wrGroups.flatten.groupBy{x => x.bankMuxWidth(banking.map(_.nBanks), banking.map(_.stride), banking.flatMap(_.alphas))}.map{case (width, accs) => width -> accs.size }
+    val histCombined: Map[Int, (Int,Int)] = histR.map{case (width, siz) => width -> (siz, histW.getOrElse(width, 0)) } ++ histW.collect{case (width, siz) if !histR.contains(width) => width -> (0,siz) }
 
     // Relative scarcity of resource, roughly % of board used (TODO: Extract from target device, these numbers were just ripped from zcu)
     val lutWeight = 34260 / 100
@@ -460,24 +460,24 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val allDims = mem.stagedDims.map(_.toInt)
     val allB = banking.map(_.stride)
     val allN = banking.map(_.nBanks)
-    val allAlpha = banking.map(_.alphas).flatten
-    val allP = banking.map(_.Ps).flatten
-    val histRaw = histCombined.toList.sortBy(_._1).map{x => List(x._1, x._2._1, x._2._2)}.flatten
+    val allAlpha = banking.flatMap(_.alphas)
+    val allP = banking.flatMap(_.Ps)
+    val histRaw = histCombined.toList.sortBy(_._1).flatMap { x => List(x._1, x._2._1, x._2._2) }
 
     mem.asInstanceOf[Sym[_]] match {
       case m:SRAM[_,_] => 
-        val auxNodes = (rdGroups ++ wrGroups).flatten.map{x => x.arithmeticNodes(allN, allB, allAlpha)}.flatten.toList
+        val auxNodes = (rdGroups ++ wrGroups).flatten.flatMap { x => x.arithmeticNodes(allN, allB, allAlpha) }.toList
         val auxWeights = auxNodes.map{case (name,a,b) => 
-          val l = (areamodel.estimateArithmetic("LUTs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / lutWeight 
-          val f = (areamodel.estimateArithmetic("FFs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / ffWeight 
+          val l = areamodel.estimateArithmetic("LUTs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1)) / lutWeight
+          val f = areamodel.estimateArithmetic("FFs", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1)) / ffWeight
           val br = (areamodel.estimateArithmetic("RAMB18", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1)) + areamodel.estimateArithmetic("RAMB32", name, List(a.getOrElse(0), b.getOrElse(0), 32,0,1))) / bramWeight 
           (l,f,br)
         }
         val auxLuts = auxWeights.map(_._1).sum
         val auxFFs = auxWeights.map(_._2).sum
         val auxBrams = auxWeights.map(_._3).sum
-        val luts = (areamodel.estimateMem("LUTs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
-        val ffs = (areamodel.estimateMem("FFs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val luts = areamodel.estimateMem("LUTs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
+        val ffs = areamodel.estimateMem("FFs", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "SRAMNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram + auxLuts + auxFFs + auxBrams
         dbgs(s"          Access Hist:")
@@ -486,8 +486,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"        - Duplicate costs $c (SRAM LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%, Auxiliary LUTs: $auxLuts%, FFs: $auxFFs%, BRAMs: $auxBrams%)")
         (banking, histRaw, auxNodes.map{x => s"${x._1}(${x._2},${x._3})"}, Seq(c, luts, ffs, bram, auxLuts, auxFFs, auxBrams))
       case m:RegFile[_,_] =>
-        val luts = (areamodel.estimateMem("LUTs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
-        val ffs = (areamodel.estimateMem("FFs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val luts = areamodel.estimateMem("LUTs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
+        val ffs = areamodel.estimateMem("FFs", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "RegFileNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram
         dbgs(s"          Access Hist:")
@@ -496,8 +496,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         dbgs(s"        - Duplicate costs $c (LUTs: $luts%, FFs: $ffs%, BRAMs: $bram%)")
         (banking, histRaw, Seq(), Seq(c, luts, ffs, bram, 0,0,0))
       case m:LineBufferNew[_] =>
-        val luts = (areamodel.estimateMem("LUTs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / lutWeight
-        val ffs = (areamodel.estimateMem("FFs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val luts = areamodel.estimateMem("LUTs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
+        val ffs = areamodel.estimateMem("FFs", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "LineBufferNew", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram
         dbgs(s"          Access Hist:")
@@ -507,7 +507,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         (banking, histRaw, Seq(), Seq(c, luts, ffs, bram, 0,0,0))
       case _ => 
         val luts = areamodel.estimateMem("LUTs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / lutWeight
-        val ffs = (areamodel.estimateMem("FFs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / ffWeight
+        val ffs = areamodel.estimateMem("FFs", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) / ffWeight
         val bram = (areamodel.estimateMem("RAMB18", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw) + areamodel.estimateMem("RAMB32", "", allDims, 32, depth, allB, allN, allAlpha, allP, histRaw)) / bramWeight
         val c = luts + ffs + bram
         dbgs(s"          Access Hist:")
@@ -617,7 +617,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val allAttemptDirectives: Seq[BankingOptions] = bankingOptionsIds
         .map{ addr => BankingOptions(bankViews(addr(0)), nStricts(addr(1)), aStricts(addr(2)), dimensionDuplication(addr(3))) }
         .sortBy{x => (x.view.P, x.N.P, x.alpha.P, x.regroup.P)}
-        .filter{x => (x.view.isInstanceOf[Hierarchical] || (x.view.isInstanceOf[Flat] && (x.regroup.dims.size == 0 || x.regroup.dims.size == x.view.rank)))}
+        .filter{x => x.view.isInstanceOf[Hierarchical] || (x.view.isInstanceOf[Flat] && (x.regroup.dims.size == 0 || x.regroup.dims.size == x.view.rank)) }
     if (allAttemptDirectives.size == 0) {
       error(s"Unable to search for banking on ${mem.fullname}:")
       error(s"  ${mem.ctx})")
@@ -650,22 +650,22 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
             }.toList
           }
           val costs_per_option: List[Double] = expanded_costs.reduce[List[Double]]{case (a: List[Double],b: List[Double]) => a.zip(b).map{case (a,b) => a+b}}
-          costs_per_option.zipWithIndex.map{case (c, j) => ((scheme,j) -> c)}.toMap
+          costs_per_option.zipWithIndex.map{case (c, j) => (scheme,j) -> c }.toMap
         }
         dbgs(s"***** Cost summary *****")
         bankings.foreach{case (scheme,banking) => banking.head._2.zipWithIndex.foreach{ case (b,optId) => dbgs(s"Cost: ${costs((scheme,optId))} for version $optId of $scheme")}}
         dbgs(s"**************************************************************************************")
         val winningScheme: ((BankingOptions, Int), Double) = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
-        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map{case (acgrp, opts) => (acgrp -> opts(winningScheme._1._2))}.toMap
+        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map{case (acgrp, opts) => acgrp -> opts(winningScheme._1._2) }.toMap
         Right(
-          winner.map{case (winningRdGrps, winningBanking) => 
-            val padding = mem.stagedDims.map(_.toInt).zip(winningBanking.flatMap(_.Ps)).map{case(d,p) => (p - d%p) % p}
-            val ports = computePorts(winningRdGrps,bufPorts) ++ computePorts(reachingWrGroups,bufPorts)
-            val isBuffAccum = writes.cross(winningRdGrps.flatten).exists{case (wr,rd) => rd.parent == wr.parent }
+          winner.flatMap { case (winningRdGrps, winningBanking) =>
+            val padding = mem.stagedDims.map(_.toInt).zip(winningBanking.flatMap(_.Ps)).map { case (d, p) => (p - d % p) % p }
+            val ports = computePorts(winningRdGrps, bufPorts) ++ computePorts(reachingWrGroups, bufPorts)
+            val isBuffAccum = writes.cross(winningRdGrps.flatten).exists { case (wr, rd) => rd.parent == wr.parent }
             val accum = if (isBuffAccum) AccumType.Buff else AccumType.None
             val accTyp = mem.accumType | accum
-            Seq(Instance(winningRdGrps,reachingWrGroups,ctrls,metapipe,winningBanking,depth,winningScheme._2,ports,padding,accTyp))
-          }.flatten.toSeq
+            Seq(Instance(winningRdGrps, reachingWrGroups, ctrls, metapipe, winningBanking, depth, winningScheme._2, ports, padding, accTyp))
+          }.toSeq
         )
       }
       else Left(issue.get)
@@ -683,7 +683,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   // TODO: Some code duplication here with groupAccesses
   protected def accessesConflict(a: AccessMatrix, b: AccessMatrix): Boolean = {
     val concurrent  = requireConcurrentPortAccess(a, b) || !willUnrollTogether(a,b)
-    val conflicting = (overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment))
+    val conflicting = overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)
     val trueConflict = concurrent && conflicting && !mem.isReg && !mem.isLockSRAM
     if (trueConflict) dbgs(s"${a.short}, ${b.short}: Concurrent: $concurrent, Conflicting: $conflicting")
     trueConflict

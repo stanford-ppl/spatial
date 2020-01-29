@@ -7,28 +7,16 @@ import spatial.node._
 import spatial.lang.types._
 import spatial.metadata.memory._
 
-abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends LocalMem[A,C] {
+abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends LocalMem[A,C] with TensorMem[A] {
   val A: Bits[A] = Bits[A]
   protected def M1: Type[SRAM1[A]] = implicitly[Type[SRAM1[A]]]
   protected def M2: Type[SRAM2[A]] = implicitly[Type[SRAM2[A]]]
   protected def M3: Type[SRAM3[A]] = implicitly[Type[SRAM3[A]]]
   protected def M4: Type[SRAM4[A]] = implicitly[Type[SRAM4[A]]]
   protected def M5: Type[SRAM5[A]] = implicitly[Type[SRAM5[A]]]
+
   def rank: Int
-  /** Returns the total capacity (in elements) of this SRAM. */
-  @api def size: I32 = product(dims:_*)
-  /** Returns the dimensions of this SRAM as a Sequence. */
   @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
-  /** Returns dim0 of this DRAM, or else 1 if SRAM is lower dimensional */
-  @api def dim0: I32 = dims.indexOrElse(0, I32(1))
-  /** Returns dim1 of this DRAM, or else 1 if SRAM is lower dimensional */
-  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
-  /** Returns dim2 of this DRAM, or else 1 if SRAM is lower dimensional */
-  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
-  /** Returns dim3 of this DRAM, or else 1 if SRAM is lower dimensional */
-  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
-  /** Returns dim4 of this DRAM, or else 1 if SRAM is lower dimensional */
-  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 
   /** Creates an alias of this SRAM with parallel access in the last dimension. */
   @api def par(p: I32): C[A] = {

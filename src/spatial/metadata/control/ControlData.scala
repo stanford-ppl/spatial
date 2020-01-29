@@ -239,7 +239,15 @@ case class UnrollAsMOP(should: Boolean) extends Data[UnrollAsMOP](SetBy.User)
 
 /** 
   * Set on unrolled unit pipes when loops are fully unrolled. Mark how much the loops are unrolled. Used by pir.
-  * Getter:  sym.unrollby
-  * Setter:  sym.unrollby = (int)
+  * Getter:  sym.unrollBy
+  * Setter:  sym.unrollBy = (int)
   */
 case class UnrollBy(par: Int) extends Data[UnrollBy](SetBy.Analysis.Self)
+
+/** 
+  * Set by unroller as it unrolling the graph. Mark unrolled nodes with program order on preunrolled
+  * nodes
+  * Getter:  sym.progorder
+  * Setter:  sym.progorder = (int)
+  */
+case class ProgramOrder(id: Int) extends Data[ProgramOrder](SetBy.Analysis.Self)

@@ -4,12 +4,32 @@ import argon._
 import forge.tags._
 import spatial.lang._
 import spatial.node.{DenseTransfer, FrameTransmit, MemDenseAlias, SparseTransfer}
+import utils.implicits.collections._
 
 trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   val evMem: C[A] <:< Mem[A,C]
   implicit val A: Bits[A]
 
   override protected val __neverMutable: Boolean = false
+}
+
+trait TensorMem[A] {
+
+  /** Returns the total capacity (in elements) of this memory. */
+  @api def size: I32 = product(dims:_*)
+
+  /** Returns the dimensions of this memory as a Sequence. */
+  @api def dims: Seq[I32]
+  /** Returns dim0 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim0: I32 = dims.indexOrElse(0, I32(1))
+  /** Returns dim1 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim1: I32 = dims.indexOrElse(1, I32(1))
+  /** Returns dim2 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim2: I32 = dims.indexOrElse(2, I32(1))
+  /** Returns dim3 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim3: I32 = dims.indexOrElse(3, I32(1))
+  /** Returns dim4 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim4: I32 = dims.indexOrElse(4, I32(1))
 }
 
 trait RemoteMem[A,C[_]] extends Mem[A,C] {
@@ -277,16 +297,21 @@ trait Mem5[A,M1[T],M2[T],M3[T],M4[T],M5[T]] extends Mem[A,M5] {
 
 trait ReadMem1[A] {
   @api def apply(pos: I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }
 trait ReadMem2[A] {
   @api def apply(row: I32, col: I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }
 trait ReadMem3[A] {
   @api def apply(d0: I32, d1: I32, d2: I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }
 trait ReadMem4[A] {
   @api def apply(d0: I32, d1: I32, d2: I32, d3:I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }
 trait ReadMem5[A] {
   @api def apply(d0: I32, d1: I32, d2: I32, d3:I32, d4:I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }

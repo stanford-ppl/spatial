@@ -147,4 +147,4 @@ while(1):
 		else:
 			number = 16**(numDbits/4 + numFbits/4) + number
 			converted = hex(number)
-		print converted[0:len(converted)-(numFbits/4)] + "." + converted[len(converted)-(numFbits/4):len(converted)]
+		print(converted[0:len(converted)-(numFbits/4)] + "." + converted[len(converted)-(numFbits/4):len(converted)])

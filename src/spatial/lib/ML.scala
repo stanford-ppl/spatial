@@ -74,6 +74,50 @@ object ML extends HostML {
   }
 
   /*                                                       
+   * Forward MLP with parameterized layers and dimensions
+   * @param weights A list of 2D weights for each layer, SRAM or LUT
+   * @param b A list of 1D weights for each layer, SRAM or LUT
+   * @param activation activation function
+   * @param input input layer access function
+   * @param output final output layer update function
+   * @param ips a list of inner loop unrolling factor on input dimension of each layer
+   * @param mps a list of outer loop unrolling factor on input dimension of each layer
+   * @param ops a list of outer loop unrolling factor on output dimension of each layer
+   * */
+  @api def mlp_forward[T:Num](
+    weights:Seq[Sym[_] with TensorMem[T] with ReadMem2[T]], 
+    biases:Seq[Sym[_] with TensorMem[T] with ReadMem1[T]], 
+    activation: T => T,
+    input:I32 => T,
+    output:(I32, T) => scala.Unit,
+  )(
+    ips:Seq[scala.Int]=List.fill(weights.size)(16),
+    mps:Seq[scala.Int]=List.fill(weights.size)(1),
+    ops:Seq[scala.Int]=List.fill(weights.size)(1),
+  ):Unit = {
+    val dims = weights.head.constDims.head +: biases.map { _.constDims.head }
+    val layers = List.tabulate(dims.size) { i => i }
+    val hiddenDims = dims.slice(1,layers.size-1)
+    val hiddens = hiddenDims.map { h => SRAM[T](h) }
+    layers.sliding(2,1).foreach { case List(prev,next) =>
+      val in = IfElse[I32 => T](prev==0) { input } { hiddens(prev-1)(_) }
+      val out = IfElse[(I32, T) => scala.Unit](next==layers.last) { output } { hiddens(next-1).update }
+      val activation = IfElse(next==layers.last) { identity[T] } { relu[T] }
+      val I = dims(prev)
+      val O = dims(next)
+      val ip = ips(prev)
+      val mp = mps(prev)
+      val op = ops(prev)
+      scala.Predef.assert(ip <= I, s"ip=$ip, I=$I")
+      scala.Predef.assert(mp <= I/ip, s"ip=$ip, mp=$mp, I=$I")
+      scala.Predef.assert(op <= O, s"op=$op, O=$O")
+      val w = weights(prev)
+      val b = biases(prev)
+      denselayer[T](w, b, activation, in=in, nlout=out)(ip=ip, mp=mp, op=op)
+    }
+  }
+
+  /*                                                       
    *                     o
    *     i          +----------+             o
    *  +-----+   x  i|    w     |   =    +----------+
@@ -89,8 +133,8 @@ object ML extends HostML {
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
   @api def denselayer[T:Num](
-    w:Sym[_] with ReadMem2[T], 
-    b:Sym[_] with ReadMem1[T], 
+    w:Sym[_] with TensorMem[T] with ReadMem2[T], 
+    b:Sym[_] with TensorMem[T] with ReadMem1[T], 
     activation: T => T,
     in:I32 => T,
     nlout:(I32, T) => scala.Unit,
@@ -105,7 +149,7 @@ object ML extends HostML {
     val O = dims(1)
 
     def InnerNN(o:Int) = {
-      val dot = dp_tiled(I,ip,mp,ip) { i => 
+      val dot = dp_tiled(N=I,ts=ip,op=mp,ip=ip) { i => 
         (in(i), w(i,o))
       }
       val lo = dot + b(o)

@@ -5,7 +5,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
 
-trait PIRGenLockSRAM extends PIRCodegen {
+trait PIRGenLock extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case LockNew(depth) => 
@@ -17,7 +17,9 @@ trait PIRGenLockSRAM extends PIRCodegen {
         src"""LockOnKeys().key(${assertOne(keys)}).lock(${lock})"""
       }
     case op: LockSRAMNew[_,_] => 
-      stateMem(lhs, "LockSRAM()")
+      stateMem(lhs, "LockMem(false)")
+    case op: LockDRAMHostNew[_,_] => 
+      stateMem(lhs, src"LockMem(true)")
     case op@LockSRAMBankedRead(sram,bank,ofs,lock,ens)       => 
       stateAccess(lhs, sram, ens) {
         src"LockRead()" +
@@ -28,6 +30,18 @@ trait PIRGenLockSRAM extends PIRCodegen {
       stateAccess(lhs, sram, ens, data=Some(data)) {
         src"LockWrite()" +
         src".addr(${assertOne(bank)})" + 
+        src".lock(${lock.map { lock => assertOne(lock) }})"
+      }
+    case op@LockDRAMBankedRead(dram,bank,ofs,lock,ens)       => 
+      stateAccess(lhs, dram, ens) {
+        src"LockRead()" +
+        src".addr(${assertOne(ofs)})" + 
+        src".lock(${lock.map { lock => assertOne(lock) }})"
+      }
+    case op@LockDRAMBankedWrite(dram,data,bank,ofs,lock,ens) => 
+      stateAccess(lhs, dram, ens, data=Some(data)) {
+        src"LockWrite()" +
+        src".addr(${assertOne(ofs)})" + 
         src".lock(${lock.map { lock => assertOne(lock) }})"
       }
     case _ => super.genAccel(lhs, rhs)

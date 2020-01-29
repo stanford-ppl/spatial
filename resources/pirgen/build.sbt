@@ -1,7 +1,7 @@
 // Build file for testing spatial apps
 name := "pir-app"
 
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.10"
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls")
 
 scalaSource in Compile := baseDirectory.value / "pir"

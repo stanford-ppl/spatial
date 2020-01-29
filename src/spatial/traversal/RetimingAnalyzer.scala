@@ -111,6 +111,7 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case _:AccelScope => inAccel { analyzeCtrl(lhs,rhs) }
+    case _@SpatialBlackboxImpl(func) => inAccel { analyzeCtrl(lhs,rhs); lhs.bodyLatency = func.result.fullDelay }
     case _:BlackboxImpl[_,_,_] => inAccel { analyzeCtrl(lhs,rhs) }
     case _ if lhs.isInnerControl => analyzeCtrl(lhs, rhs)
     case _ => super.visit(lhs,rhs)

@@ -101,10 +101,29 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
         emit(src"""cout << "Allocate ${lhs.name.getOrElse(lhs)} of size "<< ${cdims.mkString(""" << " * " << """)} << " at " << ($tp*)${lhs} << " (" << (long)$lhs << ")" << endl;""")
       }
 
+    case LockDRAMHostNew(dims, _) =>
+      val tp = lhs.tp.typeArgs.head
+      genIO {
+        // Make sure allocated address is burst aligned
+        emit(src"""void* $lhs;""")
+      }
+      val cdims = dims.map { case Expect(c) => c; case d => quote(d) }
+      genAlloc(lhs, dims.forall { _.isConst }) { 
+        emit(src"$lhs = malloc(sizeof($tp) * ${cdims.mkString("*")} + ${bytePerBurst});")
+        emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
+        emit(src"""cout << "Allocate ${lhs.name.getOrElse(lhs)} of size "<< ${cdims.mkString(""" << " * " << """)} << " at " << ($tp*)${lhs} << " (" << (long)$lhs << ")" << endl;""")
+      }
+
     case SetMem(dram, data) =>
       emit(src"memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
 
     case GetMem(dram, data) =>
+      emit(src"memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+
+    case SetLockMem(dram, data) =>
+      emit(src"memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+
+    case GetLockMem(dram, data) =>
       emit(src"memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
 
     case _ => super.gen(lhs, rhs)

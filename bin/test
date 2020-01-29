@@ -2,10 +2,11 @@
 
 import os, sys, datetime
 sys.path.insert(0, 'pir/bin')
-import spatial_test
+from spatial_test import SpatialTest
 
 def main():
-    spatial_test.main()
+    tester = SpatialTest()
+    tester.run()
 
 if __name__ == "__main__":
     main()

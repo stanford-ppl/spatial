@@ -53,6 +53,7 @@ class Config {
   var logDir: String = files.cwd + files.sep + "logs"
   var genDir: String = files.cwd + files.sep + "gen"
   var genDirOverride: Boolean = false
+  var genDirRaw:String = files.cwd + files.sep + "gen" 
   var repDir: String = files.cwd + files.sep + "reports"
 
   /** Testing */

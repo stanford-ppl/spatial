@@ -31,12 +31,13 @@ trait PlasticineTest extends DSLTest { test =>
     def compileOnly = checkFlag(s"test.compileOnly")
     def runOnly = checkFlag(s"test.runOnly")
     def genName = this.name
-    override def genDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/"
-    override def logDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/log"
-    override def repDir(name:String):String = s"${IR.config.cwd}/gen/${genName}/$name/report"
+    override def genDir(name:String):String = s"${IR.config.genDirRaw}/${genName}/$name/"
+    override def logDir(name:String):String = s"${IR.config.genDirRaw}/${genName}/$name/log"
+    override def repDir(name:String):String = s"${IR.config.genDirRaw}/${genName}/$name/report"
     override def runBackend() = {
       s"${test.name}" should s"run for backend $name" in {
         val name = test.name
+        init((args + cmdlnArgs).split(" ").map { _.trim })
         IR.config.name = name
         IR.config.genDir = genDir(test.name)
         IR.config.logDir = logDir(test.name)

@@ -141,10 +141,10 @@ trait Compiler extends DSLRunnable { self =>
     cli.note("")
     cli.note("Output")
     cli.opt[String]('n',"name").action{(n,_) => config.name = n }.text("Set application name [<app>]")
-    cli.opt[String]('o',"out").action{(d,_) => config.genDir = d; config.genDirOverride = true }.text("Set output directory [./gen/<name>]")
+    cli.opt[String]('o',"out").action{(d,_) => config.genDirRaw = d; config.genDirOverride = true }.text("Set output directory [./<name>]")
     cli.opt[String]('l',"log").action{(d,_) => config.logDir = d }.text("Set log directory [./logs/<name>]")
     cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<name>]")
-    cli.opt[String]("gendir").action{(d,_) => config.genDir = d; }.text("Set output directory [./gen/<name>]")
+    cli.opt[String]("gendir").action{(d,_) => config.genDirRaw = d; }.text("Set output directory [./gen/<name>]")
     cli.opt[Unit]("nonaming").action{(_,_) => config.naming = false }.text("Disable verbose naming")
 
     cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.").hidden()
@@ -187,7 +187,7 @@ trait Compiler extends DSLRunnable { self =>
     settings()                     // Override config with any DSL or app-specific settings
     name = config.name
     IR.config.logDir = IR.config.logDir + files.sep + name + files.sep
-    IR.config.genDir = IR.config.genDir + files.sep + {if (config.genDirOverride) "" else {name + files.sep}}
+    IR.config.genDir = IR.config.genDirRaw + files.sep + {if (config.genDirOverride) "" else {name + files.sep}}
     IR.config.repDir = IR.config.repDir + files.sep + name + files.sep
     flows()
     rewrites()

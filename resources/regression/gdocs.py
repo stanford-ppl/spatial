@@ -98,8 +98,8 @@ def getDoc(title):
 	# credentials = ServiceAccountCredentials.from_json_keyfile_name(json_key, scope)
 
 	# pygsheets auth
-json_key = '/home/mattfel/regression/synth/pygsheets_edo_key.json'
-gc = pygsheets.authorize(outh_file = json_key)
+	json_key = '/home/mattfel/regression/synth/pygsheets_edo_key.json'
+	gc = pygsheets.authorize(outh_file = json_key)
 
 	if (title == "vcs-noretime"):
 		try: 

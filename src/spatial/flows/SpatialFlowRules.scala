@@ -8,6 +8,7 @@ import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.node._
+import spatial.util.spatialConfig
 
 case class SpatialFlowRules(IR: State) extends FlowRules {
   @flow def memories(a: Sym[_], op: Op[_]): Unit = a match {
@@ -209,7 +210,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     *         - All other controllers are Pipelined by default
     *      c. Otherwise, use the compiler's schedule
     *   4. "Single" iteration control (Accel, UnitPipe, fully unrolled loops) cannot be Pipelined - override these with Sequenced.
-    *   5. Inner controllers cannot be Streaming - override these with Pipelined
+    *   5. Inner controllers cannot be Streaming - override these with Pipelined (not for PIR)
     *   6. Outer controllers with only one child cannot be Pipelined - override these to Sequenced
     */
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
@@ -244,7 +245,9 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
 
       if (s.isSingleControl && s.rawSchedule == Pipelined)  s.rawSchedule = Sequenced
-      if (s.isInnerControl && s.rawSchedule == Streaming)   s.rawSchedule = Pipelined
+      if (!spatialConfig.enablePIR) {
+        if (s.isInnerControl && s.rawSchedule == Streaming)   s.rawSchedule = Pipelined
+      }
       if (isSingleChildOuter && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isUnitPipe && s.rawSchedule == Fork) s.rawSchedule = Sequenced // Undo transfer of metadata copied from Switch in PipeInserter
 

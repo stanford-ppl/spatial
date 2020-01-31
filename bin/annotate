@@ -1,0 +1,5 @@
+#!/bin/bash
+
+path=$1
+cd $path
+python3 bin/annotate.py

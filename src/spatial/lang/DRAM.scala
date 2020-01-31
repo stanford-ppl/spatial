@@ -4,6 +4,7 @@ import argon._
 import forge.tags._
 import spatial.node._
 import spatial.lang.types._
+import spatial.util.spatialConfig
 
 abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends Top[C[A]] with RemoteMem[A,C] with TensorMem[A] {
   val A: Bits[A] = Bits[A]
@@ -71,7 +72,13 @@ object DRAM {
     stage(MemSparseAlias[A,SRAM1,W,DRAM1,DRAMSparseTile,W2](this,addrs,size, origin))
   }
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers. */
-  @api def apply[W:INT](addrs: FIFO[Ind[W]]): DRAMSparseTile[A] = apply(addrs, addrs.numel, zero[Ind[W]])
+  @api def apply[W:INT](addrs: FIFO[Ind[W]]): DRAMSparseTile[A] = {
+    if (spatialConfig.enablePIR) {
+      stage(MemSparseAlias[A,FIFO,W,DRAM1,DRAMSparseTile](Seq(Bit(true)), Seq(this), Seq(addrs),Seq.empty,Seq(zero[Ind[W]])))
+    } else {
+      apply(addrs, addrs.numel, zero[Ind[W]])
+    }
+  }
   @api def apply[W:INT](addrs: FIFO[Ind[W]], size: Int): DRAMSparseTile[A] = apply(addrs, size.to[I32], zero[Ind[W]])
   @api def apply[W:INT,W2:INT](addrs: FIFO[Ind[W]], size: Ind[W2]): DRAMSparseTile[A] = apply(addrs, size, zero[Ind[W]])
   /** Creates a view of a sparse region of this DRAM1 for use in scatter and gather transfers, with number of addresses to operate on. */

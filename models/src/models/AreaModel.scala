@@ -46,7 +46,7 @@ class AreaEstimator {
   }
 
   private def getModel(model: String) = {
-    val spatial_home = sys.env("SPATIAL_HOME")
+    val spatial_home = sys.env.getOrElse("SPATIAL_HOME", "")
     val model_path = spatial_home + "/models/resources/" + model
     val file_exists = (new File(model_path)).exists
     if (file_exists) {
@@ -178,7 +178,10 @@ class AreaEstimator {
           val e = new LoadingModelEvaluatorBuilder().load(model)build()
           e.verify()
           e
-        })) else None} catch {case x:Throwable => None}
+        })) else None} catch {case x:Throwable =>
+        println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Unable to find area model at path env(SPATIAL_HOME) + /models/resources/$modelName (${sys.env.getOrElse("SPATIAL_HOME", "")}/models/resources/$modelName)" )
+        None
+      }
       if (model != null) model.close()
       if (tryEvaluator.isDefined) {
         val evaluator = tryEvaluator.get
@@ -199,12 +202,12 @@ class AreaEstimator {
           result
         } catch {
           case _: Throwable => 
-            println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error using model for $prop of $nodetype node (${modelName})")
+            println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error using model for $prop of $nodetype node ($modelName) at path env(SPATIAL_HOME) + /models/resources/$modelName (${sys.env.getOrElse("SPATIAL_HOME", "")}/models/resources/$modelName)")
             failedModels += ((nodetype,prop))
             crudeEstimateMem(prop, nodetype, dims, bitWidth, depth, B, N, alpha, P, histRaw)
         }
       } else {
-        if (!failedModels.contains((nodetype,prop))) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error getting model for $prop of $nodetype node (${modelName})!")
+        if (!failedModels.contains((nodetype,prop))) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error getting model for $prop of $nodetype node ($modelName) at path env(SPATIAL_HOME) + /models/resources/$modelName (${sys.env.getOrElse("SPATIAL_HOME", "")}/models/resources/$modelName)!")
         failedModels += ((nodetype,prop))
         crudeEstimateMem(prop, nodetype, dims, bitWidth, depth, B, N, alpha, P, histRaw)
       }
@@ -245,11 +248,11 @@ class AreaEstimator {
         } catch {
           case _: Throwable => 
             failedModels += ((nodetype,prop))
-            println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error using model for $prop of $nodetype node (${modelName})")
+            println("[" + Console.YELLOW + "warn" + Console.RESET + s"] Error using model for $prop of $nodetype node ($modelName) at path env(SPATIAL_HOME) + /models/resources/$modelName (${sys.env.getOrElse("SPATIAL_HOME", "")}/models/resources/$modelName)")
             0.0
         }
       } else {
-        if (!failedModels.contains((nodetype,prop))) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] No model for $prop of $nodetype node (${modelName})!")
+        if (!failedModels.contains((nodetype,prop))) println("[" + Console.YELLOW + "warn" + Console.RESET + s"] No model for $prop of $nodetype node ($modelName) at path env(SPATIAL_HOME) + /models/resources/$modelName (${sys.env.getOrElse("SPATIAL_HOME", "")}/models/resources/$modelName)!")
         failedModels += ((nodetype,prop))
         0.0
       }

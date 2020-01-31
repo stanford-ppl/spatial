@@ -91,6 +91,17 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     override val makeTimeout: Long = 32400
   }
 
+  object CXP extends ChiselBackend(
+    name = "CXP",
+    args = "--synth --insanity --fpga CXP",
+    make = "make",
+    run  = "",
+    model = "noninteractive"
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.CXP")
+    override val makeTimeout: Long = 32400
+  }
+
   class RequireErrors(errors: Int) extends IllegalExample("--sim", errors)
   object RequireErrors {
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))

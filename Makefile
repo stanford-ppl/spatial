@@ -1,4 +1,4 @@
-.PHONY: all resources apps test pir models
+.PHONY: all resources apps test pir models utils
 all: apps
 
 ###-----------------------------------###
@@ -35,7 +35,7 @@ install:
 ###-----------------------------------###
 ## Update pir libs.                    ##
 ###-----------------------------------###
-pir: models
+pir: models utils
 	git submodule update --init
 	bin/update_resources.sh
 	cd pir && make
@@ -79,6 +79,12 @@ resources:
 ###-----------------------------------###
 models:
 	sbt "; project models; publishLocal"
+
+###-----------------------------------###
+## Update the utils package.          ##
+###-----------------------------------###
+utils:
+	sbt "; project utils; publishLocal"
 
 ###-----------------------------------###
 ## Update local emul package.          ##

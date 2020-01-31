@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd pir
-bin/pir ../$1 ${@:2}
+bin/pir ../$1 ${@:2} --pir-home=$(pwd)

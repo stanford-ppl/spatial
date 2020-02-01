@@ -436,7 +436,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 				else: worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1] ])
 				if (not keep_row_75): deleteRows(worksheet, 75)
 			if (worksheet.title == "Properties" and perf):
-				worksheet.update_values('B3:DQ3', [[' ']*120]) # Clear old pass bitmask
+				worksheet.update_cells('B3:DQ3', [[' ']*120]) # Clear old pass bitmask
 		sys.stdout.write(str(3))
 	else:
 		# get time difference

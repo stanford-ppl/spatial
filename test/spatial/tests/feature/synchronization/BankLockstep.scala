@@ -24,7 +24,7 @@ import spatial.dsl._
     setMem(cols_dram, cols)
 
     Accel {
-      val dataInConfl = SRAM[Int](16,16).flat   // Should duplicate
+      val dataInConfl = SRAM[Int](16,16).flat.nofission   // Should duplicate
       val dataInNoConfl = SRAM[Int](16,16).flat  // Should not duplicate
       val dataOut = SRAM[Int](4,16,16).hierarchical     // Should bank N = 4
       val cols_todo = SRAM[Int](16).nofission
@@ -32,7 +32,7 @@ import spatial.dsl._
       dataInConfl load dram
       dataInNoConfl load dram
 
-      println(r"Force banking that I want by reading: ${dataInConfl(0,0)} ${dataInConfl(0,1)} ${dataInConfl(0,2)}")
+//      println(r"Force banking that I want by reading: ${dataInConfl(0,0)} ${dataInConfl(0,1)} ${dataInConfl(0,2)}")
       println(r"Force banking that I want by reading: ${dataInNoConfl(0,0)} ${dataInNoConfl(0,1)} ${dataInNoConfl(0,2)}")
 
       Foreach(16 by 1 par 2){b1 => 

@@ -79,7 +79,7 @@ x_par=4  |       --->       X                XX    |
 
     val par_load = 1
     val par_store = 1
-    val x_par = 4
+    val x_par = 2
 
     // Square
     val bias_matrix = (0::ROWS, 0::COLS){(i,j) => if (i > ROWS/4 && i < 3*ROWS/4 && j > COLS/4 && j < 3*COLS/4) -1.to[Int] else 1.to[Int]}

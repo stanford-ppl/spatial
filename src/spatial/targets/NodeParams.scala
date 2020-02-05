@@ -11,7 +11,7 @@ import spatial.metadata.types._
 import spatial.metadata.memory._
 import spatial.metadata.blackbox._
 import spatial.metadata.retiming._
-import scala.math.log
+import scala.math.{log,ceil}
 
 trait NodeParams {
 
@@ -41,6 +41,8 @@ trait NodeParams {
     case _@DelayLine(d,_) => ("DelayLine", Seq("d" -> {if (s.userInjectedDelay) d else 0}))
 
     case _:Mux[_] => ("Mux", Seq("b" -> nbits(s)))
+    case _@OneHotMux(sel,d) => ("OneHotMux", Seq("b" -> ceil(log(sel.length) / log(2))))
+    case _@PriorityMux(sel,d) => ("PriorityMux", Seq("b" -> ceil(log(sel.length) / log(2))))
 
     case op@SpatialBlackboxUse(bbox,_) => ("SpatialBlackbox", Seq("lat" -> bbox.bodyLatency.headOption.getOrElse(0.0)))
 

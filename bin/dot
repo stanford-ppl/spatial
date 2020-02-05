@@ -10,19 +10,7 @@ fi
 extension="${FILE##*.}"
 FILE="${FILE%.*}"
 
-if [[ $OPT == "-"*"t"*  ]]; then
-  mkdir -p $(dirname $FILE)
-	scp yaqiz@tucson.stanford.edu:~/pir/$FILE.dot $(dirname $FILE)
-elif [[ $OPT == "-"*"l"*  ]]; then
-  mkdir -p $(dirname $FILE)
-	scp yaqiz@london.stanford.edu:~/pir/$FILE.dot $(dirname $FILE)
-fi
-
-if [[ $OPT == "-"*"p"*  ]]; then
-	EXT=pdf
-else
-	EXT=svg
-fi
+EXT=svg
 
 if [[ $OPT == "-"*"c"*  ]]; then
 	dot -Kfdp -n -T$EXT -o $FILE.$EXT $FILE.dot
@@ -33,25 +21,29 @@ fi
 
 dot $FLAG -T$EXT -o $FILE.$EXT $FILE.dot
 
-# Do not open
-if [[ $OPT == "-"*"n"*  ]]; then
-  exit
+if [[ $EXT == "svg" ]]; then
+  mv $FILE.$EXT $FILE.html
 fi
 
-if [[ $EXT == "pdf"  ]]; then
-	if [ "$(uname)" == "Darwin" ]; then
-		# Do something under Mac OS X platform        
-		open $FILE.$EXT
-	elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-		# Do something under GNU/Linux platform
-		gnome-open $FILE.$EXT # not tested
-	fi
-elif [[ $EXT == "svg" ]]; then
-	if [ "$(uname)" == "Darwin" ]; then
-		# Do something under Mac OS X platform        
-		open -a "Google Chrome" $FILE.svg
-	elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-		# Do something under GNU/Linux platform
-		google-chrome $FILE.svg # not tested
-	fi
-fi
+## Do not open
+#if [[ $OPT == "-"*"n"*  ]]; then
+  #exit
+#fi
+
+#if [[ $EXT == "pdf"  ]]; then
+	#if [ "$(uname)" == "Darwin" ]; then
+		## Do something under Mac OS X platform        
+		#open $FILE.$EXT
+	#elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+		## Do something under GNU/Linux platform
+		#gnome-open $FILE.$EXT # not tested
+	#fi
+#elif [[ $EXT == "svg" ]]; then
+	#if [ "$(uname)" == "Darwin" ]; then
+		## Do something under Mac OS X platform        
+		#open -a "Google Chrome" $FILE.svg
+	#elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+		## Do something under GNU/Linux platform
+		#google-chrome $FILE.svg # not tested
+	#fi
+#fi

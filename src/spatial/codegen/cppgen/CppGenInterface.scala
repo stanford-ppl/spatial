@@ -35,9 +35,9 @@ trait CppGenInterface extends CppGenCommon {
       emit(src"// $lhs $reg $v $en reg write")
     case DRAMHostNew(dims, _) =>
       drams += lhs
-      emit(src"""uint64_t ${lhs} = c1->malloc(sizeof(${lhs.tp.typeArgs.head}) * ${dims.map(quote).mkString("*")});""")
+      emit(src"""uint64_t $lhs = c1->malloc(sizeof(${lhs.tp.typeArgs.head}) * ${dims.map(quote).mkString("*")});""")
       emit(src"c1->setArg(${argHandle(lhs)}_ptr, $lhs, false);")
-      emit(src"""printf("Allocate mem of size ${dims.map(quote).mkString("*")} at %p\n", (void*)${lhs});""")
+      emit(src"""printf("Allocate mem of size ${dims.map(quote).mkString("*")} at %p\n", (void*)$lhs);""")
 
     case SetReg(reg, v) =>
       reg.tp.typeArgs.head match {
@@ -51,7 +51,7 @@ trait CppGenInterface extends CppGenCommon {
           }
         case FltPtType(g,e) =>         
           emit(src"int64_t ${v}_raw;")
-          emit(src"memcpy(&${v}_raw, &${v}, sizeof(${v}));")
+          emit(src"memcpy(&${v}_raw, &$v, sizeof($v));")
           emit(src"${v}_raw = ${v}_raw & ((int64_t) 0 | (int64_t) pow(2,${g+e}) - 1);")
           emit(src"c1->setArg(${argHandle(reg)}_arg, ${v}_raw, ${reg.isHostIO}); // $reg")
           emit(src"$reg = $v;")
@@ -63,20 +63,20 @@ trait CppGenInterface extends CppGenCommon {
     case _: CounterChainNew => 
     case GetReg(reg)    =>
       val bigArg = if (bitWidth(lhs.tp) > 32 & bitWidth(lhs.tp) <= 64) "64" else ""
-      val get_string = src"c1->getArg${bigArg}(${argHandle(reg)}_arg, ${reg.isHostIO})"
+      val get_string = src"c1->getArg$bigArg(${argHandle(reg)}_arg, ${reg.isHostIO})"
     
       lhs.tp match {
         case FixPtType(s,d,f) => 
-          emit(src"int64_t ${lhs}_tmp = ${get_string};")            
+          emit(src"int64_t ${lhs}_tmp = $get_string;")
           emit(src"bool ${lhs}_sgned = $s & ((${lhs}_tmp & ((int64_t)1 << ${d+f-1})) > 0); // Determine sign")
           emit(src"if (${lhs}_sgned) ${lhs}_tmp = ${lhs}_tmp | ~(((int64_t)1 << ${d+f})-1); // Sign-extend if necessary")
-          emit(src"${lhs.tp} ${lhs} = (${lhs.tp}) ${lhs}_tmp / ((int64_t)1 << $f);")            
+          emit(src"${lhs.tp} $lhs = (${lhs.tp}) ${lhs}_tmp / ((int64_t)1 << $f);")
         case FltPtType(g,e) => 
-          emit(src"int64_t ${lhs}_tmp = ${get_string};")            
-          emit(src"${lhs.tp} ${lhs};")
-          emit(src"memcpy(&${lhs}, &${lhs}_tmp, sizeof(${lhs}));")
+          emit(src"int64_t ${lhs}_tmp = $get_string;")
+          emit(src"${lhs.tp} $lhs;")
+          emit(src"memcpy(&$lhs, &${lhs}_tmp, sizeof($lhs));")
         case _ => 
-          emit(src"${lhs.tp} $lhs = (${lhs.tp}(${get_string}));")
+          emit(src"${lhs.tp} $lhs = (${lhs.tp}($get_string));")
       }
 
     case StreamInNew(stream) => 
@@ -87,47 +87,47 @@ trait CppGenInterface extends CppGenCommon {
       val width = bitWidth(data.tp.typeArgs.head)
       val f = fracBits(dram.tp.typeArgs.head)
       val ptr = if (f > 0 && width >= 8) {
-        emit(src"vector<${rawtp}>* ${dram}_rawified = new vector<${rawtp}>((*${data}).size());")
-        open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i++) {")
-        emit(src"(*${dram}_rawified)[${dram}_rawified_i] = (${rawtp}) ((*${data})[${dram}_rawified_i] * ((${rawtp})1 << $f));")
+        emit(src"vector<$rawtp>* ${lhs}_rawified = new vector<$rawtp>((*$data).size());")
+        open(src"for (int ${lhs}_rawified_i = 0; ${lhs}_rawified_i < (*$data).size(); ${lhs}_rawified_i++) {")
+        emit(src"(*${lhs}_rawified)[${lhs}_rawified_i] = ($rawtp) ((*$data)[${lhs}_rawified_i] * (($rawtp)1 << $f));")
         close("}")
-        src"${dram}_rawified"
+        src"${lhs}_rawified"
       } else if (f == 0 && width < 8){
-        emit(src"vector<uint8_t>* ${dram}_rawified = new vector<uint8_t>((*${data}).size() / ${8/width});")
-        open(src"for (int ${dram}_rawified_i = 0; ${dram}_rawified_i < (*${data}).size(); ${dram}_rawified_i = ${dram}_rawified_i + ${8/width}) {")
-          open(src"for (int ${dram}_rawified_j = 0; ${dram}_rawified_j < ${8/width}; ${dram}_rawified_j++) {")
-            emit(src"(*${dram}_rawified)[${dram}_rawified_i/${8/width}] = (*${dram}_rawified)[${dram}_rawified_i/${8/width}] + (uint8_t) (((*${data})[${dram}_rawified_i + ${dram}_rawified_j] % ${scala.math.pow(2,width).toInt}) << (${dram}_rawified_j * $width) );")
+        emit(src"vector<uint8_t>* ${lhs}_rawified = new vector<uint8_t>((*$data).size() / ${8/width});")
+        open(src"for (int ${lhs}_rawified_i = 0; ${lhs}_rawified_i < (*$data).size(); ${lhs}_rawified_i = ${lhs}_rawified_i + ${8/width}) {")
+          open(src"for (int ${lhs}_rawified_j = 0; ${lhs}_rawified_j < ${8/width}; ${lhs}_rawified_j++) {")
+            emit(src"(*${lhs}_rawified)[${lhs}_rawified_i/${8/width}] = (*${lhs}_rawified)[${lhs}_rawified_i/${8/width}] + (uint8_t) (((*$data)[${lhs}_rawified_i + ${lhs}_rawified_j] % ${scala.math.pow(2,width).toInt}) << (${lhs}_rawified_j * $width) );")
           close("}")
         close("}")
-        src"${dram}_rawified"        
+        src"${lhs}_rawified"
       } else if (f > 0 && width < 8) throw new Exception(s"Small data types (< 8 bits) with more than 0 fractional bits is currently not supported.  Please transfer using an integer type.")
       else {
         src"$data"
       }
-      emit(src"c1->memcpy($dram, &(*$ptr)[0], (*$ptr).size() * sizeof(${rawtp}));")
+      emit(src"c1->memcpy($dram, &(*$ptr)[0], (*$ptr).size() * sizeof($rawtp));")
 
     case GetMem(dram, data) =>
       val rawtp = asIntType(dram.tp.typeArgs.head)
       val width = bitWidth(data.tp.typeArgs.head)
       val f = fracBits(dram.tp.typeArgs.head)
       if (f > 0 && width >= 8) {
-        emit(src"vector<${rawtp}>* ${data}_rawified = new vector<${rawtp}>((*${data}).size());")
-        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
-        open(src"for (int ${data}_i = 0; ${data}_i < (*${data}).size(); ${data}_i++) {")
-        emit(src"${rawtp} ${data}_tmp = (*${data}_rawified)[${data}_i];")
-        emit(src"(*${data})[${data}_i] = (double) ${data}_tmp / ((${rawtp})1 << $f);")
+        emit(src"vector<$rawtp>* ${lhs}_rawified = new vector<$rawtp>((*$data).size());")
+        emit(src"c1->memcpy(&(*${lhs}_rawified)[0], $dram, (*${lhs}_rawified).size() * sizeof($rawtp));")
+        open(src"for (int ${data}_i = 0; ${data}_i < (*$data).size(); ${data}_i++) {")
+        emit(src"$rawtp ${data}_tmp = (*${lhs}_rawified)[${data}_i];")
+        emit(src"(*$data)[${data}_i] = (double) ${data}_tmp / (($rawtp)1 << $f);")
         close("}")
       } else if (f == 0 && width < 8) {
-        emit(src"vector<uint8_t>* ${data}_rawified = new vector<uint8_t>((*${data}).size() / ${8/width});")
-        emit(src"c1->memcpy(&(*${data}_rawified)[0], $dram, (*${data}_rawified).size() * sizeof(${rawtp}));")
-        open(src"for (int ${data}_rawified_i = 0; ${data}_rawified_i < (*${data}).size(); ${data}_rawified_i = ${data}_rawified_i + ${8/width}) {")
-          open(src"for (int ${data}_rawified_j = 0; ${data}_rawified_j < ${8/width}; ${data}_rawified_j++) {")
-            emit(src"(*${data})[${data}_rawified_i + ${data}_rawified_j] = ((*${data}_rawified)[${data}_rawified_i/${8/width}] >> (${data}_rawified_j * $width)) % ${scala.math.pow(2,width).toInt};")
+        emit(src"vector<uint8_t>* ${lhs}_rawified = new vector<uint8_t>((*$data).size() / ${8/width});")
+        emit(src"c1->memcpy(&(*${lhs}_rawified)[0], $dram, (*${lhs}_rawified).size() * sizeof($rawtp));")
+        open(src"for (int ${lhs}_rawified_i = 0; ${lhs}_rawified_i < (*$data).size(); ${lhs}_rawified_i = ${lhs}_rawified_i + ${8/width}) {")
+          open(src"for (int ${lhs}_rawified_j = 0; ${lhs}_rawified_j < ${8/width}; ${lhs}_rawified_j++) {")
+            emit(src"(*$data)[${lhs}_rawified_i + ${lhs}_rawified_j] = ((*${lhs}_rawified)[${lhs}_rawified_i/${8/width}] >> (${lhs}_rawified_j * $width)) % ${scala.math.pow(2,width).toInt};")
           close("}")
         close("}")
       } else if (f > 0 && width < 8) throw new Exception(s"Small data types (< 8 bits) with more than 0 fractional bits is currently not supported.  Please transfer using an integer type.")
       else {
-        emit(src"c1->memcpy(&(*$data)[0], $dram, (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")
+        emit(src"c1->memcpy(&(*$data)[0], $dram, (*$data).size() * sizeof(${dram.tp.typeArgs.head}));")
       }
 
     case _ => super.gen(lhs, rhs)

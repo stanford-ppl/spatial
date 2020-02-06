@@ -112,7 +112,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     def modelArgs(version: String): Seq[String] = (model + " " + version).split(" ").map(_.trim).filter(_.nonEmpty)
 
     def parseMakeError(line: String): Result = {
-      if (line.contains("error")) MakeError(line)
+      if (line.contains("error") && !line.contains("to avoid error in")) MakeError(line)
       else Unknown
     }
     def parseRunError(line: String): Result = {

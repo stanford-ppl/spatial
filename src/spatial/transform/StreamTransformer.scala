@@ -8,6 +8,7 @@ import spatial.node._
 import spatial.util.shouldMotionFromConditional
 import spatial.traversal.AccelTraversal
 import spatial.metadata.control._
+import spatial.util.spatialConfig
 
 /** Converts Stream Foreach controllers into Stream Unit controllers with the counterchain
   * duplicated and injected directly into children controllers. This removes the overhead of
@@ -68,7 +69,7 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
-    case OpForeach(ens, cchain, block, iters, stopWhen) if inHw && lhs.isStreamControl && lhs.isOuterControl =>
+    case OpForeach(ens, cchain, block, iters, stopWhen) if inHw && lhs.isStreamControl && lhs.isOuterControl && !spatialConfig.enablePIR =>
       stageWithFlow(UnitPipe(ens, injectCtrs(block, cchain.counters, iters), stopWhen)){lhs2 => transferData(lhs, lhs2)}
 
     case _ => dbgs(s"visiting $lhs = $rhs");super.transform(lhs,rhs)

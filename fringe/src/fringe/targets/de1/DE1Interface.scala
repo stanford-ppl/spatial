@@ -8,8 +8,8 @@ import fringe.templates.axi4.{AXI4BundleParameters, AXI4Inlined, AXI4Probe, Aval
 class DE1Interface extends SpatialIPInterface {
   val avalonLiteParams = new AvalonBundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
 //  val avalonBurstParams = new AvalonBundleParameters(ADDR_WIDTH, 512, 32)
-  // TODO: 26 shouldn't be hard-coded. This is the addr bits for m_axi on de1.
-  val axiParams = new AXI4BundleParameters(26, 512, 26)
+  // TODO: 26 and 18 shouldn't be hard-coded. This is the addr bits for m_axi on de1.
+  val axiParams = new AXI4BundleParameters(26, 512, 18)
 
   val S_AVALON = new AvalonSlave(avalonLiteParams)
   // TODO: M_AVALON may work better.

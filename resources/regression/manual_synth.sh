@@ -14,6 +14,7 @@ if [[ $jobs -gt 40 ]]; then
 fi
 
 if [[ $1 = "zynq" ]]; then
+	export VIVADO_HOME
 	export PIR_HOME=${REGRESSION_HOME}
 	export KEEP_HIERARCHY=1
 	export CLOCK_FREQ_MHZ=125
@@ -56,7 +57,8 @@ echo $tid > ${REGRESSION_HOME}/tid
 echo $hash > ${REGRESSION_HOME}/hash
 echo $branchname > ${REGRESSION_HOME}/branchname
 
-export PATH=/usr/bin:/local/ssd/home/mattfel/aws-fpga/hdk/common/scripts:/opt/Xilinx/SDx/2017.1/Vivado/bin:/opt/Xilinx/SDx/2017.1/SDK/bin:/opt/Xilinx/Vivado/2017.1/bin:/opt/Xilinx/SDK/2017.1/bin:$PATH
+#export PATH=/usr/bin:/local/ssd/home/mattfel/aws-fpga/hdk/common/scripts:/opt/Xilinx/SDx/2017.1/Vivado/bin:/opt/Xilinx/SDx/2017.1/SDK/bin:/opt/Xilinx/Vivado/2017.1/bin:/opt/Xilinx/SDK/2017.1/bin:$PATH
+export PATH=/usr/bin:/local/ssd/home/mattfel/aws-fpga/hdk/common/scripts:/opt/Xilinx/Vivado/2017.1/bin:/opt/Xilinx/SDK/2017.1/bin:$PATH
 export LM_LICENSE_FILE=1717@cadlic0.stanford.edu:7195@cadlic0.stanford.edu:7193@cadlic0.stanford.edu:/opt/Xilinx/awsF1.lic:27000@cadlic0.stanford.edu:$LM_LICENSE_FILE
 export VCS_HOME=/cad/synopsys/vcs/K-2015.09-SP2-7
 export QVER=17.1

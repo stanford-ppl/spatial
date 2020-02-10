@@ -12,9 +12,14 @@ abstract class UnrolledRead extends UnrolledAccess
 abstract class UnrolledWrite extends UnrolledAccess {
   def data: Seq[Sym[_]]
 }
+abstract class UnrolledRMW extends UnrolledAccess {
+  def op: String
+  def order: String
+}
 
 case class BankedRead(mem: Sym[_], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends UnrolledRead
 case class BankedWrite(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], ens: Seq[Set[Bit]]) extends UnrolledWrite
+case class BankedRMW(mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Idx]], ofs: Seq[Idx], op: String, order: String, ens: Seq[Set[Bit]]) extends UnrolledRMW
 
 case class VectorRead(mem: Sym[_], addr: Seq[Seq[Idx]], ens: Seq[Set[Bit]]) extends UnrolledRead
 case class VectorWrite(mem: Sym[_], data: Seq[Sym[_]], addr: Seq[Seq[Idx]], ens: Seq[Set[Bit]]) extends UnrolledWrite
@@ -58,6 +63,13 @@ object UnrolledWriter {
 abstract class BankedAccessor[A:Type,R:Type] extends UnrolledAccessor[A,R] {
   def bank: Seq[Seq[Idx]]
   def ofs: Seq[Idx]
+}
+
+/** Banked token accessors */
+abstract class BankedTokenAccessor[A:Type,R:Type] extends UnrolledTokenAccessor[A,R] {
+  def bank: Seq[Seq[Idx]]
+  def ofs: Seq[Idx]
+  def tokens: Option[Token]
 }
 
 object UnrolledAccessor {
@@ -138,8 +150,6 @@ abstract class BankedEnqueue[A:Type] extends BankedWriter[A] {
   def ofs: Seq[Idx] = Nil
 }
 
-
-
 abstract class Accumulator[A:Bits] extends UnrolledAccessor[A,A] {
   def en: Set[Bit]
   def data: Seq[Sym[_]] = Nil // We don't actually have a symbol for data being written to the memory
@@ -150,5 +160,91 @@ abstract class Accumulator[A:Bits] extends UnrolledAccessor[A,A] {
   def unrolledRead = Some(BankedRead(mem,bank,ofs,enss))
   def unrolledWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
   override def effects: Effects = Effects.Writes(mem)
+}
 
+
+abstract class UnrolledTokenAccessor[A:Type,R:Type] extends UnrolledAccessor[A,R] {
+  def mem: Sym[_]
+  def unrolledRead: Option[UnrolledRead]
+  def unrolledWrite: Option[UnrolledWrite]
+  def unrolledRMW: Option[UnrolledRMW]
+  def tokens: Option[Token]
+  def op: String
+  def order: String
+  var enss: Seq[Set[Bit]]
+
+  override def mirrorEn(f: Tx, addEns: Set[Bit]): Op[R] = {
+    enss = enss.map{ens => ens ++ addEns}
+    this.mirror(f)
+  }
+  override def updateEn(f: Tx, addEns: Set[Bit]): Unit = {
+    enss = enss.map{ens => ens ++ addEns}
+    this.update(f)
+  }
+}
+
+abstract class BankedTokenReader[A:Bits](implicit vT: Type[Vec[A]]) extends BankedTokenAccessor[A,Vec[A]] {
+  def unrolledRead = Some(BankedRead(mem,bank,ofs,enss))
+  def unrolledWrite: Option[UnrolledWrite] = None
+  def unrolledRMW: Option[UnrolledRMW] = None
+  def op = ""
+  def order = ""
+}
+
+object BankedTokenReader {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x match {
+    case a: BankedTokenReader[_] => a.unrolledRead.map{rd => (rd.mem,rd.bank,rd.ofs,rd.ens) }
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x.op.flatMap(BankedTokenReader.unapply)
+}
+
+abstract class BankedTokenWriter[A:Type] extends BankedTokenAccessor[A,Token] {
+  override def effects: Effects = Effects.Writes(mem)
+  def data: Seq[Sym[_]]
+  def unrolledRead: Option[UnrolledRead] = None
+  def unrolledWrite = Some(BankedWrite(mem,data,bank,ofs,enss))
+  def unrolledRMW: Option[UnrolledRMW] = None
+  def op = ""
+  def order = ""
+  def tokens: Option[Token] = None
+}
+
+object BankedTokenWriter {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x match {
+    case a: BankedTokenWriter[_] => a.unrolledWrite.map{rd => (rd.mem,rd.data,rd.bank,rd.ofs,rd.ens) }
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],Seq[Set[Bit]])] = x.op.flatMap(BankedTokenWriter.unapply)
+}
+
+abstract class BankedRMWDoer[A:Type](implicit vT: Type[Vec[A]]) extends BankedTokenAccessor[A,Vec[A]] {
+  override def effects: Effects = Effects.Writes(mem)
+  def data: Seq[Sym[_]]
+  def unrolledRead: Option[UnrolledRead] = None
+  def unrolledWrite: Option[UnrolledWrite] = None
+  def unrolledRMW = Some(BankedRMW(mem,data,bank,ofs,op,order,enss))
+}
+
+object BankedRMWDoer {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],String,String,Seq[Set[Bit]])] = x match {
+    case a: BankedRMWDoer[_] => a.unrolledRMW.map{rd => (rd.mem,rd.data,rd.bank,rd.ofs,rd.op,rd.order,rd.ens) }
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Sym[_]],Seq[Seq[Idx]],Seq[Idx],String,String,Seq[Set[Bit]])] = x.op.flatMap(BankedRMWDoer.unapply)
+}
+
+object UnrolledTokenReader {
+  def unapply(x: Op[_]): Option[UnrolledRead] = x match {
+    case a: UnrolledTokenAccessor[_,_] => a.unrolledRead
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[UnrolledRead] = x.op.flatMap(UnrolledTokenReader.unapply)
+}
+object UnrolledTokenWriter {
+  def unapply(x: Op[_]): Option[UnrolledWrite] = x match {
+    case a: UnrolledTokenAccessor[_,_] => a.unrolledWrite
+    case _ => None
+  }
+  def unapply(x: Sym[_]): Option[UnrolledWrite] = x.op.flatMap(UnrolledTokenWriter.unapply)
 }

@@ -12,6 +12,9 @@ import spatial.lang._
 @op case class ForeverNew() extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
+@op case class ScannerNew(bits: U512) extends Alloc[Counter[I32]] {
+  override def effects: Effects = Effects.Unique
+}
 
 @op case class CounterChainNew(counters: Seq[Counter[_]]) extends Alloc[CounterChain] {
   override def effects: Effects = Effects.Unique

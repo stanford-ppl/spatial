@@ -75,7 +75,6 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val readers = mem.readers
     val writers = mem.writers
     resetData(readers, writers)
-
     val readMatrices = readers.flatMap{rd => rd.affineMatrices }
     val writeMatrices = writers.flatMap{wr => wr.affineMatrices}
 
@@ -754,7 +753,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           var instIdx = 0
           var merged = false
           val unmergedSchemesInfo = latestSchemesInfo.clone()
-          while (instIdx < instances.length && !merged && insts.length == 1) {
+          while (instIdx < instances.length && !merged && insts.length == 1) {;
             dbgs(s"Attempting to merge group #$grpId with instance #$instIdx: ")
             state.logTab += 1
             val i2 = instances(instIdx)

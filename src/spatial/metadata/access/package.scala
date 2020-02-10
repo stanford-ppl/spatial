@@ -26,6 +26,26 @@ package object access {
       case _ => None
     }
 
+    def getToken: Option[Token] = op match {
+      case x@SparseSRAMTokenRead(_,_,token,_) => token
+      case x@SparseSRAMBankedTokenRead(_,_,_,token,_) => token
+      case x@SparseSRAMRMW(_,_,_,token,_,_,_) => token
+      case x@SparseSRAMBankedRMW(_,_,_,_,token,_,_,_) => token
+      case _ => None
+    }
+
+    def getSparseOp: String = op match {
+      case x@SparseSRAMRMW(_,_,_,_,op,_,_) => op
+      case x@SparseSRAMBankedRMW(_,_,_,_,_,op,_,_) => op
+      case _ => ""
+    }
+    def getSparseOrder: String = op match {
+      case x@SparseSRAMRMW(_,_,_,_,_,order,_) => order
+      case x@SparseSRAMBankedRMW(_,_,_,_,_,_,order,_) => order
+      case _ => ""
+    }
+
+
     def isParEnq: Boolean = op match {
       // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true
@@ -119,15 +139,15 @@ package object access {
     def isStreamStageHolder: Boolean = a.op.exists(_.isStreamStageHolder)
 
     def isStatusReader: Boolean = StatusReader.unapply(a).isDefined
-    def isReader: Boolean = Reader.unapply(a).isDefined || isUnrolledReader
-    def isWriter: Boolean = Writer.unapply(a).isDefined || isUnrolledWriter || isSpecialWriter
+    def isReader: Boolean = Reader.unapply(a).isDefined || TokenReader.unapply(a).isDefined || isUnrolledReader
+    def isWriter: Boolean = Writer.unapply(a).isDefined || TokenWriter.unapply(a).isDefined || isUnrolledWriter || isSpecialWriter
 
     def isSpecialWriter: Boolean = a match {
       case Op(_:RegAccum[_]) => true
       case _ => false
     }
-    def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined
-    def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined
+    def isUnrolledReader: Boolean = UnrolledReader.unapply(a).isDefined || UnrolledTokenReader.unapply(a).isDefined
+    def isUnrolledWriter: Boolean = UnrolledWriter.unapply(a).isDefined || UnrolledTokenWriter.unapply(a).isDefined
 
     def parOrElse1: Int = a match {
       case Op(x: UnrolledAccessor[_,_]) => x.enss.size

@@ -31,6 +31,7 @@ class Pipe(name: Option[String], ii: Option[Int], directive: Option[UnrollStyle]
   def MOP = new Pipe(name, ii, Some(MetapipeOfParallels), nobind, None)
   def NoBind = new Pipe(name, ii, directive, true, None)
 }
+
 class Stream(name: Option[String], stopWhen: Option[Reg[Bit]]) extends Directives(CtrlOpt(name,Some(Streaming),None,stopWhen)) {
   /** "Streaming" unit controller */
   @api def apply(func: => Any): Void = unit_pipe(func)

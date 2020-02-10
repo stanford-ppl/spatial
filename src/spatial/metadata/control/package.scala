@@ -303,6 +303,12 @@ package object control {
       case Some(_: ForeverNew) => true
       case _ => false
     }
+    def isScanner: Boolean = op match {
+      case Some(op: Control[_]) => op.cchains.exists(_._1.isScanner)
+      case Some(op: CounterChainNew) => op.counters.exists(_.isScanner)
+      case Some(_: ScannerNew) => true
+      case _ => false
+    }
 
     /** True if this controller, counterchain, or counter is statically known to run forever.
       * Also true if any of this controller's descendants will run forever.
@@ -956,10 +962,10 @@ package object control {
       case _ => throw new Exception(s"Could not find counter definition for $x")
     }
 
-    @stateful def start: Sym[F] = if (x.isForever) I32(0).asInstanceOf[Sym[F]] else x.node.start
-    @stateful def step: Sym[F] = if (x.isForever) I32(1).asInstanceOf[Sym[F]] else x.node.step
-    @stateful def end: Sym[F] = if (x.isForever) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
-    @stateful def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
+    @stateful def start: Sym[F] = if (x.isForever || x.isScanner) I32(0).asInstanceOf[Sym[F]] else x.node.start
+    @stateful def step: Sym[F] = if (x.isForever || x.isScanner) I32(1).asInstanceOf[Sym[F]] else x.node.step
+    @stateful def end: Sym[F] = if (x.isForever || x.isScanner) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
+    @stateful def ctrPar: I32 = if (x.isForever || x.isScanner) I32(1) else x.node.par
     @stateful def ctrParOr1: Int = ctrPar.toInt
     @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits
     @stateful def isStatic: Boolean = (start,step,end) match {

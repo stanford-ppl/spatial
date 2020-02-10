@@ -110,6 +110,11 @@ trait ExternalAliases extends InternalAliases {
   type Reg[A] = spatial.lang.Reg[A]
   type FIFOReg[A] = spatial.lang.FIFOReg[A]
 
+  type SparseSRAM[A,C[T]] = spatial.lang.SparseSRAM[A,C]
+  lazy val SparseSRAM = spatial.lang.SparseSRAM
+//  type LockDRAM[A,C[T]] = spatial.lang.LockDRAM[A,C]
+//  lazy val LockDRAM = spatial.lang.LockDRAM
+
   type LockSRAM[A,C[T]] = spatial.lang.LockSRAM[A,C]
   lazy val LockSRAM = spatial.lang.LockSRAM
   type LockDRAM[A,C[T]] = spatial.lang.LockDRAM[A,C]

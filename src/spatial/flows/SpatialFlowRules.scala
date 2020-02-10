@@ -21,6 +21,11 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
 
+    case TokenAccessor(wr,rd, rmw) =>
+      wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
+      rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
+      rmw.foreach{r => r.mem.writers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.writers}") }
+
     case UnrolledAccessor(wr,rd) =>
       wr.foreach{w => w.mem.writers += s; logs(s"  Writers of ${w.mem} is now: ${w.mem.writers}") }
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }

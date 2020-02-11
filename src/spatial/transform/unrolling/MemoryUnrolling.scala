@@ -16,6 +16,8 @@ trait MemoryUnrolling extends UnrollingBase {
     case _: MemAlloc[_,_] if lhs.isRemoteMem => unrollGlobalMemory(lhs, rhs)
     case _: MemAlloc[_,_] if lhs.isLocalMem  => unrollMemory(lhs)
 
+//    case op@SplitterStart(addrs) =>  unrollSplitter(lhs, op)
+//    case op@SplitterEnd(addrs) =>    unrollSplitter(lhs, op)
     case op: StatusReader[_] => unrollStatus(lhs, op)
     case op: Resetter[_]   => unrollResetter(lhs.asInstanceOf[Sym[Void]], op)
     case op: Accessor[_,_] => unrollAccess(lhs, op)
@@ -139,7 +141,18 @@ trait MemoryUnrolling extends UnrollingBase {
     vecOfs:   Seq[Int]
   )
 
-  /** Unrolls a memory access.
+  def unrollSplitter[A:Bits](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): List[Sym[_]] = {
+    val unr = lanes.map { lns =>
+      dbgs(s"Lane #$lns: ")
+      val s2 = mirror(lhs, rhs)
+      register(lhs -> s2)
+      dbgs(s"${stm(s2)}")
+      s2
+    }
+    val laneIds = lanes.map { lane => lanes.ulanes.indexOf(lane) }
+    lanes.unifyLanes(laneIds)(lhs, Vec.fromSeq[A](unr.map(_.unbox)))
+  }
+    /** Unrolls a memory access.
     * NOTE: Three levels of indirection here:
     * Used to separate muxed accesses into individual accesses (select lanes -> chunk)
     * Then to make distinct addresses within each chunk (select chunk -> vector)

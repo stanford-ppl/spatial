@@ -122,7 +122,8 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
   }
 
   protected def configurer[C[_]](mem: Sym[_]): MemoryConfigurer[C] = (mem match {
-    case m:SRAM[_,_]    => new MemoryConfigurer(m, strategy)
+    case m:SRAM[_,_] if mem.noBankingAnalysis => new MemoryConfigurer(m, customBanked)
+    case m:SRAM[_,_]   => new MemoryConfigurer(m, strategy)
     case m:SparseSRAM[_,_]    => new MemoryConfigurer(m, customBanked)
     case m:RegFile[_,_] => new MemoryConfigurer(m, fullyBanked)
     case m:LUT[_,_]     => new MemoryConfigurer(m, fullyBanked)

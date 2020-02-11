@@ -1,22 +1,21 @@
 package spatial.transform.unrolling
 
 import argon._
-import argon.node.Enabled
+import argon.node.{Enabled, VecAlloc}
 import argon.transform.MutateTransformer
 import forge.tags.rig
-import emul.{FixedPoint, Bool}
-
+import emul.{Bool, FixedPoint}
 import utils.math.combs
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.params._
+import spatial.metadata.access._
 import spatial.metadata.bounds._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
-
 import utils.tags.instrument
 
 /** Options when transforming a statement:
@@ -348,11 +347,26 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     def mapFirst[A](block: => A):A = inLane(ulanes.head) { block }
 
+    private def unifySplitter[A](s: Sym[A], nodes: Seq[Sym[_]]): List[Sym[_]] = {
+      val laneIds = map { lane => lanes.ulanes.indexOf(lane) }
+      val payloads = nodes.flatMap{
+        case Op(x@SplitterStart(n)) => n
+        case Op(x@SplitterEnd(n)) => n
+        case _ => throw new Exception(s"Problem unrolling splitter $s!")
+      }
+      val unified = s match {
+        case Op(x@SplitterStart(n)) => stage(SplitterStart(payloads))
+        case Op(x@SplitterEnd(n)) => stage(SplitterEnd(payloads))
+        case _ => throw new Exception(s"Problem unrolling splitter $s!")
+      }
+      unifyLanes(laneIds)(s,unified)
+    }
+
     // --- Each unrolling rule should do at least one of three things:
 
     // 1. Split a given vector as the substitution for the single original symbol
     final def duplicate[A](s: Sym[A], d: Op[A]): List[Sym[_]] = {
-      if (size > 1 || copyMode) map{ lns =>
+      if (!s.isSplitter && (size > 1 || copyMode)) map{ lns =>
         dbgs(s"Lane #$lns: ")
         val s2 = mirror(s, d)
         register(s -> s2)
@@ -365,6 +379,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
         register(s -> s2)
         List(s2)
       }
+
     }
     // 2. Make later stages depend on the given substitution across all lanes
     // NOTE: This assumes that the node has no meaningful return value (i.e. all are Pipeline or Unit)

@@ -86,8 +86,8 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
 
   private def blkOfUser(x: Sym[_], block: Blk): Blk = {
     x match {
-      case s if (s.isControl) => Blk.Node(s,-1)
-      case s if ((s.isCounter || s.isCounterChain) && s.getOwner.isDefined) => Blk.Node(s.owner,-1)
+      case s if s.isControl => Blk.Node(s,-1)
+      case s if (s.isCounter || s.isCounterChain) && s.getOwner.isDefined => Blk.Node(s.owner,-1)
       case _ => block
     }
   }

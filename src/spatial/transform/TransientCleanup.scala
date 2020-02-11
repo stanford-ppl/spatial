@@ -33,7 +33,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
       completedMirrors(key)
     } else {
       val newMirror = inBlk(blk){ inCopyMode(copy = true){ updateWithContext(lhs, rhs) } }
-      completedMirrors += ((key -> newMirror))
+      completedMirrors += (key -> newMirror)
       dbgs(s"Created new mirror ${newMirror} for $lhs in $blk")
       newMirror
     }
@@ -45,8 +45,8 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
   */
   private def priorUser(x: User): Boolean = { 
     x.sym match {
-      case s if (s.isControl) => (blk.s == Some(s)) && (blk.block > -1)
-      case s if (s.isCounter && s.getOwner.isDefined) => (blk.s == Some(s.owner)) && (blk.block > -1)
+      case s if s.isControl => blk.s.contains(s) && (blk.block > -1)
+      case s if s.isCounter && s.getOwner.isDefined => blk.s.contains(s.owner) && (blk.block > -1)
       case _ => (blk.s == x.blk.s) && (blk.block > x.blk.block)
     }
   }
@@ -107,7 +107,8 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
       }
 
     // Remove unused counters and counterchains
-    case _:CounterNew[_]     => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
+    case _:(CounterNew[_])   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
+    case _:(ScannerNew)   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
     case _:CounterChainNew   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
 
     case RegWrite(reg,value,en) =>

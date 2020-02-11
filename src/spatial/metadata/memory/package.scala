@@ -88,7 +88,7 @@ package object memory {
         }
       }
     }
-    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).map(_.flag).getOrElse(false)
+    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).exists(_.flag)
     def forceExplicitBanking_=(flag: Boolean): Unit = metadata.add(s, ForceExplicitBanking(flag))
 
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)
@@ -96,6 +96,9 @@ package object memory {
 
     def isMustMerge: Boolean = metadata[MustMerge](s).exists(_.flag)
     def isMustMerge_=(flag: Boolean): Unit = metadata.add(s, MustMerge(flag))
+
+    def noBankingAnalysis: Boolean = metadata[NoBankingAnalysis](s).exists(_.flag)
+    def noBankingAnalysis_=(flag: Boolean): Unit = metadata.add(s, NoBankingAnalysis(flag))
 
     def isFullFission: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
     def isFullFission_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))

@@ -442,6 +442,15 @@ case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
   */
 case class MustMerge(flag: Boolean) extends Data[MustMerge](SetBy.User)
 
+/** Flag set by the user to skip banking analysis for this memory.  The user promises that the backend (i.e. PIR) will
+  * do the banking itself
+  *
+  * Getter:  sym.isMustMerge
+  * Setter:  sym.isMustMerge = (true | false)
+  * Default: false
+  */
+case class NoBankingAnalysis(flag: Boolean) extends Data[NoBankingAnalysis](SetBy.User)
+
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
   *

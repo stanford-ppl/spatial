@@ -35,7 +35,7 @@ import spatial.dsl._
 
     def func(i: Int): T = 2.to[T] * i.to[T]
     Accel {
-      val sram = SRAM[T](512)
+      val sram = SRAM[T](512).conflictable.skipbanking
       Foreach(512 by 1) { i => sram(i) = -1 }
 
       Foreach(512 by 1 par 16) { i =>

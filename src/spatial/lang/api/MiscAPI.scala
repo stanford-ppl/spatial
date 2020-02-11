@@ -12,9 +12,9 @@ trait MiscAPI {
   @api def Scan(bv: U512) = stage(ScannerNew(bv))
 
   @api def splitter(addr: I32)(func: => Any): Unit = {
-    stage(SplitterStart(addr))
+    stage(SplitterStart(Seq(addr)))
     func
-    stage(SplitterEnd(addr))
+    stage(SplitterEnd(Seq(addr)))
   }
 
   implicit class TextOps(t: Text) {

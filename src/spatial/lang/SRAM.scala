@@ -66,6 +66,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * Only use this if you know exactly what you are doing! 
     */
   def mustmerge: C[A] = { this.isMustMerge = true; me }
+  def skipbanking: C[A] = {this.noBankingAnalysis = true; me}
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}

@@ -142,6 +142,8 @@ package object access {
     def isReader: Boolean = Reader.unapply(a).isDefined || TokenReader.unapply(a).isDefined || isUnrolledReader
     def isWriter: Boolean = Writer.unapply(a).isDefined || TokenWriter.unapply(a).isDefined || isUnrolledWriter || isSpecialWriter
 
+    def isSplitter: Boolean = a.op.exists{case _:SplitterStart => true; case _:SplitterEnd => true; case _ => false}
+
     def isSpecialWriter: Boolean = a match {
       case Op(_:RegAccum[_]) => true
       case _ => false

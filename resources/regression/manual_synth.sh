@@ -16,7 +16,7 @@ fi
 if [[ $1 = "zynq" ]]; then
 	export VIVADO_HOME
 	export PIR_HOME=${REGRESSION_HOME}
-	export KEEP_HIERARCHY=1
+	#export KEEP_HIERARCHY=1
 	export CLOCK_FREQ_MHZ=125
 	export FRINGE_PACKAGE="zynq"
 	# Prep the spreadsheet
@@ -25,7 +25,7 @@ if [[ $1 = "zynq" ]]; then
 elif [[ $1 = "zcu" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
 	export CLOCK_FREQ_MHZ=100
-	export KEEP_HIERARCHY=1
+	#export KEEP_HIERARCHY=1
 	export FRINGE_PACKAGE="zcu"
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}
@@ -40,7 +40,7 @@ elif [[ $1 = "arria10" ]]; then
 elif [[ $1 = "aws" ]]; then
 	export PIR_HOME=${REGRESSION_HOME}
 	export CLOCK_FREQ_MHZ=250
-	export KEEP_HIERARCHY=1
+	#export KEEP_HIERARCHY=1
 	export FRINGE_PACKAGE="aws"
 	# Prep the spreadsheet
 	cd ${REGRESSION_HOME}

@@ -223,6 +223,7 @@ abstract class RMWDoer[A:Bits,R:Bits] extends TokenAccessor[A,R] {
   def localRead: Option[Read] = None
   def localWrite: Option[Write] = None
   def localRMW = Some(RMW(mem,data,addr,op,order,ens))
+  override def dataOpt: Option[Sym[_]] = localRMW.map(_.data)
 }
 
 object RMWDoer {

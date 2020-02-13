@@ -112,6 +112,8 @@ trait ExternalAliases extends InternalAliases {
 
   type SparseSRAM[A,C[T]] = spatial.lang.SparseSRAM[A,C]
   lazy val SparseSRAM = spatial.lang.SparseSRAM
+  type Barrier[A] = spatial.lang.Barrier[A]
+  lazy val Barrier = spatial.lang.Barrier
 //  type LockDRAM[A,C[T]] = spatial.lang.LockDRAM[A,C]
 //  lazy val LockDRAM = spatial.lang.LockDRAM
 

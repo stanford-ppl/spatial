@@ -14,7 +14,7 @@ abstract class Access {
 
 case class Read(mem: Sym[_], addr: Seq[Idx], ens: Set[Bit]) extends Access
 case class Write(mem: Sym[_], data: Sym[_], addr: Seq[Idx], ens: Set[Bit]) extends Access
-case class RMW(mem: Sym[_], data: Sym[_], addr: Seq[Idx], op: String, order: String, ens: Set[Bit]) extends Access
+case class RMW(mem: Sym[_], data: Sym[_], addr: Seq[Idx], op: String, order: String, barriers: Seq[BarrierTransaction], ens: Set[Bit]) extends Access
 
 /** Status read of a memory */
 abstract class StatusReader[R:Bits] extends EnPrimitive[R] {
@@ -160,78 +160,25 @@ object VectorEnqueuer {
   def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(VectorEnqueuer.unapply)
 }
 
-/** Any access of a memory */
-abstract class TokenAccessor[A:Bits,R:Type] extends Accessor[A,R] {
+/** Any read of a memory */
+abstract class RMWDoer[A:Bits,R:Bits] extends Accessor[A,R] {
+  override def effects: Effects = Effects.Writes(mem)
+  def data: Sym[_]
   def op: String
   def order: String
-  def localRMW: Option[RMW]
-  def token: Option[Token]
-  override def localAccesses: Set[Access] = (localRead ++ localWrite ++ localRMW).toSet
-}
-
-object TokenAccessor {
-  def unapply(x: Op[_]): Option[(Option[Write],Option[Read],Option[RMW])] = x match {
-    case a: TokenAccessor[_,_] if a.localWrite.nonEmpty || a.localRead.nonEmpty || a.localRMW.nonEmpty =>
-      Some((a.localWrite,a.localRead,a.localRMW))
-    case _ => None
-  }
-  def unapply(x: Sym[_]): Option[(Option[Write],Option[Read],Option[RMW])] = x.op.flatMap(TokenAccessor.unapply)
-}
-
-/** Any read of a memory */
-abstract class TokenReader[A:Bits,R:Bits] extends TokenAccessor[A,R] {
-  def localRead = Some(Read(mem,addr,ens))
-  def localWrite: Option[Write] = None
-  def localRMW: Option[RMW] = None
-  def op = ""
-  def order = ""
-}
-
-object TokenReader {
-  def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {
-    case a: TokenAccessor[_,_] => a.localRead.map{rd => (rd.mem,rd.addr,rd.ens) }
-    case _ => None
-  }
-  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(TokenReader.unapply)
-}
-
-/** Any write to a memory that returns a token */
-abstract class TokenWriter[A:Bits] extends TokenAccessor[A,Token] {
-  override def effects: Effects = Effects.Writes(mem)
-
-  def data: Sym[_]
-  def localRead: Option[Read] = None
-  def localWrite = Some(Write(mem,data,addr,ens))
-  def localRMW: Option[RMW] = None
-  def op = ""
-  def order = ""
-  def token: Option[Token] = None
-}
-
-object TokenWriter {
-  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x match {
-    case a: TokenAccessor[_,_] => a.localWrite.map{wr => (wr.mem,wr.data,wr.addr,wr.ens) }
-    case _ => None
-  }
-  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(TokenWriter.unapply)
-}
-
-/** Any read of a memory */
-abstract class RMWDoer[A:Bits,R:Bits] extends TokenAccessor[A,R] {
-  override def effects: Effects = Effects.Writes(mem)
-  def data: Sym[_]
+  def barriers: Seq[BarrierTransaction]
   def localRead: Option[Read] = None
   def localWrite: Option[Write] = None
-  def localRMW = Some(RMW(mem,data,addr,op,order,ens))
+  def localRMW = Some(RMW(mem,data,addr,op,order,barriers,ens))
   override def dataOpt: Option[Sym[_]] = localRMW.map(_.data)
 }
 
 object RMWDoer {
-  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[Idx],String,String,Set[Bit])] = x match {
-    case a: TokenAccessor[_,_] => a.localRMW.map{rd => (rd.mem,rd.data,rd.addr,rd.op,rd.order,rd.ens) }
+  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[Idx],String,String,Seq[BarrierTransaction],Set[Bit])] = x match {
+    case a: RMWDoer[_,_] => a.localRMW.map{rd => (rd.mem,rd.data,rd.addr,rd.op,rd.order,rd.barriers,rd.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],String,String,Set[Bit])] = x.op.flatMap(RMWDoer.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],String,String,Seq[BarrierTransaction],Set[Bit])] = x.op.flatMap(RMWDoer.unapply)
 }
 
 

@@ -76,9 +76,4 @@ trait Implicits extends argon.lang.api.Implicits { this: MuxAPI =>
   // --- Series
   @api implicit def SeriesToCounter[S:BOOL,I:INT,F:INT](x: Series[Fix[S,I,F]]): Counter[Fix[S,I,F]] = Counter.from(x)
 
-  // --- Tokens
-  implicit class TokenCombos(b: Token)(implicit state: State) {
-    @api def &&(that: Token): Token = stage(TokenAnd[Token](b, that))
-  }
-
 }

@@ -17,14 +17,19 @@ import spatial.dsl._
         Foreach(128 by 1 par 16) { i => s1.RMW(i, func(i), "add", "TSO") }
         Foreach(128 by 1 par 16) { i => println(r"${s1(i)}") }
       }
-      // Test token write/read
       val s2 = SparseSRAM[T](128)
       val s3 = SparseSRAM[T](128)
-      Foreach(128 by 1 par 16) { i =>
-        val token1 = s2.tokenWrite(i, func(i))
-        val token2 = s3.tokenWrite(i, func(i))
-        val r2 = s2.tokenRead(i, token1 && token2)
-        println(r"$r2 ")
+      // I don't know what the following control structure is supposed to do but it is a vehicle for generating the IR we talked about
+      val outerBarrier = Barrier[Token](5) // The type arg doesn't actually do anything right now
+      Foreach(16 by 1 par 2) { i =>
+        val midBarrier = Barrier[Token](1) // The type arg doesn't actually do anything right now
+        Foreach(128 by 1 par 16) { j =>
+          val innerBarrier = Barrier[Token](32) // The type arg doesn't actually do anything right now
+          s2.barrierWrite(j, func(j), Seq(outerBarrier.push, midBarrier.push, innerBarrier.push))
+          s3.barrierWrite(j, func(j), Seq(innerBarrier.pop, midBarrier.push))
+          val r2 = s2.barrierRead(j, Seq(midBarrier.pop, outerBarrier.pop))
+          println(r"$r2 ")
+        }
       }
     }
 

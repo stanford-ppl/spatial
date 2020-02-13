@@ -248,7 +248,7 @@ trait MemoryUnrolling extends UnrollingBase {
 
         val bank = addr2.map{a => bankSelects(mem,rhs,a,inst) }
         val ofs  = addr2.map{a => bankOffset(mem,lhs,a,inst) }
-        val token: Option[Token] = rhs.asInstanceOf[Op[_]].getToken.flatMap{t: Token => Some(lanes.inLanes(Seq(0)){_ => f(t)}.head)}
+        val barriers: Seq[BarrierTransaction] = rhs.asInstanceOf[Op[_]].getBarrierTransactions.flatMap{t: BarrierTransaction => Some(lanes.inLanes(Seq(0)){_ => f(t)}.head)}
         /** End withFlow **/
 
         val banked: Seq[(UnrolledAccess[A], List[Int], Int)] = if (lhs.segmentMapping.nonEmpty && {lhs.segmentMapping.groupBy(_._2).map{case (k,v) => k -> v.keys}}.size > 1) {
@@ -262,11 +262,11 @@ trait MemoryUnrolling extends UnrollingBase {
             val ofs3 = if (ofs.getOrElse(Nil).nonEmpty) vecsInSegment.map(ofs.getOrElse(Nil)(_)) else Nil
             val ens3 = vecsInSegment.map(ens2(_))
             implicit val vT: Type[Vec[A]] = Vec.bits[A](vecsInSegment.size)
-            (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, token, locks, ens3.toSeq), vecsInSegment.toList, segment)
+            (bankedAccess[A](rhs, mem2, data3.toSeq, bank3.toSeq, ofs3.toSeq, barriers, locks, ens3.toSeq), vecsInSegment.toList, segment)
           }.toSeq
         } else {
           implicit val vT: Type[Vec[A]] = Vec.bits[A](vecLength)
-          Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), token, locks, ens2), vecIds.toList, 0))
+          Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), barriers, locks, ens2), vecIds.toList, 0))
         }
 
         dbgs(s"banked is $banked")
@@ -344,7 +344,6 @@ trait MemoryUnrolling extends UnrollingBase {
 
           case (USymReadSym(v), _, _)        => lanes.unifyLanes(laneIds)(lhs, v)
           case (UWrite(write), _, _)   => lanes.unifyLanes(laneIds)(lhs, write)
-          case (UTokenWrite(vec), _, _)   => lanes.unifyLanes(laneIds)(lhs, vec)
           case (UMultiWrite(vs), _, _) => lanes.unifyLanes(laneIds)(lhs, vs.head.s.head)
         }
       }
@@ -503,7 +502,6 @@ trait MemoryUnrolling extends UnrollingBase {
   case class UVecReadSym[T](v: Vec[T])  extends UnrolledAccess[T] { def s = Seq(v) }
   case class UVecReadVec[T](v: Vec[T])  extends UnrolledAccess[T] { def s = Seq(v) }
   case class UWrite[T](v: Void)  extends UnrolledAccess[T] { def s = Seq(v) }
-  case class UTokenWrite[T](v: Token)  extends UnrolledAccess[T] { def s = Seq(v) }
   case class UMultiWrite[T](vs: Seq[UWrite[T]]) extends UnrolledAccess[T] { def s = vs.flatMap(_.s) }
 
   sealed abstract class DataOption { def s: Option[Sym[_]] }
@@ -524,7 +522,7 @@ trait MemoryUnrolling extends UnrollingBase {
     data:   Seq[Bits[A]],
     bank:   Seq[Seq[Idx]],
     ofs:    Seq[Idx],
-    token:  Option[Token],
+    barriers:  Seq[BarrierTransaction],
     lock:   Option[Seq[LockWithKeys[I32]]],
     enss:   Seq[Set[Bit]]
   )(implicit vT: Type[Vec[A]], ctx: SrcCtx): UnrolledAccess[A] = node match {
@@ -539,9 +537,8 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LUTRead[_,_]     => UVecReadSym(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
     case _:RegFileRead[_,_] => UVecReadSym(stage(RegFileVectorRead(mem.asInstanceOf[RegFilex[A]], bank, enss)))
     case _:SRAMRead[_,_]    => UVecReadSym(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
-    case _:SparseSRAMRMW[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMW(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, token, node.getSparseOp, node.getSparseOrder, enss)))
-    case _:SparseSRAMRead[_,_]    => UVecReadSym(stage(SparseSRAMBankedRead(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, enss)))
-    case _:SparseSRAMTokenRead[_,_]    => UVecReadSym(stage(SparseSRAMBankedTokenRead(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, token, enss)))
+    case _:SparseSRAMRMW[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMW(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, node.getSparseOp, node.getSparseOrder, barriers, enss)))
+    case _:SparseSRAMRead[_,_]    => UVecReadSym(stage(SparseSRAMBankedRead(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, barriers, enss)))
     case _:StreamInRead[_]  => UVecReadSym(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
     case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))
@@ -556,8 +553,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LIFOPush[_]       => UWrite[A](stage(LIFOBankedPush(mem.asInstanceOf[LIFO[A]], data, enss)))
     case _:RegFileWrite[_,_] => UWrite[A](stage(RegFileVectorWrite(mem.asInstanceOf[RegFilex[A]], data, bank, enss)))
     case _:SRAMWrite[_,_]    => UWrite[A](stage(SRAMBankedWrite(mem.asInstanceOf[SRAMx[A]], data, bank, ofs, enss)))
-    case _:SparseSRAMWrite[_,_]    => UWrite[A](stage(SparseSRAMBankedWrite(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, enss)))
-    case _:SparseSRAMTokenWrite[_,_]    => UTokenWrite[A](stage(SparseSRAMBankedTokenWrite(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, enss)))
+    case _:SparseSRAMWrite[_,_]    => UWrite[A](stage(SparseSRAMBankedWrite(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, barriers, enss)))
     case _:StreamOutWrite[_] => UWrite[A](stage(StreamOutBankedWrite(mem.asInstanceOf[StreamOut[A]], data, enss)))
 
     case _:FIFOPeek[_]       => USymReadSym(stage(FIFOPeek(mem.asInstanceOf[FIFO[A]], enss.flatten.toSet)))

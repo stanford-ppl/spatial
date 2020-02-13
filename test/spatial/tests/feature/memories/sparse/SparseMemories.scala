@@ -4,7 +4,8 @@ import spatial.dsl._
 
 @spatial class SparseMemories extends SpatialTest {
   override def runtimeArgs: Args = "32"
-  type T = FixPt[TRUE, _16, _16]
+  //type T = FixPt[TRUE, _16, _16]
+  type T = Int
 
   def main(args: Array[String]): Unit = {
 
@@ -33,5 +34,6 @@ import spatial.dsl._
       }
     }
 
+    assert(true)
   }
 }

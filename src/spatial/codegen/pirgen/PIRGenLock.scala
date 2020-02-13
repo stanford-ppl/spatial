@@ -44,6 +44,7 @@ trait PIRGenLock extends PIRCodegen {
         src".addr(${assertOne(ofs)})" + 
         src".lock(${lock.map { lock => assertOne(lock) }})"
       }
+
     case _ => super.genAccel(lhs, rhs)
   }
 }

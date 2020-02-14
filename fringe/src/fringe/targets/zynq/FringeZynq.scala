@@ -86,7 +86,7 @@ class FringeZynq(
     fringeCommon.io.wdata := axiLiteBridge.io.wdata
     axiLiteBridge.io.rdata := fringeCommon.io.rdata
   }
-  else if (target.isInstanceOf[targets.zynq.Zynq]) {
+  else if (target.isInstanceOf[targets.zynq.Zynq] || target.isInstanceOf[targets.zedboard.ZedBoard]) {
     val axiLiteBridge = Module(new AXI4LiteToRFBridge(ADDR_WIDTH, DATA_WIDTH))
     axiLiteBridge.io.S_AXI <> io.S_AXI
 

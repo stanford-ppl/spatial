@@ -315,7 +315,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
       setAccessPattern(mem, lhs, adr)
     case Writer(mem,_,adr,_) => 
       setAccessPattern(mem, lhs, adr)
-    case RMWDoer(mem,_,adr,_,_,_) =>
+    case RMWDoer(mem,_,adr,_,_,_,_) =>
       setAccessPattern(mem, lhs, adr)
     case _ => super.visit(lhs, rhs)
   }

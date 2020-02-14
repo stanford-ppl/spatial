@@ -9,60 +9,6 @@ import spatial.node._
 import spatial.lang.types._
 import spatial.metadata.memory._
 
-//
-//abstract class LockDRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockDRAM[A,C]) extends Top[C[A]] with RemoteMem[A,C] {
-//  val A: Bits[A] = Bits[A]
-//
-//  protected def M1: Type[LockDRAM1[A]] = implicitly[Type[LockDRAM1[A]]]
-//  def rank: Seq[Int]
-//
-//  /** Returns the total capacity (in elements) of this DRAM. */
-//  @api def size: I32 = product(dims:_*)
-//
-//  /**
-//    * Returns the dimensions of this DRAM as a Sequence.
-//    */
-//  @api def dims: Seq[I32] = Seq.tabulate(rank.length){d => stage(MemDim(this,rank(d))) }
-//
-//  /** Returns dim0 of this DRAM, or else 1 if DRAM is lower dimensional */
-//  @api def dim0: I32 = dims.head
-//
-//  /** Returns the 64-bit address of this DRAM */
-//  @api def address: I64 = stage(LockDRAMAddress(me))
-//
-//  @api override def neql(that: C[A]): Bit = {
-//    error(this.ctx, "Native comparison of DRAMs is unsupported. Use getMem to extract data.")
-//    error(this.ctx)
-//    super.neql(that)
-//  }
-//  @api override def eql(that: C[A]): Bit = {
-//    error(this.ctx, "Native comparision of DRAMs is unsupported. Use getMem to extract data.")
-//    error(this.ctx)
-//    super.eql(that)
-//  }
-//}
-//object LockDRAM {
-//  /** Allocates a 1-dimensional [[LockDRAM1]] with capacity of `length` elements of type A. */
-//  @api def apply[A:Bits](length: I32): LockDRAM1[A] = stage(LockDRAMHostNew[A,LockDRAM1](Seq(length),zero[A]))
-//}
-//
-///** A 1-dimensional [[LockDRAM]] with elements of type A. */
-//@ref class LockDRAM1[A:Bits] extends LockDRAM[A,LockDRAM1] with Ref[Array[Any],LockDRAM1[A]] with Mem1[A,LockDRAM1] {
-//  def rank: Seq[Int] = Seq(0)
-//  @api def length: I32 = dims.head
-//  @api override def size: I32 = dims.head
-//
-//  /** Returns the value at `pos`. */
-//  @api def apply(pos: I32): A = stage(LockDRAMRead(this,Seq(pos),None,Set.empty))
-//  @api def apply(pos: I32, lock: LockWithKeys[I32]): A = stage(LockDRAMRead(this,Seq(pos),Some(lock),Set.empty))
-//
-//  /** Updates the value at `pos` to `data`. */
-//  @api def update(pos: I32, data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos),None,Set.empty))
-//  @api def update(pos: I32, lock: LockWithKeys[I32], data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos),Some(lock),Set.empty))
-//
-//  @api def store[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = throw new Exception(s"LockDRAM store needs to be implemented!")
-//  @api def store(local: SRAM1[A], len: I32): Void = throw new Exception(s"LockDRAM store needs to be implemented!")
-//}
 
 abstract class SparseSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SparseSRAM[A,C]) extends LocalMem[A,C] {
   val A: Bits[A] = Bits[A]
@@ -95,18 +41,18 @@ abstract class SparseSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SparseSRAM[A
     * The number of indices should match the SparseSRAM's rank.
     * NOTE: Use the apply method if the SparseSRAM's rank is statically known.
     */
-  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
+  @api def read(addr: Seq[Idx], bs: Seq[BarrierTransaction] = Seq(), ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
-    stage(SparseSRAMRead[A,C](me,addr,ens))
+    stage(SparseSRAMRead[A,C](me,addr,bs,ens))
   }
 
   /** Updates the value at `addr` to `data`.
     * The number of indices should match the SparseSRAM's rank.
     * NOTE: Use the update method if the SparseSRAM's rank is statically known.
     */
-  @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
+  @api def write(data: A, addr: Seq[Idx], bs: Seq[BarrierTransaction] = Seq(), ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
-    stage(SparseSRAMWrite[A,C](me,data,addr,ens))
+    stage(SparseSRAMWrite[A,C](me,data,addr,bs,ens))
   }
 
   @rig private def checkDims(given: Int): Unit = {
@@ -134,8 +80,8 @@ abstract class SparseSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SparseSRAM[A
 
 
   // --- Typeclass Methods
-  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
-  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, Seq(), ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, Seq(), ens)
   @rig def __reset(ens: Set[Bit]): Void = void
 }
 object SparseSRAM {
@@ -156,15 +102,15 @@ object SparseSRAM {
   @api override def size: I32 = dims.head
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: I32): A = stage(SparseSRAMRead(this,Seq(pos),Set.empty))
-  @api def tokenRead(pos: I32, token: Token): A = stage(SparseSRAMTokenRead(this,Seq(pos),Some(token),Set.empty))
+  @api def apply(pos: I32): A = stage(SparseSRAMRead(this,Seq(pos),Seq(),Set.empty))
+  @api def barrierRead(pos: I32, bs: Seq[BarrierTransaction]): A = stage(SparseSRAMRead(this,Seq(pos),bs,Set.empty))
 
-  @api def RMW(pos: I32, data: A, op: String, order: String): A = {
+  @api def RMW(pos: I32, data: A, op: String, order: String, bs: Seq[BarrierTransaction] = Seq()): A = {
     warn(s"Currently no syntax for input token to RMW, but it can be added.")
-    stage(SparseSRAMRMW(this,data,Seq(pos),None,op,order,Set.empty))
+    stage(SparseSRAMRMW(this,data,Seq(pos),op,order,bs,Set.empty))
   }
   /** Updates the value at `pos` to `data`. */
-  @api def update(pos: I32, data: A): Void = stage(SparseSRAMWrite(this,data,Seq(pos),Set.empty))
-  @api def tokenWrite(pos: I32, data: A): Token = stage(SparseSRAMTokenWrite(this, data, Seq(pos), Set.empty))
+  @api def update(pos: I32, data: A): Void = stage(SparseSRAMWrite(this,data,Seq(pos),Seq(), Set.empty))
+  @api def barrierWrite(pos: I32, data: A, bs: Seq[BarrierTransaction]): Void = stage(SparseSRAMWrite(this, data, Seq(pos), bs, Set.empty))
 
 }

@@ -11,31 +11,19 @@ trait PIRGenSparse extends PIRCodegen {
     case op@SparseSRAMNew(dims)       => 
       stateMem(lhs, "SparseMem(false)")
 
-    case op@SparseSRAMBankedTokenRead(sram,bank,ofs,tokens,ens)       => 
+    case op@SparseSRAMBankedRead(sram,bank,ofs,barriers,ens)       => 
       stateAccess(lhs, sram, ens) {
         src"SparseRead()" +
         src".addr(${assertOne(bank)})"
         //src".lock(${lock.map { lock => assertOne(lock) }})"
       }
-    case op@SparseSRAMBankedRead(sram,bank,ofs,ens)       => 
-      stateAccess(lhs, sram, ens) {
-        src"SparseRead()" +
-        src".addr(${assertOne(bank)})"
-        //src".lock(${lock.map { lock => assertOne(lock) }})"
-      }
-    case op@SparseSRAMBankedTokenWrite(sram,data,bank,ofs,ens) => 
+    case op@SparseSRAMBankedWrite(sram,data,bank,ofs,barriers,ens) => 
       stateAccess(lhs, sram, ens, data=Some(data)) {
         src"SparseWrite()" +
         src".addr(${assertOne(bank)})"
         //src".lock(${lock.map { lock => assertOne(lock) }})"
       }
-    case op@SparseSRAMBankedWrite(sram,data,bank,ofs,ens) => 
-      stateAccess(lhs, sram, ens, data=Some(data)) {
-        src"SparseWrite()" +
-        src".addr(${assertOne(bank)})" 
-        //src".lock(${lock.map { lock => assertOne(lock) }})"
-      }
-    case op@SparseSRAMBankedRMW(sram,data,bank,ofs,tokens,opcode,order,ens) => 
+    case op@SparseSRAMBankedRMW(sram,data,bank,ofs,opcode,order,barriers,ens) => 
       stateAccess(lhs, sram, ens) {
         src"""SparseRMW("$opcode","$order")""" +
         src".addr(${assertOne(bank)})" + 

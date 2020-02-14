@@ -78,9 +78,17 @@ trait PIRGenController extends PIRCodegen {
       emitController(lhs) { ret(body) }
 
     case StateMachine(ens, start, notDone, action, nextState) =>
-      emit(s"//TODO: ${qdef(lhs)}")
+      emit(src"//TODO: ${qdef(lhs)}")
 
     //case IfThenElse(cond, thenp, elsep) =>
+    
+    case SplitterStart(addr) =>
+      state(lhs, tp=Some("SplitController"))(
+        src"""createCtrl(schedule=Pipelined)(SplitController().splitOn($addr))"""
+      )
+
+    case SplitterEnd(addr) =>
+      emit(src"endState[Ctrl]")
 
     case _ => super.genAccel(lhs, rhs)
   }

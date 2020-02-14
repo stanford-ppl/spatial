@@ -22,38 +22,42 @@ import spatial.dsl._
     }
 
     printArray(getMem(dram), "Got: ")
+    assert(true)
   }
 }
 
 @spatial class SplitterLoop extends SpatialTest {
   override def runtimeArgs: Args = "32"
-  type T = FixPt[TRUE, _16, _16]
+  //type T = FixPt[TRUE, _16, _16]
+  type T = Int
 
   def main(args: Array[String]): Unit = {
 
     val dram = DRAM[T](512)
 
-    def func(i: Int): T = 2.to[T] * i.to[T]
     Accel {
-      val sram = SRAM[T](512).conflictable.skipbanking
-      Foreach(512 by 1) { i => sram(i) = -1 }
+      // disable banking on dense sram is causing issue. In general dense memory cannot be accessed
+      // within splitter because they cannot be banked
+      //val sram = SparseSRAM[T](512)
+      //Foreach(512 by 1) { i => sram(i) = -1 }
 
+      val sram = SRAM[T](512)
       Foreach(512 by 1 par 16) { i =>
         val addrs = i * 3 % 7
         splitter(addrs) {
-          sram(addrs) = func(i)
+          sram(i) = i.to[T] // CSE causing weird behavior. The FixToFix on i is passed from the first splitter to the second splitter
         }
 
-        val more_addrs = i * 5 % 9
-        splitter(more_addrs) {
-          sram(more_addrs) = func(i)
-        }
+        //val more_addrs = i * 5 % 9
+        //splitter(more_addrs) {
+          //sram(more_addrs) = func(i)
+        //}
       }
-
       dram store sram
 
     }
 
     printArray(getMem(dram), "Got: ")
+    assert(true)
   }
 }

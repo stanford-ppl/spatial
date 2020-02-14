@@ -53,7 +53,7 @@ import spatial.dsl._
 
               val dotAccum = Reduce(Reg[T])(D par ip){j => logregX(ii,j) * btheta(j) }{_+_}  // read
               Pipe { pipe2Res := (logregY(ii) - sigmoid(dotAccum.value)) }
-              Foreach(D par ip) {j => subRam(j) = logregX(ii,j) - pipe2Res.value }
+              Foreach(D par ip) {j => subRam(j) = logregX(ii,j) * pipe2Res.value }
               subRam
             }{_+_}
           }
@@ -92,7 +92,7 @@ import spatial.dsl._
           a*b}.reduce{_+_})
         row.map{a =>
           // println("subtraction for " + y + " is " + (a - sub))
-          a - sub}
+          a * sub}
       }.reduce{(a,b) => a.zip(b){_+_}}
       for (i <- 0 until D) {
         gold(i) = gold(i) + next(i)

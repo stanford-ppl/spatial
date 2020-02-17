@@ -5,6 +5,8 @@ import chisel3.core._
 import fringe.targets.zynq.ZynqLike
 import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 
+// TODO: At some point we need to unify these Fringe code...
+//  So many duplicates!
 class DE1Like extends ZynqLike {
   override def makeBigIP: BigIP = new fringe.targets.de1.BigIPDE1
 
@@ -19,11 +21,7 @@ class DE1Like extends ZynqLike {
     fringe.io.S_AVALON <> io.S_AVALON
 
     // Fringe <-> DRAM connections
-    // TODO: Fringe Memory
     io.M_AXI <> fringe.io.M_AXI
-    scala.Console.println(
-      io.M_AXI.foreach(a4i => a4i.ARADDR)
-    )
 
     // TODO: Probe
     io.TOP_AXI <> fringe.io.TOP_AXI
@@ -31,7 +29,6 @@ class DE1Like extends ZynqLike {
     io.PROTOCOL_AXI <> fringe.io.PROTOCOL_AXI
     io.CLOCKCONVERT_AXI <> fringe.io.CLOCKCONVERT_AXI
 
-    // io.rdata handled by bridge inside FringeZynq
      io.rdata := DontCare
 
     accel.io.argIns := fringe.io.argIns

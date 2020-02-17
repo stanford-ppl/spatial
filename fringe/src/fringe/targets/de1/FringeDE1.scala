@@ -27,7 +27,7 @@ class FringeDE1(blockingDRAMIssue: Boolean,
       Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 
     // TODO: Add Avalon probes for board debugging.
-    //  For now just add AXI to stop firrtl panicing
+    //  For now just add AXI to stop FIRRTL panicing
 
     val TOP_AXI = new AXI4Probe(avalonLiteParams)
     val DWIDTH_AXI = new AXI4Probe(avalonLiteParams)

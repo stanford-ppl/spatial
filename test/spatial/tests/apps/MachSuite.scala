@@ -509,13 +509,13 @@ import utils.io.files._
       // }
 
       // from --> to
-      Sequential.Foreach(0 until steps_to_take) { step =>
+      Sequential.Foreach(0 until steps_to_take par 1) { step =>
         val obs = obs_sram(step)
-        Sequential.Foreach(0 until N_STATES) { to =>
+        Sequential.Foreach(0 until N_STATES par 4) { to =>
           val emission = emissions_sram(to, obs)
           val best_hop = Reg[T](0x4000)
-          best_hop.reset
-          Reduce(best_hop)(0 until N_STATES) { from =>
+//          best_hop.reset
+          Reduce(best_hop)(0 until N_STATES par 4) { from =>
             val base = llike_sram((step-1) % N_OBS, from) + transitions_sram(from,to)
             base + emission
           } { (a,b) => mux(a < b, a, b)}
@@ -527,7 +527,7 @@ import utils.io.files._
       Sequential.Foreach(steps_to_take-1 until -1 by -1) { step =>
         val from = path_sram(step+1)
         val min_pack = Reg[Tup2[Int, T]](pack(-1.to[Int], (0x4000).to[T]))
-        min_pack.reset
+//        min_pack.reset
         Reduce(min_pack)(0 until N_STATES){ to =>
           val jump_cost = mux(step == steps_to_take-1, 0.to[T], transitions_sram(to, from))
           val p = llike_sram(step,to) + jump_cost

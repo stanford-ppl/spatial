@@ -526,7 +526,7 @@ object SpatialHelper {
     val output_composite_dram = DRAM[composite](LINES_TODO)
 
 
-    // Define bbox outside of Accel
+    // Define bbox outside of Accelo
     val computeUnitImpl = Blackbox.SpatialController[BBOX_IN, BBOX_OUT] { in: BBOX_IN =>
       val deriv_window = sharp_kernel.size
       val COLS = in.COLS
@@ -535,6 +535,7 @@ object SpatialHelper {
       val last_unit = in.last_unit
       val issue = FIFO[Int](2*rowTileSize/interleave_factor).conflictable
       val result = FIFO[composite](2*rowTileSize/interleave_factor)
+      val noise_floor = 15
 
       Pipe.II(1).Foreach(COLS by 1, interleave_line_els by 1){(oc, ic) =>
         val c = oc*interleave_line_els + ic
@@ -552,11 +553,11 @@ object SpatialHelper {
         if (c == 0) first_reg := next
         if (c == COLS * interleave_line_els - 1) last_reg := next
         val t = List.tabulate(deriv_window){i => sharp_kernel(i).to[T] * sr(i).to[T]}.reduceTree{_+_}
-        if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] > best_rising.value.v)) {
+        if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] > best_rising.value.v && sr(deriv_window-1) < noise_floor)) {
           acc_after_rising.reset()
           best_rising := score(c,t.to[I32])
         }
-        if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] < best_falling.value.v)) {
+        if (c == deriv_window.to[Int] || (c > deriv_window.to[Int] && t.to[I32] < best_falling.value.v && sr(0) < noise_floor)) {
           acc_after_falling.reset()
           best_falling := score(c,t.to[I32])
         }

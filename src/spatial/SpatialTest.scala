@@ -107,6 +107,6 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS) ++ super.backends
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP) ++ super.backends
 
 }

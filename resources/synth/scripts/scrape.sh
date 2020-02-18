@@ -4,22 +4,22 @@
 #2+ = args
 
 if [[ $1 = "Zynq" ]]; then
-	REGRESSION_HOME="/home/mattfel/regression/synth/zynq"
+	REGRESSION_HOME="/home/mattfel/sp_zynq/spatial"
 elif [[ $1 = "ZCU" ]]; then
-	REGRESSION_HOME="/home/mattfel/regression/synth/zcu"
+	REGRESSION_HOME="/home/mattfel/sp_zcu/spatial"
 elif [[ $1 = "AWS" ]]; then
-	REGRESSION_HOME="/home/mattfel/regression/synth/aws"
+	REGRESSION_HOME="/home/mattfel/sp_aws/spatial"
 elif [[ $1 = "AWS" ]]; then
-	REGRESSION_HOME="/home/mattfel/regression/synth/arria10"
+	REGRESSION_HOME="/home/mattfel/sp_arria10/spatial"
 fi
 
-hash=`cat ${REGRESSION_HOME}/current-spatial/spatial/hash`
-branchname=`cat ${REGRESSION_HOME}/current-spatial/spatial/branchname`
+hash=`cat ${REGRESSION_HOME}/hash`
+branchname=`cat ${REGRESSION_HOME}/branchname`
 
 #appname=`basename \`pwd\``
 fullname=`cat chisel/AccelWrapper*.scala | grep "Root controller for app" | sed "s/.*: //g"`
 aws_dir_name=`basename \`pwd\``
-testdirs=`find ${REGRESSION_HOME}/current-spatial/spatial/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
+testdirs=`find ${REGRESSION_HOME}/test -type d -printf '%d\t%P\n' | sort -r -nk1 | cut -f2- | grep -v target | sed "s/.*\///g"`
 testdirsarray=($testdirs)
 for t in "${testdirsarray[@]}"; do
 	fullname=`echo $fullname | sed "s/${t}_//g" | sed "s/${t}\.//g"` 
@@ -113,7 +113,7 @@ fi
 synthtime=$((endtime-starttime))
 
 echo "LUT: $lutraw (${lutpcnt}%) Regs: $regraw (${regpcnt}%) BRAM: $ramraw (${rampcnt}%) URAM: $uramraw (${urampcnt}%) DSP: $dspraw (${dsppcnt}%) LaL: $lalraw (${lalpcnt}%) LaM: $lamraw (${lampcnt}%) Synthtime: $synthtime Tmg_Met: $tmg $1"
-python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_synth_results" $appname "$lutraw (${lutpcnt}%)" "$regraw (${regpcnt}%)" "$ramraw (${rampcnt}%)" "$uramraw (${urampcnt}%)" "$dspraw (${dsppcnt}%)" "$lalraw (${lalpcnt}%)" "$lamraw (${lampcnt}%)" "$synthtime" "$tmg" "$1" "$hash" "$branchname"
+python3 ${REGRESSION_HOME}/resources/regression/gdocs.py "report_synth_results" $appname "$lutraw (${lutpcnt}%)" "$regraw (${regpcnt}%)" "$ramraw (${rampcnt}%)" "$uramraw (${urampcnt}%)" "$dspraw (${dsppcnt}%)" "$lalraw (${lalpcnt}%)" "$lamraw (${lampcnt}%)" "$synthtime" "$tmg" "$1" "$hash" "$branchname"
 
 
 # Run on board
@@ -143,7 +143,7 @@ if [[ $1 = "Zynq" ]]; then
     runtime=`cat log | grep -a "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
     pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
-    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"
+    python3 ${REGRESSION_HOME}/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"
 elif [[ $1 = "ZCU" ]]; then
 	APP=$(basename $(pwd))
 	scp $(basename $(pwd)).tar.gz root@holodeck-zcu102:
@@ -170,7 +170,7 @@ elif [[ $1 = "ZCU" ]]; then
     runtime=`cat log | grep -a "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
     pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
-    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"	
+    python3 ${REGRESSION_HOME}/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"
 elif [[ $1 = "Arria10" ]]; then
 	APP=$(basename $(pwd))
 	scp $(basename $(pwd)).tar.gz root@arria10:   # TODO: Tian (fill in whatever you need to scp and execute the app on the board)
@@ -193,7 +193,7 @@ elif [[ $1 = "Arria10" ]]; then
     runtime=`cat log | grep -a "ran for" | head -1 | sed "s/^.*ran for //g" | sed "s/ ms, .*$//g"`
     if [[ $runtime = "" ]]; then runtime=NA; fi
     pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo FAILED; else echo Passed!; fi`
-    python3 ${REGRESSION_HOME}/current-spatial/spatial/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"	
+    python3 ${REGRESSION_HOME}/resources/regression/gdocs.py "report_board_runtime" $appname $timeout $runtime $pass "$2 $3 $4 $5 $6 $7 $8" "$1" "$locked" "$hash" "$branchname"
 fi
 
 # Fake out regression

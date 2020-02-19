@@ -4,6 +4,7 @@ import argon._
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 
 trait PIRGenSparse extends PIRCodegen {
 
@@ -14,21 +15,21 @@ trait PIRGenSparse extends PIRCodegen {
     case op@SparseSRAMBankedRead(sram,bank,ofs,barriers,ens)       => 
       stateAccess(lhs, sram, ens) {
         src"SparseRead()" +
-        src".addr(${assertOne(bank)})"
-        //src".lock(${lock.map { lock => assertOne(lock) }})"
+        src".addr(${assertOne(bank)})" +
+        src".barriers($barriers)"
       }
     case op@SparseSRAMBankedWrite(sram,data,bank,ofs,barriers,ens) => 
       stateAccess(lhs, sram, ens, data=Some(data)) {
         src"SparseWrite()" +
-        src".addr(${assertOne(bank)})"
-        //src".lock(${lock.map { lock => assertOne(lock) }})"
+        src".addr(${assertOne(bank)})" +
+        src".barriers($barriers)"
       }
     case op@SparseSRAMBankedRMW(sram,data,bank,ofs,opcode,order,barriers,ens) => 
       stateAccess(lhs, sram, ens) {
         src"""SparseRMW("$opcode","$order")""" +
         src".addr(${assertOne(bank)})" + 
-        src".input(${assertOne(data)})" 
-        //src".lock(${lock.map { lock => assertOne(lock) }})"
+        src".input(${assertOne(data)})" +
+        src".barriers($barriers)"
       }
     //case op@LockDRAMBankedRead(dram,bank,ofs,lock,ens)       => 
       //stateAccess(lhs, dram, ens) {
@@ -42,6 +43,12 @@ trait PIRGenSparse extends PIRCodegen {
         //src".addr(${assertOne(ofs)})" + 
         ////src".lock(${lock.map { lock => assertOne(lock) }})"
       //}
+    case op@BarrierNew(init) => 
+      state(lhs)(src"Barrier(${lhs.parent.s.get}.getCtrl,$init)")
+    case op@BarrierPush(barrier) =>
+      state(lhs, tp=Some("(Barrier, Boolean)"))(src"($barrier,true)")
+    case op@BarrierPop(barrier) =>
+      state(lhs, tp=Some("(Barrier, Boolean)"))(src"($barrier,false)")
     case _ => super.genAccel(lhs, rhs)
   }
 }

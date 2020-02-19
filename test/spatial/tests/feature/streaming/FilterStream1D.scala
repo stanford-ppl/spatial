@@ -535,7 +535,7 @@ object SpatialHelper {
       val last_unit = in.last_unit
       val issue = FIFO[Int](2*rowTileSize/interleave_factor).conflictable
       val result = FIFO[composite](2*rowTileSize/interleave_factor)
-      val noise_floor = 15
+      val noise_floor = 999// 15
 
       Pipe.II(1).Foreach(COLS by 1, interleave_line_els by 1){(oc, ic) =>
         val c = oc*interleave_line_els + ic

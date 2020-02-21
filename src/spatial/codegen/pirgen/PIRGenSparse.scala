@@ -12,6 +12,9 @@ trait PIRGenSparse extends PIRCodegen {
     case op@SparseSRAMNew(dims)       => 
       stateMem(lhs, "SparseMem(false)")
 
+    case op@SparseDRAMNew(dims, par)       => 
+      stateMem(lhs, s"SparseMem(true, $par)")
+
     case op@SparseSRAMBankedRead(sram,bank,ofs,barriers,ens)       => 
       stateAccess(lhs, sram, ens) {
         src"SparseRead()" +

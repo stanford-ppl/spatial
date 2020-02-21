@@ -9,7 +9,13 @@ import spatial.lang._
   * @param dims The dimensions of the memory
   */
 @op case class SparseSRAMNew[A:Bits,C[T]](
-    dims: Seq[I32]
+    dims: Seq[I32],
+    )(implicit val tp: Type[C[A]])
+  extends MemAlloc[A,C]
+
+@op case class SparseDRAMNew[A:Bits,C[T]](
+    dims: Seq[I32],
+    par: Int
     )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 

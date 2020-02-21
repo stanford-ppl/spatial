@@ -26,11 +26,34 @@ class SRAMVerilogIO[T<:Data](t: T, d: Int) extends Bundle {
 
 }
 
+class SRAMVerilogDualReadIO[T<:Data](t: T, d: Int) extends Bundle {
+    val clk = Input(Clock())
+    val raddr0 = Input(UInt({1 max log2Ceil(d)}.W))
+    val raddr1 = Input(UInt({1 max log2Ceil(d)}.W))
+    val waddr = Input(UInt({1 max log2Ceil(d)}.W))
+    val raddrEn0 = Input(Bool())
+    val raddrEn1 = Input(Bool())
+    val waddrEn = Input(Bool())
+    val wen = Input(Bool())
+    val backpressure = Input(Bool())
+    val wdata = Input(UInt(t.getWidth.W))
+    val rdata0 = Output(UInt(t.getWidth.W))
+    val rdata1 = Output(UInt(t.getWidth.W))
+
+    override def cloneType = (new SRAMVerilogDualReadIO(t, d)).asInstanceOf[this.type] // See chisel3 bug 358
+
+}
+
 abstract class SRAMBlackBox[T<:Data](params: Map[String,Param]) extends BlackBox(params) {
   val io: SRAMVerilogIO[T]
 }
 
 
+class SRAMVerilogDualRead[T<:Data](val t: T, val d: Int) extends BlackBox(
+  Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
+{
+  override val io = IO(new SRAMVerilogDualReadIO(t, d))
+}
 
 class SRAMVerilogSim[T<:Data](val t: T, val d: Int) extends BlackBox(
   Map("DWIDTH" -> IntParam(t.getWidth), "WORDS" -> IntParam(d), "AWIDTH" -> IntParam({1 max log2Ceil(d)})))
@@ -76,11 +99,30 @@ class GenericRAMIO[T<:Data](t: T, d: Int) extends Bundle {
   }
 }
 
+class GenericRAMDualReadIO[T<:Data](t: T, d: Int) extends Bundle {
+  val addrWidth = {1 max log2Ceil(d)}
+  val raddr0 = Input(UInt(addrWidth.W))
+  val raddr1 = Input(UInt(addrWidth.W))
+  val wen = Input(Bool())
+  val waddr = Input(UInt(addrWidth.W))
+  val wdata = Input(t.cloneType)
+  val rdata0 = Output(t.cloneType)
+  val rdata1 = Output(t.cloneType)
+  val backpressure = Input(Bool())
+
+  override def cloneType: this.type = {
+    new GenericRAMDualReadIO(t, d).asInstanceOf[this.type]
+  }
+}
+
 abstract class GenericRAM[T<:Data](val t: T, val d: Int) extends Module {
   val addrWidth = {1 max log2Ceil(d)}
   val io: GenericRAMIO[T]
 }
-
+abstract class GenericRAMDualRead[T<:Data](val t: T, val d: Int) extends Module {
+  val addrWidth = {1 max log2Ceil(d)}
+  val io: GenericRAMDualReadIO[T]
+}
 class FFRAM[T<:Data](override val t: T, override val d: Int) extends GenericRAM(t, d) {
   class FFRAMIO[T<:Data](t: T, d: Int) extends GenericRAMIO(t, d) {
     class Bank[T<:Data](t: T, d: Int) extends Bundle {
@@ -151,6 +193,39 @@ class SRAM[T<:Data](override val t: T, override val d: Int, val resourceType: St
       mem.io.waddrEn := true.B
 
       io.rdata := mem.io.rdata.asTypeOf(t)
+  }
+}
+
+
+class SRAMDualRead[T<:Data](override val t: T, override val d: Int, val resourceType: String) extends GenericRAMDualRead(t, d) {
+  val io = IO(new GenericRAMDualReadIO(t, d))
+
+  // Customize SRAM here
+  // TODO: Still needs some cleanup
+  globals.target match {
+//    case _:AWS_F1 | _:Zynq | _:ZCU | _:Arria10 | _:KCU1500 | _:CXP  =>
+    case _ =>
+      val mem = Module(new SRAMVerilogDualRead(t, d))
+
+      mem.io.clk := clock
+      mem.io.raddr0 := io.raddr0
+      mem.io.raddr1 := io.raddr1
+      mem.io.wen := io.wen
+      mem.io.waddr := io.waddr
+      mem.io.wdata := io.wdata.asUInt()
+      mem.io.backpressure := io.backpressure
+      mem.io.raddrEn0 := true.B
+      mem.io.raddrEn1 := true.B
+      mem.io.waddrEn := true.B
+
+      // Implement WRITE_FIRST logic here
+      // equality register
+      val equalReg0 = RegNext(io.wen & (io.raddr0 === io.waddr), false.B)
+      val equalReg1 = RegNext(io.wen & (io.raddr1 === io.waddr), false.B)
+      val wdataReg = RegNext(io.wdata.asUInt, 0.U)
+      io.rdata0 := Mux(equalReg0, wdataReg.asUInt, mem.io.rdata0).asTypeOf(t)
+      io.rdata1 := Mux(equalReg1, wdataReg.asUInt, mem.io.rdata1).asTypeOf(t)
+
   }
 }
 

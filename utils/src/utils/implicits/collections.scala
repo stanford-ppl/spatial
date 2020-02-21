@@ -86,7 +86,7 @@ object collections {
     /** Returns a new Map from elements in x to func(x)  */
     def mapping[B](func: A => B): Map[A,B] = x.map{x => x -> func(x) }.toMap
 
-    def toSortedSeq(implicit rule: (A => Int) = {y => y.hashCode()}): Seq[A] = x.toSeq.sortBy(rule)
+    def toSortedSeq(implicit rule: A => Int = {y => y.hashCode()}): Seq[A] = x.toSeq.sortBy(rule)
 
     def maxByOrElse[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.maxBy(f)
     def minByOrElse[B:Ordering](z: A)(f: A => B): A = if (x.isEmpty) z else x.minBy(f)
@@ -105,6 +105,12 @@ object collections {
     def forallPairs(func: (A,A) => Boolean): Boolean = x.pairs.forall{case (a,b) => func(a,b) }
 
     /**
+      * Returns true if the given function is true over all combinations of 3 elements
+      * in this collection.
+      */
+    def forallTriplets(func: (A,A,A) => Boolean): Boolean = x.triplets.forall{case (a,b,c) => func(a,b,c) }
+
+    /**
       * Returns an iterator over all combinations of 2 from this iterable collection.
       * Assumes that either the collection has (functionally) distinct elements.
       */
@@ -114,7 +120,15 @@ object collections {
     //   case _ => Iterator.empty
     // }
     def pairs: Iterator[(A,A)] = {
-      if (x.size >= 2) (x.tail.iterator.map{m1 => (x.head,m1) } ++ x.tail.pairs) else Iterator.empty
+      if (x.size >= 2) x.tail.iterator.map{m1 => (x.head,m1) } ++ x.tail.pairs else Iterator.empty
+    }
+
+    /**
+      * Returns an iterator over all combinations of 3 from this iterable collection.
+      * Assumes that either the collection has (functionally) distinct elements.
+      */
+    def triplets: Iterator[(A,A,A)] = {
+      if (x.size >= 3) x.tail.pairs.map{case (m1,m2) => (x.head,m1,m2)} ++ x.tail.triplets else Iterator.empty
     }
 
     def mapFind[B](func: A => Option[B]): Option[B] = {

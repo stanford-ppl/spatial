@@ -441,6 +441,14 @@ case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
   */
 case class MustMerge(flag: Boolean) extends Data[MustMerge](SetBy.User)
 
+/** Flag set by the user to let compiler assume memory has dual read ports.
+  *
+  * Getter:  sym.isDualPortedRead
+  * Setter:  sym.isDualPortedRead = (true | false)
+  * Default: false
+  */
+case class DualPortedRead(flag: Boolean) extends Data[DualPortedRead](SetBy.User)
+
 /** Flag set by the user to ensure an SRAM will merge the buffers, in cases
     where you have metapipelined access such as pre-load, accumulate, store.
   *

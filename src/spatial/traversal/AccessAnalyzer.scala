@@ -218,7 +218,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"    [$d] $p") }
 
-    val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil)
+    val matrices = getUnrolledMatrices(mem,access,addr,pattern,Nil,access.isReader)
     access.accessPattern = pattern
     access.affineMatrices = matrices
 
@@ -252,7 +252,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     dbgs(s"  Access pattern: ")
     pattern.zipWithIndex.foreach{case (p,d) => dbgs(s"  [$d] $p") }
 
-    val matrices = pattern.flatMap{p => getUnrolledMatrices(mem, access, Nil, Seq(p), Nil)}
+    val matrices = pattern.flatMap{p => getUnrolledMatrices(mem, access, Nil, Seq(p), Nil, access.isReader)}
     access.accessPattern = pattern
     access.affineMatrices = matrices
 

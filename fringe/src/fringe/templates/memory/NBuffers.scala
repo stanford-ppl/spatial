@@ -115,6 +115,31 @@ class NBufMem(np: NBufParams) extends Module {
         io.rPort(i).output.zipWithIndex.foreach{case (r, j) => r := chisel3.util.Mux1H(outSel, srams.map{f => f.io.rPort(i).output(j)})}
       }
 
+    case BankedSRAMDualReadType =>
+      val srams = (0 until np.numBufs).map{ i =>
+        val x = Module(new BankedSRAM(np.p.Ds, np.p.bitWidth,
+                        np.p.Ns, np.p.Bs, np.p.Ps,
+                        np.p.WMapping, np.p.RMapping,
+                        np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, np.p.numActives, "SRAM"))
+        x.io <> DontCare
+        x
+      }
+      // Route NBuf IO to SRAM IOs
+      srams.zipWithIndex.foreach{ case (f,i) =>
+        np.p.WMapping.zipWithIndex.foreach { case (a,j) =>
+          val wMask = if (a.port.bufPort.isDefined) {ctrl.io.statesInW(ctrl.lookup(a.port.bufPort.get)) === i.U} else true.B
+          f.connectBufW(io.wPort(j), j, wMask)
+        }
+        np.p.RMapping.zipWithIndex.foreach { case (a,j) =>
+          val rMask = if (a.port.bufPort.isDefined) {ctrl.io.statesInR(a.port.bufPort.get) === i.U} else true.B
+          f.connectBufR(io.rPort(j), j, rMask)
+        }
+      }
+
+      np.p.RMapping.zipWithIndex.collect{case (p, i) if (p.port.bufPort.isDefined) =>
+        val outSel = (0 until np.numBufs).map{ a => ctrl.io.statesInR(p.port.bufPort.get) === a.U }
+        io.rPort(i).output.zipWithIndex.foreach{case (r, j) => r := chisel3.util.Mux1H(outSel, srams.map{f => f.io.rPort(i).output(j)})}
+      }
 
     case FFType => 
       val ffs = (0 until np.numBufs).map{ i => 

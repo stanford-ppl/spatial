@@ -2,7 +2,7 @@ package poly
 
 import utils.implicits.collections._
 
-case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
+case class SparseMatrix[K](rows: Seq[SparseVector[K]], isReader: Boolean = false) {
   def keys: Set[K] = rows.map(_.cols.keySet).fold(Set.empty)(_++_)
   def replaceKeys(keySwap: Map[K,(K,Int)]): SparseMatrix[K] = {
     val rows2 = rows.map{r => 
@@ -10,20 +10,20 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
       val offset = r.cols.collect{case (k,_) if (keySwap.contains(k)) => keySwap(k)._2}.sum
       SparseVector[K](cols2, r.c + offset, r.allIters)
     }
-    SparseMatrix[K](rows2)
+    SparseMatrix[K](rows2, isReader)
   }
 
   def prependBlankRow: SparseMatrix[K] = {
     val rows2 = Seq(SparseVector[K](Map[K,Int](), 0, Map[K,Seq[K]]())) ++ rows
-    SparseMatrix[K](rows2)
+    SparseMatrix[K](rows2, isReader)
   }
 
-  def sliceDims(dims: Seq[Int]): SparseMatrix[K] = SparseMatrix[K](dims.map{i => rows(i) })
+  def sliceDims(dims: Seq[Int]): SparseMatrix[K] = SparseMatrix[K](dims.map{i => rows(i) }, isReader)
 
-  def map(f: SparseVector[K] => SparseVector[K]): SparseMatrix[K] = SparseMatrix[K](rows.map(f))
+  def map(f: SparseVector[K] => SparseVector[K]): SparseMatrix[K] = SparseMatrix[K](rows.map(f), isReader)
   def zip(that: SparseMatrix[K])(func: (Int,Int) => Int): SparseMatrix[K] = {
     val rows2 = this.rows.zip(that.rows).map{case (v1,v2) => v1.zip(v2)(func) }
-    SparseMatrix[K](rows2)
+    SparseMatrix[K](rows2, isReader)
   }
   def unary_-(): SparseMatrix[K] = this.map{row => -row}
   def +(that: SparseMatrix[K]): SparseMatrix[K] = this.zip(that){_+_}
@@ -35,13 +35,13 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
       val stepsize = r.cols.collect{case (k,v) if (k == key) => v}.headOption.getOrElse(0)
       SparseVector[K](r.cols, r.c + value * stepsize, r.allIters)
     }
-    SparseMatrix[K](rows2)
+    SparseMatrix[K](rows2, isReader)
   }
   def incrementConst(value: Int): SparseMatrix[K] = {
     val rows2 = this.rows.map{r => 
       SparseVector[K](r.cols, r.c + value, r.allIters)
     }
-    SparseMatrix[K](rows2)
+    SparseMatrix[K](rows2, isReader)
   }
   private def combs(lol: List[List[SparseVector[K]]]): List[List[SparseVector[K]]] = lol match {
     case Nil => List(Nil)
@@ -67,7 +67,7 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
       }
     }
 
-    combs(rowOptions.toList).map{sm => SparseMatrix[K](sm)}
+    combs(rowOptions.toList).map{sm => SparseMatrix[K](sm, isReader)}
   }
   def asConstraintEqlZero = ConstraintMatrix(rows.map(_.asConstraintEqlZero).toSet)
   def asConstraintGeqZero = ConstraintMatrix(rows.map(_.asConstraintGeqZero).toSet)
@@ -81,7 +81,7 @@ case class SparseMatrix[K](rows: Seq[SparseVector[K]]) {
     val rowStrs = rows.map{row => header.map{k => row(k).toString } :+ row.c.toString :+ row.mod.toString}
     val entries = (header.map(_.toString) :+ "c" :+ "mod") +: rowStrs
     val maxCol = entries.flatMap(_.map(_.length)).maxOrElse(0)
-    entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n")
+    entries.map{row => row.map{x => " "*(maxCol - x.length + 1) + x }.mkString(" ") }.mkString("\n") + {if (isReader) "rd" else "wr"}
   }
 }
 object SparseMatrix {

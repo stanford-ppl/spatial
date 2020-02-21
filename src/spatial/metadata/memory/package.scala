@@ -104,6 +104,9 @@ package object memory {
     def isMustMerge: Boolean = metadata[MustMerge](s).exists(_.flag)
     def isMustMerge_=(flag: Boolean): Unit = metadata.add(s, MustMerge(flag))
 
+    def isDualPortedRead: Boolean = metadata[DualPortedRead](s).exists(_.flag)
+    def isDualPortedRead_=(flag: Boolean): Unit = metadata.add(s, DualPortedRead(flag))
+
     def isFullFission: Boolean = metadata[OnlyDuplicate](s).exists(_.flag)
     def isFullFission_=(flag: Boolean): Unit = metadata.add(s, OnlyDuplicate(flag))
 

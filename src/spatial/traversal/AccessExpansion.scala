@@ -54,11 +54,11 @@ trait AccessExpansion {
   def domain(x: Idx): ConstraintMatrix[Idx] = getOrAddDomain(x)
 
 
-  def getAccessCompactMatrix(access: Sym[_], addr: Seq[Idx], pattern: Seq[AddressPattern]): SparseMatrix[Idx] = {
+  def getAccessCompactMatrix(access: Sym[_], addr: Seq[Idx], pattern: Seq[AddressPattern], isReader: Boolean = false): SparseMatrix[Idx] = {
     val rows = pattern.zipWithIndex.map{case (ap,d) =>
       ap.toSparseVector{() => addr.indexOrElse(d, nextRand()) }
     }
-    val matrix = SparseMatrix[Idx](rows)
+    val matrix = SparseMatrix[Idx](rows, isReader)
     matrix.keys.foreach{x => getOrAddDomain(x) }
     matrix
   }
@@ -68,7 +68,8 @@ trait AccessExpansion {
     access:  Sym[_],
     addr:    Seq[Idx],
     pattern: Seq[AddressPattern],
-    vecID:   Seq[Int] = Nil
+    vecID:   Seq[Int] = Nil,
+    isReader: scala.Boolean = false
   ): Seq[AccessMatrix] = {
     val is = accessIterators(access, mem)
     val ps = is.map(_.ctrParOr1)
@@ -77,7 +78,7 @@ trait AccessExpansion {
     dbgs("  Iterators: " + is.indices.map{i => s"${is(i)} (par: ${ps(i)}, start: ${starts(i)})"}.mkString(", "))
 
     val iMap = is.zipWithIndex.toMap
-    val matrix = getAccessCompactMatrix(access, addr, pattern)
+    val matrix = getAccessCompactMatrix(access, addr, pattern, isReader)
 
     multiLoop(ps).map{uid: Seq[Int] =>
       val mat = matrix.map{vec: SparseVector[Idx] =>
@@ -119,7 +120,7 @@ trait AccessExpansion {
         val uI = components.collectAsMap{case (_,x,_,i) if !i.contains(x) => (x, i): (Idx, Seq[Idx]) }
         SparseVector[Idx](xs.zip(as).toMap, c, uI)
       }
-      val amat = AccessMatrix(access, mat, uid ++ vecID)
+      val amat = AccessMatrix(access, mat, uid ++ vecID, isReader)
       amat.keys.foreach{x => getOrAddDomain(x) }
       amat
     }.toSeq

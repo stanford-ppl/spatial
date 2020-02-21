@@ -1075,7 +1075,7 @@ package object control {
     *   - Text (staged strings) (TODO: only allowed in debug mode?)
     */
   def allowSharingBetweenHostAndAccel(s: Sym[_], allowArgInference: Boolean): Boolean = {
-    s.isRemoteMem ||
+    s.isRemoteMem || s.isBlackboxImpl ||
       (s.isBits && allowArgInference) ||
       s.isInstanceOf[Text]
   }

@@ -82,7 +82,7 @@ class AXICmdIssue(dram: DRAMStream) extends Module {
   io.in.wdata.ready := dramWriteIssue
 
   io.out.cmd.valid := io.in.cmd.valid & Mux(writeCmd, !writeIssued, true.B)
-
+  // wdata valid related to this one?
   io.out.wdata.valid := io.in.wdata.valid & writeIssued
   io.out.wdata.bits.wlast := wlast
 }

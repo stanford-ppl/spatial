@@ -15,7 +15,7 @@ import spatial.dsl._
       val mem = SRAM[Int](memLen)
       result := Sequential
         .Reduce(Reg[Int])(len by memLen) { i =>
-          mem load inDRAM(i :: i + memLen)
+          mem load inDRAM(i :: i + memLen par 2)
           Reduce(Reg[Int])(memLen by 1) { j =>
             mem(j)
           } {

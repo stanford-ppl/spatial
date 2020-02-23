@@ -132,7 +132,27 @@ class DRAMArbiter(
       }
 
       val cycleCount = debugCounter(io.enable)
+      scala.Console.println("Enabling inspection on W signals")
       connectDbgSig(cycleCount, "Cycles")
+
+      connectDbgSig(
+        debugCounter(io.dram.wdata.valid), " # WVALID"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wdata.ready), " # WREADY"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.cmd.ready & io.dram.cmd.bits.isWr), " # AWREADY"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.cmd.valid & io.dram.cmd.bits.isWr), " # AWVALID"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wresp.valid), " # BVALID"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wresp.ready), " # BREADY"
+      )
 
       val rdataEnqCount = debugCounter(io.dram.rresp.valid & io.dram.rresp.ready)
       val wdataCount = debugCounter(io.dram.wdata.valid & io.dram.wdata.ready)
@@ -190,6 +210,7 @@ class DRAMArbiter(
 
       // Connect AXI loopback debuggers
       // TOP
+      connectDbgSig(debugCounter(io.dram.wdata.valid), "# cycles io.dram.wdata.valid")
       connectDbgSig(debugCounter(io.TOP_AXI.ARVALID), "# cycles TOP ARVALID ")
       connectDbgSig(debugCounter(io.TOP_AXI.ARREADY), "# cycles TOP ARREADY")
       connectDbgSig(debugCounter(io.TOP_AXI.ARREADY & io.TOP_AXI.ARVALID), "# cycles TOP ARREADY & ARVALID ")

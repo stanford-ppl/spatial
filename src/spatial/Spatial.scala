@@ -449,7 +449,13 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.useCheapFifos = true
       spatialConfig.enableRetiming = true
       overrideRetime = true
-    }.text("Enable cheap fifos where accesses must be multiples of each other and not have lane-enables")
+    }.text("<DEPRECATED> Enable cheap fifos where accesses must be multiples of each other and not have lane-enables")
+
+    cli.opt[Unit]("cheapSRAMs").action { (_,_) => // Must necessarily turn on retiming
+      spatialConfig.useCheapSRAMs = true
+      spatialConfig.enableRetiming = true
+      overrideRetime = true
+    }.text("Enable cheap SRAM templates, which is mostly safe but could give wrong results in stream-based control structures or complex banking schemes (i.e. remove SRAM enable hysteresis)")
 
     cli.opt[Int]("sramThreshold").action { (t,_) => spatialConfig.sramThreshold = t }.text("Minimum number of elements in memory to instantiate BRAM over Registers")
 

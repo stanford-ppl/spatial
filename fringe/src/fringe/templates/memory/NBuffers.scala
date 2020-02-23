@@ -117,7 +117,7 @@ class NBufMem(np: NBufParams) extends Module {
 
     case BankedSRAMDualReadType =>
       val srams = (0 until np.numBufs).map{ i =>
-        val x = Module(new BankedSRAM(np.p.Ds, np.p.bitWidth,
+        val x = Module(new BankedSRAMDualRead(np.p.Ds, np.p.bitWidth,
                         np.p.Ns, np.p.Bs, np.p.Ps,
                         np.p.WMapping, np.p.RMapping,
                         np.p.bankingMode, np.p.inits, np.p.syncMem, np.p.fracBits, np.p.numActives, "SRAM"))

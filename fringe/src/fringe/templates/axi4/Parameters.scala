@@ -9,6 +9,7 @@ import _root_.utils.math.log2Up
 import scala.math.max
 
 // Avalon buses
+// TODO: Later I need to put this into Avalon's own package...
 class AvalonBundleParameters(addrBits: Int, dataBits: Int, idBits: Int) extends
   AXI4BundleParameters(addrBits, dataBits, idBits)
 

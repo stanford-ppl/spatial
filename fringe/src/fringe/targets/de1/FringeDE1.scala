@@ -17,18 +17,17 @@ class FringeDE1(blockingDRAMIssue: Boolean,
 
   val v = 16 // Number of words in the same stream
   val numOutstandingBursts = 1024 // Picked arbitrarily
-  val burstSizeBytes = 64
 
   val io = IO(new Bundle {
     val S_AVALON = new AvalonSlave(avalonLiteParams)
 
     // TODO: Add M_AVALON Later...
+    scala.Console.println("TODO: Get M_AVALON maybe...")
     val M_AXI: Vec[AXI4Inlined] =
       Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
+//    val M_AVALON = new AvalonMaster(avalonMMParams)
 
     // TODO: Add Avalon probes for board debugging.
-    //  For now just add AXI to stop FIRRTL panicing
-
     val TOP_AXI = new AXI4Probe(avalonLiteParams)
     val DWIDTH_AXI = new AXI4Probe(avalonLiteParams)
     val PROTOCOL_AXI = new AXI4Probe(avalonLiteParams)
@@ -64,7 +63,6 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   fringeCommon.io.wdata := io.S_AVALON.writeData
   io.S_AVALON.readData := fringeCommon.io.rdata
 
-  // TODO: Update M_AXI
   io.M_AXI := DontCare
   fringeCommon.io.dram.foreach(m => m := DontCare)
   fringeCommon.io.aws_top_enable := DontCare

@@ -29,7 +29,7 @@ class DE1Like extends ZynqLike {
     io.PROTOCOL_AXI <> fringe.io.PROTOCOL_AXI
     io.CLOCKCONVERT_AXI <> fringe.io.CLOCKCONVERT_AXI
 
-     io.rdata := DontCare
+    io.rdata := DontCare
 
     accel.io.argIns := fringe.io.argIns
     fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
@@ -55,7 +55,9 @@ class DE1Like extends ZynqLike {
 
 class DE1 extends DE1Like {
   override def makeBigIP: BigIP = new fringe.targets.de1.BigIPDE1
+
   override def regFileAddrWidth(n: Int): Int = 32
+
   override val magPipelineDepth: Int = 0
   override val addrWidth: Int = 18
   override val dataWidth: Int = 32

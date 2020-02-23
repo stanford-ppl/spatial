@@ -235,6 +235,23 @@ class AvalonSlave(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   val writeData = Input(UInt(params.dataBits.W))
 }
 
+// Avalon Memory-mapped Master interface
+class AvalonMaster(params: AvalonBundleParameters) extends AXI4BundleBase(params) {
+  // Fundamental signals
+  val address = Output(UInt(params.addrBits.W))
+  val read = Output(Bool())
+  val readData = Input(UInt(params.dataBits.W))
+  val write = Output(Bool())
+  val writeData = Output(UInt(params.dataBits.W))
+  val waitRequest = Input(Bool())
+  // Pipeline signals
+  val readDataValid = Input(Bool())
+  val writeResponseValid = Input(Bool())
+  // TODO: I'm not sure what a proper number
+  //  for the burstCount width should be...
+//  val burstCount = Output(11.W)
+}
+
 // Avalon streaming interface
 class AvalonStream(params: AXI4BundleParameters) extends AXI4BundleBase(params) {
   // TODO: need to parameterize these bits

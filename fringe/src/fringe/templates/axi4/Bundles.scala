@@ -247,9 +247,7 @@ class AvalonMaster(params: AvalonBundleParameters) extends AXI4BundleBase(params
   // Pipeline signals
   val readDataValid = Input(Bool())
   val writeResponseValid = Input(Bool())
-  // TODO: I'm not sure what a proper number
-  //  for the burstCount width should be...
-//  val burstCount = Output(11.W)
+  val burstCount = Output(UInt(params.burstCountBits.W))
 }
 
 // Avalon streaming interface

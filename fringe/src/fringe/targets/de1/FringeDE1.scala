@@ -2,13 +2,14 @@ package fringe.targets.de1
 
 import chisel3._
 import chisel3.util.{Decoupled, DecoupledIO}
-import fringe.{AppStreams, Fringe, HeapIO, globals}
 import fringe.globals._
+import fringe.templates.avalon.MAGToAvalonBridge
 import fringe.templates.axi4._
+import fringe.{AppStreams, Fringe, HeapIO}
 
 class FringeDE1(blockingDRAMIssue: Boolean,
                 avalonLiteParams: AvalonBundleParameters,
-                axiParams: AXI4BundleParameters)
+                avalonParams: AvalonBundleParameters)
     extends Module {
 
   val numRegs: Int = NUM_ARG_INS + NUM_ARG_OUTS + NUM_ARG_IOS + 2
@@ -22,10 +23,9 @@ class FringeDE1(blockingDRAMIssue: Boolean,
     val S_AVALON = new AvalonSlave(avalonLiteParams)
 
     // TODO: Add M_AVALON Later...
-    scala.Console.println("TODO: Get M_AVALON maybe...")
-    val M_AXI: Vec[AXI4Inlined] =
-      Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
-//    val M_AVALON = new AvalonMaster(avalonMMParams)
+    scala.Console.println("Getting M_AVALON tested...")
+    val M_AVALON: Vec[AvalonMaster] =
+      Vec(NUM_CHANNELS, new AvalonMaster(avalonParams))
 
     // TODO: Add Avalon probes for board debugging.
     val TOP_AXI = new AXI4Probe(avalonLiteParams)
@@ -56,14 +56,14 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   io <> DontCare
 
   // Common Fringe
-  val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
+  val fringeCommon = Module(new Fringe(blockingDRAMIssue, avalonParams))
   fringeCommon.io.raddr := io.S_AVALON.address
   fringeCommon.io.wen := io.S_AVALON.write
   fringeCommon.io.waddr := io.S_AVALON.address
   fringeCommon.io.wdata := io.S_AVALON.writeData
   io.S_AVALON.readData := fringeCommon.io.rdata
 
-  io.M_AXI := DontCare
+  io.M_AVALON := DontCare
   fringeCommon.io.dram.foreach(m => m := DontCare)
   fringeCommon.io.aws_top_enable := DontCare
 
@@ -88,14 +88,15 @@ class FringeDE1(blockingDRAMIssue: Boolean,
 
   // TODO: This might work better with an Avalon stream...
   // AXI bridge
-  io.M_AXI.zipWithIndex.foreach {
-    case (maxi, i) =>
-      val axiBridge = Module(new MAGToAXI4Bridge(axiParams))
-      axiBridge.io.in <> fringeCommon.io.dram(i)
-      maxi <> axiBridge.io.M_AXI
+  io.M_AVALON.zipWithIndex.foreach {
+    case (m, i) =>
+      val avalonBridge = Module(new MAGToAvalonBridge(avalonParams))
+      avalonBridge.io.in <> fringeCommon.io.dram(i)
+      m <> avalonBridge.io.M_AVALON
   }
-  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
-    io.M_AXI.foreach(_.AWVALID := false.B)
-    io.M_AXI.foreach(_.ARVALID := false.B)
-  }
+  // TODO: Seems that this one is not helping much?
+//  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
+//    io.M_AXI.foreach(_.AWVALID := false.B)
+//    io.M_AXI.foreach(_.ARVALID := false.B)
+//  }
 }

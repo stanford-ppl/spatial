@@ -72,6 +72,10 @@ class AXICmdIssue(dram: DRAMStream) extends Module {
   } .elsewhen(dramCmdIssue & writeCmd) {
     writeIssued := true.B
   }
+//  }.otherwise { // TODO: Tian: Seems that we are missing an otherWise case here?
+//    scala.Console.println("Instantiating otherWise clause for writeIssued...")
+//    writeIssued := false.B
+//  }
 
   wdataCounter.io.reset := wlast
   wdataCounter.io.enable := dramWriteIssue
@@ -83,7 +87,16 @@ class AXICmdIssue(dram: DRAMStream) extends Module {
 
   io.out.cmd.valid := io.in.cmd.valid & Mux(writeCmd, !writeIssued, true.B)
   // wdata valid related to this one?
-  io.out.wdata.valid := io.in.wdata.valid & writeIssued
+  // TODO: Tian: Based on the AXI4 signal dependency doc,
+  //  wdata.valid should assert independent of the incoming awready.
+  //  However when tracing from AWREADY, it seems that WVALID assertion
+  //  dependes on awready? Seems like a bug to me. We could easily
+  //  run into an edge case where the vendor interconect is not strictly
+  //  Xilinx AXI (or Xilinx decides to change their impl to give a stricter
+  //  AXI conformance...
+  // Also, wvalid should be on until wlast asserts.
+//  io.out.wdata.valid := io.in.wdata.valid & writeIssued
+  io.out.wdata.valid := io.in.wdata.valid
   io.out.wdata.bits.wlast := wlast
 }
 

@@ -10,7 +10,7 @@ import spatial.dsl._
       Foreach(len by memLen) { i =>
         val mem = SRAM[Int](memLen)
         Foreach (memLen by 1) { j =>
-          mem(j) = i + j
+          mem(j) = i + j + 12
         }
 
         outDRAM(i :: i + memLen) store mem

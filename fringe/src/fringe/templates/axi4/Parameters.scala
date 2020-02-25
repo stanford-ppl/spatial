@@ -10,7 +10,12 @@ import scala.math.max
 
 // Avalon buses
 // TODO: Later I need to put this into Avalon's own package...
-class AvalonBundleParameters(addrBits: Int, dataBits: Int, idBits: Int) extends
+class AvalonBundleParameters(addrBits: Int,
+                             dataBits: Int,
+                             idBits: Int,
+                             val burstCountBits: Int = 11,
+                             val tagQueueSize: Int = 64
+                            ) extends
   AXI4BundleParameters(addrBits, dataBits, idBits)
 
 // AXI buses

@@ -153,6 +153,9 @@ class DRAMArbiter(
       connectDbgSig(
         debugCounter(io.dram.wresp.ready), " # BREADY"
       )
+      connectDbgSig(
+        debugCounter(io.dram.wdata.bits.wlast), " # WLAST"
+      )
 
       val rdataEnqCount = debugCounter(io.dram.rresp.valid & io.dram.rresp.ready)
       val wdataCount = debugCounter(io.dram.wdata.valid & io.dram.wdata.ready)

@@ -24,14 +24,15 @@ import emul.ResidualGenerator._
 case class AccessMatrix(
   access: Sym[_],
   matrix: SparseMatrix[Idx],
-  unroll: Seq[Int]
+  unroll: Seq[Int],
+  isReader: scala.Boolean = false
 ) {
   def keys: Set[Idx] = matrix.keys
   @stateful def parent: Ctrl = access.parent
   def substituteKeys(keySwap: Map[Idx,(Idx,Int)]): AccessMatrix = {
     keySwap.foreach{case (old, (swp,_)) => swp.domain = old.domain.replaceKeys(keySwap)}
     val matrix2 = matrix.replaceKeys(keySwap) 
-    AccessMatrix(access, matrix2, unroll)
+    AccessMatrix(access, matrix2, unroll, this.isReader)
   }
 
   /** True if there exists a reachable multi-dimensional index I such that a(I) = b(I).
@@ -47,7 +48,7 @@ case class AccessMatrix(
   def intersects(b: AccessMatrix)(implicit isl: ISL): Boolean = isl.intersects(this.matrix, b.matrix)
 
   override def toString: String = {
-    stm(access) + " {" + unroll.mkString(",") + "}\n" + matrix.toString
+    stm(access) + " " + {if (isReader) "rd" else "wr"} + "{" + unroll.mkString(",") + "}\n" + matrix.toString
   }
 
   def short: String = s"$access {${unroll.mkString(",")}}"
@@ -65,7 +66,7 @@ case class AccessMatrix(
         val c2 = r.c * alpha
         SparseVector[Idx](vec, c2, r.allIters)
       }
-      SparseMatrix[Idx](rows2)
+      SparseMatrix[Idx](rows2, b.isReader)
     }
   }
 

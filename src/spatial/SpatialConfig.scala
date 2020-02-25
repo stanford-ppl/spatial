@@ -29,6 +29,7 @@ class SpatialConfig extends Config {
   var enableModular: Boolean = true
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
+  var useCheapSRAMs: Boolean = true
   var prioritizeFlat: Boolean = false
   var numSchemesPerRegion: Int = 2
   var bankingTimeout: Int = 50000
@@ -92,6 +93,7 @@ class SpatialConfig extends Config {
       dstSC.enableInstrumentation = enableInstrumentation
       dstSC.enableTightControl = enableTightControl
       dstSC.useCheapFifos = useCheapFifos
+      dstSC.useCheapSRAMs = useCheapSRAMs
       dstSC.enableOptimizedReduce = enableOptimizedReduce
       dstSC.enableForceBanking = enableForceBanking
       dstSC.groupUnrolledAccess = groupUnrolledAccess

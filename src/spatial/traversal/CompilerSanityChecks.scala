@@ -85,6 +85,12 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
     parent = Some(lhs)
     rhs match {
       case AccelScope(_) => inAccel {check(lhs, rhs); super.visit(lhs, rhs) }
+      case SpatialBlackboxImpl(block) =>
+        if (lhs.parent match { case Ctrl.Host => false; case _ => true }) error(ctx, s"Please declare Blackbox implementation outside of Accel!")
+        inBox { check(lhs,rhs); super.visit(lhs, rhs) }
+      case SpatialCtrlBlackboxImpl(block) =>
+        if (lhs.parent match { case Ctrl.Host => false; case _ => true }) error(ctx, s"Please declare Blackbox implementation outside of Accel!")
+        inBox { check(lhs,rhs); super.visit(lhs, rhs) }
       case _ =>
         check(lhs, rhs)
         super.visit(lhs, rhs)

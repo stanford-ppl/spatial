@@ -138,13 +138,14 @@ trait ChiselGenMem extends ChiselGenCommon {
 
     if (!mem.isNBuffered && name == "LineBuffer") throw new Exception(s"Cannot create non-buffered line buffer!  Make sure $mem has readers and writers bound by a pipelined LCA, or else turn it into an SRAM")
 
-    val templateName = if (!mem.isNBuffered && name != "LineBuffer") s"$name("
+    val dualsfx = if (mem.isDualPortedRead) "DualRead" else ""
+    val templateName = if (!mem.isNBuffered && name != "LineBuffer") s"$name$dualsfx("
                        else {
                          if (name == "SRAM") appPropertyStats += HasNBufSRAM
                          mem.swappers.zipWithIndex.foreach{case (node, port) => 
                            bufMapping += (node -> {bufMapping.getOrElse(node, List[BufMapping]()) ++ List(BufMapping(mem, port))})
                          }
-                         s"NBufMem(${name}Type, "
+                         s"NBufMem(${name}${dualsfx}Type, "
                        }
     if (mem.broadcastsAnyRead) appPropertyStats += HasBroadcastRead
 

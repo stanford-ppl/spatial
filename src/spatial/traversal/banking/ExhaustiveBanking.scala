@@ -64,7 +64,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val toRewrite: Map[(Idx, Seq[Int]), Option[Int]] = if (mem.forceExplicitBanking) Map() else accs.flatten.flatMap { a => dephasingIters(a, Seq.fill(a.unroll.size)(0), mem) }.toMap
       toRewrite.map {
         case ((i, addr), ofs) if ofs.isDefined => (i, addr) -> (i, ofs.get)
-        case ((i, addr), ofs) if !ofs.isDefined => (i, addr) -> (boundVar[I32], 0)
+        case ((i, addr), ofs) if ofs.isEmpty => (i, addr) -> (boundVar[I32], 0)
       }.toMap
     }
     def rewriteAccesses(accs: AccessGroups, rules: Map[(Idx,Seq[Int]),(Idx,Int)]): AccessGroups = {
@@ -81,7 +81,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             //   iter -> rules((iter, a.unroll))
           }.toMap
           if (keyRules.nonEmpty) {
-            mem.addDephasedAccess(a.access);
+            mem.addDephasedAccess(a.access)
             dbgs(s"Substituting due to dephasing: $keyRules")
           }
           val newa = a.substituteKeys(keyRules)
@@ -176,14 +176,14 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       schemesFoundCount.clear()
       def markFound(scheme: BankingOptions): Unit = {
         val count = schemesFoundCount.getOrElse((scheme.view, scheme.regroup), 0)
-        schemesFoundCount += (((scheme.view, scheme.regroup) -> {count + 1}))
+        schemesFoundCount += ((scheme.view, scheme.regroup) -> {count + 1})
         dbgs(s"incrementing ${scheme.view}, ${scheme.regroup} to ${count + 1} ")
       }
       def wantScheme(scheme: BankingOptions): Boolean = {
         if (effort == 0 && (schemesFoundCount.map(_._2).sum > 0)) false
         else if (effort == 1 && (
           schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 0 ||
-          !(scheme.regroup.dims.size == 0 || scheme.regroup.dims.size == scheme.view.rank)
+          !(scheme.regroup.dims.isEmpty || scheme.regroup.dims.size == scheme.view.rank)
         )) false
         else if (effort == 2 && (
           schemesFoundCount.filter{x => x._1._1 == scheme.view && x._1._2 == scheme.regroup}.values.sum > 1
@@ -197,10 +197,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         if (myWrites.exists(_.size > 1) && !mem.shouldIgnoreConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i})))))
       }
-      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && !mem.explicitBanking.isDefined) Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i})))))
-      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && !mem.explicitBanking.isDefined) {
+      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && mem.explicitBanking.isEmpty) Map(attemptDirectives.head -> Map((myReads.map{ x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){ i => i})))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && mem.explicitBanking.isEmpty) {
         val autoFullBank: FullBanking = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))
-        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> (Seq(autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1))))))
+        Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1)))))
       }
       else if (mem.explicitBanking.isDefined) {
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(mem.explicitScheme)))
@@ -219,8 +219,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               *
               *   To convert to "banking," we want to take one entry from each Map and call it a new duplicate
               */
-            val autoFullBank: FullBanking = if (view.complementView.nonEmpty) view.complementView.toSeq.flatMap{axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))} else Seq()
+            val autoFullBank: FullBanking = if (view.complementView.nonEmpty) view.complementView.flatMap{ axis => Seq(ModBanking.Simple(mem.stagedDims(axis).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))} else Seq()
             // For hierarchical, rawBanking is a Seq that has an entry per dimension.  It is a Seq of size 1 for flat banking
+            var firstSearch = true // For dual ported memories that are hierarchically banked, we can only halve N for ONE of the dimensions
             val rawBanking: Seq[Map[AccessGroups, Option[PartialBankingChoices]]] = view.expand().map{axes =>
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
@@ -238,7 +239,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                   if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(Seq(ModBanking.Unit(1, axes)))
                   else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(Seq(ModBanking.Unit(rank, axes)))
                   else {
-                    findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem)
+                    val x = findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem, firstSearch)
+                    firstSearch = false
+                    x
                   }
                 })}
               if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => Set(reverseAM(a)) -> axisBankingScheme }}.toMap else Map(selRdGrps.map{ x => x.flatMap(reverseAM(_)) ++ hostReads} -> axisBankingScheme)
@@ -258,7 +261,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
                   inViewAccs -> dup.map(_._2.get).distinct
                 }.toMap
               // All-to-all combinations for hierarchical
-              val banking = bankingRepackaged.map{case (grps, schms) => grps -> combs(autoFullBank.map(List(_)).toList ++ schms.map(_.toList).toList) }.toMap
+              val banking = bankingRepackaged.map { case (grps, schms) => grps -> combs(autoFullBank.map(List(_)).toList ++ schms.map(_.toList).toList) }
               val dimsInStrategy = view.expand().flatten.distinct
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
@@ -299,7 +302,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     if (writeIterSubsts.nonEmpty) dbgs(s"General write dephasing rules for $mem: ${writeIterSubsts.mkString("\n  - ")}")
     val hostReads: mutable.Set[AccessMatrix] = scala.collection.mutable.Set[AccessMatrix]()
     val newReads = rewriteAccesses(reads, readIterSubsts).map{accs => 
-      val mats = accs.toSeq.flatMap{x => 
+      val mats = accs.toSeq.flatMap{x =>
                                       sparseMatrixMapping += (x.matrix -> {sparseMatrixMapping.getOrElse(x.matrix, Set()) ++ Set(x)})
                                       if (x.parent != Ctrl.Host) Some(x.matrix)
                                       else {
@@ -329,9 +332,11 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     grps.forall{a => a.toList.lengthLessThan(banks+1)}
   }
 
-  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_]): Option[PartialBankingChoices] = {
+  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_], firstSearch: Boolean): Option[PartialBankingChoices] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
-    val Nmin: Int = grps.map(_.size).maxOrElse(1)
+    val Nmin_base: Int = grps.map(_.size).maxOrElse(1)
+    val dualPortHalve = mem.isDualPortedRead && firstSearch
+    val Nmin =  if (dualPortHalve) scala.math.ceil(Nmin_base.toFloat / 2.0).toInt else Nmin_base
     val Ncap = filteredStagedDims.product max Nmin
     val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)
 //    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)}")
@@ -358,12 +363,12 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         // TODO: Extraction of B here may be wrong, but people should really be careful if they explicitly set B > 1
           banking = Some(banking.getOrElse(Seq()) ++ forEachP)
       }
-      dbgs(s" Solution space: ${numAs} * ${possibleNs.size} * ${mem.blockCyclicBs.size} (B), check complexity: ${numChecks}")
+      dbgs(s" Solution space: $numAs * ${possibleNs.size} * ${mem.blockCyclicBs.size} (B), check complexity: $numChecks")
       while (As.hasNext && validSchemesFound < validSchemesWanted && attempts < searchTimeout) {
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1
-        if (!mem.onlyBlockCyclic && (!mem.explicitBanking.isDefined || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(N,alpha,grps)) {
+        if (!mem.onlyBlockCyclic && (mem.explicitBanking.isEmpty || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(mem,N,alpha,grps,dualPortHalve)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val allP = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
           val forEachP = allP.map{P => ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks)}
@@ -371,9 +376,9 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           validSchemesFound = validSchemesFound + 1
         }
         else if (!mem.noBlockCyclic) {
-          val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(N,b,alpha,grps) }
+          val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(mem,N,b,alpha,grps,dualPortHalve) }
           val numBs = B.size
-          val scheme: Option[Seq[ModBanking]] = B.collectFirst{case b if (coprime(Seq(b) ++ alpha)) =>
+          val scheme: Option[Seq[ModBanking]] = B.collectFirst{case b if coprime(Seq(b) ++ alpha) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")
             val allP = computeP(N, b, alpha, stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=$b, alpha=$alpha (memory $mem ${mem.ctx})"))
             val forEachP = allP.map{P => ModBanking(N, b, alpha, axes, P,numAs*possibleNs.size*numBs,numChecks)}
@@ -397,18 +402,48 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
   }
 
-  private def checkCyclic(N: Int, alpha: Seq[Int], grps: Set[Set[SparseMatrix[Idx]]]): Boolean = grps.forall{_.forallPairs{(a0,a1) =>
-    val c0 = (alpha*(a0 - a1) + (k,N)) === 0
-    c0.andDomain.isEmpty
-  }}
+  private def checkCyclic(mem: Sym[_], N: Int, alpha: Seq[Int], grps: Set[Set[SparseMatrix[Idx]]], dualPortHalve: Boolean): Boolean = {
+    grps.forall{grp =>
+      val dp = grp.nonEmpty && grp.head.isReader && dualPortHalve // TODO: mem.isDualPortedWrite (requires simple changes here, complicated changes in chisel backend)
+      if (dp) {
+        grp.forallTriplets { (a0, a1, a2) =>
+          val c01 = ((alpha * (a0 - a1) + (k, N)) === 0).andDomain.isEmpty
+          val c02 = ((alpha * (a0 - a2) + (k, N)) === 0).andDomain.isEmpty
+//          val c12 = ((alpha * (a1 - a2) + (k, N)) === 0).andDomain.isEmpty // Apparently c12 is unnecessary
+          c01 || c02 //|| c12
+        }
+      } else {
+        grp.forallPairs{(a0,a1) =>
+          val c0 = (alpha*(a0 - a1) + (k,N)) === 0
+          c0.andDomain.isEmpty
+        }
+      }
+    }
+  }
 
-  private def checkBlockCyclic(N: Int, B: Int, alpha: Seq[Int], grps: Set[Set[SparseMatrix[Idx]]]): Boolean = grps.forall{_.forallPairs{(a0,a1) =>
-    val alphaA0 = alpha*a0
-    val alphaA1 = alpha*a1
-    val c0 = (-alphaA0 + (k0,B*N) + (k1,B) + B - 1) >== 0
-    val c1 = (-alphaA1 + (k1,B) + B - 1) >== 0
-    val c2 = (alphaA0 - (k0,B*N) - (k1,B)) >== 0
-    val c3 = (alphaA1 - (k1,B)) >== 0
-    ConstraintMatrix(Set(c0,c1,c2,c3)).andDomain.isEmpty
-  }}
+  private def checkBlockCyclic(mem: Sym[_], N: Int, B: Int, alpha: Seq[Int], grps: Set[Set[SparseMatrix[Idx]]], dualPortHalve: Boolean): Boolean = {
+    def checkPair(alphaA0: SparseVector[Idx], alphaA1: SparseVector[Idx]): Boolean = {
+      val c0 = (-alphaA0 + (k0, B * N) + (k1, B) + B - 1) >== 0
+      val c1 = (-alphaA1 + (k1, B) + B - 1) >== 0
+      val c2 = (alphaA0 - (k0, B * N) - (k1, B)) >== 0
+      val c3 = (alphaA1 - (k1, B)) >== 0
+      ConstraintMatrix(Set(c0, c1, c2, c3)).andDomain.isEmpty
+    }
+    grps.forall{grp =>
+      val dp = grp.nonEmpty && grp.head.isReader && dualPortHalve // TODO: mem.isDualPortedWrite (requires simple changes here, complicated changes in chisel backend)
+      if (dp) {
+        grp.forallTriplets { (a0, a1, a2) =>
+          val alphaA0 = alpha * a0
+          val alphaA1 = alpha * a1
+          val alphaA2 = alpha * a2
+          checkPair(alpha * a0, alpha * a1) || checkPair(alpha * a0, alpha * a2) // || checkPair(alpha * a1, alpha * a2)
+        }
+      } else {
+        grp.forallPairs { (a0, a1) =>
+          checkPair(alpha * a0, alpha * a1)
+        }
+      }
+    }
+  }
 }
+

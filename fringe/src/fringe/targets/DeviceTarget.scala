@@ -26,6 +26,7 @@ trait DeviceTarget {
   var sramload_latency = 0
   var sramstore_latency = 0
 
+  var cheapSRAMs = false
   var SramThreshold = 0 // Threshold between turning Mem1D into register array vs real memory
   var mux_latency = 1
 

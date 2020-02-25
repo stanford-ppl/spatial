@@ -409,12 +409,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         grp.forallTriplets { (a0, a1, a2) =>
           val c01 = ((alpha * (a0 - a1) + (k, N)) === 0).andDomain.isEmpty
           val c02 = ((alpha * (a0 - a2) + (k, N)) === 0).andDomain.isEmpty
-          val c12 = ((alpha * (a1 - a2) + (k, N)) === 0).andDomain.isEmpty
-          // TODO: Technically this is too restrictive, but I'm not sure how often we miss out.
-          //  We need some way of quantifying WHICH banks are conflicting, or build a three-way conflict polytope.  I.e., if access 0 touches
-          //  banks 0 and 1, access 1 touches banks 1 and 2, and access 2 touches banks 0 and 2, this
-          //  check will fail but it is still dual-port bankable
-          c01 || c02 || c12
+//          val c12 = ((alpha * (a1 - a2) + (k, N)) === 0).andDomain.isEmpty // Apparently c12 is unnecessary
+          c01 || c02 //|| c12
         }
       } else {
         grp.forallPairs{(a0,a1) =>
@@ -440,11 +436,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           val alphaA0 = alpha * a0
           val alphaA1 = alpha * a1
           val alphaA2 = alpha * a2
-          // TODO: Technically this is too restrictive, but I'm not sure how often we miss out.
-          //  We need some way of quantifying WHICH banks are conflicting, or build a three-way conflict polytope.  I.e., if access 0 touches
-          //  banks 0 and 1, access 1 touches banks 1 and 2, and access 2 touches banks 0 and 2, this
-          //  check will fail but it is still dual-port bankable
-          checkPair(alpha * a0, alpha * a1) || checkPair(alpha * a0, alpha * a2) || checkPair(alpha * a1, alpha * a2)
+          checkPair(alpha * a0, alpha * a1) || checkPair(alpha * a0, alpha * a2) // || checkPair(alpha * a1, alpha * a2)
         }
       } else {
         grp.forallPairs { (a0, a1) =>

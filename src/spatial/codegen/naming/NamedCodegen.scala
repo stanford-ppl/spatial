@@ -84,6 +84,13 @@ trait NamedCodegen extends Codegen {
       case FixDiv(_,_)  => s"${s}_${s.nameOr("div")}"
       case FixMul(_,_)  => s"${s}_${s.nameOr("mul")}"
 
+      case _:SpatialCtrlBlackboxImpl[_,_]  => s"${s}_sctrlbox_${s.nameOr("impl")}"
+      case SpatialCtrlBlackboxUse(_,box,_)  => s"${s}_${box}_${s.nameOr("use")}"
+      case _:VerilogCtrlBlackbox[_,_]  => s"${s}_vctrlbox_${s.nameOr("use")}"
+      case _:SpatialBlackboxImpl[_,_]  => s"${s}_sprimbox_${s.nameOr("impl")}"
+      case SpatialBlackboxUse(box,_)  => s"${s}_${box}_${s.nameOr("use")}"
+      case _:VerilogBlackbox[_,_]  => s"${s}_vprimbox_${s.nameOr("use")}"
+
       case DelayLine(size, data) if data.isConst => src"$data"
       // case DelayLine(size, data)                 => s"${s}_D$size"
 

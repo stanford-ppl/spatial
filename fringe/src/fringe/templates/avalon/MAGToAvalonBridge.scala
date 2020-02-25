@@ -1,7 +1,7 @@
 package fringe.templates.avalon
 
 import chisel3._
-import chisel3.util.{Cat, Decoupled, Queue}
+import chisel3.util.{Cat, Decoupled, DecoupledIO, Queue}
 import fringe.globals
 import fringe.DRAMStream
 import fringe.templates.axi4.{AvalonBundleParameters, AvalonMaster}
@@ -19,14 +19,18 @@ class MAGToAvalonBridge(val p: AvalonBundleParameters) extends Module {
   // TODO: How is dram cmd ID handled?
   val numPipelinedLevels: Int = globals.magPipelineDepth
   private val cmd = io.in.cmd
-  private val tag = cmd.bits.tag
-  private val tagQueue = Queue(Flipped(Decoupled(tag)), p.tagQueueSize)
+  private val tag = cmd.bits.tag.asUInt()
+  // TODO: Not sure if this would help...
+  private val tagQueueW = Module(new Queue(UInt(32.W), p.tagQueueSize))
+  private val tagQueueR = Module(new Queue(UInt(32.W), p.tagQueueSize))
+
   private val wData = io.in.wdata
   private val wResp = io.in.wresp
   private val rResp = io.in.rresp
   private val size = io.in.cmd.bits.size
   private val master = io.M_AVALON
   private val slaveReady = ~master.waitRequest
+  private val isWr = cmd.bits.isWr
   private val readDataVector = VecInit(
     List
       .tabulate(globals.EXTERNAL_V) { i =>
@@ -45,25 +49,35 @@ class MAGToAvalonBridge(val p: AvalonBundleParameters) extends Module {
 
   master.burstCount := size
   master.address := cmd.bits.addr
-  master.read := ~cmd.bits.isWr
+  master.read := ~isWr
   rResp.bits.rdata := readDataVector
-  master.write := cmd.bits.isWr
+  master.write := isWr
   master.writeData := wData.bits.wdata.reverse.reduce { Cat(_, _) }
   wData.ready := slaveReady
   // In avalon, we don't need to decouple cmd and transfer.
   // I'm setting cmd ready to always high for now.
-  cmd.ready := true.B
-  rResp.valid := master.readDataValid
-  wResp.valid := master.writeResponseValid
-  when(cmd.ready && cmd.valid) {
-    tagQueue.enq(tag)
-  }.elsewhen(master.readDataValid && rResp.ready) {
-      rResp.bits.tag := tagQueue.deq
-    }
-    .elsewhen(master.writeResponseValid && wResp.ready) {
-      wResp.bits.tag := tagQueue.deq
-    }
 
-  // TODO: How do we deal with tags?
-  //  Qsys interconnect ensures in-order transfers.
+  // Tag management
+  private val (tagWEnqIO, tagWDeqIO, tagREnqIO, tagRDeqIO) = (
+    tagQueueW.io.enq,
+    tagQueueW.io.deq,
+    tagQueueR.io.enq,
+    tagQueueR.io.deq
+  )
+
+  // Master to slave
+  tagWEnqIO.valid := cmd.valid && isWr
+  tagREnqIO.valid := cmd.valid && (~isWr).toBool()
+  tagWEnqIO.bits := tag
+  tagREnqIO.bits := tag
+
+  // Slave to master
+  tagWDeqIO.ready := master.writeResponseValid
+  tagRDeqIO.ready := master.readDataValid
+
+  rResp.valid := tagRDeqIO.valid
+  wResp.valid := tagWDeqIO.valid
+
+  rResp.bits.tag := tagRDeqIO.bits
+  wResp.bits.tag := tagWDeqIO.bits
 }

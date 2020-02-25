@@ -10,18 +10,21 @@ import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 class DE1Like extends ZynqLike {
   override def makeBigIP: BigIP = new fringe.targets.de1.BigIPDE1
 
-  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
+  override def addFringeAndCreateIP(
+      reset: Reset,
+      accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new DE1Interface)
 
     // Avalon Fringe
     val blockingDRAMIssue = false // Allow only one in-flight request, block until response comes back
-    val fringe = Module(new FringeDE1(blockingDRAMIssue, io.avalonLiteParams, io.axiParams))
+    val fringe = Module(
+      new FringeDE1(blockingDRAMIssue, io.avalonLiteParams, io.avalonParams))
 
     // Fringe <-> Host connections
     fringe.io.S_AVALON <> io.S_AVALON
 
     // Fringe <-> DRAM connections
-    io.M_AXI <> fringe.io.M_AXI
+    io.M_AVALON <> fringe.io.M_AVALON
 
     // TODO: Probe
     io.TOP_AXI <> fringe.io.TOP_AXI
@@ -32,13 +35,15 @@ class DE1Like extends ZynqLike {
     io.rdata := DontCare
 
     accel.io.argIns := fringe.io.argIns
-    fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
-      fringeArgOut.bits := accelArgOut.port.bits
-      fringeArgOut.valid := accelArgOut.port.valid
+    fringe.io.argOuts.zip(accel.io.argOuts) foreach {
+      case (fringeArgOut, accelArgOut) =>
+        fringeArgOut.bits := accelArgOut.port.bits
+        fringeArgOut.valid := accelArgOut.port.valid
     }
 
-    fringe.io.argEchos.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
-      accelArgOut.echo := fringeArgOut
+    fringe.io.argEchos.zip(accel.io.argOuts) foreach {
+      case (fringeArgOut, accelArgOut) =>
+        accelArgOut.echo := fringeArgOut
     }
 
     fringe.io.externalEnable := false.B

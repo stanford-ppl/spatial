@@ -237,7 +237,7 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
       mem._1.io.r0.ofs.head := finalChoice0(2)
       mem._1.io.r0.backpressure := finalChoice0(1)
       mem._1.io.r0.en.head := finalChoice0(0)
-      val finalChoice1 = fatMux("PriorityMux", ens.reverse.tail, ens.reverse.tail, backpressures.reverse.tail, ofs.reverse.tail)
+      val finalChoice1 = fatMux("PriorityMux", ens.tail.reverse, ens.tail.reverse, backpressures.tail.reverse, ofs.tail.reverse)
       mem._1.io.r1.ofs.head := finalChoice1(2)
       mem._1.io.r1.backpressure := finalChoice1(1)
       mem._1.io.r1.en.head := finalChoice1(0)

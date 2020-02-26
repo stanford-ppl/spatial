@@ -2,6 +2,7 @@ package spatial.codegen.chiselgen
 
 import argon._
 import argon.node._
+import emul.FixedPoint
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.bounds._
@@ -354,7 +355,13 @@ trait ChiselGenCommon extends ChiselCodegen {
   }
 
   protected def createCtrObject(lhs: Sym[_], start: Sym[_], stop: Sym[_], step: Sym[_], par: I32, forever: Boolean): Unit = {
-    val w = bitWidth(lhs.tp.typeArgs.head)
+    // Temporary hack to effectively implement issue #288 in hardware (still need to feed this info upstream so the IR is aware of bitwidth dieting)
+    // This should really check the bound on start and stop, to be more general than checking if they are constants
+    val w = (start, stop) match {
+      case (Const(s: FixedPoint), Const(e: FixedPoint)) => scala.math.max(utils.math.log2Up(scala.math.abs(s.toInt)), utils.math.log2Up(scala.math.abs(e.toInt))) + 2
+      case _ => bitWidth(lhs.tp.typeArgs.head)
+    }
+
     val strt = start match {
                  case _ if forever => "Left(Some(0))"
                  case Final(s) => src"Left(Some($s))"

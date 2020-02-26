@@ -37,7 +37,7 @@ hw:
 	#rm -rf zynq.hw-resources
 	#cp -r ../resources/synth/virtex7.hw-resources/ zynq.hw-resources/
 
-	cat zynq.hw-resources/SRAMVerilogAWS.v >> ${ZYNQ_V_DIR}/SpatialIP.v
+	cat zynq.hw-resources/SRAMVerilog*.v >> ${ZYNQ_V_DIR}/SpatialIP.v
 	cp zynq.hw-resources/build/* ${ZYNQ_V_DIR}
 	cp *.v ${ZYNQ_V_DIR} 2>/dev/null || : # hack for grabbing any blackboxes that may have been dumped here
 	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${ZYNQ_V_DIR}/SpatialIP.v; \

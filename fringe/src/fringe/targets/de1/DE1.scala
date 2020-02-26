@@ -27,11 +27,7 @@ class DE1Like extends ZynqLike {
     io.M_AVALON <> fringe.io.M_AVALON
 
     // TODO: Probe
-    io.TOP_AXI <> fringe.io.TOP_AXI
-    io.DWIDTH_AXI <> fringe.io.DWIDTH_AXI
-    io.PROTOCOL_AXI <> fringe.io.PROTOCOL_AXI
-    io.CLOCKCONVERT_AXI <> fringe.io.CLOCKCONVERT_AXI
-
+    io.TOP_M_AVALON <> fringe.io.TOP_M_AVALON
     io.rdata := DontCare
 
     accel.io.argIns := fringe.io.argIns

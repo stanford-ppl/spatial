@@ -27,11 +27,7 @@ class FringeDE1(blockingDRAMIssue: Boolean,
     val M_AVALON: Vec[AvalonMaster] =
       Vec(NUM_CHANNELS, new AvalonMaster(avalonParams))
 
-    // TODO: Add Avalon probes for board debugging.
-    val TOP_AXI = new AXI4Probe(avalonLiteParams)
-    val DWIDTH_AXI = new AXI4Probe(avalonLiteParams)
-    val PROTOCOL_AXI = new AXI4Probe(avalonLiteParams)
-    val CLOCKCONVERT_AXI = new AXI4Probe(avalonLiteParams)
+    val TOP_M_AVALON = new AvalonProbe(avalonParams)
 
     val enable = Output(Bool())
     val done = Input(Bool())
@@ -56,7 +52,7 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   io <> DontCare
 
   // Common Fringe
-  val fringeCommon = Module(new Fringe(blockingDRAMIssue, avalonParams))
+  val fringeCommon = Module(new Fringe(blockingDRAMIssue, avalonParams, isAvalon = true))
   fringeCommon.io.raddr := io.S_AVALON.address
   fringeCommon.io.wen := io.S_AVALON.write
   fringeCommon.io.waddr := io.S_AVALON.address
@@ -67,11 +63,12 @@ class FringeDE1(blockingDRAMIssue: Boolean,
   fringeCommon.io.dram.foreach(m => m := DontCare)
   fringeCommon.io.aws_top_enable := DontCare
 
-  // TODO: Add debug probes
-  fringeCommon.io.TOP_AXI <> io.TOP_AXI
-  fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI
-  fringeCommon.io.PROTOCOL_AXI <> io.PROTOCOL_AXI
-  fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
+  // TODO: Factor out the case for avalon debugging...
+  fringeCommon.io.TOP_M_AVALON <> io.TOP_M_AVALON
+  fringeCommon.io.TOP_AXI <> DontCare
+  fringeCommon.io.DWIDTH_AXI <> DontCare
+  fringeCommon.io.PROTOCOL_AXI <> DontCare
+  fringeCommon.io.CLOCKCONVERT_AXI <> DontCare
 
   // Fringe connections
   io.enable := fringeCommon.io.enable
@@ -93,10 +90,11 @@ class FringeDE1(blockingDRAMIssue: Boolean,
       val avalonBridge = Module(new MAGToAvalonBridge(avalonParams))
       avalonBridge.io.in <> fringeCommon.io.dram(i)
       m <> avalonBridge.io.M_AVALON
+      m.chipSelect := io.enable
   }
   // TODO: Seems that this one is not helping much?
-//  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
-//    io.M_AXI.foreach(_.AWVALID := false.B)
-//    io.M_AXI.foreach(_.ARVALID := false.B)
-//  }
+  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
+    io.M_AXI.foreach(_.AWVALID := false.B)
+    io.M_AXI.foreach(_.ARVALID := false.B)
+  }
 }

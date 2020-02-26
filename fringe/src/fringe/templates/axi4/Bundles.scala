@@ -248,6 +248,22 @@ class AvalonMaster(params: AvalonBundleParameters) extends AXI4BundleBase(params
   val readDataValid = Input(Bool())
   val writeResponseValid = Input(Bool())
   val burstCount = Output(UInt(params.burstCountBits.W))
+  val response = Input(UInt(params.writeResponseBits.W))
+  val chipSelect = Output(Bool())
+}
+
+class AvalonProbe(params: AvalonBundleParameters) extends AXI4BundleBase(params) {
+  // Fundamental signals
+  val address = Input(UInt(params.addrBits.W))
+  val read = Input(Bool())
+  val readData = Input(UInt(params.dataBits.W))
+  val write = Input(Bool())
+  val writeData = Input(UInt(params.dataBits.W))
+  val waitRequest = Input(Bool())
+  // Pipeline signals
+  val readDataValid = Input(Bool())
+  val writeResponseValid = Input(Bool())
+  val burstCount = Input(UInt(params.burstCountBits.W))
 }
 
 // Avalon streaming interface

@@ -3,12 +3,7 @@ package fringe.targets.de1
 import chisel3._
 import fringe.globals._
 import fringe.SpatialIPInterface
-import fringe.templates.axi4.{
-  AXI4Probe,
-  AvalonBundleParameters,
-  AvalonMaster,
-  AvalonSlave
-}
+import fringe.templates.axi4.{AXI4Probe, AvalonBundleParameters, AvalonMaster, AvalonProbe, AvalonSlave}
 
 class DE1Interface extends SpatialIPInterface {
   val avalonLiteParams = new AvalonBundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
@@ -22,8 +17,9 @@ class DE1Interface extends SpatialIPInterface {
 
   // TODO: Avalon debugging probes.
   //  For now just use AXI interfaces to stop FIRRTL from panicing
-  val TOP_AXI = new AXI4Probe(avalonLiteParams)
-  val DWIDTH_AXI = new AXI4Probe(avalonLiteParams)
-  val PROTOCOL_AXI = new AXI4Probe(avalonLiteParams)
-  val CLOCKCONVERT_AXI = new AXI4Probe(avalonLiteParams)
+  val TOP_M_AVALON = new AvalonProbe(avalonParams)
+//  val TOP_AXI = new AXI4Probe(avalonLiteParams)
+//  val DWIDTH_AXI = new AXI4Probe(avalonLiteParams)
+//  val PROTOCOL_AXI = new AXI4Probe(avalonLiteParams)
+//  val CLOCKCONVERT_AXI = new AXI4Probe(avalonLiteParams)
 }

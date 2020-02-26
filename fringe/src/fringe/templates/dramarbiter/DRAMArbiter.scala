@@ -29,6 +29,10 @@ class DRAMArbiter(
     val dram = new DRAMStream(EXTERNAL_W, EXTERNAL_V)
 
     val debugSignals = Output(Vec(numDebugs, UInt(32.W)))
+    // TODO: Later we need to de-couple DRAMArbiter
+    //  so that it's not dependent on the interconnect protocol
+    val de1AvalonParam = new AvalonBundleParameters(26, 512, 17, 11, 64)
+    val TOP_M_AVALON = new AvalonProbe(de1AvalonParam)
     val TOP_AXI = new AXI4Probe(axiLiteParams)
     val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
     val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
@@ -135,29 +139,50 @@ class DRAMArbiter(
       scala.Console.println("Enabling inspection on W signals")
       connectDbgSig(cycleCount, "Cycles")
 
-      connectDbgSig(
-        debugCounter(io.dram.wdata.valid), " # WVALID"
-      )
-      connectDbgSig(
-        debugCounter(io.dram.wdata.ready), " # WREADY"
-      )
-      connectDbgSig(
-        debugCounter(io.dram.cmd.ready & io.dram.cmd.bits.isWr), " # AWREADY"
-      )
-      connectDbgSig(
-        debugCounter(io.dram.cmd.valid & io.dram.cmd.bits.isWr), " # AWVALID"
-      )
-      connectDbgSig(
-        debugCounter(io.dram.wresp.valid), " # BVALID"
-      )
-      connectDbgSig(
-        debugCounter(io.dram.wresp.ready), " # BREADY"
-      )
-      connectDbgSig(
-        debugCounter(io.dram.wdata.bits.wlast), " # WLAST"
-      )
+//      connectDbgSig(
+//        debugCounter(io.dram.wdata.valid), " # wdata.valid"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.wdata.ready), " # wdata.ready"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.cmd.ready), " # cmd.ready"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.cmd.valid), " # cmd.valid"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.cmd.ready & io.dram.cmd.bits.isWr), " # cmd.ready & isWr"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.cmd.valid & io.dram.cmd.bits.isWr), " # cmd.valid & isWr"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.wresp.valid), " # wresp.valid"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.wresp.ready), " # wresp.ready"
+//      )
+//      connectDbgSig(
+//        debugCounter(io.dram.wdata.bits.wlast), " # wlast"
+//      )
+//      val ma = io.TOP_M_AVALON
+//      connectDbgSig(
+//        debugFF(ma.address, ma.write), "Last avalon write address"
+//      )
+//      connectDbgSig(
+//        debugCounter(ma.write), " # avalon.write"
+//      )
+//      connectDbgSig(
+//        debugCounter(ma.waitRequest), " # waitRequest (slave isn't ready)"
+//      )
+//      connectDbgSig(
+//        debugCounter(ma.writeResponseValid), " # writeResponseValid"
+//      )
+//      connectDbgSig(
+//        debugFF(ma.burstCount, ma.write), "Last burstCount"
+//      )
 
-      val rdataEnqCount = debugCounter(io.dram.rresp.valid & io.dram.rresp.ready)
       val wdataCount = debugCounter(io.dram.wdata.valid & io.dram.wdata.ready)
       val appWdataCount = debugCounter(io.app.stores.head.data.valid & io.app.stores.head.data.ready)
       connectDbgSig(wdataCount, "[FRINGE] num wdata transferred (wvalid & wready)")
@@ -194,22 +219,22 @@ class DRAMArbiter(
       }
 
       // Connect fringe io.dram interface debuggers
-      connectDbgSig(debugFF(io.dram.cmd.bits.addr, io.dram.cmd.valid && io.dram.cmd.ready), "Last io.dram cmd (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.cmd.bits.size, io.dram.cmd.valid && io.dram.cmd.ready), "Last io.dram size (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head, io.dram.wdata.valid & io.dram.wdata.ready), "Last io.dram wdata.head (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb.head, io.dram.wdata.valid & io.dram.wdata.ready), "Last io.dram wstrb.head (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 0.U), "First io.dram wdata.head (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 0.U), "First io.dram wstrb.head (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 1.U), "Second io.dram wdata.head (leaving fringe)")
-      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 1.U), "Second io.dram wstrb.head (leaving fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.cmd.bits.addr, io.app.stores.head.cmd.valid && io.app.stores.head.cmd.ready), "Last store cmd (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.cmd.bits.size, io.app.stores.head.cmd.valid && io.app.stores.head.cmd.ready), "Last store size (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.data.bits.wdata.head, io.app.stores.head.data.valid & io.app.stores.head.data.ready), "Last store wdata.head (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.data.bits.wstrb, io.app.stores.head.data.valid & io.app.stores.head.data.ready), "Last store wstrb.head (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.data.bits.wdata.head, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 0.U), "First store wdata.head (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.data.bits.wstrb, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 0.U), "First store wstrb.head (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.data.bits.wdata.head, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 1.U), "Second store wdata.head (entering fringe)")
-      connectDbgSig(debugFF(io.app.stores.head.data.bits.wstrb, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 1.U), "Second store wstrb.head (entering fringe)")
+//      connectDbgSig(debugFF(io.dram.cmd.bits.addr, io.dram.cmd.valid && io.dram.cmd.ready), "Last io.dram cmd (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.cmd.bits.size, io.dram.cmd.valid && io.dram.cmd.ready), "Last io.dram size (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head, io.dram.wdata.valid & io.dram.wdata.ready), "Last io.dram wdata.head (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb.head, io.dram.wdata.valid & io.dram.wdata.ready), "Last io.dram wstrb.head (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 0.U), "First io.dram wdata.head (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 0.U), "First io.dram wstrb.head (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 1.U), "Second io.dram wdata.head (leaving fringe)")
+//      connectDbgSig(debugFF(io.dram.wdata.bits.wstrb.head, io.dram.wdata.valid & io.dram.wdata.ready & wdataCount === 1.U), "Second io.dram wstrb.head (leaving fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.cmd.bits.addr, io.app.stores.head.cmd.valid && io.app.stores.head.cmd.ready), "Last store cmd (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.cmd.bits.size, io.app.stores.head.cmd.valid && io.app.stores.head.cmd.ready), "Last store size (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.data.bits.wdata.head, io.app.stores.head.data.valid & io.app.stores.head.data.ready), "Last store wdata.head (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.data.bits.wstrb, io.app.stores.head.data.valid & io.app.stores.head.data.ready), "Last store wstrb.head (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.data.bits.wdata.head, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 0.U), "First store wdata.head (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.data.bits.wstrb, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 0.U), "First store wstrb.head (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.data.bits.wdata.head, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 1.U), "Second store wdata.head (entering fringe)")
+//      connectDbgSig(debugFF(io.app.stores.head.data.bits.wstrb, io.app.stores.head.data.valid & io.app.stores.head.data.ready & appWdataCount === 1.U), "Second store wstrb.head (entering fringe)")
 
       // Connect AXI loopback debuggers
       // TOP

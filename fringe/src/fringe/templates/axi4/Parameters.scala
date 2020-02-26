@@ -14,7 +14,9 @@ class AvalonBundleParameters(addrBits: Int,
                              dataBits: Int,
                              idBits: Int,
                              val burstCountBits: Int = 11,
-                             val tagQueueSize: Int = 64
+                             val tagQueueSize: Int = 64,
+                             val writeResponseBits: Int = 2,
+                             val dramTagBits: Int = 32
                             ) extends
   AXI4BundleParameters(addrBits, dataBits, idBits)
 

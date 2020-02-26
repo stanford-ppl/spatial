@@ -2,9 +2,22 @@ package fringe.templates.avalon
 
 import chisel3._
 import chisel3.util.{Cat, Decoupled, DecoupledIO, Queue}
-import fringe.globals
-import fringe.DRAMStream
+import fringe.{DRAMCommand, DRAMStream, DRAMTag, globals}
 import fringe.templates.axi4.{AvalonBundleParameters, AvalonMaster}
+
+// TODO: Modify this queue so that it's a Tag queue.
+class TagQueue(val p: AvalonBundleParameters)
+    extends Module {
+  val io = IO(new Bundle {
+    val enqTag = Flipped(Decoupled(UInt(p.dramTagBits.W)))
+    val deqTag: DecoupledIO[UInt] = Decoupled(UInt(p.dramTagBits.W))
+    val enqIsWr = Flipped(Decoupled(Bool()))
+    val deqIsWr: DecoupledIO[Bool] = Decoupled(Bool())
+  })
+  chisel3.core.dontTouch(io)
+  io.deqTag <> Queue(io.enqTag, p.tagQueueSize)
+  io.deqIsWr <> Queue(io.enqIsWr, p.tagQueueSize)
+}
 
 class MAGToAvalonBridge(val p: AvalonBundleParameters) extends Module {
   val io = IO(new Bundle {
@@ -15,22 +28,24 @@ class MAGToAvalonBridge(val p: AvalonBundleParameters) extends Module {
     val M_AVALON = new AvalonMaster(p)
   })
 
-  io <> DontCare
-  // TODO: How is dram cmd ID handled?
-  val numPipelinedLevels: Int = globals.magPipelineDepth
+  // TODO: For now I'm connecting response to DontCare.
+  //  Later we need to figure out how to properly use this signal to back-pressure Spatial,
+  //  if the data is corrupted...
+  io.M_AVALON.response <> DontCare
+  io.M_AVALON.chipSelect <> DontCare
   private val cmd = io.in.cmd
-  private val tag = cmd.bits.tag.asUInt()
-  // TODO: Not sure if this would help...
-  private val tagQueueW = Module(new Queue(UInt(32.W), p.tagQueueSize))
-  private val tagQueueR = Module(new Queue(UInt(32.W), p.tagQueueSize))
+  private val tag = io.in.cmd.bits.tag
+  private val isWr = io.in.cmd.bits.isWr
+
+  // This one handles returning back the correct tag.
+  private val tagQueue = Module(new TagQueue(p))
 
   private val wData = io.in.wdata
   private val wResp = io.in.wresp
   private val rResp = io.in.rresp
-  private val size = io.in.cmd.bits.size
   private val master = io.M_AVALON
-  private val slaveReady = ~master.waitRequest
-  private val isWr = cmd.bits.isWr
+//  private val slaveReady = (~master.waitRequest).toBool()
+  private val slaveReady = (~master.waitRequest).toBool()
   private val readDataVector = VecInit(
     List
       .tabulate(globals.EXTERNAL_V) { i =>
@@ -47,37 +62,31 @@ class MAGToAvalonBridge(val p: AvalonBundleParameters) extends Module {
       .reverse
   )
 
-  master.burstCount := size
-  master.address := cmd.bits.addr
-  master.read := ~isWr
-  rResp.bits.rdata := readDataVector
-  master.write := isWr
   master.writeData := wData.bits.wdata.reverse.reduce { Cat(_, _) }
+  private val cmdCanIssue = slaveReady && cmd.valid
+  master.write := cmdCanIssue && cmd.bits.isWr
+  master.read := cmdCanIssue && (~cmd.bits.isWr).toBool()
+  master.burstCount := cmd.bits.size
+  master.address := cmd.bits.addr
   wData.ready := slaveReady
-  // In avalon, we don't need to decouple cmd and transfer.
-  // I'm setting cmd ready to always high for now.
 
-  // Tag management
-  private val (tagWEnqIO, tagWDeqIO, tagREnqIO, tagRDeqIO) = (
-    tagQueueW.io.enq,
-    tagQueueW.io.deq,
-    tagQueueR.io.enq,
-    tagQueueR.io.deq
-  )
+  cmd.ready := slaveReady
 
-  // Master to slave
-  tagWEnqIO.valid := cmd.valid && isWr
-  tagREnqIO.valid := cmd.valid && (~isWr).toBool()
-  tagWEnqIO.bits := tag
-  tagREnqIO.bits := tag
+  private val canIssueCmd = cmd.valid && cmd.ready
+  tagQueue.io.enqTag.valid := canIssueCmd
+  tagQueue.io.enqIsWr.valid := canIssueCmd
+  tagQueue.io.enqTag.bits := tag
+  tagQueue.io.enqIsWr.bits := isWr
 
-  // Slave to master
-  tagWDeqIO.ready := master.writeResponseValid
-  tagRDeqIO.ready := master.readDataValid
+  private val canDeqTag = (wResp.ready && master.writeResponseValid) || (rResp.ready && master.readDataValid)
+  tagQueue.io.deqTag.ready := canDeqTag
+  tagQueue.io.deqIsWr.ready := canDeqTag
 
-  rResp.valid := tagRDeqIO.valid
-  wResp.valid := tagWDeqIO.valid
+//  wResp.valid := canDeqTag && tagQueue.io.deqIsWr.bits
+  wResp.valid := master.writeResponseValid
+  wResp.bits.tag := tagQueue.io.deqTag.bits
 
-  rResp.bits.tag := tagRDeqIO.bits
-  wResp.bits.tag := tagWDeqIO.bits
+  rResp.valid := canDeqTag && (~tagQueue.io.deqIsWr.bits).toBool
+  rResp.bits.tag := tagQueue.io.deqTag.bits
+  rResp.bits.rdata := readDataVector
 }

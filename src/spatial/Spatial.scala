@@ -386,6 +386,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("noOptimizeMul").action{(_,_) => spatialConfig.optimizeMul = false}.text("Do not optimize multiplications if they can be rewritten as sum/subtraction of two pow2 multiplies")
     cli.opt[Unit]("noOptimizeMod").action{(_,_) => spatialConfig.optimizeMod = false}.text("Do not optimize modulo if they can be rewritten shifts and adds using Mersenne numbers")
+    cli.opt[Unit]("optimizeDiv").action{(_,_) => spatialConfig.optimizeDiv = true}.text("temporary")//("Do not optimize division if they can be rewritten shifts and adds using Mersenne numbers")
 
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 

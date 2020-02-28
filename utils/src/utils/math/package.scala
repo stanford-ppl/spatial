@@ -37,17 +37,17 @@ package object math {
   def divisors(x: Int): Seq[Int] = (1 to x).collect { case i if x % i == 0 => i }
 
   /** Check if this is a Mersenne number */
-  def isMersenne(x: Int): Boolean = {
-    ((scala.math.log(x + 1) / scala.math.log(2)) % 1.0 == 0) && ((scala.math.log(x + 1) / scala.math.log(2)) <= 16) && (x > 2)
+  def isMersenne(x: Int, maxPow: Int = 16): Boolean = {
+    isPow2(x + 1) && x + 1 <= scala.math.pow(2,maxPow) && x > 2
   }
-  /** Returns y such that y = x*k, where y is Mersenne and k <= N */
+  /** Returns y such that y = x*k, where y is Mersenne and k <= N.  N is also known as "radius" */
   def withinNOfMersenne(N: Int, x: Int): Option[Int] = {
     if (!isMersenne(x) && x > 3) List.tabulate(N-2){i => x*(i+2)}.collectFirst{case i if isMersenne(i) => i}
     else None
   }
 
   /** Check if int can be expressed as the sum or subtraction of two powers of 2, to be used for multiplication optimizations */
-  def isSumOfPow2(x: Int): Boolean = {
+  def isSumOfPow2(x: Int, radius: Int = 2): Boolean = {
     (x.toBinaryString.count(_ == '1') == 2) || (x.toBinaryString.indexOf("01") == -1)
   }
 
@@ -63,6 +63,37 @@ package object math {
       val minbit = x.toBinaryString.reverse.indexOf("1")
       (pow(2,maxbit).toInt, pow(2,minbit).toInt, "sub")
     }
+  }
+
+  /** Modified Crandall's algorithm implemented in software to compute floor(x / t), where t is a Mersenne number */
+  def modifiedCrandallSW(x: scala.Int, t: scala.Int): (Int, Int, Int, Int) = {
+    import scala.math.{floor}
+    val c = 1
+    val m = t + c
+    val qs = scala.collection.mutable.ListBuffer.fill(100)(-1)
+    val rs = scala.collection.mutable.ListBuffer.fill(100)(-1)
+    qs(0) = floor(x/m).toInt
+    rs(0) = x % m
+    var q = qs.head
+    var r = rs.head
+    var i = 0
+    while (qs(i) > 0) {
+      qs(i+1) = floor(qs(i) * c / m).toInt
+      rs(i+1) = (qs(i) * c) % m
+      i = i + 1
+      q = q + qs(i)
+      r = r + rs(i)
+    }
+    var step4_iters = 0
+    while (r >= t) {
+      step4_iters = step4_iters + 1
+      r = r - t
+      q = q + 1
+    }
+    if (q != x / t) println(s"messed up on $x / $t!  Got $q, wanted ${x/t}")
+    if (r != x % t) println(s"messed up on $x % $t!  Got $r, wanted ${x%t}")
+
+    (q,r, i, step4_iters)
   }
 
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),

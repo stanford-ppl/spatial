@@ -52,6 +52,27 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
   }
 
+
+  // Magical rewrite rules, based loosely on algorithm 6 of https://ece.uwaterloo.ca/~ahasan/web_papers/technical_reports/web_lwpfi.pdf
+  def rewriteDivWithMersenne[S,I,F](a: Fix[S,I,F], t: Int): Fix[S,I,F] = {
+    implicit val S: BOOL[S] = a.fmt.s
+    implicit val I: INT[I] = a.fmt.i
+    implicit val F: INT[F] = a.fmt.f
+    val nbits = a.fmt.nbits
+    val c = 1 // TODO: support pseudo-mersenne numbers (currently assumes t = 2^pow + 1)
+    val pow = (scala.math.log(t+c) / scala.math.log(2)).toInt
+    val exps = List.tabulate(scala.math.ceil(nbits / pow).toInt-1){i => pow * (i + 1)}
+    // Step 3: Keep dividing things to expand qs list, keep modding them to get rs list, and then add them up
+    val qs = exps.map{e => stage(FixSRA(a * c, e))}
+    val rs = qs.map{qi => stage(FixAnd(qi * c, Type[Fix[S,I,F]].from(scala.math.pow(2,pow).toInt-1)))}
+    val q = qs.reduceTree{_+_}
+    val r = rs.reduceTree{_+_}
+    // Step 4: figure out how many t's are in r
+    val boundaries = Seq.tabulate(scala.math.ceil(nbits / pow).toInt){i => r - t * i}
+    val correction = stage(PriorityMux(boundaries.map{ b => b <= 0}, Seq.tabulate(scala.math.ceil(nbits / pow).toInt){i => Type[Fix[S,I,F]].from(i)}))
+    stage(FixAdd(q, correction))
+  }
+
   // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
   def rewriteModWithMersenne[S,I,F](a: Fix[S,I,F], mod: Int): Fix[S,I,F] = {
     implicit val S: BOOL[S] = a.fmt.s
@@ -130,10 +151,14 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
     case _:SpatialBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
+    case _:SpatialCtrlBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
 
     case FixMul(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
       val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))
       transferDataToAllNew(lhs){ rewriteMul(a,q.toInt,mul1,mul2,dir).asInstanceOf[A] }
+
+    case FixDiv(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeDiv && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
+      transferDataToAllNew(lhs){ rewriteDivWithMersenne(a, q.toInt).asInstanceOf[A] }
 
     case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
       transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }

@@ -57,6 +57,7 @@ class SpatialConfig extends Config {
   var enableLooseIterDiffs = false
   var optimizeMul = true
   var optimizeMod = true
+  var optimizeDiv = false
   var fuseAsFMA = true
   var forceFuseFMA = false
 

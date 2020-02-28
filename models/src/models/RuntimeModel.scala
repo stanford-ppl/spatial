@@ -8,6 +8,7 @@ import scala.io.Source
 
 object Runtime {
 
+  var fpga = false
   var interactive = true
   var retune = false
   var currentAsk = 0
@@ -38,6 +39,7 @@ object Runtime {
   case object DenseLoad  extends CtrlSchedule // modeled as a schedule
   case object SparseStore extends CtrlSchedule // modeled as a schedule
   case object SparseLoad  extends CtrlSchedule // modeled as a schedule
+  case object MemReduce   extends CtrlSchedule // modeled as a schedule, used for plasticine only
 
 
   /** Control node level. */
@@ -81,6 +83,14 @@ object Runtime {
     val stm: String // IR node from spatial
   ){
     override def toString: String = s"line $line: $id"
+    def op: String = {
+      val pattern = """(Op+[^\(]+)""".r
+      val out = pattern.findFirstIn(stm) match {
+        case Some(s) => s
+        case None => "None"
+      }
+      out
+    }
   }
   object Ctx {
     def empty: Ctx = Ctx("??","??","","")
@@ -173,6 +183,25 @@ object Runtime {
       }
       roundUp(scala.math.ceil((realStop - realStart).toDouble / realStride.toDouble).toInt, realPar) / realPar
     }
+    def Nd: Double = {
+      val realStart = start.lookup
+      val realStop = stop.lookup
+      val realStride = stride.lookup
+      val realPar = par.lookup
+      scala.math.ceil((realStop - realStart).toDouble / realStride.toDouble).toDouble / realPar.toDouble
+    }
+  }
+
+  // Needed for plasticine memory dse analysis
+  case class MemModel(
+    val dims:Seq[Int],
+  ) {
+    var parent: Option[ControllerModel] = None
+
+    def size: Int = {
+      dims.reduceLeft(_*_) 
+    }
+   
   }
 
   case class CChainModel(
@@ -182,6 +211,10 @@ object Runtime {
     def N: Int = { // Num iters for lane
       if (ctrs.isEmpty) 1 
       else ctrs.map(_.N).product
+    }
+    def Nd: Double = { 
+      if (ctrs.isEmpty) 1
+      else ctrs.map(_.Nd).product
     }
     def unroll: Int = { 
       if (isFinal) 1 else ctrs.map(_.par.lookup).product
@@ -203,13 +236,20 @@ object Runtime {
 
     override def toString: String = ctx.toString
     val targetBurstSize = 512
-    // Control overhead
+    // Control overhead per Iteration
     val seqSync = 1 // cycles from end of one child to start of next
     val metaSync = 1 // cycles from end of one child to start of next
     val seqAdvance = 2 // cycles from end of last child to start of first
     val dpMask = 1 // cycles that datapath is enabled but masked by done signal
     val startup = 2
     val shutdown = 1
+
+    // Plasticine overhead total
+    val plastPipeDepth = 6                      // Plasticine pipeline depth
+    val ctrlStartup = 2
+    val plastSeq = 1
+    val plastIdealRoute = 3                     // Number of cycles to communicate b/w neighboring units using ideal routing network
+    val plastMemReduceII = 2*plastIdealRoute + 2+ plastPipeDepth   // 3 cycles on ideal route plus pipeline depth 
 
     // Schedule helpers to handle tuneable nodes
     def isSeq = schedule match {
@@ -218,6 +258,7 @@ object Runtime {
       case _ => false
     }
     def resolvedSchedule = schedule match {
+      case Left(x) if (!fpga && ctx.op == "OpMemReduce") => MemReduce 
       case Left(x) => x
       case Right(x) if x.lookup == "false" => Sequenced
       case _ => Pipelined
@@ -241,7 +282,7 @@ object Runtime {
       }
     }
 
-    private def burstAlign(numel: Int, bitsPerCycle: Int): Int = {
+    private def burstAlign(numel: Double, bitsPerCycle: Int): Double = {
       val burstSize = 512 // bits
       val bitsPerCommand = numel * bitsPerCycle
       val x = if (bitsPerCommand % burstSize == 0) numel
@@ -249,7 +290,8 @@ object Runtime {
       x
     }
     def congestionModel(competitors: Competitors): Int = {
-      val numel = burstAlign(cchain.last.N, this.bitsPerCycle.toInt)
+      emit(s"num el: ${cchain.last.N}")
+      val numel = burstAlign(cchain.last.N.toDouble, this.bitsPerCycle.toInt)
       // // Lattice regression
       // val res = CongestionModel.evaluate(CongestionModel.RawFeatureVec(loads = competitors.loads,
       //                                                        stores = competitors.stores,
@@ -275,10 +317,34 @@ object Runtime {
       r
     }
 
+    def congestionModelPlasticine(competitors: Competitors, store:Boolean): Int = {
+      val numel = burstAlign(cchain.last.N.toDouble, this.bitsPerCycle.toInt)
+      val numelD = cchain.last.Nd
+
+      def params(x: Seq[Double]): (Double, Double, Double, Double, Double, Double) = (x(0), x(1), x(2), x(3), x(4), x(5))
+
+      def fitFunc(x: Seq[Double]): Double = {
+        val maxBurstSize = 800 // bits per cycle. From DDR4 peak bw 100 GB/s
+        val (loads, stores, gateds, outerIters, innerIters, bitsPerCycle) = params(x)
+        val comp = if (store) stores + gateds else loads
+        outerIters * innerIters * ((comp * bitsPerCycle / maxBurstSize) max 1) 
+      }
+
+      val r = 1 max (fitFunc(Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble)).toInt + 1)
+ 
+      emit(s"Store: ${store}, infer on ${Seq(competitors.loads, competitors.stores, competitors.gateds, upperCChainIters, numel, this.bitsPerCycle).map(_.toDouble)} = $r")
+      r
+    }
+
+
     // Result fields
     var num_cycles = 1
     var num_iters = 1
-    def iters_per_parent = this.num_iters / {if (parent.isDefined) parent.get.num_iters else 1}
+    var num_iters_d = 1.0
+    var cycles_per_iter = 1
+    var plasticine_latency = 0
+
+    def iters_per_parent = this.num_iters / (if (parent.isDefined) parent.get.num_iters else 1)
 
     // Structure fields
     def depth = this.ancestors.size
@@ -291,15 +357,18 @@ object Runtime {
 
     /** Extract num iters from cchain, or else 1 */
     def cchainIters: Int = if (cchain.size >= 1) cchain.head.N else 1
+    def cchainItersD: Double = if (cchain.size >= 1) cchain.head.Nd else 1.0
 
     /** Extract num iters from cchains excluding last level, or else 1 */
     def upperCChainIters: Int = if (cchain.size == 2) cchain.head.N else 1
+    def upperCChainItersD: Double = if (cchain.size == 2) cchain.head.Nd else 1.0
 
     /** Extract max child or else 1 */
-    def maxChild: Int = if (children.size >= 1) children.map(_.cycsPerParent).max else 1
+    def maxChild: Int = if (children.size >= 1) children.map(_.cycles_per_iter).max else 1
 
     /** Extract sum of all children or else 1 */
-    def sumChildren: Int = if (children.size >= 1) children.map(_.cycsPerParent).sum else 1
+    def sumChildren: Int = if (children.size >= 1) children.map(_.cycles_per_iter).sum else 1
+
 
     /** Get ancestors of current node */
     def ancestors: Seq[ControllerModel] = {
@@ -310,27 +379,56 @@ object Runtime {
     def cycsPerParent: Int = level match {
       case OuterControl => resolvedSchedule match {
         case Sequenced       => 
-          if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
-          else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
+          if (fpga) {
+            if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
+            else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
+          } else {
+            emit(s"ctx: ${ctx.id} sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}, childSize: ${children.size}")
+            //(2*maxChild * cchainIters) min (sumChildren * cchainIters) //+ seqSync * children.size*cchain.head.N
+            (sumChildren * cchainIters) //+ seqSync * children.size*cchain.head.N
+            
+          }
         case Pipelined      => 
-          if (cchain.size <= 1) startup + shutdown + maxChild * (cchainIters - 1) + children.map(_.cycsPerParent).sum + metaSync * cchainIters * children.size
-          else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
-        case ForkJoin        => startup + shutdown + maxChild * cchainIters + metaSync
+          if (fpga) {
+            if (cchain.size <= 1) startup + shutdown + maxChild * (cchainIters - 1) + children.map(_.cycsPerParent).sum + metaSync * cchainIters * children.size
+            else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
+          } else {
+            emit(s"maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
+            if (cchain.size <= 1) maxChild * (cchainIters)
+            else (maxChild max cchain.last.N) * (cchain.head.N) 
+          }
+        case MemReduce       =>
+          if (fpga) {
+            if (cchain.size <= 1) startup + shutdown + maxChild * (cchainIters - 1) + children.map(_.cycsPerParent).sum + metaSync * cchainIters * children.size
+            else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
+          } else {
+//            if (cchain.size <= 1) maxChild * (cchainIters)
+//            else (maxChild max cchain.last.N) * (cchain.head.N) 
+            emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
+            ((maxChild max cchain.last.N) + plastMemReduceII) * cchainIters
+          }
+        case ForkJoin        => 
+          if (fpga) startup + shutdown + maxChild * cchainIters + metaSync
+          else maxChild * cchainIters
         case Streaming       => 
           if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
           else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Branch(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
-        case DenseLoad            => congestionModel(competitors())
-        case DenseStore           => congestionModel(competitors())
-        case GatedDenseStore      => congestionModel(competitors())
+        case DenseLoad            => if (fpga) congestionModel(competitors()) else congestionModelPlasticine(competitors(), false)
+        case DenseStore           => if (fpga) congestionModel(competitors()) else congestionModelPlasticine(competitors(), true)
+        case GatedDenseStore      => if (fpga) congestionModel(competitors()) else congestionModelPlasticine(competitors(), true)
         case SparseLoad       => 1 // TODO
         case SparseStore      => 1 // TODO
       }
       case InnerControl => resolvedSchedule match {
-        case Sequenced => cchainIters*L + startup + shutdown
-        case _ => (cchainIters - 1)*II + L + startup + shutdown + dpMask
+        case Sequenced => 
+          if (fpga) cchainIters*L + startup + shutdown
+          else cchainIters*L + plastSeq              
+        case _ => 
+          if (fpga) (cchainIters - 1)*II + L + startup + shutdown + dpMask
+          else cchainIters*II 
       }
     }
 
@@ -338,9 +436,25 @@ object Runtime {
     def execute(): Unit = {
       children.foreach{c => 
         c.num_iters = this.num_iters * this.cchainIters
+        c.num_iters_d = this.num_iters_d * this.cchainItersD
         c.execute()
       }
-      num_cycles = cycsPerParent * this.num_iters
+//      num_cycles = cycsPerParent * this.num_iters
+      num_cycles = if (fpga) {
+        cycsPerParent * this.num_iters
+      } else { 
+        level match {
+          case OuterControl => resolvedSchedule match {
+            case DenseLoad => (cycsPerParent.toDouble * this.num_iters_d).toInt
+            case DenseStore => (cycsPerParent.toDouble * this.num_iters_d).toInt
+            case GatedDenseStore => (cycsPerParent.toDouble * this.num_iters_d).toInt
+            case _ => cycsPerParent * this.num_iters
+          }
+          case InnerControl => cycsPerParent * this.num_iters
+        }
+      }
+      if (!fpga && this.num_iters <= 1) num_cycles = plastPipeDepth max num_cycles
+      cycles_per_iter = if (num_iters > 0) num_cycles / num_iters else num_cycles
     }
     /** Fetch AskMap values from given file */
     def initializeAskMap(map: scala.collection.mutable.Map[Int,Int]): Unit = {
@@ -374,7 +488,6 @@ object Runtime {
     def printResults(entry: Boolean = true): Unit = {
       if (entry) emit(s"Printing Runtime Model Results:")
       if (entry) emit("============================================")
-      val cycles_per_iter = if (num_iters > 0) num_cycles / num_iters else num_cycles
       val leading = this.ancestors.reverse.map{x => if (x.lastChild) "   " else "  |"}.mkString("") + "  |"
       emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${cycles_per_iter} (${num_cycles} / ${num_iters}) [${iters_per_parent} iters/parent execution]")
       children.foreach(_.printResults(false))
@@ -392,7 +505,7 @@ object Runtime {
                         else if (this.schedule == Left(GatedDenseStore)) s" (${this.competitors()})"
                         else ""
       // if (cchain.isDefined) emit(f"${cchain.ctx.line}%5s: ${cchain.ctx.id}%6s $leading----   (ctr: ${cchain.ctx.stm})")
-      emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info}" + competitors)
+      emit(f"${ctx.line}%5s: ${ctx.id}%6s $leading--+ ${ctx.info} " + competitors)
       children.foreach(_.printStructure(false))
       if (entry) emit("============================================")
       suppressWarns = false

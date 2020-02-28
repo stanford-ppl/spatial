@@ -9,7 +9,7 @@ trait MiscAPI {
 
   def * = new Wildcard
 
-  @api def Scan(bv: U512) = stage(ScannerNew(bv))
+  @api def Scan(bv: U32) = stage(ScannerNew(bv))
 
   @api def splitter(addr: I32)(func: => Any): Unit = {
     stage(SplitterStart(Seq(addr)))

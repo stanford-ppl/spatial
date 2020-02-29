@@ -52,9 +52,8 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
   }
 
-
   // Magical rewrite rules, based loosely on algorithm 6 of https://ece.uwaterloo.ca/~ahasan/web_papers/technical_reports/web_lwpfi.pdf
-  def rewriteDivWithMersenne[S,I,F](a: Fix[S,I,F], t: Int): Fix[S,I,F] = {
+  def crandallDivMod[S,I,F](a: Fix[S,I,F], t: Int): (Fix[S,I,F], Fix[S,I,F]) = {
     implicit val S: BOOL[S] = a.fmt.s
     implicit val I: INT[I] = a.fmt.i
     implicit val F: INT[F] = a.fmt.f
@@ -64,13 +63,18 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     val exps = List.tabulate(scala.math.ceil(nbits / pow).toInt-1){i => pow * (i + 1)}
     // Step 3: Keep dividing things to expand qs list, keep modding them to get rs list, and then add them up
     val qs = exps.map{e => stage(FixSRA(a * c, e))}
-    val rs = qs.map{qi => stage(FixAnd(qi * c, Type[Fix[S,I,F]].from(scala.math.pow(2,pow).toInt-1)))}
+    val rs = List(stage(FixAnd(a, Type[Fix[S,I,F]].from(scala.math.pow(2,pow).toInt-1)))) ++ qs.dropRight(1).map{qi => stage(FixAnd(qi * c, Type[Fix[S,I,F]].from(scala.math.pow(2,pow).toInt-1)))}
     val q = qs.reduceTree{_+_}
-    val r = rs.reduceTree{_+_}
+    val r = rs.head + rs.drop(1).zip(qs.dropRight(1)).map{case (a,b) => mux( b != 0, a, Type[Fix[S,I,F]].from(0))}.reduceTree{_+_}
     // Step 4: figure out how many t's are in r
     val boundaries = Seq.tabulate(scala.math.ceil(nbits / pow).toInt){i => r - t * i}
-    val correction = stage(PriorityMux(boundaries.map{ b => b <= 0}, Seq.tabulate(scala.math.ceil(nbits / pow).toInt){i => Type[Fix[S,I,F]].from(i)}))
-    stage(FixAdd(q, correction))
+    val correction = stage(PriorityMux(boundaries.map{ b => b < t}, Seq.tabulate(scala.math.ceil(nbits / pow).toInt){i => Type[Fix[S,I,F]].from(i)}))
+    val remainder = stage(PriorityMux(boundaries.map{ b => b < t}, boundaries))
+    (stage(FixAdd(q, correction)), remainder)
+  }
+
+  def rewriteDivWithMersenne[S,I,F](a: Fix[S,I,F], t: Int): Fix[S,I,F] = {
+    crandallDivMod(a, t)._1
   }
 
   // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
@@ -78,19 +82,23 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     implicit val S: BOOL[S] = a.fmt.s
     implicit val I: INT[I] = a.fmt.i
     implicit val F: INT[F] = a.fmt.f
-    val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
-    val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
-    dbgs(s"Rewriting $a mod $mod with $levels bitshifts")
-    val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
-    temps(0) = stage(FixAdd[S,I,F](stage(FixSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
-    List.tabulate(levels.size-1) { level =>
-      temps(level+1) = stage(FixAdd[S,I,F](
-                                stage(FixSRA(temps(level),levels(level+1))),
-                                stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
-                          )
+    if (spatialConfig.useCrandallMod && mod < scala.math.pow(2,15)) { // TODO: Is one version always better than the other?
+      crandallDivMod(a, mod)._2
+    } else {
+      val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
+      val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
+      dbgs(s"Rewriting $a mod $mod with $levels bitshifts")
+      val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
+      temps(0) = stage(FixAdd[S,I,F](stage(FixSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
+      List.tabulate(levels.size-1) { level =>
+        temps(level+1) = stage(FixAdd[S,I,F](
+                                  stage(FixSRA(temps(level),levels(level+1))),
+                                  stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
+                            )
+      }
+      val boundaries = if (mod == 3) Seq(3,6) else Seq.tabulate(3){i => mod*(i+1)}
+      stage(PriorityMux(boundaries.map{b => temps.last < b}, boundaries.map{b => temps.last - (b - mod)}))
     }
-    val boundaries = if (mod == 3) Seq(3,6) else Seq.tabulate(3){i => mod*(i+1)}
-    stage(PriorityMux(boundaries.map{b => temps.last < b}, boundaries.map{b => temps.last - (b - mod)}))
   }
 
   def rewriteMod[S,I,F](a: Fix[S,I,F], mod: Int, closestMersenne: Int): Fix[S,I,F] = {

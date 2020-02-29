@@ -65,8 +65,8 @@ package object math {
     }
   }
 
-  /** Modified Crandall's algorithm implemented in software to compute floor(x / t), where t is a Mersenne number */
-  def modifiedCrandallSW(x: scala.Int, t: scala.Int): (Int, Int, Int, Int) = {
+  /** Modified Crandall's algorithm implemented in software to compute floor(x / t), where t is a Mersenne number.  This is good as a sw test of the algorithm */
+  def modifiedCrandallSW(x: scala.Int, t: scala.Int): (Int, Int) = {
     import scala.math.{floor}
     val c = 1
     val m = t + c
@@ -84,16 +84,15 @@ package object math {
       q = q + qs(i)
       r = r + rs(i)
     }
-    var step4_iters = 0
+    println(s"Step 3 yields: qs = ${qs.take(i)}, rs = ${rs.take(i)}, q = $q, r = $r")
     while (r >= t) {
-      step4_iters = step4_iters + 1
       r = r - t
       q = q + 1
     }
     if (q != x / t) println(s"messed up on $x / $t!  Got $q, wanted ${x/t}")
     if (r != x % t) println(s"messed up on $x % $t!  Got $r, wanted ${x%t}")
 
-    (q,r, i, step4_iters)
+    (q,r)
   }
 
   /** Given the dimensions of a hypercube (i.e. maxes), a step size per dimension (i.e. a), and a scaling factor (i.e. B),

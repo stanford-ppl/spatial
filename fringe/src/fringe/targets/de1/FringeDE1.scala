@@ -93,8 +93,8 @@ class FringeDE1(blockingDRAMIssue: Boolean,
       m.chipSelect := io.enable
   }
   // TODO: Seems that this one is not helping much?
-  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
-    io.M_AXI.foreach(_.AWVALID := false.B)
-    io.M_AXI.foreach(_.ARVALID := false.B)
-  }
+//  if (globals.loadStreamInfo.size == 0 && globals.storeStreamInfo.size == 0) {
+//    io.M_AXI.foreach(_.AWVALID := false.B)
+//    io.M_AXI.foreach(_.ARVALID := false.B)
+//  }
 }

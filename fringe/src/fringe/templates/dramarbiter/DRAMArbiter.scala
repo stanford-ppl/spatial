@@ -31,7 +31,7 @@ class DRAMArbiter(
     val debugSignals = Output(Vec(numDebugs, UInt(32.W)))
     // TODO: Later we need to de-couple DRAMArbiter
     //  so that it's not dependent on the interconnect protocol
-    val de1AvalonParam = new AvalonBundleParameters(26, 512, 17, 11, 64)
+    val de1AvalonParam = new AvalonBundleParameters(32, 512, 17, 11, 64)
     val TOP_M_AVALON = new AvalonProbe(de1AvalonParam)
     val TOP_AXI = new AXI4Probe(axiLiteParams)
     val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
@@ -139,49 +139,49 @@ class DRAMArbiter(
       scala.Console.println("Enabling inspection on W signals")
       connectDbgSig(cycleCount, "Cycles")
 
-//      connectDbgSig(
-//        debugCounter(io.dram.wdata.valid), " # wdata.valid"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.wdata.ready), " # wdata.ready"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.cmd.ready), " # cmd.ready"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.cmd.valid), " # cmd.valid"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.cmd.ready & io.dram.cmd.bits.isWr), " # cmd.ready & isWr"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.cmd.valid & io.dram.cmd.bits.isWr), " # cmd.valid & isWr"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.wresp.valid), " # wresp.valid"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.wresp.ready), " # wresp.ready"
-//      )
-//      connectDbgSig(
-//        debugCounter(io.dram.wdata.bits.wlast), " # wlast"
-//      )
-//      val ma = io.TOP_M_AVALON
-//      connectDbgSig(
-//        debugFF(ma.address, ma.write), "Last avalon write address"
-//      )
-//      connectDbgSig(
-//        debugCounter(ma.write), " # avalon.write"
-//      )
-//      connectDbgSig(
-//        debugCounter(ma.waitRequest), " # waitRequest (slave isn't ready)"
-//      )
-//      connectDbgSig(
-//        debugCounter(ma.writeResponseValid), " # writeResponseValid"
-//      )
-//      connectDbgSig(
-//        debugFF(ma.burstCount, ma.write), "Last burstCount"
-//      )
+      connectDbgSig(
+        debugCounter(io.dram.wdata.valid), " # wdata.valid"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wdata.ready), " # wdata.ready"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.cmd.ready), " # cmd.ready"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.cmd.valid), " # cmd.valid"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.cmd.ready & io.dram.cmd.bits.isWr), " # cmd.ready & isWr"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.cmd.valid & io.dram.cmd.bits.isWr), " # cmd.valid & isWr"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wresp.valid), " # wresp.valid"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wresp.ready), " # wresp.ready"
+      )
+      connectDbgSig(
+        debugCounter(io.dram.wdata.bits.wlast), " # wlast"
+      )
+      val ma = io.TOP_M_AVALON
+      connectDbgSig(
+        debugFF(ma.address, ma.write), "Last avalon write address"
+      )
+      connectDbgSig(
+        debugCounter(ma.write), " # avalon.write"
+      )
+      connectDbgSig(
+        debugCounter(ma.waitRequest), " # waitRequest (slave isn't ready)"
+      )
+      connectDbgSig(
+        debugCounter(ma.writeResponseValid), " # writeResponseValid"
+      )
+      connectDbgSig(
+        debugFF(ma.burstCount, ma.write), "Last burstCount"
+      )
 
       val wdataCount = debugCounter(io.dram.wdata.valid & io.dram.wdata.ready)
       val appWdataCount = debugCounter(io.app.stores.head.data.valid & io.app.stores.head.data.ready)

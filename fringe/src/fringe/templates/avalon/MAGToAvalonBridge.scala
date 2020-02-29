@@ -63,13 +63,14 @@ class MAGToAvalonBridge(val p: AvalonBundleParameters) extends Module {
   )
 
   master.writeData := wData.bits.wdata.reverse.reduce { Cat(_, _) }
-  private val cmdCanIssue = slaveReady && cmd.valid
+//  private val cmdCanIssue = slaveReady && cmd.valid
+  // Based on intel's recommendation, I can issue writes regardless of the ready state?
+  private val cmdCanIssue = wData.valid && cmd.valid
   master.write := cmdCanIssue && cmd.bits.isWr
   master.read := cmdCanIssue && (~cmd.bits.isWr).toBool()
   master.burstCount := cmd.bits.size
   master.address := cmd.bits.addr
   wData.ready := slaveReady
-
   cmd.ready := slaveReady
 
   private val canIssueCmd = cmd.valid && cmd.ready

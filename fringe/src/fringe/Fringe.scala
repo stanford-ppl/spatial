@@ -57,7 +57,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters, isAval
     val heap = Vec(numAllocators, new HeapIO())
 
 
-    val de1AvalonParam = new AvalonBundleParameters(26, 512, 17, 11, 64)
+    val de1AvalonParam = new AvalonBundleParameters(32, 512, 17, 11, 64)
     val TOP_M_AVALON = new AvalonProbe(de1AvalonParam)
     val TOP_AXI = new AXI4Probe(axiLiteParams)
     val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
@@ -106,6 +106,9 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters, isAval
     dramArb.io.app.scatters.zip(io.memStreams.scatters).foreach{ case (s, ss) => s <> ss }
     dramArb
   }
+
+  // TODO: Tian: need better way to connect these debug signals later.
+  dramArbs.head.io.TOP_M_AVALON <> io.TOP_M_AVALON
 
   val heap = Module(new DRAMHeap(numAllocators))
   heap.io.accel <> io.heap

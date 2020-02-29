@@ -324,6 +324,9 @@ class DRAMArbiter(
       connectDbgSig(debugCounter(!io.TOP_AXI.WREADY), "# cycles TOP ~WREADY")
       connectDbgSig(debugCounter(io.TOP_AXI.WLAST), "# cycles TOP WLAST")
       connectDbgSig(debugCounter(io.TOP_AXI.BVALID), "# cycles TOP BVALID ")
+      connectDbgSig(
+        debugCounter(io.TOP_AXI.WLAST & io.TOP_AXI.WVALID & io.TOP_AXI.WREADY),
+        "# cycles Top WLAST & WVALID & WREADY")
       connectDbgSig(debugCounter(io.TOP_AXI.BREADY & io.TOP_AXI.BVALID),
                     "# cycles TOP BREADY & BVALID ")
       connectDbgSig(

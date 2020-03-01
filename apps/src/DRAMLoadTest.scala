@@ -20,7 +20,7 @@ import spatial.dsl._
             mem(j)
           } {
             _ + _
-          }.value
+          }.value + 13
 
         } {
           _ + _

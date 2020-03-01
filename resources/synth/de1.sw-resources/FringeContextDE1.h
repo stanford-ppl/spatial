@@ -46,7 +46,9 @@ class FringeContextDE1 : public FringeContextBase<void>
 
     uint32_t burstSizeBytes;
     int fd;
-    vuint *fringeScalarBase, fringeMemBase, fpgaMallocPtr;
+    vuint *fringeScalarBase;
+    vuint *fringeMemBase;
+    vuint *fpgaMallocPtr;
     u32 fpgaFreeMemSize;
     u32 commandReg;
     u32 statusReg;
@@ -142,12 +144,11 @@ public:
         EPRINTF("placing fringeScalarBase at %lx\n", (luint)fringeScalarBase);
 
         // Initialize pointer to fringeMemBase
-        // ptr = (vuchar*) mmap(NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-        //            FRINGE_MEM_BASEADDR);
-        // fringeMemBase = (u32) ptr;
-        cout << "TODO: Need to allocate memory base!" << endl;
-        // EPRINTF("placing fringeMemBase at %lx\n", (luint) fringeMemBase);
-        // fpgaMallocPtr = fringeMemBase;
+        fringeMemBase = (vuint *)mmap(
+            NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+            FRINGE_M_AXI_BASEADDR);
+        EPRINTF("placing fringeMemBase at %lx\n", (luint)fringeMemBase);
+        fpgaMallocPtr = fringeMemBase;
     }
 
     uint32_t getFPGAVirt(uint32_t physAddr)
@@ -158,7 +159,7 @@ public:
 
     uint32_t getFPGAPhys(uint32_t virtAddr)
     {
-        uint32_t offset = virtAddr - fringeMemBase;
+        uint32_t offset = virtAddr - (uint32_t)fringeMemBase;
         return (uint32_t)(FRINGE_MEM_BASEADDR + offset);
     }
 
@@ -172,11 +173,11 @@ public:
             "dd if=SpatialIP.rbf of=/dev/fpga0 bs=1M",
             "echo 1 > /sys/class/fpga-bridge/fpga2hps/enable",
             "echo 1 > /sys/class/fpga-bridge/hps2fpga/enable",
-            "echo 1 > /sys/class/fpga-bridge/lwhps2fpga/enable"
-        };
+            "echo 1 > /sys/class/fpga-bridge/lwhps2fpga/enable"};
         list<string>::iterator it;
         int dnu = -1;
-        for (it = cmds.begin(); it != cmds.end(); ++it) {
+        for (it = cmds.begin(); it != cmds.end(); ++it)
+        {
             cout << it->c_str() << endl;
             sleep(0.5);
             dnu = system(it->c_str());
@@ -210,7 +211,7 @@ public:
         for (int i = 0; i < paddedSize / sizeof(u32); i++)
         {
             u32 *addr = (u32 *)(virtAddr + i * sizeof(u32));
-            *addr = 4081516 + i;
+            *addr = 0;
         }
         fpgaMallocPtr += paddedSize;
         fpgaFreeMemSize -= paddedSize;
@@ -305,7 +306,7 @@ public:
     {
         EPRINTF("[run] Begin..\n");
         uint32_t status = 0;
-        double timeout = 60; // seconds
+        double timeout = 10; // seconds
         int timed_out = 0;
 
         // Implement 4-way handshake

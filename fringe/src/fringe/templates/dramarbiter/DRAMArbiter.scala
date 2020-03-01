@@ -238,6 +238,9 @@ class DRAMArbiter(
       connectDbgSig(
         debugFF(io.dram.cmd.bits.size, io.dram.cmd.valid && io.dram.cmd.ready),
         "Last io.dram size (leaving fringe)")
+      connectDbgSig(
+        debugFF(io.dram.cmd.bits.tag, io.dram.cmd.valid && io.dram.cmd.ready),
+        "Last io.dram tag (leaving fringe)")
       connectDbgSig(debugFF(io.dram.wdata.bits.wdata.head,
                             io.dram.wdata.valid & io.dram.wdata.ready),
                     "Last io.dram wdata.head (leaving fringe)")
@@ -306,10 +309,12 @@ class DRAMArbiter(
       // TOP
       connectDbgSig(debugCounter(io.dram.wdata.valid),
                     "# cycles io.dram.wdata.valid")
-      connectDbgSig(debugCounter(io.TOP_AXI.ARVALID), "# cycles TOP ARVALID ")
-      connectDbgSig(debugCounter(io.TOP_AXI.ARREADY), "# cycles TOP ARREADY")
-      connectDbgSig(debugCounter(io.TOP_AXI.ARREADY & io.TOP_AXI.ARVALID),
-                    "# cycles TOP ARREADY & ARVALID ")
+//      connectDbgSig(debugCounter(io.TOP_AXI.ARVALID), "# cycles TOP ARVALID ")
+//      connectDbgSig(debugCounter(io.TOP_AXI.ARREADY), "# cycles TOP ARREADY")
+//      connectDbgSig(debugCounter(io.TOP_AXI.ARREADY & io.TOP_AXI.ARVALID),
+//                    "# cycles TOP ARREADY & ARVALID ")
+      connectDbgSig(debugFF(io.TOP_AXI.AWID, io.TOP_AXI.AWREADY & io.TOP_AXI.AWVALID), "Last TOP AWID")
+      connectDbgSig(debugFF(io.TOP_AXI.BID, io.TOP_AXI.BVALID & io.TOP_AXI.BREADY), "Last TOP BID")
       connectDbgSig(debugCounter(io.TOP_AXI.AWVALID), "# cycles TOP AWVALID ")
       connectDbgSig(debugCounter(io.TOP_AXI.AWREADY & io.TOP_AXI.AWVALID),
                     "# cycles TOP AWREADY & AWVALID ")

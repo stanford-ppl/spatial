@@ -127,7 +127,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   else {
     io.rdata := chisel3.util.ShiftRegister(regs.io.rdata, 1)
   }
-  
+
 
   val command = regs.io.argIns(0)
   val curStatus = regs.io.argIns(1).asTypeOf(new StatusReg)
@@ -142,7 +142,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   val timeoutCycles = 12000000000L
   val timeoutCtr = Module(new FringeCounter(40))
   timeoutCtr.io <> DontCare
-  timeoutCtr.io.reset := 0.U 
+  timeoutCtr.io.reset := 0.U
   timeoutCtr.io.saturate := 1.U
   timeoutCtr.io.max := timeoutCycles.U
   timeoutCtr.io.stride := 1.U

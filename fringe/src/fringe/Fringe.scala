@@ -17,7 +17,7 @@ import fringe.templates.memory.RegFile
   * @param blockingDRAMIssue TODO: What is this?
   * @param axiParams TODO: What is this?
   */
-class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters, isAvalon: Boolean = false) extends Module {
+class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extends Module {
   val commandReg = 0  // TODO: These vals are used in test only, logic below does not use them.
   val statusReg = 1   //       Changing these values alone has no effect on the logic below.
 
@@ -56,13 +56,11 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters, isAval
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
     val heap = Vec(numAllocators, new HeapIO())
 
-
-    val de1AvalonParam = new AvalonBundleParameters(32, 512, 17, 11, 64)
+    // AXI Debuggers
     val TOP_AXI = new AXI4Probe(axiLiteParams)
     val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
     val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
     val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
-
 
     //Accel stream IO
 //    val genericStreamsAccel = Flipped(new GenericStreams(streamInsInfo, streamOutsInfo))

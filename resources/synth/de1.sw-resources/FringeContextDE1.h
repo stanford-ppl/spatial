@@ -15,28 +15,11 @@
 #include <unistd.h>
 #include <list>
 #include <iostream>
-// #include <xil_cache.h>
-// #include <xil_io.h>
-
-// Some key code snippets have been borrowed from the following source:
-// https://shanetully.com/2014/12/translating-virtual-addresses-to-physcial-addresses-in-user-space
-
-// The page frame shifted left by PAGE_SHIFT will give us the physcial address
-// of the frame
-// // Note that this number is architecture dependent. For me on x86_64 with
-// 4096 page sizes,
-// // it is defined as 12. If you're running something different, check the
-// kernel source
-// // for what it is defined as.
 #define PAGE_SHIFT 12
 #define PAGEMAP_LENGTH 8
 #define USE_PHYS_ADDR
 
 using namespace std;
-
-/**
- * DE1 Fringe Context
- */
 
 typedef long unsigned int luint;
 typedef volatile unsigned int vuint;
@@ -48,7 +31,7 @@ class FringeContextDE1 : public FringeContextBase<void>
     int fd;
     vuint *fringeScalarBase;
     vuint *fringeMemBase;
-    vuint *fpgaMallocPtr;
+    u32 fpgaMallocPtr;
     u32 fpgaFreeMemSize;
     u32 commandReg;
     u32 statusReg;
@@ -136,19 +119,17 @@ public:
             perror("error opening /dev/mem\n");
         }
 
-        // Initialize pointers to fringeScalarBase
         vuint *ptr = (vuint *)mmap(
             NULL, MAP_LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
             FRINGE_SCALAR_BASEADDR);
         fringeScalarBase = ptr;
         EPRINTF("placing fringeScalarBase at %lx\n", (luint)fringeScalarBase);
 
-        // Initialize pointer to fringeMemBase
         fringeMemBase = (vuint *)mmap(
             NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
             FRINGE_M_AXI_BASEADDR);
         EPRINTF("placing fringeMemBase at %lx\n", (luint)fringeMemBase);
-        fpgaMallocPtr = fringeMemBase;
+        fpgaMallocPtr = (u32)fringeMemBase;
     }
 
     uint32_t getFPGAVirt(uint32_t physAddr)
@@ -200,7 +181,6 @@ public:
 
     virtual uint32_t malloc(size_t bytes)
     {
-
         size_t paddedSize = alignedSize(burstSizeBytes, bytes);
         ASSERT(paddedSize <= fpgaFreeMemSize,
                "FPGA Out-Of-Memory: requested %lu, available %lu\n", (luint)paddedSize,
@@ -213,8 +193,10 @@ public:
             u32 *addr = (u32 *)(virtAddr + i * sizeof(u32));
             *addr = 0;
         }
+
         fpgaMallocPtr += paddedSize;
         fpgaFreeMemSize -= paddedSize;
+
         uint32_t physAddr = getFPGAPhys(virtAddr);
         EPRINTF("[malloc] virtAddr = %lx, physAddr = %lx\n", (luint)virtAddr, (luint)physAddr);
         return physAddr;

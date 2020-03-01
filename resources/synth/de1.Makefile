@@ -35,6 +35,7 @@ hw:
 	echo "$$(date +%s)" > start.log
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs de1"
 	cat de1.hw-resources/SRAMVerilogAWS.v >> ${DE1_DIR}/SpatialIP.v
+    cp de1.hw-resources/SpatialIP_wrapper.v ${DE1_DIR}/
 	cp de1.hw-resources/build/* ${DE1_DIR}
 	sed -i 's/SRFF/SRFF_sp/g' ${DE1_DIR}/SpatialIP.v
 	make -C ${DE1_DIR} -j8

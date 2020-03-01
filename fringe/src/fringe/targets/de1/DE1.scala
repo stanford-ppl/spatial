@@ -10,36 +10,35 @@ import fringe.{AbstractAccelUnit, BigIP, SpatialIPInterface}
 class DE1Like extends ZynqLike {
   override def makeBigIP: BigIP = new fringe.targets.de1.BigIPDE1
 
-  override def addFringeAndCreateIP(
-      reset: Reset,
-      accel: AbstractAccelUnit): SpatialIPInterface = {
+  override def addFringeAndCreateIP(reset: Reset, accel: AbstractAccelUnit): SpatialIPInterface = {
     val io = IO(new DE1Interface)
 
     // Avalon Fringe
     val blockingDRAMIssue = false // Allow only one in-flight request, block until response comes back
-    val fringe = Module(
-      new FringeDE1(blockingDRAMIssue, io.avalonLiteParams, io.avalonParams))
+    val fringe = Module(new FringeDE1(blockingDRAMIssue, io.avalonLiteParams, io.axiParams))
 
     // Fringe <-> Host connections
     fringe.io.S_AVALON <> io.S_AVALON
 
     // Fringe <-> DRAM connections
-    io.M_AVALON <> fringe.io.M_AVALON
+    io.M_AXI <> fringe.io.M_AXI
 
     // TODO: Probe
-    io.TOP_M_AVALON <> fringe.io.TOP_M_AVALON
+    io.TOP_AXI <> fringe.io.TOP_AXI
+    io.DWIDTH_AXI <> fringe.io.DWIDTH_AXI
+    io.PROTOCOL_AXI <> fringe.io.PROTOCOL_AXI
+    io.CLOCKCONVERT_AXI <> fringe.io.CLOCKCONVERT_AXI
+
     io.rdata := DontCare
 
     accel.io.argIns := fringe.io.argIns
-    fringe.io.argOuts.zip(accel.io.argOuts) foreach {
-      case (fringeArgOut, accelArgOut) =>
-        fringeArgOut.bits := accelArgOut.port.bits
-        fringeArgOut.valid := accelArgOut.port.valid
+    fringe.io.argOuts.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
+      fringeArgOut.bits := accelArgOut.port.bits
+      fringeArgOut.valid := accelArgOut.port.valid
     }
 
-    fringe.io.argEchos.zip(accel.io.argOuts) foreach {
-      case (fringeArgOut, accelArgOut) =>
-        accelArgOut.echo := fringeArgOut
+    fringe.io.argEchos.zip(accel.io.argOuts) foreach { case (fringeArgOut, accelArgOut) =>
+      accelArgOut.echo := fringeArgOut
     }
 
     fringe.io.externalEnable := false.B
@@ -60,6 +59,7 @@ class DE1 extends DE1Like {
   override def regFileAddrWidth(n: Int): Int = 32
 
   override val magPipelineDepth: Int = 0
+//  override val addrWidth: Int = 18
   override val addrWidth: Int = 32
   override val dataWidth: Int = 32
   override val wordsPerStream: Int = 16

@@ -6,6 +6,7 @@ all:
 	set -e
 	quartus_sh --restore ${PROJECT}.qar
 	cp ${IP}.v ${SUBMODULE_DIR}/synthesis/submodules/
+	cp ${IP}_wrapper.v ${SUBMODULE_DIR}/synthesis/submodules/
 	quartus_map --read_settings_files=on --write_settings_files=off ${PROJECT} -c ${PROJECT}
 	quartus_fit --read_settings_files=off --write_settings_files=off ${PROJECT} -c ${PROJECT}
 	quartus_asm --read_settings_files=off --write_settings_files=off ${PROJECT} -c ${PROJECT}

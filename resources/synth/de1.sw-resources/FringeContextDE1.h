@@ -30,7 +30,7 @@ class FringeContextDE1 : public FringeContextBase<void>
     uint32_t burstSizeBytes;
     int fd;
     vuint *fringeScalarBase;
-    vuint *fringeMemBase;
+    u32 fringeMemBase;
     u32 fpgaMallocPtr;
     u32 fpgaFreeMemSize;
     u32 commandReg;
@@ -125,16 +125,18 @@ public:
         fringeScalarBase = ptr;
         EPRINTF("placing fringeScalarBase at %lx\n", (luint)fringeScalarBase);
 
-        fringeMemBase = (vuint *)mmap(
+        fringeMemBase = (u32)mmap(
             NULL, MEM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
             FRINGE_M_AXI_BASEADDR);
-        EPRINTF("placing fringeMemBase at %lx\n", (luint)fringeMemBase);
-        fpgaMallocPtr = (u32)fringeMemBase;
+        EPRINTF("placing fringeMemBase at %lx\n", fringeMemBase);
+        fpgaMallocPtr = fringeMemBase;
     }
 
     uint32_t getFPGAVirt(uint32_t physAddr)
     {
+        EPRINTF("[getFPGAVirt] physAddr = %lx\n", physAddr);
         uint32_t offset = physAddr - FRINGE_MEM_BASEADDR;
+        cout << "[getFPGAVirt] offset = " << offset << endl;
         return (uint32_t)(fringeMemBase + offset);
     }
 
@@ -219,6 +221,7 @@ public:
         EPRINTF("[memcpy FPGA -> HOST] hostmem = %p, devmem = %lx, size = %lu\n",
                 hostmem, (long unsigned int)devmem, (long unsigned int)size);
         void *src = (void *)getFPGAVirt(devmem);
+        EPRINTF("[memcpy FPGA -> HOST fpga_src = %lx \n", src);
         std::memcpy(hostmem, src, size);
     }
 
@@ -453,6 +456,14 @@ public:
             EPRINTF("\t%s: %016lx (%08lu)\n", signalLabels[i], (luint)value, (luint)value);
         }
         EPRINTF(" **************************\n");
+    }
+
+    void peekMem(uint32_t addr, size_t size) {
+        vuint* vAddr = (vuint *)(fringeMemBase + addr); 
+        for (int i = 0; i < size; i ++) {
+            EPRINTF("addr = %lx, data = %d \n", vAddr + i, *(vAddr + i));
+            // cout << vAddr + i << ": " << *(vAddr + i) << endl;
+        }
     }
 
     ~FringeContextDE1() { dumpDebugRegs(); }

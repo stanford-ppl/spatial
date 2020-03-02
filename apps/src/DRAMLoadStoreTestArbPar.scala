@@ -16,7 +16,7 @@ import spatial.dsl._
 
         mem0 load inDRAM(i :: i + memLen par 2)
         Foreach(memLen by 1 par 2) { j =>
-          mem1(j) = mem0(j) + 13
+          mem1(j) = mem0(j) + 13.to[Int]
         }
 
         outDRAM(i :: i + memLen par 2) store mem1

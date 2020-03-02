@@ -14,7 +14,7 @@ import spatial.dsl._
       Sequential.Foreach(len by memLen) { i =>
         mem load inDRAM(i :: i + memLen)
         Foreach(memLen by 1) { j =>
-          mem(j) = mem(j) + 13
+          mem(j) = mem(j) + 21
         }
 
         outDRAM(i :: i + memLen) store mem

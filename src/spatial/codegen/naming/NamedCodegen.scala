@@ -3,6 +3,7 @@ package spatial.codegen.naming
 import argon._
 import argon.node._
 import argon.codegen.Codegen
+import spatial.util.spatialConfig
 
 import spatial.lang._
 import spatial.node._
@@ -37,7 +38,7 @@ trait NamedCodegen extends Codegen {
       case LineBufferNew(_,_,_) => s"${s}_${s.nameOr("linebuf")}"
       case FIFONew(_)   => s"${s}_${s.nameOr("fifo")}"
       case LIFONew(_)   => s"${s}_${s.nameOr("lifo")}"
-      case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}"
+      case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}" + {if (spatialConfig.dualReadPort || mem.isDualPortedRead) "_dualread" else ""}
       case LUTNew(_,_)  => s"${s}_${s.nameOr("lut")}"
 
       case SetReg(reg,_)      => s"${s}_${s.nameOr(src"set_${local(reg)}")}"

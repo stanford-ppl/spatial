@@ -40,6 +40,10 @@ package object math {
   def isMersenne(x: Int, maxPow: Int = 16): Boolean = {
     isPow2(x + 1) && x + 1 <= scala.math.pow(2,maxPow) && x > 2
   }
+  /** Returns c such that x + c is a power of 2 */
+  def pseudoMersenneC(x: Int, maxPow: Int = 16): Int = {
+    scala.math.pow(2, scala.math.ceil(log2(x.toDouble)).toInt).toInt - x
+  }
   /** Returns y such that y = x*k, where y is Mersenne and k <= N.  N is also known as "radius" */
   def withinNOfMersenne(N: Int, x: Int): Option[Int] = {
     if (!isMersenne(x) && x > 3) List.tabulate(N-2){i => x*(i+2)}.collectFirst{case i if isMersenne(i) => i}
@@ -66,9 +70,9 @@ package object math {
   }
 
   /** Modified Crandall's algorithm implemented in software to compute floor(x / t), where t is a Mersenne number.  This is good as a sw test of the algorithm */
-  def modifiedCrandallSW(x: scala.Int, t: scala.Int): (Int, Int) = {
+  def modifiedCrandallSW(x: scala.Int, t: scala.Int, c: scala.Int): (Int, Int) = {
     import scala.math.{floor}
-    val c = 1
+    assert(isPow2(t + c))
     val m = t + c
     val qs = scala.collection.mutable.ListBuffer.fill(100)(-1)
     val rs = scala.collection.mutable.ListBuffer.fill(100)(-1)
@@ -84,7 +88,7 @@ package object math {
       q = q + qs(i)
       r = r + rs(i)
     }
-    println(s"Step 3 yields: qs = ${qs.take(i)}, rs = ${rs.take(i)}, q = $q, r = $r")
+    println(s"Step 3 yields: qs = ${qs.filter(_ != -1)}, rs = ${rs.filter(_ != -1)}, q = $q, r = $r")
     while (r >= t) {
       r = r - t
       q = q + 1

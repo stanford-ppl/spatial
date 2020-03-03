@@ -22,11 +22,11 @@ reports:
 
 bd: pre-build-checks design_1.v
 	sed -i 's/design_1_SpatialIP_0_0/SpatialIP/' design_1.v
-    if [ -z "$$(vivado -version | grep v2017.1)" ]; then \
-            echo 'Skipping comment hack for vivado Version != 2017.1'; \
-    else \
-            sed -i 's/(\*/\/\/ (\*/' design_1.v; \
-    fi
+	if [ -z "$$(vivado -version | grep v2017.1)" ]; then \
+			echo 'Skipping comment hack for vivado Version != 2017.1'; \
+	else \
+			sed -i 's/(\*/\/\/ (\*/' design_1.v; \
+	fi
 
 
 design_1.v:

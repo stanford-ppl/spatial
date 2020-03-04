@@ -64,7 +64,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       val exps = List.tabulate(levels - 1){i => pow * (i + 1)}
       val cs = List.tabulate(levels-1){i => scala.math.pow(c,i+1).toInt}
       // Step 3: Keep dividing things to expand qs list, keep modding them to get rs list, and then add them up
-      val qs = List(stage(FixSRA(a, exps.head))) ++ exps.drop(1).zip(cs).map{case (e,cc) => stage(FixSRA(a * cc, e))}
+      val qs = List(stage(FixDivSRA(a, exps.head))) ++ exps.drop(1).zip(cs).map{case (e,cc) => stage(FixDivSRA(a * cc, e))}
       val rs = List(stage(FixAnd(a, Type[Fix[S,I,F]].from(t)))) ++ qs.map{qi => stage(FixAnd(qi * c, Type[Fix[S,I,F]].from(t)))}
       val q = qs.reduceTree{_+_}
       val r = rs.head + {if (rs.length > 1) rs.drop(1).zip(qs).map{case (a,b) => mux( b != 0, a, Type[Fix[S,I,F]].from(0))}.reduceTree{_+_} else Type[Fix[S,I,F]].from(0)}
@@ -92,12 +92,11 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       implicit val F: INT[F] = a.fmt.f
       val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
       val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
-      dbgs(s"Rewriting $a mod $mod with $levels bitshifts")
       val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
-      temps(0) = stage(FixAdd[S,I,F](stage(FixSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
+      temps(0) = stage(FixAdd[S,I,F](stage(FixDivSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
       List.tabulate(levels.size-1) { level =>
         temps(level+1) = stage(FixAdd[S,I,F](
-                                  stage(FixSRA(temps(level),levels(level+1))),
+                                  stage(FixDivSRA(temps(level),levels(level+1))),
                                   stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
                             )
       }

@@ -444,6 +444,17 @@ object Math {
     result
   }
 
+  def arith_right_shift_div(a: FixedPoint, shift: Int, delay: Option[Double], flow: Bool, myName: String): FixedPoint = {
+    val result = Wire(new FixedPoint(a.fmt))
+    val latency = delay.getOrElse(0.0).toInt
+    val sgnextend = if (a.s) util.Fill(shift, a.msb) else util.Fill(shift, false.B)
+    val goesTo0 = a(a.d+a.f-1, shift) === util.Fill(a.d+a.f - shift, true.B) && a(shift-1,0) =/= util.Fill(shift, false.B)
+    val real = getRetimed(util.Cat(sgnextend, a(a.d+a.f-1, shift)), latency, flow)
+    val zero = 0.U
+    result.r := Mux(goesTo0, zero, real)
+    result
+  }
+
   def arith_left_shift(a: FixedPoint, shift: Int, delay: Option[Double], flow: Bool, myName: String): FixedPoint = {
     val result = Wire(new FixedPoint(a.fmt))
     val latency = delay.getOrElse(0.0).toInt

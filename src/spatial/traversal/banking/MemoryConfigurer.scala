@@ -213,7 +213,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       if (outermost.isInnerControl) true  // Unrolling takes care of this broadcast within inner ctrl
       else {
         // Need more specialized logic for broadcasting across controllers
-        spatialConfig.enableBroadcast && divergedIters(a, b, mem).values.forall(_.isDefined)
+        spatialConfig.enableBroadcast /* && !spatialConfig.dualReadPort */ && divergedIters(a, b, mem).values.forall(_.isDefined)
       }
     }
     else true

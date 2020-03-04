@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Run this script with a space-separated list of apps you want to rerun as the arguments"
+echo "REMEMBER TO CHANGE THE HOST COLUMN OF THE SPREADSHEET TO WHATEVER SERVER YOU ARE RUNNING ON (IT WON'T UPDATE THE SHEET IF THIS DOESN'T MATCH"
 export GDOCS=1
 
 for app in "$@"; do

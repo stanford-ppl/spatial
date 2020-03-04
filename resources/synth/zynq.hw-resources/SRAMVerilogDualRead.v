@@ -26,12 +26,16 @@ module SRAMVerilogDualRead
             begin
                 mem[waddr] <= wdata;
             end
-            rdata0 <= mem[raddr0];
+            if (backpressure)
+            begin
+                rdata0 <= mem[raddr0];
+            end
     end
 
 
     always @(posedge clk)
     begin
+        if (backpressure)
         begin
             rdata1 <= mem[raddr1];
         end

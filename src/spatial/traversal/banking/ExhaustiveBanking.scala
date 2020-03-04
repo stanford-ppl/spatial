@@ -341,7 +341,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)
 //    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)}")
     val Ns = possibleNs.iterator
-    val numChecks = grps.map{x => nCr(x.size, 2)}.sum
+    val numChecks = grps.map{x => nCr(x.size, {if (dualPortHalve) 3 else 2})}.sum
     val rank = axes.length
     var banking: Option[PartialBankingChoices] = None
 

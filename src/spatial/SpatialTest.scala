@@ -48,7 +48,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --insanity --instrument --runtime --fpga VCS",
+    args = "--synth --insanity --instrument --runtime --fpga VCS --dualReadPort",
     make = "make",
     run  = "bash scripts/regression_run.sh vcs",
     model  = "bash scripts/model_run.sh vcs",
@@ -60,7 +60,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object Zynq extends ChiselBackend(
     name = "Zynq",
-    args = "--synth --insanity --fpga Zynq",
+    args = "--synth --insanity --fpga Zynq --dualReadPort",
     make = "make",
     run  = "bash scripts/scrape.sh Zynq",
     model = "noninteractive"
@@ -71,7 +71,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object ZCU extends ChiselBackend(
     name = "ZCU",
-    args = "--synth --insanity --fpga ZCU",
+    args = "--synth --insanity --fpga ZCU --dualReadPort",
     make = "make",
     run  = "bash scripts/scrape.sh ZCU",
     model = "noninteractive"

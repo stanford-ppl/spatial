@@ -8,6 +8,7 @@ import spatial.util.spatialConfig
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 
 trait NamedCodegen extends Codegen {
 

@@ -121,7 +121,7 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
       val ens =
         if (globals.target.cheapSRAMs) rawEns // TODO: Figure out how to properly use sticky selects for dual ported...
         else {
-          val stickyEns = Module(new StickySelects(rawEns.size, true)) // Fixes bug exposed by ScatterGatherSRAM app
+          val stickyEns = Module(new StickySelects(rawEns.size, false)) // Fixes bug exposed by ScatterGatherSRAM app
           stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
           stickyEns.io.outs.map(_.toBool)
         }

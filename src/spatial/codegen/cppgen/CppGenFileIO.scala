@@ -7,6 +7,29 @@ import spatial.node._
 trait CppGenFileIO extends CppGenCommon {
 
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
+    case op @ LoadDRAMWithASCIIText(dram, file) =>
+      emit(
+        src"${file}.seekg(0, std::ios::end);"
+      )
+      emit(
+        src"""std::ifstream::pos_type ${lhs}_pos = ${file}.tellg();"""
+      )
+      emit(
+        src"char* ${lhs}_temp = (char *) malloc(${lhs}_pos * sizeof(char));"
+      )
+      emit(
+        src"${file}.seekg(0, std::ios::beg);"
+      )
+      emit(
+        src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);"
+      )
+      emit(
+        src"c1->memcpy($dram, &${lhs}_temp[0], ${lhs}_pos * sizeof(char));"
+      )
+      emit(
+        src"free(${lhs}_temp);"
+      )
+
     case OpenBinaryFile(filename, isWr) =>
       val dir = if (isWr) "o" else "i"
       emit(src"""std::${dir}fstream ${lhs} ($filename, std::ios::binary);""")

@@ -127,4 +127,9 @@ trait FileIOAPI { this: Implicits =>
   /** Creates a placeholder for a numpy matrix as an @Tensor2.**/
   @api def loadNumpy2D[T:Num](name: String): Tensor2[T] = stage(NumpyMatrix(name))
 
+  @api def loadDRAMWithASCIIText[T:Num](filename: Text, dram: DRAM1[T]): Void = {
+    val file = openBinary(filename, write = false)
+    stage(LoadDRAMWithASCIIText(dram, file))
+    closeBinary(file)
+  }
 }

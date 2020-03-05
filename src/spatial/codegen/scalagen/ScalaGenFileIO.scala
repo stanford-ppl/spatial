@@ -48,6 +48,21 @@ trait ScalaGenFileIO extends ScalaCodegen {
         emit(src"writer.close()")
       close("}")
 
+    case LoadDRAMWithASCIIText(dram, filename) =>
+      open(src"val $lhs = {")
+      emit(src"val filepath = java.nio.file.Paths.get($filename)")
+      emit(src"val buffer = java.nio.file.Files.readAllBytes(filepath)")
+      emit(src"val bb = java.nio.ByteBuffer.wrap(buffer)")
+      emit(src"bb.order(java.nio.ByteOrder.nativeOrder)")
+      emit(src"val array = bb.array")
+
+      open(s"array.sliding(1, 1).toArray.map{x => ")
+      emit(src"FixedPoint.fromByteArray(x, FixFormat(false, 8, 0))")
+      close("}")
+      close("}")
+      open(src"for (i <- 0 until ${lhs}.length) {")
+      emit(src"$dram(i) = ${lhs}(i)")
+      close("}")
 
     case OpenBinaryFile(filename, write) => emit(src"val $lhs = $filename")
 

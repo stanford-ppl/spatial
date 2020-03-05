@@ -26,7 +26,10 @@ add_files -norecurse [glob *.sv]
 
 switch $TARGET {
   "Virtex7" {
-    synth_design -mode out_of_context -top SpatialIP_v1_0
+    ## synth_design -mode out_of_context -top SpatialIP_v1_0
+    synth_design -mode out_of_context -top SpatialIP
+    report_utilization -packthru -file ./synth_utilization.rpt
+    report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file ./synth_utilization_hierarchical.rpt
   }
   default {
     import_ip -files [list \

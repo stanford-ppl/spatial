@@ -255,8 +255,8 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
   }
 
   // Connect read data to output
-  // laneBitvecs is a Sequence with one entry per read port lane: <bank address, bank.port0 output, bank.port1 output, read enable, banks (flattend addr) visible for lane>
-  val laneBitvecs: Seq[(UInt, UInt, UInt, Bool, List[scala.Int])] = p.RMapping.zipWithIndex.flatMap{ case (rm, k) =>
+  // laneBitvecs is a Sequence with one entry per read port lane: <bank address, bank.port0 output, bank.port1 output, read enable, banks (flattend addr) visible for lane, isPsuedo (i.e. broadcast sniffer)>
+  val laneBitvecs: Seq[(UInt, UInt, UInt, Bool, List[scala.Int], scala.Boolean)] = p.RMapping.zipWithIndex.flatMap{ case (rm, k) =>
     val port = io.rPort(k)
     // First identify the bank each lane is asking for
     port.output.zipWithIndex.map{case (out, lane) =>
@@ -272,7 +272,8 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
          if (true /*globals.target.cheapSRAMs*/) getRetimed(en, globals.target.sramload_latency, port.backpressure)
          else List.tabulate(globals.target.sramload_latency + 1){i => getRetimed(en, i, port.backpressure)}.reduce{_||_} // hacky way to capture sticky selects memory without a real sticky select module
        },
-       combs(visBanksForLane.map(_.toList)).map(hierToFlat).sorted
+       combs(visBanksForLane.map(_.toList)).map(hierToFlat).sorted,
+       rm.broadcast(lane) > 0
       )
     }
   }
@@ -287,8 +288,8 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
         out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.toList.zip(p.RMapping.flatMap{r => List.fill(r.castgroup.size)(r.muxPort)}).collect{case ((cg, b, o),mp) if b == 0 && cg == castgrp && mp == rm.muxPort =>  o}.head
       }
       else {
-        val conflictsBelowIdx = laneBitvecs.take(base + lane).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty => i}
-        val conflictsAboveIdx = laneBitvecs.takeRight(laneBitvecs.size - base - lane - 1).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty => i + laneBitvecs.size + 1}
+        val conflictsBelowIdx = laneBitvecs.take(base + lane).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty && !vb._6 => i}
+        val conflictsAboveIdx = laneBitvecs.takeRight(laneBitvecs.size - base - lane - 1).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty && !vb._6 => i + laneBitvecs.size + 1}
         val takeUpper = if (conflictsBelowIdx.isEmpty) false.B
                         else if (conflictsAboveIdx.isEmpty) true.B
                         else conflictsBelowIdx.map(laneBitvecs).map{fba => fba._4 && (fba._1 === laneBitvecs(base + lane)._1)}.reduce{_||_}

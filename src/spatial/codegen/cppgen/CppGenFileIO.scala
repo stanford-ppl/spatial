@@ -24,7 +24,7 @@ trait CppGenFileIO extends CppGenCommon {
         src"${file}.read(&${lhs}_temp[0], ${lhs}_pos);"
       )
       emit(
-        src"c1->memcpy($dram, &${lhs}_temp[0], ${lhs}_pos * sizeof(char));"
+        src"memcpy($dram, &${lhs}_temp[0], ${lhs}_pos * sizeof(char));"
       )
       emit(
         src"free(${lhs}_temp);"

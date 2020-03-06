@@ -767,7 +767,8 @@ class Mem1DDualRead(val size: Int, bitWidth: Int, syncMem: Boolean = false) exte
     m.io.waddr     := io.w.ofs.head
     m.io.wen       := io.w.en.head & wInBound
     m.io.wdata     := io.w.data.head
-    m.io.backpressure      := io.r0.backpressure || io.r1.backpressure
+    m.io.backpressure0      := io.r0.backpressure
+    m.io.backpressure1      := io.r1.backpressure
     io.output0 := m.io.rdata0
     io.output1 := m.io.rdata1
   } else {

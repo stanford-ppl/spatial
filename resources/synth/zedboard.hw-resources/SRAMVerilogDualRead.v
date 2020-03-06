@@ -12,7 +12,8 @@ module SRAMVerilogDualRead
     input raddrEn1,
     input waddrEn,
     input wen,
-    input backpressure,
+    input backpressure0,
+    input backpressure1,
     input [DWIDTH-1:0] wdata,
     output reg [DWIDTH-1:0] rdata0,
     output reg [DWIDTH-1:0] rdata1
@@ -26,19 +27,13 @@ module SRAMVerilogDualRead
             begin
                 mem[waddr] <= wdata;
             end
-            if (backpressure)
-            begin
-                rdata0 <= mem[raddr0];
-            end
+            if (backpressure0) rdata0 <= mem[raddr0];
     end
 
 
     always @(posedge clk)
     begin
-        if (backpressure)
-        begin
-            rdata1 <= mem[raddr1];
-        end
+        if (backpressure1) rdata1 <= mem[raddr1];
     end
 endmodule
 

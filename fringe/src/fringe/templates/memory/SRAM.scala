@@ -35,7 +35,8 @@ class SRAMVerilogDualReadIO[T<:Data](t: T, d: Int) extends Bundle {
     val raddrEn1 = Input(Bool())
     val waddrEn = Input(Bool())
     val wen = Input(Bool())
-    val backpressure = Input(Bool())
+    val backpressure0 = Input(Bool())
+    val backpressure1 = Input(Bool())
     val wdata = Input(UInt(t.getWidth.W))
     val rdata0 = Output(UInt(t.getWidth.W))
     val rdata1 = Output(UInt(t.getWidth.W))
@@ -108,7 +109,8 @@ class GenericRAMDualReadIO[T<:Data](t: T, d: Int) extends Bundle {
   val wdata = Input(t.cloneType)
   val rdata0 = Output(t.cloneType)
   val rdata1 = Output(t.cloneType)
-  val backpressure = Input(Bool())
+  val backpressure0 = Input(Bool())
+  val backpressure1 = Input(Bool())
 
   override def cloneType: this.type = {
     new GenericRAMDualReadIO(t, d).asInstanceOf[this.type]
@@ -213,7 +215,8 @@ class SRAMDualRead[T<:Data](override val t: T, override val d: Int, val resource
       mem.io.wen := io.wen
       mem.io.waddr := io.waddr
       mem.io.wdata := io.wdata.asUInt()
-      mem.io.backpressure := io.backpressure
+      mem.io.backpressure0 := io.backpressure0
+      mem.io.backpressure1 := io.backpressure1
       mem.io.raddrEn0 := true.B
       mem.io.raddrEn1 := true.B
       mem.io.waddrEn := true.B

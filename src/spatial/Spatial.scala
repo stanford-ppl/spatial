@@ -386,6 +386,9 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("noOptimizeMul").action{(_,_) => spatialConfig.optimizeMul = false}.text("Do not optimize multiplications if they can be rewritten as sum/subtraction of two pow2 multiplies")
     cli.opt[Unit]("noOptimizeMod").action{(_,_) => spatialConfig.optimizeMod = false}.text("Do not optimize modulo if they can be rewritten shifts and adds using Mersenne numbers")
+    cli.opt[Unit]("crandallMod").action{(_,_) => spatialConfig.useCrandallMod = true}.text("Do not optimize modulo if they can be rewritten shifts and adds using Mersenne numbers")
+    cli.opt[Unit]("optimizeDiv").action{(_,_) => spatialConfig.optimizeDiv = true}.text("Replace division by Crandall's Algorithm to avoid using DSPs.  Also turns on Crandall-based modulo since the datapath will already contain most of the nodes required to replace modulo")
+    cli.opt[Unit]("dualReadPort").action{(_,_) => spatialConfig.dualReadPort = true}.text("Treat all memories as dual read port")
 
     cli.opt[Unit]("noBroadcast").action{(_,_) => spatialConfig.enableBroadcast = false }.text("Disable broadcast reads")
 

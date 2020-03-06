@@ -82,7 +82,10 @@ trait ChiselGenMath extends ChiselGenCommon {
       case FixSRA(x,y) => 
         val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
         emit(src"""$lhs.r := Math.arith_right_shift($x, $shift, $lat, $backpressure,"$lhs").r""")
-      case FixSRU(x,y) => 
+      case FixDivSRA(x,y) =>
+        val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
+        emit(src"""$lhs.r := Math.arith_right_shift_div($x, $shift, $lat, $backpressure,"$lhs").r""")
+      case FixSRU(x,y) =>
         val shift = DLTrace(y).getOrElse(throw new Exception("Cannot shift by non-constant amount in accel")).replaceAll("\\.FP.*|\\.U.*|\\.S.*|L","")
         emit(src"""$lhs.r := Math.logic_right_shift($x, $shift, $lat, $backpressure,"$lhs").r""")
 
@@ -145,6 +148,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case SatSub(x,y) => MathDL(lhs, rhs, latencyOption("FixSub", Some(bitWidth(lhs.tp))))
     case FixSLA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
+    case FixDivSRA(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case FixSRU(x,y) => MathDL(lhs, rhs, latencyOption("FixSLA", Some(bitWidth(lhs.tp))))
     case BitRandom(None) if lhs.parent.s.isDefined => emit(src"""val $lhs = Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn, "$lhs") === 1.U""")
     case FixRandom(None) if lhs.parent.s.isDefined => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"""$lhs.r := Math.fixrand(${scala.math.random*scala.math.pow(2, bitWidth(lhs.tp))}.toInt, ${bitWidth(lhs.tp)}, $datapathEn, "$lhs").r""")

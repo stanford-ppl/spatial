@@ -149,6 +149,10 @@ trait CppGenMath extends CppGenCommon {
         case FixPtType(s,d,f) if (f > 0) => emit(src"${lhs.tp} $lhs = $x / pow(2.,$y);")
         case _ => emit(src"${lhs.tp} $lhs = $x >> $y;")
       }
+    case FixDivSRA(x,y) => lhs.tp match {
+        case FixPtType(s,d,f) if (f > 0) => emit(src"${lhs.tp} $lhs = $x / pow(2.,$y);")
+        case _ => emit(src"${lhs.tp} $lhs = $x / pow(2.,$y);")
+      }
     case FixSRU(x,y) => emit(src"${lhs.tp} $lhs = $x >>> $y; // Need to do this correctly for cpp")
       
     case _ => super.gen(lhs, rhs)

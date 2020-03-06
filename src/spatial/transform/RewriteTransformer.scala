@@ -20,7 +20,7 @@ import emul.FixedPoint
 
 import utils.math.{isPow2,log2,gcd}
 import spatial.util.math._
-import utils.math.{isSumOfPow2,asSumOfPow2,isMersenne,withinNOfMersenne}
+import utils.math.{isSumOfPow2,asSumOfPow2,isMersenne,withinNOfMersenne,pseudoMersenneC}
 
 /** Performs hardware-specific rewrite rules. */
 case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTraversal {
@@ -52,31 +52,64 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     }
   }
 
-  // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
-  def rewriteModWithMersenne[S,I,F](a: Fix[S,I,F], mod: Int): Fix[S,I,F] = {
+  // Magical rewrite rules, based loosely on algorithm 6 of https://ece.uwaterloo.ca/~ahasan/web_papers/technical_reports/web_lwpfi.pdf
+  def crandallDivMod[S,I,F](a: Fix[S,I,F], t: Int, c: Int): (Fix[S,I,F], Fix[S,I,F]) = {
     implicit val S: BOOL[S] = a.fmt.s
     implicit val I: INT[I] = a.fmt.i
     implicit val F: INT[F] = a.fmt.f
-    val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
-    val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
-    dbgs(s"Rewriting $a mod $mod with $levels bitshifts")
-    val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
-    temps(0) = stage(FixAdd[S,I,F](stage(FixSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
-    List.tabulate(levels.size-1) { level =>
-      temps(level+1) = stage(FixAdd[S,I,F](
-                                stage(FixSRA(temps(level),levels(level+1))),
-                                stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
-                          )
+    val nbits = a.fmt.nbits
+    val pow = (scala.math.log(t+c) / scala.math.log(2)).toInt
+//    if (pow < 16) {
+      val levels = scala.math.ceil(nbits.toFloat / pow).toInt
+      val exps = List.tabulate(levels - 1){i => pow * (i + 1)}
+      val cs = List.tabulate(levels-1){i => scala.math.pow(c,i+1).toInt}
+      // Step 3: Keep dividing things to expand qs list, keep modding them to get rs list, and then add them up
+      val qs = List(stage(FixDivSRA(a, exps.head))) ++ exps.drop(1).zip(cs).map{case (e,cc) => stage(FixDivSRA(a * cc, e))}
+      val rs = List(stage(FixAnd(a, Type[Fix[S,I,F]].from(t)))) ++ qs.map{qi => stage(FixAnd(qi * c, Type[Fix[S,I,F]].from(t)))}
+      val q = qs.reduceTree{_+_}
+      val r = rs.head + {if (rs.length > 1) rs.drop(1).zip(qs).map{case (a,b) => mux( b != 0, a, Type[Fix[S,I,F]].from(0))}.reduceTree{_+_} else Type[Fix[S,I,F]].from(0)}
+      // Step 4: figure out how many t's are in r
+      val boundaries = Seq.tabulate(levels + 1){i => r - t * i}
+      val correction = stage(PriorityMux(boundaries.map{ b => b < t}, Seq.tabulate(levels){i => Type[Fix[S,I,F]].from(i)}))
+      val remainder = stage(PriorityMux(boundaries.map{ b => b < t}, boundaries))
+      (stage(FixAdd(q, correction)), remainder)
+//    } else {
+//      (stage(FixDiv(a, Type[Fix[S,I,F]].from(t))), stage(FixMod(a, Type[Fix[S,I,F]].from(t))))
+//    }
+  }
+
+  def rewriteDivWithMersenne[S,I,F](a: Fix[S,I,F], t: Int, c: Int): Fix[S,I,F] = {
+    crandallDivMod(a, t, c)._1
+  }
+
+  def rewriteModWithMersenne[S,I,F](a: Fix[S,I,F], mod: Int, c: Int): Fix[S,I,F] = {
+    if (spatialConfig.useCrandallMod) { // TODO: Is one version always better than the other?
+      crandallDivMod(a, mod, c)._2
+    } else {
+      // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
+      implicit val S: BOOL[S] = a.fmt.s
+      implicit val I: INT[I] = a.fmt.i
+      implicit val F: INT[F] = a.fmt.f
+      val pow = (scala.math.log(mod+1) / scala.math.log(2)).toInt
+      val levels = ({if (mod == 3) List(pow,pow) else List(pow)} ++ List.tabulate(31){i => i+1}.collect{case i if (i % pow == 0) && isPow2(i / pow) => i}).reverse
+      val temps: scala.collection.mutable.ListBuffer[Fix[S,I,F]] = scala.collection.mutable.ListBuffer.fill(levels.size)(a)
+      temps(0) = stage(FixAdd[S,I,F](stage(FixDivSRA(a,levels.head)), stage(FixAnd(a,Type[Fix[S,I,F]].from(scala.math.pow(2,levels.head).toInt-1)))))
+      List.tabulate(levels.size-1) { level =>
+        temps(level+1) = stage(FixAdd[S,I,F](
+                                  stage(FixDivSRA(temps(level),levels(level+1))),
+                                  stage(FixAnd(temps(level),Type[Fix[S,I,F]].from(scala.math.pow(2,levels(level+1)).toInt-1))))
+                            )
+      }
+      val boundaries = if (mod == 3) Seq(3,6) else Seq.tabulate(3){i => mod*(i+1)}
+      stage(PriorityMux(boundaries.map{b => temps.last < b}, boundaries.map{b => temps.last - (b - mod)}))
     }
-    val boundaries = if (mod == 3) Seq(3,6) else Seq.tabulate(3){i => mod*(i+1)}
-    stage(PriorityMux(boundaries.map{b => temps.last < b}, boundaries.map{b => temps.last - (b - mod)}))
   }
 
   def rewriteMod[S,I,F](a: Fix[S,I,F], mod: Int, closestMersenne: Int): Fix[S,I,F] = {
     implicit val S: BOOL[S] = a.fmt.s
     implicit val I: INT[I] = a.fmt.i
     implicit val F: INT[F] = a.fmt.f
-    val bigmod = rewriteModWithMersenne(a, closestMersenne)
+    val bigmod = rewriteModWithMersenne(a, closestMersenne, 1)
     dbgs(s"Rewriting $a mod $mod as a function of $closestMersenne")
     val boundaries = Seq.tabulate(closestMersenne / mod){i => mod*(i+1)}
     stage(PriorityMux(boundaries.map{b => bigmod < Type[Fix[S,I,F]].from(b)}, boundaries.map{b => bigmod - Type[Fix[S,I,F]].from(b - mod)}))
@@ -130,13 +163,21 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
 
     case _:AccelScope => inAccel{ super.transform(lhs,rhs) }
     case _:SpatialBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
+    case _:SpatialCtrlBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
 
     case FixMul(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMul && (q.toDouble % 1.0 == 0.0) && isSumOfPow2(scala.math.abs(q.toInt)) =>
       val (mul1, mul2, dir) = asSumOfPow2(scala.math.abs(q.toInt))
       transferDataToAllNew(lhs){ rewriteMul(a,q.toInt,mul1,mul2,dir).asInstanceOf[A] }
 
+    case FixDiv(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeDiv && (q.toDouble % 1.0 == 0.0) && pseudoMersenneC(q.toInt) == 1 && q.toInt < scala.math.pow(2,15) =>
+      transferDataToAllNew(lhs){ rewriteDivWithMersenne(a, q.toInt, pseudoMersenneC(q.toInt)).asInstanceOf[A] }
+
+    // If Crandall's flag is on, try more aggressive substitution (on pseudo mersennes)
+    case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && spatialConfig.useCrandallMod && (q.toDouble % 1.0 == 0.0) && pseudoMersenneC(q.toInt) == 1 && q.toInt < scala.math.pow(2,15) =>
+      transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt, pseudoMersenneC(q.toInt)).asInstanceOf[A] }
+
     case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && isMersenne(q.toInt) =>
-      transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt).asInstanceOf[A] }
+      transferDataToAllNew(lhs){ rewriteModWithMersenne(a, q.toInt, 1).asInstanceOf[A] }
 
     case FixMod(F(a: Fix[s,i,f]), Const(q)) if inHw && spatialConfig.optimizeMod && (q.toDouble % 1.0 == 0.0) && withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).isDefined =>
       transferDataToAllNew(lhs){ rewriteMod(a, q.toInt, withinNOfMersenne(spatialConfig.mersenneRadius,q.toInt).get).asInstanceOf[A] }

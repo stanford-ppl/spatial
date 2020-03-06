@@ -118,9 +118,13 @@ class BankedSRAM(p: MemParams) extends MemPrimitive(p) {
          b: (Seq[Bool], Seq[UInt], Seq[Bool])
         ) => (a._1 ++ b._1, a._2 ++ b._2, a._3 ++ b._3)}
 
-      val stickyEns = Module(new StickySelects(rawEns.size)) // Fixes bug exposed by ScatterGatherSRAM app
-      stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
-      val ens = stickyEns.io.outs.map(_.toBool)
+      val ens =
+        if (globals.target.cheapSRAMs) rawEns // TODO: Figure out how to properly use sticky selects for dual ported...
+        else {
+          val stickyEns = Module(new StickySelects(rawEns.size, false)) // Fixes bug exposed by ScatterGatherSRAM app
+          stickyEns.io.ins.zip(rawEns).foreach{case (a,b) => a := b}
+          stickyEns.io.outs.map(_.toBool)
+        }
 
       // Unmask write port if any of the above match
       val finalChoice = fatMux("PriorityMux", ens, ens, backpressures, ofs)
@@ -233,20 +237,26 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
         }
 
       // Unmask write port if any of the above match
-      val finalChoice0 = fatMux("PriorityMux", ens.reverse.tail.reverse, ens.reverse.tail.reverse, backpressures.reverse.tail.reverse, ofs.reverse.tail.reverse)
-      mem._1.io.r0.ofs.head := finalChoice0(2)
-      mem._1.io.r0.backpressure := finalChoice0(1)
-      mem._1.io.r0.en.head := finalChoice0(0)
-      val finalChoice1 = fatMux("PriorityMux", ens.tail.reverse, ens.tail.reverse, backpressures.tail.reverse, ofs.tail.reverse)
-      mem._1.io.r1.ofs.head := finalChoice1(2)
-      mem._1.io.r1.backpressure := finalChoice1(1)
-      mem._1.io.r1.en.head := finalChoice1(0)
+      if (ens.length == 1) {
+        mem._1.io.r0.ofs.head := ofs.head
+        mem._1.io.r0.backpressure := backpressures.head
+        mem._1.io.r0.en.head := ens.head
+      } else {
+        val finalChoice0 = fatMux("PriorityMux", ens.reverse.tail.reverse, ens.reverse.tail.reverse, backpressures.reverse.tail.reverse, ofs.reverse.tail.reverse)
+        mem._1.io.r0.ofs.head := finalChoice0(2)
+        mem._1.io.r0.backpressure := finalChoice0(1)
+        mem._1.io.r0.en.head := finalChoice0(0)
+        val finalChoice1 = fatMux("PriorityMux", ens.tail.reverse, ens.tail.reverse, backpressures.tail.reverse, ofs.tail.reverse)
+        mem._1.io.r1.ofs.head := finalChoice1(2)
+        mem._1.io.r1.backpressure := finalChoice1(1)
+        mem._1.io.r1.en.head := finalChoice1(0)
+      }
     }
   }
 
   // Connect read data to output
-  // laneBitvecs is a Sequence with one entry per read port lane: <bank address, bank.port0 output, bank.port1 output, read enable, banks visible for lane>
-  val laneBitvecs: Seq[(UInt, UInt, UInt, Bool, List[Seq[scala.Int]])] = p.RMapping.zipWithIndex.flatMap{ case (rm, k) =>
+  // laneBitvecs is a Sequence with one entry per read port lane: <bank address, bank.port0 output, bank.port1 output, read enable, banks (flattend addr) visible for lane, isPsuedo (i.e. broadcast sniffer)>
+  val laneBitvecs: Seq[(UInt, UInt, UInt, Bool, List[scala.Int], scala.Boolean)] = p.RMapping.zipWithIndex.flatMap{ case (rm, k) =>
     val port = io.rPort(k)
     // First identify the bank each lane is asking for
     port.output.zipWithIndex.map{case (out, lane) =>
@@ -262,11 +272,11 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
          if (true /*globals.target.cheapSRAMs*/) getRetimed(en, globals.target.sramload_latency, port.backpressure)
          else List.tabulate(globals.target.sramload_latency + 1){i => getRetimed(en, i, port.backpressure)}.reduce{_||_} // hacky way to capture sticky selects memory without a real sticky select module
        },
-       visBanksForLane
+       combs(visBanksForLane.map(_.toList)).map(hierToFlat).sorted,
+       rm.broadcast(lane) > 0
       )
     }
   }
-
   p.RMapping.zipWithIndex.foreach{ case (rm, k) =>
     val port = io.rPort(k)
     val base = io.rPort.take(k).map(_.output.size).sum
@@ -277,16 +287,16 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
         out := (p.RMapping.flatMap(_.castgroup), p.RMapping.flatMap(_.broadcast), io.rPort.flatMap(_.output)).zipped.toList.zip(p.RMapping.flatMap{r => List.fill(r.castgroup.size)(r.muxPort)}).collect{case ((cg, b, o),mp) if b == 0 && cg == castgrp && mp == rm.muxPort =>  o}.head
       }
       else {
-        val conflictsBelowIdx = laneBitvecs.take(base + lane).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty => i}
-        val conflictsAboveIdx = laneBitvecs.takeRight(laneBitvecs.size - base - lane - 1).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty => i + laneBitvecs.size + 1}
-        val takeUpper = if (conflictsBelowIdx.length == 0) false.B
-                        else if (conflictsAboveIdx.length == 0) true.B
+        val conflictsBelowIdx = laneBitvecs.take(base + lane).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty && !vb._6 => i}
+        val conflictsAboveIdx = laneBitvecs.takeRight(laneBitvecs.size - base - lane - 1).zipWithIndex.collect{case (vb,i) if (vb._5 intersect laneBitvecs(base+lane)._5).nonEmpty && !vb._6 => i + laneBitvecs.size + 1}
+        val takeUpper = if (conflictsBelowIdx.isEmpty) false.B
+                        else if (conflictsAboveIdx.isEmpty) true.B
                         else conflictsBelowIdx.map(laneBitvecs).map{fba => fba._4 && (fba._1 === laneBitvecs(base + lane)._1)}.reduce{_||_}
         out := Mux(takeUpper, laneBitvecs(base + lane)._3, laneBitvecs(base + lane)._2)
       }
     }
-
   }
+
 
 }
 
@@ -756,7 +766,8 @@ class Mem1DDualRead(val size: Int, bitWidth: Int, syncMem: Boolean = false) exte
     m.io.waddr     := io.w.ofs.head
     m.io.wen       := io.w.en.head & wInBound
     m.io.wdata     := io.w.data.head
-    m.io.backpressure      := io.r0.backpressure || io.r1.backpressure
+    m.io.backpressure0      := io.r0.backpressure
+    m.io.backpressure1      := io.r1.backpressure
     io.output0 := m.io.rdata0
     io.output1 := m.io.rdata1
   } else {

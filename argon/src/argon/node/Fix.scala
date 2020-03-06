@@ -134,8 +134,16 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_, Literal(1)) => a
     case (Literal(0), _) => a
     case (Literal(1), _) => stage(FixRecip(b))
-    case (_, Const(r)) if r.isPow2 && r > 0 => a >> Type[Fix[TRUE,_16,_0]].from(Number.log2(r))
-    case (_, Const(r)) if r.isPow2 && r < 0 => -a >> Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))
+    case (_, Const(r)) if r.isPow2 && r > 0 => stage(FixDivSRA(a, Type[Fix[TRUE,_16,_0]].from(Number.log2(r))))
+    case (_, Const(r)) if r.isPow2 && r < 0 => stage(FixDivSRA(-a, Type[Fix[TRUE,_16,_0]].from(Number.log2(-r))))
+    case _ => super.rewrite
+  }
+}
+
+/** Fixed point arithmetic shift right from division*/
+@op case class FixDivSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[TRUE,_16,_0]) extends FixOp1[S,I,F] {
+  @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (x, Literal(0))      => x
     case _ => super.rewrite
   }
 }

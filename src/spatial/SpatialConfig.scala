@@ -29,7 +29,7 @@ class SpatialConfig extends Config {
   var enableModular: Boolean = true
   var enableTightControl: Boolean = false
   var useCheapFifos: Boolean = false
-  var useCheapSRAMs: Boolean = true
+  var useCheapSRAMs: Boolean = false
   var prioritizeFlat: Boolean = false
   var numSchemesPerRegion: Int = 2
   var bankingTimeout: Int = 50000
@@ -53,10 +53,13 @@ class SpatialConfig extends Config {
 
   var sramThreshold = 1 // Minimum number of elements to instantiate BRAM over Registers 
   var enableAsyncMem = false
+  var dualReadPort = false
   var enableRetiming = true
   var enableLooseIterDiffs = false
   var optimizeMul = true
   var optimizeMod = true
+  var useCrandallMod = false
+  var optimizeDiv = false
   var fuseAsFMA = true
   var forceFuseFMA = false
 

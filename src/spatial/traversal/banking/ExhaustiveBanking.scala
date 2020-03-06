@@ -334,8 +334,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
   protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_], firstSearch: Boolean): Option[PartialBankingChoices] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
-    val Nmin_base_r: Int = grps.filter(_.head.isReader).map(_.size).maxOrElse(1)
-    val Nmin_base_w: Int = grps.filter(!_.head.isReader).map(_.size).maxOrElse(1)
+    val Nmin_base_r: Int = grps.filter(_.size > 0).filter(_.head.isReader).map(_.size).maxOrElse(1)
+    val Nmin_base_w: Int = grps.filter(_.size > 0).filter(!_.head.isReader).map(_.size).maxOrElse(1)
     val dualPortHalve = mem.isDualPortedRead && firstSearch
     val Nmin = scala.math.max(Nmin_base_w, {if (dualPortHalve) scala.math.ceil(Nmin_base_r.toFloat / 2.0).toInt else Nmin_base_r})
     val Ncap = filteredStagedDims.product max Nmin

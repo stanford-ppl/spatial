@@ -277,7 +277,6 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
       )
     }
   }
-
   p.RMapping.zipWithIndex.foreach{ case (rm, k) =>
     val port = io.rPort(k)
     val base = io.rPort.take(k).map(_.output.size).sum
@@ -296,8 +295,8 @@ class BankedSRAMDualRead(p: MemParams) extends MemPrimitive(p) {
         out := Mux(takeUpper, laneBitvecs(base + lane)._3, laneBitvecs(base + lane)._2)
       }
     }
-
   }
+
 
 }
 

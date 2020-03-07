@@ -15,15 +15,17 @@ import utils.implicits.Readable._
   @api def length: I32 = stage(ArrayLength(this))
 
   /** Returns the element at index `i`. */
-  @api def apply(i: I32): A = stage(ArrayApply(this, i))
+//  @api def apply(i: I32): A = stage(ArrayApply(this, i))
+  @api def apply(i: ICTR): A = stage(ArrayApply(this, i.to[I32]))
 
   /** Updates the element at index `i` to data. */
-  @api def update(i: I32, data: A): Void = stage(ArrayUpdate(this, i, data))
+//  @api def update(i: I32, data: A): Void = stage(ArrayUpdate(this, i, data))
+  @api def update(i: ICTR, data: A): Void = stage(ArrayUpdate(this, i.to[I32], data))
 
   /** Applies the function **func** on each element in the Array. */
   @api def foreach(func: A => Void): Void = {
     val i   = boundVar[I32]
-    val applyBlk = stageLambda2(this,i){ this(i) }
+    val applyBlk = stageLambda2(this,i){ this(i.to[ICTR]) }
     val funcBlk  = stageLambda1(applyBlk.result){ func(applyBlk.result.unbox) }
     stage(ArrayForeach(this, applyBlk, funcBlk))
   }
@@ -31,7 +33,7 @@ import utils.implicits.Readable._
   /** Returns a new Array created using the mapping `func` over each element in this Array. */
   @api def map[B:Type](func: A => B): Array[B] = {
     val i   = boundVar[I32]
-    val applyBlk = stageLambda2(this,i){ this(i) }
+    val applyBlk = stageLambda2(this,i){ this(i.to[ICTR]) }
     val funcBlk  = stageLambda1(applyBlk.result){ func(applyBlk.result.unbox) }
     stage(ArrayMap(this,applyBlk,funcBlk))
   }
@@ -41,8 +43,8 @@ import utils.implicits.Readable._
     */
   @api def zip[B:Type,C:Type](that: Array[B])(func: (A,B) => C): Array[C] = {
     val i    = boundVar[I32]
-    val applyA = stageLambda2(this,i){ this(i) }
-    val applyB = stageLambda2(that,i){ that(i) }
+    val applyA = stageLambda2(this,i){ this(i.to[ICTR]) }
+    val applyB = stageLambda2(that,i){ that(i.to[ICTR]) }
     val funcBlk = stageLambda2(applyA.result,applyB.result){ func(applyA.result.unbox,applyB.result.unbox) }
     stage(ArrayZip(this,that,applyA,applyB,funcBlk))
   }
@@ -52,7 +54,7 @@ import utils.implicits.Readable._
     val i   = boundVar[I32]
     val a1  = boundVar[A]
     val a2  = boundVar[A]
-    val applyBlk  = stageLambda2(this,i){ this(i) }
+    val applyBlk  = stageLambda2(this,i){ this(i.to[ICTR]) }
     val reduceBlk = stageLambda2(a1,a2){ rfunc(a1,a2) }
     stage(ArrayReduce(this,applyBlk,reduceBlk))
   }
@@ -88,7 +90,7 @@ import utils.implicits.Readable._
     val i   = boundVar[I32]
     val a1  = boundVar[A]
     val a2  = boundVar[A]
-    val applyBlk  = stageLambda2(this,i){ this(i) }
+    val applyBlk  = stageLambda2(this,i){ this(i.to[ICTR]) }
     val reduceBlk = stageLambda2(a1,a2){ rfunc(a1,a2) }
     stage(ArrayFold(this,init,applyBlk,reduceBlk))
   }
@@ -96,7 +98,7 @@ import utils.implicits.Readable._
   /** Returns a new Array with all elements in this Array which satisfy the given predicate `cond`. */
   @api def filter(cond: A => Bit): Array[A] = {
     val i   = boundVar[I32]
-    val applyBlk = stageLambda2(this,i){ this(i) }
+    val applyBlk = stageLambda2(this,i){ this(i.to[ICTR]) }
     val condBlk  = stageLambda1(applyBlk.result){ cond(applyBlk.result.unbox) }
     stage(ArrayFilter(this,applyBlk,condBlk))
   }
@@ -104,7 +106,7 @@ import utils.implicits.Readable._
   /** Returns a new Array created by concatenating the results of `func` applied to all elements in this Array. */
   @api def flatMap[B:Type](func: A => Array[B]): Array[B] = {
     val i   = boundVar[I32]
-    val applyBlk = stageLambda2(this,i){ this(i) }
+    val applyBlk = stageLambda2(this,i){ this(i.to[ICTR]) }
     val funcBlk  = stageLambda1(applyBlk.result){ func(applyBlk.result.unbox) }
     stage(ArrayFlatMap(this,applyBlk,funcBlk))
   }
@@ -112,7 +114,7 @@ import utils.implicits.Readable._
   @api def forall(func: A => Bit): Bit = this.map(func).reduce{_&&_}
   @api def exists(func: A => Bit): Bit = this.map(func).reduce{_||_}
   @virtualize
-  @api def indexOf(x: A): I32 = Array.tabulate(this.length){i => if(this(i) == x) i else -1}.filter(_ >= 0).min
+  @api def indexOf(x: A): I32 = Array.tabulate(this.length){i => if(this(i.to[ICTR]) == x) i else -1}.filter(_ >= 0).min
 
   /** Returns a string representation using the given `delimeter`. */
   @api def mkString(delimeter: Text): Text = this.mkString("", delimeter, "")
@@ -166,7 +168,7 @@ import utils.implicits.Readable._
       val filter_i = filter_base / (imgdim1+pad1)
       val filter_j = filter_base % (imgdim1+pad1)
       if (filter_base >= 0 && filter_j < filterdim1 && filter_j >= 0 && filter_i < filterdim0 && filter_i >= 0)
-        this.apply(filter_i * filterdim1 + filter_j)
+        this.apply(filter_i.to[ICTR] * filterdim1.to[ICTR] + filter_j.to[ICTR])
       else
         0.to[A]
     }
@@ -175,7 +177,7 @@ import utils.implicits.Readable._
 
   /** Concatenates two Arrays. **/
   @api def ++(that: Array[A]): Array[A] = {
-    Array.tabulate(this.length + that.length){i => ifThenElse(i < this.length, () => this.apply(i), () => that.apply(i-this.length))}
+    Array.tabulate(this.length + that.length){i => ifThenElse(i < this.length, () => this.apply(i.to[ICTR]), () => that.apply((i-this.length).to[ICTR]))}
   }
 
   /** Returns true if this Array and `that` contain the same elements, false otherwise. */

@@ -104,11 +104,11 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
     val ctrs2 = cchain.counters.zip(addr).map{case (ctr, i) =>
       // TODO: x.getIntValue.getOrElse(c.toInt) is only necessary if we allow dse to retune parameters (currently not the case)
-      val start = ctr.start.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr start a constant or mark controller with Pipe.MOP!")}
-      val step = ctr.step.asInstanceOf[I32] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr step a constant or mark controller with Pipe.MOP!")}
-      val newStart = start + i.to[I32] * step
+      val start = ctr.start.asInstanceOf[ICTR] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr start a constant or mark controller with Pipe.MOP!")}
+      val step = ctr.step.asInstanceOf[ICTR] match {case Const(c) => c.toInt; case x@Final(c) => x.getIntValue.getOrElse(c.toInt); case x@Expect(c) => x.getIntValue.getOrElse(c.toInt); case _ => throw new Exception(s"Cannot unroll $cchain (${cchain.ctx}) as POM!  Please make ctr step a constant or mark controller with Pipe.MOP!")}
+      val newStart = start.to[ICTR] + i.to[ICTR] * step
       val newStep = step * ctr.ctrParOr1
-      Counter[I32](newStart, ctr.end.asInstanceOf[I32], newStep, 1)
+      Counter[ICTR](newStart, ctr.end.asInstanceOf[ICTR], newStep, 1)
     }
     stage(CounterChainNew(ctrs2))
   }
@@ -427,7 +427,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     // Counter iterators + valids grouped by counter level for mop (Counters[lanes]), grouped by lane for pom (Lanes[Counters])
     // (Mop) When unroller is vectorized, each indices and indexValid contains a list of single
     // node, which represents a vectorized index/valid
-    def indices: Seq[Seq[I32]]
+    def indices: Seq[Seq[ICTR]]
     def indexValids: Seq[Seq[Bit]]
 
     val vectorize = isInnerLoop && spatialConfig.vecInnerLoop
@@ -486,14 +486,14 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   }
 
   case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean, mop: Boolean) extends LoopUnroller {
-    lazy val indices: Seq[Seq[I32]] = createBounds { (ctr, lane) => boundVar[I32] }
+    lazy val indices: Seq[Seq[ICTR]] = createBounds { (ctr, lane) => boundVar[ICTR] }
     lazy val indexValids:  Seq[Seq[Bit]] = createBounds { (ctr, lane) => boundVar[Bit] }
   }
 
   case class FullUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean, mop: Boolean) extends LoopUnroller {
-    lazy val indices: Seq[Seq[I32]] = createBounds{ 
-      case (ctr, List(i)) => I32(ctr.start.toInt + ctr.step.toInt*i)
-      case (ctr, ctrIdxs) => val i = boundVar[I32]; i.vecConst = ctrIdxs.map{ i => FixedPoint.fromInt(ctr.start.toInt + ctr.step.toInt*i) }; i
+    lazy val indices: Seq[Seq[ICTR]] = createBounds{
+      case (ctr, List(i)) => ICTR(ctr.start.toInt + ctr.step.toInt*i)
+      case (ctr, ctrIdxs) => val i = boundVar[ICTR]; i.vecConst = ctrIdxs.map{ i => FixedPoint.fromInt(ctr.start.toInt + ctr.step.toInt*i) }; i
     }
     lazy val indexValids: Seq[Seq[Bit]] = 
       if (mop) {

@@ -43,7 +43,7 @@ trait ReduceUnrolling extends UnrollingBase {
     store:  Lambda2[Reg[A],A,Void],
     func:   Block[A],
     reduce: Lambda2[A,A,A],
-    iters:  Seq[I32],
+    iters:  Seq[ICTR],
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
@@ -93,7 +93,7 @@ trait ReduceUnrolling extends UnrollingBase {
     store:  Lambda2[Reg[A],A,Void], // Store function for accumulator
     func:   Block[A],               // Map function
     reduce: Lambda2[A,A,A],         // Reduce function
-    iters:  Seq[I32],                // Bound iterators for map loop
+    iters:  Seq[ICTR],                // Bound iterators for map loop
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
@@ -101,7 +101,7 @@ trait ReduceUnrolling extends UnrollingBase {
     val mapLanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl, mop)
     val inds2 = mapLanes.indices
     val vs = mapLanes.indexValids
-    val start = cchain.counters.map(_.start.asInstanceOf[I32])
+    val start = cchain.counters.map(_.start.asInstanceOf[ICTR])
 
     val blk = stageLambda1(accum) {
       dbgs(s"Unrolling reduce map $lhs -> $accum")
@@ -177,8 +177,8 @@ trait ReduceUnrolling extends UnrollingBase {
     reduce: Lambda2[A,A,A],       // Reduction function
     load:   Lambda1[C[A],A],      // Load function from accumulator
     store:  Lambda2[C[A],A,Void], // Store function to accumulator
-    iters:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
-    start:  Seq[I32],             // Start for each iterator
+    iters:  Seq[ICTR],             // Iterators for entire reduction (used to determine when to reset)
+    start:  Seq[ICTR],             // Start for each iterator
     isInner: Boolean
   )(implicit ctx: SrcCtx): Void = {
     val redLanes = UnitUnroller(s"${accum}_accum", isInnerLoop = true)

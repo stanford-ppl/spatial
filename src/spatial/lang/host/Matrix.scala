@@ -26,10 +26,12 @@ import forge.tags._
   @api def cols: I32 = field[I32]("cols")
 
   /** Returns the element in this Matrix at the given 2-dimensional address (`i`, `j`). */
-  @api def apply(i: I32, j: I32): A = data.apply(i*cols + j)
+//  @api def apply(i: I32, j: I32): A = data.apply(i*cols + j)
+  @api def apply(i: ICTR, j: ICTR): A = data.apply(i*cols.to[ICTR] + j)
 
   /** Updates the element at the given two dimensional address to `elem`. */
-  @api def update(i: I32, j: I32, elem: A): Void = data.update(i*cols + j, elem)
+//  @api def update(i: I32, j: I32, elem: A): Void = data.update(i*cols + j, elem)
+  @api def update(i: ICTR, j: ICTR, elem: A): Void = data.update(i*cols.to[ICTR] + j, elem)
 
   /** Returns a flattened, immutable @Array view of this Matrix's data. */
   @api def flatten: Array[A] = data
@@ -52,13 +54,13 @@ import forge.tags._
   @api def reduce(rfunc: (A,A) => A): A = data.reduce(rfunc)
 
   /** Returns the transpose of this Matrix. */
-  @api def t: Matrix[A] = Matrix.tabulate(cols, rows){(i,j) => apply(j,i) }
+  @api def t: Matrix[A] = Matrix.tabulate(cols, rows){(i,j) => apply(j.to[ICTR],i.to[ICTR]) }
 
   /** Reorders the Matrix based on given ordering (i.e.- reorder(1,0) is the same as transpose) */
   @api def reorder(ordering: Seq[scala.Int]): Matrix[A] = {
     (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1))){(a,b) => 
       val i = List(a,b)
-      apply(i(ordering(0)), i(ordering(1)))
+      apply(i(ordering(0)).to[ICTR], i(ordering(1)).to[ICTR])
     }
   }
 

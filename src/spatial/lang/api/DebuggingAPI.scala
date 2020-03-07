@@ -13,7 +13,7 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   this: StaticAPI_Shadowing =>
 
   @virtualize
-  @api def sleep(cycles: I32): Void = Pipe.NoBind.Foreach(cycles by 1){i => if (i == 0) print(i) }
+  @api def sleep(cycles: ICTR): Void = Pipe.NoBind.Foreach(cycles by 1){i => if (i == 0) print(i) }
 
   /** Prints the given Array to the console, preceded by an optional heading. **/
   @virtualize
@@ -109,7 +109,7 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     println(header)
     Foreach(0 until matrix.rows){ i =>
       Foreach(0 until matrix.cols){ j =>
-        print(matrix(i, j).toString + "\t")
+        print(matrix.gimme(i, j).toString + "\t")
       }
       println("")
     }
@@ -122,7 +122,7 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     Foreach(0 until tensor.dim0) { i =>
       Foreach(0 until tensor.dim1) { j =>
         Foreach(0 until tensor.dim2) { k =>
-          print(tensor(i, j, k).toString + "\t")
+          print(tensor.gimme(i, j, k).toString + "\t")
         }
         println("")
       }
@@ -131,8 +131,8 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     }
   }
 
-  implicit class I32Range(x: Series[I32]) {
-    @api def foreach(func: I32 => Void): Void = Foreach(x){i => func(i) }
+  implicit class ICTRRange(x: Series[ICTR]) {
+    @api def foreach(func: ICTR => Void): Void = Foreach(x){i => func(i) }
   }
 
 

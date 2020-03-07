@@ -23,7 +23,7 @@ trait ForeachUnrolling extends UnrollingBase {
     ens:    Set[Bit],
     cchain: CounterChain,
     func:   Block[Void],
-    iters:  Seq[I32],
+    iters:  Seq[ICTR],
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit ctx: SrcCtx): Void = {
@@ -55,7 +55,7 @@ trait ForeachUnrolling extends UnrollingBase {
     ens:    Set[Bit],
     cchain: CounterChain,
     func:   Block[Void],
-    iters:  Seq[I32],
+    iters:  Seq[ICTR],
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit ctx: SrcCtx): Sym[_] = {

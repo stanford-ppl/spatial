@@ -56,12 +56,12 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                       }
                   }
                 }
-                val selfRelativeTicks: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => i -> d._1 }.toMap
-                val strides: Map[I32, Int] = iters.zip(selfRelativeData).map{case (i, d) => i -> d._2 }.toMap
+                val selfRelativeTicks: Map[ICTR, Int] = iters.zip(selfRelativeData).map{case (i, d) => i -> d._1 }.toMap
+                val strides: Map[ICTR, Int] = iters.zip(selfRelativeData).map{case (i, d) => i -> d._2 }.toMap
 
                 // Figure out number of ticks of innermost iterator that each iterator takes to increment. 
                 // TODO: What to do when iterators come from different levels of control hierarchy?
-                val ticks: Map[I32, Int] = List.tabulate(iters.size){i => iters(i) -> selfRelativeTicks.values.drop(i+1).product }.toMap
+                val ticks: Map[ICTR, Int] = List.tabulate(iters.size){i => iters(i) -> selfRelativeTicks.values.drop(i+1).product }.toMap
 
                 dbgs(s"Iter info:")
                 iters.map{it => dbgs(s"$it:");dbgs(s"  ${selfRelativeTicks(it)} personal ticks to exhaust");dbgs(s"  ${ticks(it)} global ticks to increment");dbgs(s"  ${strides(it)} stride")}
@@ -81,7 +81,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
                     // Figure out which iterator closes gap the fastest. TODO: What if both are required to close it?
                     if (its.nonEmpty) {
                       val innermostDep = its.toList.maxBy(accumIters.indexOf(_))
-                      (dist * ticks.getOrElse(innermostDep.asInstanceOf[I32], 1)) / strides.getOrElse(innermostDep.asInstanceOf[I32], 1)
+                      (dist * ticks.getOrElse(innermostDep.asInstanceOf[ICTR], 1)) / strides.getOrElse(innermostDep.asInstanceOf[ICTR], 1)
                     } else 0
                   }.sum
                   val variantTicksPerInvariantTick = if (innermostIterNotContributing.isDefined) ticks(innermostIterNotContributing.get) else 0

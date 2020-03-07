@@ -26,9 +26,11 @@ import forge.tags._
   /** Returns the third dimension of this Tensor3. */
   @api def dim2: I32 = field[I32]("dim2")
   /** Returns the element in this Tensor3 at the given 3-dimensional address. */
-  @api def apply(i: I32, j: I32, k: I32): A = data.apply(i*dim1*dim2 + j*dim2 + k)
+//  @api def apply(i: I32, j: I32, k: I32): A = data.apply(i*dim1*dim2 + j*dim2 + k)
+  @api def apply(i: ICTR, j: ICTR, k: ICTR): A = data.apply(i*dim1.to[ICTR]*dim2.to[ICTR] + j*dim2.to[ICTR] + k)
   /** Updates the element at the given 3-dimensional address to `elem`. */
-  @api def update(i: I32, j: I32, k: I32, elem: A): Void = data.update(i*dim1*dim2 + j*dim1 + k, elem)
+//  @api def update(i: I32, j: I32, k: I32, elem: A): Void = data.update(i*dim1*dim2 + j*dim1 + k, elem)
+  @api def update(i: ICTR, j: ICTR, k: ICTR, elem: A): Void = data.update(i*dim1.to[ICTR]*dim2.to[ICTR] + j*dim1.to[ICTR] + k, elem)
   /** Returns a flattened, immutable @Array view of this Tensor3's data. */
   @api def flatten: Array[A] = data
   /** Returns the number of elements in the Tensor3. */
@@ -49,7 +51,7 @@ import forge.tags._
   @api def reorder(ordering: Seq[scala.Int]): Tensor3[A] = {
     (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1)), 0::dims.apply(ordering(2))){(a,b,c) => 
       val i = List(a,b,c)
-      apply(i(ordering(0)), i(ordering(1)), i(ordering(2)))
+      apply(i(ordering(0)).to[ICTR], i(ordering(1)).to[ICTR], i(ordering(2)).to[ICTR])
     }
   }
 

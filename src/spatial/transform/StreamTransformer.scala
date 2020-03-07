@@ -18,13 +18,13 @@ import spatial.metadata.blackbox._
   */
 case class StreamTransformer(IR: State) extends MutateTransformer with AccelTraversal {
 
-  private def injectCtrs(block: Block[Void], ctrs: Seq[Sym[_]], is: Seq[I32]): Block[Void] = {
+  private def injectCtrs(block: Block[Void], ctrs: Seq[Sym[_]], is: Seq[ICTR]): Block[Void] = {
     stageBlock{
       block.stms.foreach{
         case x@Op(CounterChainNew(ctrs2)) => 
           val newctrs = ctrs.map{
             case Op(CounterNew(start, stop, step, par)) =>
-              stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
+              stage(CounterNew[ICTR](start.asInstanceOf[ICTR], stop.asInstanceOf[ICTR], step.asInstanceOf[ICTR], par))
             case Op(ForeverNew()) =>
               stage(ForeverNew())
           }
@@ -36,7 +36,7 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
         case x@Op(OpForeach(ens, cchain, blk, iters, stopWhen)) =>
           val newctrs = subst(cchain).asInstanceOf[CounterChain].counters
           val newiters = is.zip(newctrs).map{case (i,ctr) => 
-            val n = boundVar[I32]
+            val n = boundVar[ICTR]
             subst += (i -> n)
             n.name = i.name
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
@@ -46,13 +46,13 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
         case x@Op(UnitPipe(ens, blk, stopWhen)) =>
           val newctrs = ctrs.map{
             case Op(CounterNew(start, stop, step, par)) =>
-              stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
+              stage(CounterNew[ICTR](start.asInstanceOf[ICTR], stop.asInstanceOf[ICTR], step.asInstanceOf[ICTR], par))
             case Op(ForeverNew()) =>
               stage(ForeverNew())
           }
           val newcchain = stageWithFlow(CounterChainNew(newctrs)){lhs2 => transferData(x, lhs2)}
           val newiters = is.zip(newctrs).map{case (i,ctr) => 
-            val n = boundVar[I32]
+            val n = boundVar[ICTR]
             subst += (i -> n)
             n.name = i.name
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})

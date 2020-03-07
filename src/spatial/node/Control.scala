@@ -9,7 +9,7 @@ import spatial.lang._
   val A: Num[A] = Num[A]
   override def effects: Effects = Effects.Unique
 }
-@op case class ForeverNew() extends Alloc[Counter[I32]] {
+@op case class ForeverNew() extends Alloc[Counter[ICTR]] {
   override def effects: Effects = Effects.Unique
 }
 
@@ -45,7 +45,7 @@ import spatial.lang._
   ens:    Set[Bit],
   cchain: CounterChain,
   block:  Block[Void],
-  iters:  Seq[I32],
+  iters:  Seq[ICTR],
   stopWhen:  Option[Reg[Bit]]
 ) extends Loop[Void] {
   def cchains = Seq(cchain -> iters)
@@ -63,7 +63,7 @@ import spatial.lang._
   store:  Lambda2[Reg[A],A,Void],
   ident:  Option[A],
   fold:   Option[A],
-  iters:  List[I32],
+  iters:  List[ICTR],
   stopWhen:  Option[Reg[Bit]]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
@@ -86,12 +86,12 @@ import spatial.lang._
   storeAcc:  Lambda2[C[A],A,Void],
   ident:     Option[A],
   fold:      Boolean,
-  itersMap:  Seq[I32],
-  itersRed:  Seq[I32],
+  itersMap:  Seq[ICTR],
+  itersRed:  Seq[ICTR],
   stopWhen:  Option[Reg[Bit]]
 )(implicit val A: Bits[A], val C: LocalMem[A,C]) extends Loop[Void] {
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
-  override def iters: Seq[I32] = itersMap ++ itersRed
+  override def iters: Seq[ICTR] = itersMap ++ itersRed
   override def cchains = Seq(cchainMap -> itersMap, cchainRed -> itersRed)
   override def bodies = Seq(
     PseudoStage(itersMap -> map),
@@ -107,7 +107,7 @@ import spatial.lang._
   nextState: Lambda1[A,A]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def binds = super.binds ++ notDone.inputs
-  override def iters: Seq[I32] = Nil
+  override def iters: Seq[ICTR] = Nil
   override def cchains = Nil
   override def bodies = Seq(
     InnerStage(Nil -> notDone),
@@ -121,7 +121,7 @@ import spatial.lang._
   ens:     Set[Bit],
   cchain:  CounterChain,
   func:    Block[Void],
-  iterss:  Seq[Seq[I32]],
+  iterss:  Seq[Seq[ICTR]],
   validss: Seq[Seq[Bit]],
   stopWhen: Option[Reg[Bit]]
 ) extends UnrolledLoop[Void] {
@@ -133,7 +133,7 @@ import spatial.lang._
   ens:     Set[Bit],
   cchain:  CounterChain,
   func:    Block[Void],
-  iterss:  Seq[Seq[I32]],
+  iterss:  Seq[Seq[ICTR]],
   validss: Seq[Seq[Bit]],
   stopWhen: Option[Reg[Bit]]
 ) extends UnrolledLoop[Void] {

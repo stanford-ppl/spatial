@@ -71,7 +71,7 @@ trait FileIOAPI { this: Implicits =>
     **/
   @api def writeCSV1D[T:Type](array: Tensor1[T], filename: Text, delim: Text = Text(","), format:Option[String]=None): Void = {
     val file = openCSV(filename, write = true)
-    writeTokens(file, delim, array.length){i => array(i) match {
+    writeTokens(file, delim, array.length){i => array(i.to[ICTR]) match {
       case e:Fix[_,_,_] => e.toText(format)
       case e:Flt[_,_] => e.toText(format)
       case e => e.toText
@@ -85,7 +85,7 @@ trait FileIOAPI { this: Implicits =>
   @api def writeCSV2D[T:Type](matrix: Tensor2[T], filename: Text, delim1: Text = Text(","), delim2: Text = Text("\n"), format:Option[String]=None): Void = {
     val file = openCSV(filename, write = true)
     Foreach(0 until matrix.rows){ i =>
-      writeTokens(file, delim1, matrix.cols){j => matrix(i,j) match {
+      writeTokens(file, delim1, matrix.cols){j => matrix(i,j.to[ICTR]) match {
         case e:Fix[_,_,_] => e.toText(format)
         case e:Flt[_,_] => e.toText(format)
         case e => e.toText
@@ -115,7 +115,7 @@ trait FileIOAPI { this: Implicits =>
   /** Saves the given Array to disk as a binary file at `filename`. */
   @api def writeBinary[T:Num](array: Tensor1[T], filename: Text): Void = {
     val file = openBinary(filename, write = true)
-    writeBinary(file, array.length){i => array(i) }
+    writeBinary(file, array.length){i => array(i.to[ICTR]) }
     closeBinary(file)
   }
 

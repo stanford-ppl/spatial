@@ -29,12 +29,18 @@ import forge.tags._
   /** Returns the fourth dimension of this Tensor4. */
   @api def dim3: I32 = field[I32]("dim3")
   /** Returns the element in this Tensor4 at the given 4-dimensional address. */
-  @api def apply(i: I32, j: I32, k: I32, l: I32): A = {
-    data.apply(i*dim1*dim2*dim3 + j*dim2*dim3 + k*dim3 + l)
+//  @api def apply(i: I32, j: I32, k: I32, l: I32): A = {
+//    data.apply(i*dim1*dim2*dim3 + j*dim2*dim3 + k*dim3 + l)
+//  }
+  @api def apply(i: ICTR, j: ICTR, k: ICTR, l: ICTR): A = {
+    data.apply(i*dim1.to[ICTR]*dim2.to[ICTR]*dim3.to[ICTR] + j*dim2.to[ICTR]*dim3.to[ICTR] + k*dim3.to[ICTR] + l)
   }
   /** Updates the element at the given 4-dimensional address to `elem`. */
-  @api def update(i: I32, j: I32, k: I32, l: I32, elem: A): Void = {
-    data.update(i*dim1*dim2*dim3 + j*dim2*dim3 + k*dim3 + l, elem)
+//  @api def update(i: I32, j: I32, k: I32, l: I32, elem: A): Void = {
+//    data.update(i*dim1*dim2*dim3 + j*dim2*dim3 + k*dim3 + l, elem)
+//  }
+  @api def update(i: ICTR, j: ICTR, k: ICTR, l: ICTR, elem: A): Void = {
+    data.update(i*dim1.to[ICTR]*dim2.to[ICTR]*dim3.to[ICTR] + j*dim2.to[ICTR]*dim3.to[ICTR] + k*dim3.to[ICTR] + l, elem)
   }
   /** Returns a flattened, immutable @Array view of this Tensor4's data. */
   @api def flatten: Array[A] = data
@@ -59,9 +65,9 @@ import forge.tags._
 
   /** Reorders the Tensor4 based on given ordering (i.e.- reorder(0,1,2,3) does nothing) */
   @api def reorder(ordering: Seq[scala.Int]): Tensor4[A] = {
-    (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1)), 0::dims.apply(ordering(2)), 0::dims.apply(ordering(3))){(a,b,c,d) => 
+    (0::dims.apply(ordering(0)).to[ICTR], 0::dims.apply(ordering(1)).to[ICTR], 0::dims.apply(ordering(2)).to[ICTR], 0::dims.apply(ordering(3)).to[ICTR]){(a,b,c,d) =>
       val i = List(a,b,c,d)
-      apply(i(ordering(0)), i(ordering(1)), i(ordering(2)), i(ordering(3)))
+      apply(i(ordering(0)).to[ICTR], i(ordering(1)).to[ICTR], i(ordering(2)).to[ICTR], i(ordering(3)).to[ICTR])
     }
   }
 

@@ -108,9 +108,9 @@ object MemSparseAlias {
   }
 }
 
-@op case class MemStart(mem: Sym[_], d: Int)extends Transient[I32]
-@op case class MemStep(mem: Sym[_], d: Int) extends Transient[I32]
-@op case class MemEnd(mem: Sym[_], d: Int) extends Transient[I32]
+@op case class MemStart(mem: Sym[_], d: Int)extends Transient[ICTR]
+@op case class MemStep(mem: Sym[_], d: Int) extends Transient[ICTR]
+@op case class MemEnd(mem: Sym[_], d: Int) extends Transient[ICTR]
 @op case class MemPar(mem: Sym[_], d: Int) extends Transient[I32]
 @op case class MemLen(mem: Sym[_], d: Int) extends Transient[I32]
 @op case class MemOrigin[W:INT](mem: Sym[_], d: Int) extends Transient[Ind[W]]

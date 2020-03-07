@@ -22,7 +22,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
     case _ if spatialConfig.enablePIR => f(a) << f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
-      Foreach(abs(b.to[I32]) by 1){i =>
+      Foreach(abs(b.to[ICTR]) by 1){i =>
         x := mux(i === 0, mux(b > 0, a << 1, a >> 1),
           mux(b > 0, x << 1, x >> 1))
       }
@@ -40,7 +40,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
     case _ if spatialConfig.enablePIR => f(a) >> f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
-      Foreach(abs(b.to[I32]) by 1){i =>
+      Foreach(abs(b.to[ICTR]) by 1){i =>
         x := mux(i === 0, mux(b > 0, a >> 1, a << 1),
           mux(b > 0, x >> 1, a << 1))
 
@@ -59,7 +59,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
     case _ if spatialConfig.enablePIR => f(a) >>> f(b)
     case _ =>
       val x: Reg[Fix[S,I,F]] = Reg[Fix[S,I,F]]
-      Foreach(abs(b.to[I32]) by 1){i =>
+      Foreach(abs(b.to[ICTR]) by 1){i =>
         x := mux(i === 0, mux(b > 0, a >>> 1, a << 1),
           mux(b > 0, x >>> 1, x << 1))
       }

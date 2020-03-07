@@ -70,7 +70,7 @@ trait Implicits extends argon.lang.api.Implicits { this: MuxAPI =>
 
 
   // --- Wildcard
-  @api implicit def wildcardToForever(w: Wildcard): Counter[I32] = stage(ForeverNew())
+  @api implicit def wildcardToForever(w: Wildcard): Counter[ICTR] = stage(ForeverNew())
 
 
   // --- Series

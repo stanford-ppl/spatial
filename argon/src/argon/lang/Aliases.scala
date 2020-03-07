@@ -9,6 +9,7 @@ trait InternalAliases extends CustomBitWidths {
   type Ind[W] = FixPt[TRUE,W,_0]
   type Idx = Ind[_]
   type Rng = argon.lang.Series[Idx]
+  type ICTR = I8 // Placeholder for ctr iterator type, pending issue #288
 
   type I512 = FixPt[TRUE,_512,_0]
   type I256 = FixPt[TRUE,_256,_0]
@@ -135,6 +136,7 @@ trait ExternalAliases extends InternalAliases {
   type Fix[S,I,F] = argon.lang.Fix[S,I,F]
   lazy val Fix = argon.lang.Fix
   lazy val I32 = argon.lang.I32
+  lazy val ICTR = argon.lang.ICTR
   lazy val FixPtType = argon.lang.FixPtType
 
   type FltFmt[M,E] = argon.lang.FltFmt[M,E]

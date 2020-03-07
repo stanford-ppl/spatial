@@ -61,7 +61,7 @@ package object control {
       case _ => false
     }
 
-    def memReduceItersRed: Seq[I32] = op match {
+    def memReduceItersRed: Seq[ICTR] = op match {
       case _@OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,itersRed,_) => itersRed
       case _ => Seq()
     }
@@ -142,7 +142,7 @@ package object control {
     def isFSM: Boolean = op.exists(_.isFSM)
 
     def isMemReduce: Boolean = op.exists(_.isMemReduce)
-    def memReduceItersRed: Seq[I32] = op.flatMap{x => Some(x.memReduceItersRed)}.get
+    def memReduceItersRed: Seq[ICTR] = op.flatMap{x => Some(x.memReduceItersRed)}.get
     def isAnyReduce: Boolean = op.exists(_.isAnyReduce)
 
     def isStreamLoad: Boolean = op.exists(_.isStreamLoad)
@@ -166,14 +166,14 @@ package object control {
       case _         => Inner
     }
 
-    @stateful def innerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+    @stateful def innerBlocks: Seq[(Seq[ICTR],Block[_])] = op match {
       case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
         val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
         if (!stage.mayBeOuterBlock || this.isInnerControl) body.blocks else Nil
       }
       case _ => Nil
     }
-    @stateful def outerBlocks: Seq[(Seq[I32],Block[_])] = op match {
+    @stateful def outerBlocks: Seq[(Seq[ICTR],Block[_])] = op match {
       case Some(ctrl:Control[_]) => ctrl.bodies.zipWithIndex.flatMap{case (body, id) =>
         val stage = s.map{sym => Ctrl.Node(sym, id) }.getOrElse(Ctrl.Host)
         if (stage.mayBeOuterBlock && this.isOuterControl) body.blocks else Nil
@@ -181,7 +181,7 @@ package object control {
       case _ => Nil
     }
 
-    @stateful def innerAndOuterBlocks: (Seq[(Seq[I32],Block[_])], Seq[(Seq[I32],Block[_])]) = {
+    @stateful def innerAndOuterBlocks: (Seq[(Seq[ICTR],Block[_])], Seq[(Seq[ICTR],Block[_])]) = {
       (innerBlocks, outerBlocks)
     }
 
@@ -841,7 +841,7 @@ package object control {
     def parent: Ctrl = toCtrl.parent
     def scope: Scope = scp
 
-    def iters: Seq[I32] = Try(scp match {
+    def iters: Seq[ICTR] = Try(scp match {
       case Scope.Host => Nil
       case Scope.SpatialBlackbox(sym) => Nil
       case Scope.Node(Op(loop: Loop[_]), -1, -1)         => loop.iters
@@ -982,9 +982,9 @@ package object control {
       case _ => throw new Exception(s"Could not find counter definition for $x")
     }
 
-    @stateful def start: Sym[F] = if (x.isForever) I32(0).asInstanceOf[Sym[F]] else x.node.start
-    @stateful def step: Sym[F] = if (x.isForever) I32(1).asInstanceOf[Sym[F]] else x.node.step
-    @stateful def end: Sym[F] = if (x.isForever) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
+    @stateful def start: Sym[F] = if (x.isForever) ICTR(0).asInstanceOf[Sym[F]] else x.node.start
+    @stateful def step: Sym[F] = if (x.isForever) ICTR(1).asInstanceOf[Sym[F]] else x.node.step
+    @stateful def end: Sym[F] = if (x.isForever) boundVar[ICTR].asInstanceOf[Sym[F]] else x.node.end
     @stateful def ctrPar: I32 = if (x.isForever) I32(1) else x.node.par
     @stateful def ctrParOr1: Int = ctrPar.toInt
     @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits

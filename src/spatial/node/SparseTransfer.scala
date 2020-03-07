@@ -59,7 +59,7 @@ object SparseTransfer {
     val addrs = dram.addrs[_32]()
     val origin = dram.sparseOrigins[_32]().values.head
     val p = addrs.sparsePars().values.head
-    val requestLength = dram.sparseLens().values.head
+    val requestLength = dram.sparseLens().values.head.to[ICTR]
 
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 
@@ -67,9 +67,9 @@ object SparseTransfer {
       requestLength
     } else {
       // TODO[2]: Bump up request to nearest multiple of 16 because of fringe
-      mux(requestLength == 0.to[I32], 0.to[I32], 
-      mux(requestLength < 16.to[I32], 16.to[I32],
-        mux(requestLength % 16.to[I32] === 0.to[I32], requestLength, requestLength + 16.to[I32] - (requestLength % 16.to[I32]) )))
+      mux(requestLength == 0.to[ICTR], 0.to[ICTR],
+      mux(requestLength < 16.to[ICTR], 16.to[ICTR],
+        mux(requestLength % 16.to[ICTR] === 0.to[ICTR], requestLength, requestLength + 16.to[ICTR] - (requestLength % 16.to[ICTR]) ))).to[ICTR]
     }
 
     val top = Stream {
@@ -91,7 +91,7 @@ object SparseTransfer {
 
         (requestLength, iters) match {
           case (requestLength, iters) if spatialConfig.enablePIR =>
-            Foreach(requestLength par p){i =>
+            Foreach(requestLength.to[ICTR] par p){i =>
               val addr: I64 = ((addrs.__read(Seq(i),Set.empty) + origin) * bytesPerWord).to[I64] + dram.address
               addrBus := (addr, dram.isAlloc)
             }
@@ -99,13 +99,13 @@ object SparseTransfer {
             val load = Fringe.sparseLoad(dram, addrBus, dataBus)
             transferSyncMeta(old, load)
             // Receive
-            Foreach(requestLength par p){i =>
+            Foreach(requestLength.to[ICTR] par p){i =>
               val data = dataBus.value()
               local.__write(data, Seq(i), Set.empty)
             }
 
           case (requestLength, iters) =>
-            Foreach(iters par p){i =>
+            Foreach(iters.to[ICTR] par p){i =>
               val lastAddr = Reg[I64]
               val cond = i < requestLength
               val addr: I64 = mux(cond, ((addrs.__read(Seq(i),Set(cond)) + origin) * bytesPerWord).to[I64] + dram.address, dram.address)
@@ -117,7 +117,7 @@ object SparseTransfer {
             val load = Fringe.sparseLoad(dram, addrBus, dataBus)
             transferSyncMeta(old, load)
             // Receive
-            Foreach(iters par p){i =>
+            Foreach(iters.to[ICTR] par p){i =>
               val data = dataBus.value()
               local.__write(data, Seq(i), Set(i < requestLength))
             }
@@ -131,7 +131,7 @@ object SparseTransfer {
         (requestLength, iters) match {
           case (requestLength, iters) if spatialConfig.enablePIR => // Special case iters == requestLength
             // Send
-            Foreach(requestLength par p){i =>
+            Foreach(requestLength.to[ICTR] par p){i =>
               val addr: I64  = ((origin + addrs.__read(Seq(i), Set.empty)) * bytesPerWord).to[I64] + dram.address
               val data     = local.__read(Seq(i), Set.empty)
               cmdBus := (pack(data, addr), dram.isAlloc)
@@ -140,15 +140,15 @@ object SparseTransfer {
             val store = Fringe.sparseStore(dram, cmdBus, ackBus)
             transferSyncMeta(old, store)
             // Receive
-            Foreach(requestLength by 1 par p){i =>
+            Foreach(requestLength.to[ICTR] by 1 par p){i =>
               val ack = ackBus.value()
             }
           case (requestLength, iters) =>
             // Send
-            Foreach(iters par p){i =>
+            Foreach(iters.to[ICTR] par p){i =>
               val lastAddr = Reg[I64]
               val lastData = Reg[A]
-              val pad_addr = max(requestLength - 1, 0.to[I32])
+              val pad_addr = max(requestLength - 1, 0.to[ICTR])
               val cond     = i < requestLength
               val curAddr: I64  = ((origin + addrs.__read(Seq(i), Set(cond))) * bytesPerWord).to[I64] + dram.address
               val data     = local.__read(Seq(i), Set(cond))
@@ -163,7 +163,7 @@ object SparseTransfer {
             transferSyncMeta(old, store)
             // Receive
             // TODO[4]: Assumes one ack per address
-            Foreach(iters by 1){i =>
+            Foreach(iters.to[ICTR] by 1){i =>
               val ack = ackBus.value()
             }
         }

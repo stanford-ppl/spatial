@@ -16,22 +16,22 @@ protected class MemReduceAccum[A,C[T]](
   stopWhen: Option[Reg[Bit]]
 ) {
   /** 1 dimensional memory reduction */
-  @api def apply(domain1: Counter[I32])(map: I32 => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
+  @api def apply(domain1: Counter[ICTR])(map: ICTR => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     apply(Seq(domain1)){x => map(x(0)) }{reduce}
   }
 
   /** 2 dimensional memory reduction */
-  @api def apply(domain1: Counter[I32], domain2: Counter[I32])(map: (I32,I32) => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
+  @api def apply(domain1: Counter[ICTR], domain2: Counter[ICTR])(map: (ICTR,ICTR) => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     apply(Seq(domain1,domain2)){x => map(x(0),x(1)) }{reduce}
   }
 
   /** 3 dimensional memory reduction */
-  @api def apply(domain1: Counter[I32], domain2: Counter[I32], domain3: Counter[I32])(map: (I32,I32,I32) => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
+  @api def apply(domain1: Counter[ICTR], domain2: Counter[ICTR], domain3: Counter[ICTR])(map: (ICTR,ICTR,ICTR) => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     apply(Seq(domain1,domain2,domain3)){x => map(x(0),x(1),x(2)) }{reduce}
   }
 
   /** N dimensional memory reduction */
-  @api def apply(domain: Seq[Counter[I32]])(map: List[I32] => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
+  @api def apply(domain: Seq[Counter[ICTR]])(map: List[ICTR] => C[A])(reduce: (A,A) => A)(implicit A: Bits[A], C: LocalMem[A,C]): C[A] = {
     val cchainMap = CounterChain(domain)
     val acc = C.evMem(accum)
 
@@ -50,14 +50,14 @@ protected class MemReduceAccum[A,C[T]](
     dbgs(s"  Pars:    $pars")
 
     val ctrsRed = (0 to acc.sparseRank.length-1).map{ i =>
-        Counter[I32](start = 0, step = strides(rankSeq(i)), end = ends(rankSeq(i)) - starts(rankSeq(i)), par = pars(rankSeq(i)))
+        Counter[ICTR](start = 0.to[ICTR], step = strides(rankSeq(i)), end = ends(rankSeq(i)) - starts(rankSeq(i)), par = pars(rankSeq(i)))
       }
     val cchainRed = CounterChain(ctrsRed)
 
     //logs(s"Creating MemReduce on accumulator of rank ${acc.seqRank.length}")
 
-    val itersMap = List.fill(domain.length){ boundVar[I32] }
-    val itersRed = List.fill(acc.sparseRank.length){ boundVar[I32] }
+    val itersMap = List.fill(domain.length){ boundVar[ICTR] }
+    val itersRed = List.fill(acc.sparseRank.length){ boundVar[ICTR] }
     domain.zip(itersMap).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i}) }
     ctrsRed.zip(itersRed).foreach{case (ctr, i) => i.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i}) }
 

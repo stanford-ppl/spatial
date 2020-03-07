@@ -215,6 +215,10 @@ object I32 {
   def apply(c: Int): I32 = uconst[I32](FixedPoint.fromInt(c))
   @rig def p(c: Int): I32 = parameter[I32](FixedPoint.fromInt(c))
 }
+object ICTR {
+  def apply(c: Int): ICTR = uconst[ICTR](FixedPoint.fromInt(c))
+  @rig def p(c: Int): ICTR = parameter[ICTR](FixedPoint.fromInt(c))
+}
 
 object FixPtType {
   def unapply(x: Type[_]): Option[(Boolean,Int,Int)] = x match {

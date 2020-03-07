@@ -2,29 +2,27 @@ package spatial.util
 
 import argon._
 import forge.tags._
-
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.memory._
-
 import argon.node._
+import emul.FixedPoint
 import spatial.metadata.control._
 import utils.tags.instrument
-
 import utils.implicits.collections._
 
 object memops {
 
   implicit class AliasOps[A](mem: Sym[A]) {
-    @rig def sparseStarts(): Map[Int,I32] = {
+    @rig def sparseStarts(): Map[Int,ICTR] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get starts of sparse alias")
       mem.sparseRank.map{ d => d -> stage(MemStart(mem, d)) }.toMap
     }
-    @rig def sparseSteps(): Map[Int,I32] = {
+    @rig def sparseSteps(): Map[Int,ICTR] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get steps of sparse alias")
       mem.sparseRank.map{ d => d -> stage(MemStep(mem, d)) }.toMap
     }
-    @rig def sparseEnds(): Map[Int,I32] = {
+    @rig def sparseEnds(): Map[Int,ICTR] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get ends of sparse alias")
       mem.sparseRank.map{ d => d -> stage(MemEnd(mem, d)) }.toMap
     }
@@ -32,21 +30,21 @@ object memops {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get pars of sparse alias")
       mem.sparseRank.map{ d => d -> stage(MemPar(mem, d)) }.toMap
     }
-    @rig def sparseLens(): Map[Int,I32] = {
-      mem.sparseRank.map{ d => d -> stage(MemLen(mem, d)) }.toMap
+    @rig def sparseLens(): Map[Int,ICTR] = {
+      mem.sparseRank.map{ d => d -> stage(MemLen(mem, d)).to[ICTR] }.toMap
     }
     @rig def sparseOrigins[W:INT](): Map[Int,Ind[W]] = {
       mem.sparseRank.map{ d => d -> stage(MemOrigin(mem, d)) }.toMap
     }
 
-    @rig def rawStarts(): Seq[I32] = {
+    @rig def rawStarts(): Seq[ICTR] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get rawStarts of sparse alias")
       mem.rawRank.map{d => stage(MemStart(mem, d)) }
     }
 
-    @rig def rawDims(): Seq[I32] = {
+    @rig def rawDims(): Seq[ICTR] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get rawDims of sparse alias")
-      mem.rawRank.map{d => stage(MemDim(mem, d)) }
+      mem.rawRank.map{d => stage(MemDim(mem, d)).to[ICTR] }
     }
 
     def parsImm: Seq[I32] = mem match {
@@ -55,7 +53,7 @@ object memops {
       case _ => Nil
     }
 
-    @rig def rawSeries(): Seq[Series[I32]] = {
+    @rig def rawSeries(): Seq[Series[ICTR]] = {
       if (mem.isSparseAlias) throw new Exception(s"Cannot get series of sparse alias")
       val sparseRank = mem.sparseRank
       mem.rawRank.map{
@@ -66,7 +64,7 @@ object memops {
           val par   = stage(MemPar(mem, d))
           Series(start, end, step, par)
         case _ =>
-          Series(I32(0),I32(1),I32(1),I32(1))
+          Series(ICTR(0),ICTR(1),ICTR(1),I32(1))
       }
     }
 

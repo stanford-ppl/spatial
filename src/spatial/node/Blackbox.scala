@@ -27,7 +27,7 @@ abstract class EarlyBlackbox[R:Type] extends FunctionBlackbox[R] {
   j:     I32,
   mt:    I32,
   nt:    I32,
-  iters: Seq[I32]
+  iters: Seq[ICTR]
 ) extends FunctionBlackbox[Void] {
   override def cchains = Seq(cchain -> iters)
   override def bodies = Nil
@@ -38,7 +38,7 @@ abstract class PrimitiveBlackboxUse[A:Struct,B:Struct] extends Primitive[B] {
   override def effects = Effects.Unique
 }
 abstract class CtrlBlackboxUse[A:StreamStruct,B:StreamStruct](ens: Set[Bit]) extends EnControl[B] {
-  override def iters: Seq[I32] = Seq()
+  override def iters: Seq[ICTR] = Seq()
   override def cchains = Seq()
   override def bodies = Seq()
   override def effects = Effects.Unique andAlso Effects.Mutable

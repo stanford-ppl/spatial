@@ -46,8 +46,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     loadAcc:   Lambda1[C[A],A],       // Load function for accumulator
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
-    itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    itersMap:  Seq[ICTR],              // Bound iterators for map loop
+    itersRed:  Seq[ICTR],               // Bound iterators for reduce loop
     stopWhen:  Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
@@ -101,8 +101,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     loadAcc:   Lambda1[C[A],A],       // Load function for accumulator
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
-    itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    itersMap:  Seq[ICTR],              // Bound iterators for map loop
+    itersRed:  Seq[ICTR],               // Bound iterators for reduce loop
     stopWhen:  Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
@@ -112,7 +112,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val redLanes = FullUnroller(s"${lhs}_red", cchainRed, itersRed, true, mop)
     val isMap2   = mapLanes.indices
     val mvs      = mapLanes.indexValids
-    val start    = cchainMap.counters.map(_.start.asInstanceOf[I32])
+    val start    = cchainMap.counters.map(_.start.asInstanceOf[ICTR])
     val redType  = reduce.result.reduceType
     val intermed = func.result
 
@@ -166,8 +166,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     loadAcc:   Lambda1[C[A],A],       // Load function for accumulator
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
-    itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    itersMap:  Seq[ICTR],              // Bound iterators for map loop
+    itersRed:  Seq[ICTR],               // Bound iterators for reduce loop
     stopWhen:  Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
@@ -224,8 +224,8 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     loadAcc:   Lambda1[C[A],A],       // Load function for accumulator
     reduce:    Lambda2[A,A,A],        // Reduction function
     storeAcc:  Lambda2[C[A],A,Void],  // Store function for accumulator
-    itersMap:  Seq[I32],              // Bound iterators for map loop
-    itersRed:  Seq[I32],               // Bound iterators for reduce loop
+    itersMap:  Seq[ICTR],              // Bound iterators for map loop
+    itersRed:  Seq[ICTR],               // Bound iterators for reduce loop
     stopWhen:  Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], C: LocalMem[A,C], ctx: SrcCtx): Void = {
@@ -237,7 +237,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val isRed2   = redLanes.indices
     val mvs      = mapLanes.indexValids
     val rvs      = redLanes.indexValids
-    val start    = cchainMap.counters.map(_.start.asInstanceOf[I32])
+    val start    = cchainMap.counters.map(_.start.asInstanceOf[ICTR])
     val redType  = reduce.result.reduceType
     val intermed = func.result
 
@@ -288,9 +288,9 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     loadAcc:   Lambda1[C[A],A],      // Load function from accumulator
     storeAcc:  Lambda2[C[A],A,Void], // Store function to accumulator
     redType: Option[ReduceFunction],
-    itersMap:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
-    itersRed:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
-    start:  Seq[I32],             // Start for each iterator
+    itersMap:  Seq[ICTR],             // Iterators for entire reduction (used to determine when to reset)
+    itersRed:  Seq[ICTR],             // Iterators for entire reduction (used to determine when to reset)
+    start:  Seq[ICTR],             // Start for each iterator
     mapLanes: Unroller,
     redLanes: Unroller,
     mop: Boolean

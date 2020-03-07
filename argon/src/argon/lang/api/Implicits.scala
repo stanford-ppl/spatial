@@ -1,6 +1,7 @@
 package argon.lang.api
 
 import argon._
+import argon.lang.ICTR
 import argon.node._
 import forge.VarLike
 import forge.tags._
@@ -270,16 +271,16 @@ trait Implicits extends ImplicitsPriority1 {
   class ShortWrapper(a: Short)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Short](a)
 
   class IntWrapper(b: Int)(implicit ctx: SrcCtx, state: State) extends LiteralWrapper[Int](b) {
-    def until(end: I32): Series[I32] = Series[I32](I32(b), end, I32(1), I32(1))
-    def by(step: I32): Series[I32] = Series[I32](0, b, step, 1)
-    def par(p: I32): Series[I32] = Series[I32](0, b, 1, p)
+    def until(end: I32): Series[ICTR] = Series[ICTR](ICTR(b), end.to[ICTR], ICTR(1), I32(1))
+    def by(step: I32): Series[ICTR] = Series[ICTR](0, b, step.to[ICTR], 1)
+    def par(p: I32): Series[ICTR] = Series[ICTR](0, b, 1, p)
 
-    def until(end: Int): Series[I32] = Series[I32](b, end, 1, 1)
-    def by(step: Int): Series[I32] = Series[I32](0, b, step, 1)
-    def par(p: Int): Series[I32] = Series[I32](0, b, 1, p)
+    def until(end: Int): Series[ICTR] = Series[ICTR](b, end, 1, 1)
+    def by(step: Int): Series[ICTR] = Series[ICTR](0, b, step, 1)
+    def par(p: Int): Series[ICTR] = Series[ICTR](0, b, 1, p)
 
-    def ::(start: I32): Series[I32] = Series[I32](start, b, 1, 1)
-    def ::(start: Int): Series[I32] = Series[I32](start, b, 1, 1)
+    def ::(start: I32): Series[ICTR] = Series[ICTR](start.to[ICTR], b, 1, 1)
+    def ::(start: Int): Series[ICTR] = Series[ICTR](start, b, 1, 1)
 
     def to(end: Int): Range = Range.inclusive(b, end)
 

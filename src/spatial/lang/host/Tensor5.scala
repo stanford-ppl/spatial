@@ -32,12 +32,18 @@ import forge.tags._
   /** Returns the fifth dimension of this Tensor5. */
   @api def dim4: I32 = field[I32]("dim4")
   /** Returns the element in this Tensor5 at the given 5-dimensional addreess. */
-  @api def apply(i: I32, j: I32, k: I32, l: I32, m: I32): A = {
-    data.apply(i*dim1*dim2*dim3*dim4 + j*dim2*dim3*dim4 + k*dim3*dim4 + l*dim4 + m)
+//  @api def apply(i: I32, j: I32, k: I32, l: I32, m: I32): A = {
+//    data.apply(i*dim1*dim2*dim3*dim4 + j*dim2*dim3*dim4 + k*dim3*dim4 + l*dim4 + m)
+//  }
+  @api def apply(i: ICTR, j: ICTR, k: ICTR, l: ICTR, m: ICTR): A = {
+    data.apply(i*dim1.to[ICTR]*dim2.to[ICTR]*dim3.to[ICTR]*dim4.to[ICTR] + j*dim2.to[ICTR]*dim3.to[ICTR]*dim4.to[ICTR] + k*dim3.to[ICTR]*dim4.to[ICTR] + l*dim4.to[ICTR] + m)
   }
   /** Updates the element at the given 5-dimensional address to `elem`. */
-  @api def update(i: I32, j: I32, k: I32, l: I32, m: I32, elem: A): Void = {
-    data.update(i*dim1*dim2*dim3*dim4 + j*dim2*dim3*dim4 + k*dim3*dim4 + l*dim4 + m, elem)
+//  @api def update(i: I32, j: I32, k: I32, l: I32, m: I32, elem: A): Void = {
+//    data.update(i*dim1*dim2*dim3*dim4 + j*dim2*dim3*dim4 + k*dim3*dim4 + l*dim4 + m, elem)
+//  }
+  @api def update(i: ICTR, j: ICTR, k: ICTR, l: ICTR, m: ICTR, elem: A): Void = {
+    data.update(i*dim1.to[ICTR]*dim2.to[ICTR]*dim3.to[ICTR]*dim4.to[ICTR] + j*dim2.to[ICTR]*dim3.to[ICTR]*dim4.to[ICTR] + k*dim3.to[ICTR]*dim4.to[ICTR] + l*dim4.to[ICTR] + m, elem)
   }
   /** Returns a flattened, immutable @Array view of this Tensor5's data. */
   @api def flatten: Array[A] = data
@@ -62,7 +68,7 @@ import forge.tags._
   @api def reorder(ordering: Seq[scala.Int]): Tensor5[A] = {
     (0::dims.apply(ordering(0)), 0::dims.apply(ordering(1)), 0::dims.apply(ordering(2)), 0::dims.apply(ordering(3)), 0::dims.apply(ordering(4))){(a,b,c,d,e) => 
       val i = List(a,b,c,d,e)
-      apply(i(ordering(0)), i(ordering(1)), i(ordering(2)), i(ordering(3)), i(ordering(4)))
+      apply(i(ordering(0)).to[ICTR], i(ordering(1)).to[ICTR], i(ordering(2)).to[ICTR], i(ordering(3)).to[ICTR], i(ordering(4)).to[ICTR])
     }
   }
 

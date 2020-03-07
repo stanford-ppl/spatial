@@ -66,18 +66,18 @@ object FrameTransmit {
       val localAddr =
         if (local.constDims.product > len.head.toInt) {
           warn("On-chip memory for Frame transmit is smaller than Frame!  Will wrap around while transferring (You should probably use a Stream controller")
-          i: I32 => i % local.constDims.map(_.toInt).product
-        } else {i: I32 => i}
+          i: ICTR => i % local.constDims.map(_.toInt).product
+        } else {i: ICTR => i}
       if (isLoad) {
 
         // Data loading
-        Stream.Foreach(len.head by 1){i =>
+        Stream.Foreach(len.head.to[ICTR] by 1){i =>
           local.__write(dataStream.asInstanceOf[StreamIn[A]].value(), Seq(localAddr(i)), Set.empty)
         }
       }
       else {
         val (tid, tdest) = dataStream.asInstanceOf[Sym[_]] match { case _@Op(StreamOutNew(bus: AxiStream64Bus)) => (bus.tid, bus.tdest); case _ => (0,0)}
-        Stream.Foreach(len.head by 1){i =>
+        Stream.Foreach(len.head.to[ICTR] by 1){i =>
           val tuser = mux(i === 0, 2.to[U32], 0.to[U32])
           val data = local.__read(Seq(localAddr(i)), Set.empty)
           val last = i === (len.head-1)

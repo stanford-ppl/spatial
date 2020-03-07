@@ -51,7 +51,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
   private def emitUnrolledLoop(
     lhs:    Sym[_],
     cchain: CounterChain,
-    iters:  Seq[Seq[I32]],
+    iters:  Seq[Seq[ICTR]],
     valids: Seq[Seq[Bit]]
   )(func: => Unit): Unit = {
 

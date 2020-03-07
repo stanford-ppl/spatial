@@ -16,7 +16,7 @@ package object access {
   implicit class OpAccessOps(op: Op[_]) {
     // TODO[3]: Should this just be any write?
 
-    def getLockNode: Option[LockWithKeys[I32]] = op match {
+    def getLockNode: Option[LockWithKeys[ICTR]] = op match {
       case x: LockSRAMRead[_,_] => x.lock
       case x: LockSRAMWrite[_,_] => x.lock
       case x: LockDRAMRead[_,_] => x.lock

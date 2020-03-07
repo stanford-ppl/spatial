@@ -11,7 +11,7 @@ import spatial.lang._
 @op case class LIFOPush[A:Bits](mem: LIFO[A], data: Bits[A], ens: Set[Bit]) extends Enqueuer[A]
 @op case class LIFOPop[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends Dequeuer[A,A]
 @op case class LIFOPeek[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends Reader[A,A] {
-  def addr: Seq[Idx] = Nil
+  def addr: Seq[ICTR] = Nil
 }
 
 @op case class LIFOIsEmpty[A:Bits](mem: LIFO[A], ens: Set[Bit]) extends StatusReader[Bit]

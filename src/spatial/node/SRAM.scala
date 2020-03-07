@@ -19,7 +19,7 @@ import spatial.lang._
   */
 @op case class SRAMRead[A:Bits,C[T]](
     mem:  SRAM[A,C],
-    addr: Seq[Idx],
+    addr: Seq[ICTR],
     ens:  Set[Bit])
   extends Reader[A,A]
 
@@ -32,7 +32,7 @@ import spatial.lang._
 @op case class SRAMWrite[A:Bits,C[T]](
     mem:  SRAM[A,C],
     data: Bits[A],
-    addr: Seq[Idx],
+    addr: Seq[ICTR],
     ens: Set[Bit])
   extends Writer[A]
 
@@ -47,8 +47,8 @@ import spatial.lang._
   */
 @op case class SRAMBankedRead[A:Bits,C[T]](
     mem:  SRAM[A,C],
-    bank: Seq[Seq[Idx]],
-    ofs:  Seq[Idx],
+    bank: Seq[Seq[ICTR]],
+    ofs:  Seq[ICTR],
     enss: Seq[Set[Bit]]
     )(implicit val vT: Type[Vec[A]])
   extends BankedReader[A]
@@ -63,7 +63,7 @@ import spatial.lang._
 @op case class SRAMBankedWrite[A:Bits,C[T]](
     mem:  SRAM[A,C],
     data: Seq[Sym[A]],
-    bank: Seq[Seq[Idx]],
-    ofs:  Seq[Idx],
+    bank: Seq[Seq[ICTR]],
+    ofs:  Seq[ICTR],
     enss: Seq[Set[Bit]])
   extends BankedWriter[A]

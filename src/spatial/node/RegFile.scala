@@ -20,7 +20,7 @@ import spatial.lang._
   */
 @op case class RegFileRead[A:Bits,C[T]](
     mem:  RegFile[A,C],
-    addr: Seq[Idx],
+    addr: Seq[ICTR],
     ens:  Set[Bit])
   extends Reader[A,A]
 
@@ -33,7 +33,7 @@ import spatial.lang._
 @op case class RegFileWrite[A:Bits,C[T]](
     mem:  RegFile[A,C],
     data: Bits[A],
-    addr: Seq[Idx],
+    addr: Seq[ICTR],
     ens:  Set[Bit])
   extends Writer[A]
 
@@ -50,7 +50,7 @@ import spatial.lang._
 @op case class RegFileShiftIn[A:Bits,C[T]](
     mem:  RegFile[A,C],
     data: Bits[A],
-    addr: Seq[Idx],
+    addr: Seq[ICTR],
     ens:  Set[Bit],
     axis: Int)
   extends EnqueuerLike[A]
@@ -68,11 +68,11 @@ import spatial.lang._
 @op case class RegFileBankedShiftIn[A:Bits,C[T]](
     mem:  RegFile[A,C],
     data: Seq[Sym[A]],
-    adr:  Seq[Seq[Idx]],
+    adr:  Seq[Seq[ICTR]],
     enss: Seq[Set[Bit]],
     axis: Int
 ) extends BankedEnqueue[A] {
-    override def bank: Seq[Seq[Idx]] = adr
+    override def bank: Seq[Seq[ICTR]] = adr
 }
 
 /** Reset of a RegFile.
@@ -97,11 +97,11 @@ import spatial.lang._
 @op case class RegFileShiftInVector[A:Bits,C[T]](
   mem:  RegFile[A,C],
   data: Vec[A],
-  adr:  Seq[Idx],
+  adr:  Seq[ICTR],
   ens:  Set[Bit],
   axis: Int
 ) extends VectorEnqueuer[A] {
-    override def addr: Seq[Idx] = adr
+    override def addr: Seq[ICTR] = adr
 }
 
 /** A banked read of a vector of elements from a RegFile.
@@ -111,7 +111,7 @@ import spatial.lang._
   */
 @op case class RegFileVectorRead[A:Bits,C[T]](
     mem:  RegFile[A,C],
-    addr: Seq[Seq[Idx]],
+    addr: Seq[Seq[ICTR]],
     enss: Seq[Set[Bit]]
     )(implicit val vT: Type[Vec[A]])
   extends VectorReader[A] 
@@ -125,7 +125,7 @@ import spatial.lang._
 @op case class RegFileVectorWrite[A:Bits,C[T]](
     mem:  RegFile[A,C],
     data: Seq[Sym[A]],
-    addr: Seq[Seq[Idx]],
+    addr: Seq[Seq[ICTR]],
     enss: Seq[Set[Bit]])
   extends VectorWriter[A]
 

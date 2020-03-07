@@ -33,7 +33,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   /** Returns the value at `addr`.
     * The number of indices should match the RegFile's rank.
     */
-  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
+  @api def read(addr: Seq[ICTR], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(RegFileRead[A,C](me,addr,ens))
   }
@@ -41,7 +41,7 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   /** Updates the value at `addr` to `data`.
     * The number of indices should match the RegFile's rank.
     */
-  @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
+  @api def write(data: A, addr: Seq[ICTR], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
     stage(RegFileWrite[A,C](me,data,addr,ens))
   }
@@ -65,8 +65,8 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
 
   // --- Typeclass Methods
-  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
-  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr.map(_.asInstanceOf[ICTR]), ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr.map(_.asInstanceOf[ICTR]), ens)
   @rig def __reset(ens: Set[Bit]): Void = stage(RegFileReset(this, ens))
 }
 object RegFile {
@@ -96,19 +96,19 @@ object RegFile {
   @api def length: I32 = dims.head
 
   /** Shifts in `data` into the first register, shifting all other values over by one position. */
-  @api def <<=(data: A): Void = stage(RegFileShiftIn(this,data,Seq(I32(0)),Set.empty,0))
+  @api def <<=(data: A): Void = stage(RegFileShiftIn(this,data,Seq(ICTR(0)),Set.empty,0))
 
   /** Shifts in `data` into the first N registers, where N is the size of the given Vector.
     * All other elements are shifted by N positions.
     */
-  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(this,data,Seq(I32(0)),Set.empty,0))
+  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(this,data,Seq(ICTR(0)),Set.empty,0))
 
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: I32): A = stage(RegFileRead(this,Seq(pos),Set.empty))
+  @api def apply(pos: I32): A = stage(RegFileRead(this,Seq(pos.to[ICTR]),Set.empty))
 
   /** Updates the value at `pos` to `data`. */
-  @api def update(pos: I32, data: A): Void = stage(RegFileWrite(this,data,Seq(pos),Set.empty))
+  @api def update(pos: I32, data: A): Void = stage(RegFileWrite(this,data,Seq(pos.to[ICTR]),Set.empty))
 
 
   /** Shifts in `data` into the first N registers, where N is the size of the given [[Vec]].
@@ -130,10 +130,10 @@ object RegFile {
   @api def cols: I32 = dim1
 
   /** Returns the value at (`row`, `col`). */
-  @api def apply(row: I32, col: I32): A = stage(RegFileRead(this,Seq(row,col),Set.empty))
+  @api def apply(row: I32, col: I32): A = stage(RegFileRead(this,Seq(row.to[ICTR],col.to[ICTR]),Set.empty))
 
   /** Updates the value at (`row`,`col`) to `data`. */
-  @api def update(row: I32, col: I32, data: A): Void = stage(RegFileWrite(this, data, Seq(row,col), Set.empty))
+  @api def update(row: I32, col: I32, data: A): Void = stage(RegFileWrite(this, data, Seq(row.to[ICTR],col.to[ICTR]), Set.empty))
 
 
   /** Returns a view of row `i` of this RegFile. **/
@@ -152,10 +152,10 @@ object RegFile {
   def rank: Int = 3
 
   /** Returns the value at (`d0`,`d1`,`d2`). */
-  @api def apply(d0: I32, d1: I32, d2: I32): A = stage(RegFileRead(this,Seq(d0,d1,d2),Set.empty))
+  @api def apply(d0: I32, d1: I32, d2: I32): A = stage(RegFileRead(this,Seq(d0.to[ICTR],d1.to[ICTR],d2.to[ICTR]),Set.empty))
 
   /** Updates the value at (`d0`,`d1`,`d2`) to `data`. */
-  @api def update(d0: I32, d1: I32, d2: I32, data: A): Void = stage(RegFileWrite(this,data,Seq(d0,d1,d2), Set.empty))
+  @api def update(d0: I32, d1: I32, d2: I32, data: A): Void = stage(RegFileWrite(this,data,Seq(d0.to[ICTR],d1.to[ICTR],d2.to[ICTR]), Set.empty))
 
 
   /** Returns a 1-dimensional view of part of this RegFile3. **/
@@ -168,7 +168,7 @@ object RegFile {
 
 
 case class RegFileView[A:Bits,C[T]](s: RegFile[A,C], addr: Seq[I32], axis: Int) {
-  @api def <<=(data: A): Void = stage(RegFileShiftIn(s, data, addr, Set.empty, axis))
-  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(s, data, addr, Set.empty, axis))
+  @api def <<=(data: A): Void = stage(RegFileShiftIn(s, data, addr.map(_.asInstanceOf[ICTR]), Set.empty, axis))
+  @api def <<=(data: Vec[A]): Void = stage(RegFileShiftInVector(s, data, addr.map(_.asInstanceOf[ICTR]), Set.empty, axis))
 }
 

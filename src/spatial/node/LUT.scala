@@ -29,7 +29,7 @@ import spatial.lang._
   */
 @op case class LUTRead[A:Bits,C[T]](
   mem:  LUT[A,C],
-  addr: Seq[Idx],
+  addr: Seq[ICTR],
   ens:  Set[Bit])
   extends Reader[A,A]
 
@@ -42,8 +42,8 @@ import spatial.lang._
   */
 @op case class LUTBankedRead[A:Bits,C[T]](
   mem:  LUT[A,C],
-  bank: Seq[Seq[Idx]],
-  ofs:  Seq[Idx],
+  bank: Seq[Seq[ICTR]],
+  ofs:  Seq[ICTR],
   enss: Seq[Set[Bit]]
 )(implicit val vT: Type[Vec[A]])
   extends BankedReader[A]

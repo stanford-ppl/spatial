@@ -30,7 +30,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * The number of indices should match the SRAM's rank.
     * NOTE: Use the apply method if the SRAM's rank is statically known.
     */
-  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
+  @api def read(addr: Seq[ICTR], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(SRAMRead[A,C](me,addr,ens))
   }
@@ -39,7 +39,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * The number of indices should match the SRAM's rank.
     * NOTE: Use the update method if the SRAM's rank is statically known.
     */
-  @api def write(data: A, addr: Seq[Idx], ens: Set[Bit] = Set.empty): Void = {
+  @api def write(data: A, addr: Seq[ICTR], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
     stage(SRAMWrite[A,C](me,data,addr,ens))
   }
@@ -119,8 +119,8 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods
-  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
-  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr.map(_.asInstanceOf[ICTR]), ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr.map(_.asInstanceOf[ICTR]), ens)
   @rig def __reset(ens: Set[Bit]): Void = void
 }
 object SRAM {
@@ -153,12 +153,10 @@ object SRAM {
   @api override def size: I32 = dims.head
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: I32): A = stage(SRAMRead(this,Seq(pos),Set.empty))
-  @api def gimme(pos: ICTR): A = stage(SRAMRead(this,Seq(pos),Set.empty))
+  @api def apply(pos: ICTR): A = stage(SRAMRead(this,Seq(pos),Set.empty))
 
   /** Updates the value at `pos` to `data`. */
-  @api def update(pos: I32, data: A): Void = stage(SRAMWrite(this,data,Seq(pos),Set.empty))
-  @api def setme(pos: ICTR, data: A): Void = stage(SRAMWrite(this,data,Seq(pos),Set.empty))
+  @api def update(pos: ICTR, data: A): Void = stage(SRAMWrite(this,data,Seq(pos),Set.empty))
 
 }
 
@@ -174,12 +172,10 @@ object SRAM {
   @api def cols: I32 = dim1
 
   /** Returns the value at (`row`, `col`). */
-  @api def apply(row: I32, col: I32): A = stage(SRAMRead(this,Seq(row,col),Set.empty))
-  @api def gimme(row: ICTR, col: ICTR): A = stage(SRAMRead(this,Seq(row,col),Set.empty))
+  @api def apply(row: ICTR, col: ICTR): A = stage(SRAMRead(this,Seq(row,col),Set.empty))
 
   /** Updates the value at (`row`,`col`) to `data`. */
-  @api def update(row: I32, col: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
-  @api def setme(row: ICTR, col: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
+  @api def update(row: ICTR, col: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
 
 }
 
@@ -194,12 +190,10 @@ object SRAM {
   def rank: Int = 3
 
   /** Returns the value at (`d0`,`d1`,`d2`). */
-  @api def apply(d0: I32, d1: I32, d2: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2),Set.empty))
-  @api def gimme(d0: ICTR, d1: ICTR, d2: ICTR): A = stage(SRAMRead(this,Seq(d0,d1,d2),Set.empty))
+  @api def apply(d0: ICTR, d1: ICTR, d2: ICTR): A = stage(SRAMRead(this,Seq(d0,d1,d2),Set.empty))
 
   /** Updates the value at (`d0`,`d1`,`d2`) to `data`. */
-  @api def update(d0: I32, d1: I32, d2: I32, data: A): Void = stage(SRAMWrite(this,data,Seq(d0,d1,d2), Set.empty))
-  @api def setme(d0: ICTR, d1: ICTR, d2: ICTR, data: A): Void = stage(SRAMWrite(this,data,Seq(d0,d1,d2), Set.empty))
+  @api def update(d0: ICTR, d1: ICTR, d2: ICTR, data: A): Void = stage(SRAMWrite(this,data,Seq(d0,d1,d2), Set.empty))
 
 
 }
@@ -215,12 +209,10 @@ object SRAM {
   def rank: Int = 4
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`). */
-  @api def apply(d0: I32, d1: I32, d2: I32, d3: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3),Set.empty))
-  @api def gimme(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3),Set.empty))
+  @api def apply(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3),Set.empty))
 
   /** Updates the value at (`d0`,`d1`,`d2`,`d3`) to `data`. */
-  @api def update(d0: I32, d1: I32, d2: I32, d3: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3), Set.empty))
-  @api def setme(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3), Set.empty))
+  @api def update(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3), Set.empty))
 
 }
 
@@ -235,12 +227,10 @@ object SRAM {
   def rank: Int = 5
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`,`d4`). */
-  @api def apply(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
-  @api def gimme(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR, d4: ICTR): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
+  @api def apply(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR, d4: ICTR): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
 
   /** Updates the value at (`d0`,`d1`,`d2`,`d3`,`d4`) to `data`. */
-  @api def update(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3,d4), Set.empty))
-  @api def setme(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR, d4: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3,d4), Set.empty))
+  @api def update(d0: ICTR, d1: ICTR, d2: ICTR, d3: ICTR, d4: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3,d4), Set.empty))
 
 }
 

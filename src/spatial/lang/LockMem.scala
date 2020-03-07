@@ -51,12 +51,12 @@ object LockDRAM {
   @api override def size: I32 = dims.head
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: I32): A = stage(LockDRAMRead(this,Seq(pos),None,Set.empty))
-  @api def apply(pos: I32, lock: LockWithKeys[I32]): A = stage(LockDRAMRead(this,Seq(pos),Some(lock),Set.empty))
+  @api def apply(pos: I32): A = stage(LockDRAMRead(this,Seq(pos.to[ICTR]),None,Set.empty))
+  @api def apply(pos: I32, lock: LockWithKeys[ICTR]): A = stage(LockDRAMRead(this,Seq(pos.to[ICTR]),Some(lock),Set.empty))
 
   /** Updates the value at `pos` to `data`. */
-  @api def update(pos: I32, data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos),None,Set.empty))
-  @api def update(pos: I32, lock: LockWithKeys[I32], data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos),Some(lock),Set.empty))
+  @api def update(pos: I32, data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos.to[ICTR]),None,Set.empty))
+  @api def update(pos: I32, lock: LockWithKeys[ICTR], data: A): Void = stage(LockDRAMWrite(this,data,Seq(pos.to[ICTR]),Some(lock),Set.empty))
 
   @api def store[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit tp: Type[Local[A]]): Void = throw new Exception(s"LockDRAM store needs to be implemented!")
   @api def store(local: SRAM1[A], len: I32): Void = throw new Exception(s"LockDRAM store needs to be implemented!")
@@ -93,7 +93,7 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
     * The number of indices should match the LockSRAM's rank.
     * NOTE: Use the apply method if the LockSRAM's rank is statically known.
     */
-  @api def read(addr: Seq[Idx], lock: Option[LockWithKeys[I32]] = None, ens: Set[Bit] = Set.empty): A = {
+  @api def read(addr: Seq[ICTR], lock: Option[LockWithKeys[ICTR]] = None, ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(LockSRAMRead[A,C](me,addr,lock,ens))
   }
@@ -102,7 +102,7 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
     * The number of indices should match the LockSRAM's rank.
     * NOTE: Use the update method if the LockSRAM's rank is statically known.
     */
-  @api def write(data: A, addr: Seq[Idx], lock: Option[LockWithKeys[I32]], ens: Set[Bit] = Set.empty): Void = {
+  @api def write(data: A, addr: Seq[ICTR], lock: Option[LockWithKeys[ICTR]], ens: Set[Bit] = Set.empty): Void = {
     checkDims(addr.length)
     stage(LockSRAMWrite[A,C](me,data,addr,lock,ens))
   }
@@ -132,8 +132,8 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
 
 
   // --- Typeclass Methods
-  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, None, ens)
-  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, None, ens)
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr.map(_.asInstanceOf[ICTR]), None, ens)
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr.map(_.asInstanceOf[ICTR]), None, ens)
   @rig def __reset(ens: Set[Bit]): Void = void
 }
 object LockSRAM {
@@ -154,12 +154,12 @@ object LockSRAM {
   @api override def size: I32 = dims.head
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: I32): A = stage(LockSRAMRead(this,Seq(pos),None,Set.empty))
-  @api def apply(pos: I32, lock: LockWithKeys[I32]): A = stage(LockSRAMRead(this,Seq(pos),Some(lock),Set.empty))
+  @api def apply(pos: I32): A = stage(LockSRAMRead(this,Seq(pos.to[ICTR]),None,Set.empty))
+  @api def apply(pos: I32, lock: LockWithKeys[ICTR]): A = stage(LockSRAMRead(this,Seq(pos.to[ICTR]),Some(lock),Set.empty))
 
   /** Updates the value at `pos` to `data`. */
-  @api def update(pos: I32, data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos),None,Set.empty))
-  @api def update(pos: I32, lock: LockWithKeys[I32], data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos),Some(lock),Set.empty))
+  @api def update(pos: I32, data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos.to[ICTR]),None,Set.empty))
+  @api def update(pos: I32, lock: LockWithKeys[ICTR], data: A): Void = stage(LockSRAMWrite(this,data,Seq(pos.to[ICTR]),Some(lock),Set.empty))
 
 }
 

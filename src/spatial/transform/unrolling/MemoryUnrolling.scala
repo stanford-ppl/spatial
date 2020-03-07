@@ -179,8 +179,8 @@ trait MemoryUnrolling extends UnrollingBase {
         dbgs(s"  Lane IDs: $laneIds")
         dbgs(s"  Port:     $port")
 
-        case class NDAddressInLane(addr: Seq[Idx], lane: Int)
-        case class NDAddressAcrossLanes(addr: Seq[Idx], lanes: Seq[Int])
+        case class NDAddressInLane(addr: Seq[ICTR], lane: Int)
+        case class NDAddressAcrossLanes(addr: Seq[ICTR], lanes: Seq[Int])
 
         val inst  = mem2.instance
         val addrOpt = 
@@ -199,7 +199,7 @@ trait MemoryUnrolling extends UnrollingBase {
                                .toSeq.map{case (adr, ls) => NDAddressAcrossLanes(adr, ls) }
                                .sortBy(_.lanes.last)                        // (ND address, lane IDs) pairs
               val portReordering = distinct.flatMap{d => d.lanes}.map(laneIds.indexOf)
-              val addr: Seq[Seq[Idx]] = distinct.map(_.addr)                // Vector of ND addresses
+              val addr: Seq[Seq[ICTR]] = distinct.map(_.addr)                // Vector of ND addresses
               val masters: Seq[Int] = distinct.map(_.lanes.last)            // Lane ID for each distinct address
               val lane2Vec: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => laneId -> aId }}.toMap
               val vec2Lane: Map[Int,Int] = distinct.zipWithIndex.flatMap{case (entry,aId) => entry.lanes.map{laneId => aId -> laneId }}.toMap
@@ -341,9 +341,9 @@ trait MemoryUnrolling extends UnrollingBase {
   def bankSelects(
     mem:       Sym[_],
     node:      Op[_],               // Pre-unrolled access
-    addr:      Seq[Seq[Idx]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
+    addr:      Seq[Seq[ICTR]],       // Per-lane ND address (Lanes is outer Seq, ND is inner Seq)
     inst:      Memory               // Memory instance associated with this access
-  )(implicit ctx: SrcCtx): Seq[Seq[Idx]] = node match {
+  )(implicit ctx: SrcCtx): Seq[Seq[ICTR]] = node match {
     // LineBuffers are special in that their first dimension is always implicitly fully banked
     //case _:LineBufferRotateEnq[_]  => addr
     // The unrolled version of register file shifting currently doesn't take a banked address
@@ -354,28 +354,28 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:RegFileWrite[_,_]    => addr
     case _:LineBufferEnq[_]     => addr.map{laneAddr => Seq(laneAddr.head)}
     case _:LineBufferRead[_]    => addr.map{laneAddr =>
-      Seq(laneAddr.head) ++ inst.bankSelects(mem, laneAddr).drop(1)
+      Seq(laneAddr.head) ++ inst.bankSelects[ICTR](mem, laneAddr).drop(1)
     }
     case _ => addr.map{laneAddr =>
-      inst.bankSelects(mem, laneAddr)
+      inst.bankSelects[ICTR](mem, laneAddr)
     }
   }
 
   def bankOffset(
     mem:    Sym[_],
     access: Sym[_],
-    addr:   Seq[Seq[Idx]],
+    addr:   Seq[Seq[ICTR]],
     inst:   Memory
-  )(implicit ctx: SrcCtx): Seq[Idx] = access match {
+  )(implicit ctx: SrcCtx): Seq[ICTR] = access match {
     case Op(_:RegFileShiftIn[_,_])  => Nil
     case Op(_:RegFileRead[_,_])     => Nil
     case Op(_:RegFileWrite[_,_])    => Nil
     case Op(_:LineBufferEnq[_])     => addr.map{laneAddr => laneAddr.head}
     case Op(_:LineBufferRead[_])  => addr.map{laneAddr =>
-      inst.bankOffset(mem, Seq(0.to[I32]) ++ laneAddr.drop(1))
+      inst.bankOffset[ICTR](mem, Seq(0.to[ICTR]) ++ laneAddr.drop(1))
     }
     case _ => addr.map{laneAddr =>
-      inst.bankOffset(mem, laneAddr)
+      inst.bankOffset[ICTR](mem, laneAddr)
     }
   }
 
@@ -507,9 +507,9 @@ trait MemoryUnrolling extends UnrollingBase {
     node:   Op[_],
     mem:    Sym[_],
     data:   Seq[Bits[A]],
-    bank:   Seq[Seq[Idx]],
-    ofs:    Seq[Idx],
-    lock:   Option[Seq[LockWithKeys[I32]]],
+    bank:   Seq[Seq[ICTR]],
+    ofs:    Seq[ICTR],
+    lock:   Option[Seq[LockWithKeys[ICTR]]],
     enss:   Seq[Set[Bit]]
   )(implicit vT: Type[Vec[A]], ctx: SrcCtx): UnrolledAccess[A] = node match {
     case _:MergeBufferDeq[_] => UVecReadSym(stage(MergeBufferBankedDeq(mem.asInstanceOf[MergeBuffer[A]], enss)))

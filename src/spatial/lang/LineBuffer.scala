@@ -13,18 +13,18 @@ import scala.collection.mutable.Queue
   val evMem: LineBuffer[A] <:< LocalMem[A,LineBuffer] = implicitly[LineBuffer[A] <:< LocalMem[A,LineBuffer]]
 
   // --- Typeclass Methods
-  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(LineBufferRead(this,addr,ens))
-  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = if (addr.size == 1) stage(LineBufferEnq(this,data,Seq(0.to[I32]) ++ addr,ens)) else stage(LineBufferEnq(this,data,addr,ens))
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(LineBufferRead(this,addr.map(_.asInstanceOf[ICTR]),ens))
+  @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = if (addr.size == 1) stage(LineBufferEnq(this,data,Seq(0.to[ICTR]) ++ addr.map(_.asInstanceOf[ICTR]),ens)) else stage(LineBufferEnq(this,data,addr.map(_.asInstanceOf[ICTR]),ens))
   @rig def __reset(ens: Set[Bit]): Void = void
 
   /** Creates a load port to this LineBuffer at the given `row` and `col`. **/
-  @api def apply(row: I32, col: I32): A = stage(LineBufferRead(this, Seq(row, col), Set.empty))
+  @api def apply(row: I32, col: I32): A = stage(LineBufferRead(this, Seq(row.to[ICTR], col.to[ICTR]), Set.empty))
 
   /** Creates an enqueue (write) port to this LineBuffer of `data`. **/
   @api def enqAt(row: Idx, data: A): Void = this.enqAt(row, data, true)
 
   /** Creates a conditional enqueue (write) port to this LineBuffer of `data` enabled by `en`. **/
-  @api def enqAt(row: Idx, data: A, en: Bit): Void = stage(LineBufferEnq(this,data,Seq(row, 0.to[I32]), Set(en)))
+  @api def enqAt(row: Idx, data: A, en: Bit): Void = stage(LineBufferEnq(this,data,Seq(row.asInstanceOf[ICTR], 0.to[ICTR]), Set(en)))
 
   /** Load 1D DRAM into row of LineBuffer. */
   @api def load(dram: DRAM1[A]): Void = {

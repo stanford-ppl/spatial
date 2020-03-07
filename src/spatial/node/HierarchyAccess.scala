@@ -8,11 +8,11 @@ import spatial.lang._
 /** Memory accesses */
 abstract class Access {
   def mem:  Sym[_]
-  def addr: Seq[Idx]
+  def addr: Seq[ICTR]
   def ens:  Set[Bit]
 }
-case class Read(mem: Sym[_], addr: Seq[Idx], ens: Set[Bit]) extends Access
-case class Write(mem: Sym[_], data: Sym[_], addr: Seq[Idx], ens: Set[Bit]) extends Access
+case class Read(mem: Sym[_], addr: Seq[ICTR], ens: Set[Bit]) extends Access
+case class Write(mem: Sym[_], data: Sym[_], addr: Seq[ICTR], ens: Set[Bit]) extends Access
 
 /** Status read of a memory */
 abstract class StatusReader[R:Bits] extends EnPrimitive[R] {
@@ -45,7 +45,7 @@ object Resetter {
 abstract class Accessor[A:Bits,R:Type] extends EnPrimitive[R] {
   val A: Bits[A] = Bits[A]
   def mem:  Sym[_]
-  def addr: Seq[Idx]
+  def addr: Seq[ICTR]
   def dataOpt: Option[Sym[_]] = localWrite.map(_.data)
   def localRead: Option[Read]
   def localWrite: Option[Write]
@@ -68,11 +68,11 @@ abstract class Reader[A:Bits,R:Bits] extends Accessor[A,R] {
 }
 
 object Reader {
-  def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: Accessor[_,_] => a.localRead.map{rd => (rd.mem,rd.addr,rd.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(Reader.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(Reader.unapply)
 }
 
 /** Any dequeue-like operation from a memory */
@@ -81,34 +81,34 @@ abstract class DequeuerLike[A:Bits,R:Bits] extends Reader[A,R] {
 }
 
 object DequeuerLike {
-  def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: DequeuerLike[_,_] => a.localRead.map{rd => (rd.mem,rd.addr,rd.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(DequeuerLike.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(DequeuerLike.unapply)
 }
 
 /** An address-less dequeue operation. */
 abstract class Dequeuer[A:Bits,R:Bits] extends DequeuerLike[A,R] {
-  def addr: Seq[Idx] = Nil
+  def addr: Seq[ICTR] = Nil
 }
 
 object Dequeuer {
-  def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: Dequeuer[_,_] => a.localRead.map{rd => (rd.mem,rd.addr,rd.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(Dequeuer.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(Dequeuer.unapply)
 }
 
 abstract class VectorDequeuer[A:Bits](implicit VA: Vec[A]) extends Dequeuer[A,Vec[A]]
 
 object VectorDequeuer {
-  def unapply(x: Op[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: VectorDequeuer[_] => a.localRead.map{rd => (rd.mem,rd.addr,rd.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(VectorDequeuer.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(VectorDequeuer.unapply)
 }
 
 
@@ -122,11 +122,11 @@ abstract class Writer[A:Bits] extends Accessor[A,Void] {
 }
 
 object Writer {
-  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: Accessor[_,_] => a.localWrite.map{wr => (wr.mem,wr.data,wr.addr,wr.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(Writer.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(Writer.unapply)
 }
 
 /** Any enqueue-like operation to a memory */
@@ -134,25 +134,25 @@ abstract class EnqueuerLike[A:Bits] extends Writer[A]
 
 /** An address-less enqueue operation. */
 abstract class Enqueuer[A:Bits] extends EnqueuerLike[A] {
-  def addr: Seq[Idx] = Nil
+  def addr: Seq[ICTR] = Nil
 }
 
 object Enqueuer {
-  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: Enqueuer[_] => a.localWrite.map{wr => (wr.mem,wr.data,wr.addr,wr.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(Enqueuer.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(Enqueuer.unapply)
 }
 
 abstract class VectorEnqueuer[A:Bits] extends Enqueuer[A]
 
 object VectorEnqueuer {
-  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x match {
+  def unapply(x: Op[_]): Option[(Sym[_],Sym[_],Seq[ICTR],Set[Bit])] = x match {
     case a: VectorEnqueuer[_] => a.localWrite.map{wr => (wr.mem,wr.data,wr.addr,wr.ens) }
     case _ => None
   }
-  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[Idx],Set[Bit])] = x.op.flatMap(VectorEnqueuer.unapply)
+  def unapply(x: Sym[_]): Option[(Sym[_],Sym[_],Seq[ICTR],Set[Bit])] = x.op.flatMap(VectorEnqueuer.unapply)
 }
 
 

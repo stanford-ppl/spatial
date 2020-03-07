@@ -27,7 +27,7 @@ import spatial.lang._
   override val isTransient = true
   // Register read never takes enables
   override var ens: Set[Bit] = Set.empty
-  override def addr: Seq[Idx] = Nil
+  override def addr: Seq[ICTR] = Nil
   override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)
 }
@@ -35,7 +35,7 @@ import spatial.lang._
 @op case class FIFORegDeq[A:Bits](mem: FIFOReg[A], ens: Set[Bit]) extends Dequeuer[A,A] {
   override def effects: Effects = super.effects andAlso Effects.Unique
   override val isTransient = true
-  override def addr: Seq[Idx] = Nil
+  override def addr: Seq[ICTR] = Nil
   override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)
 }
@@ -43,14 +43,14 @@ import spatial.lang._
 @op case class RegReset[A:Bits](mem: Reg[A], ens: Set[Bit]) extends Resetter[A]
 
 @op case class GetReg[A:Bits](mem: Reg[A]) extends Reader[A,A] {
-  override def addr: Seq[Idx] = Nil
+  override def addr: Seq[ICTR] = Nil
   override var ens: Set[Bit] = Set.empty
   override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)
 }
 
 @op case class SetReg[A:Bits](mem: Reg[A], data: Bits[A]) extends Writer[A] {
-  override def addr: Seq[Idx] = Nil
+  override def addr: Seq[ICTR] = Nil
   override var ens:  Set[Bit] = Set.empty
   override def updateEn(f: Tx, addEns: Set[Bit]) = this.update(f)
   override def mirrorEn(f: Tx, addEns: Set[Bit]) = this.mirror(f)

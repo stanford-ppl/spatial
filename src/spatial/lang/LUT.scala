@@ -25,7 +25,7 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
     * The number of indices should match the LUT's rank.
     * NOTE: Use the apply method if the LUT's rank is statically known.
     */
-  @api def read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A = {
+  @api def read(addr: Seq[ICTR], ens: Set[Bit] = Set.empty): A = {
     checkDims(addr.length)
     stage(LUTRead[A,C](me,addr,Set.empty))
   }
@@ -38,7 +38,7 @@ abstract class LUT[A:Bits,C[T]](implicit val evMem: C[A] <:< LUT[A,C]) extends L
   }
 
   // --- Typeclass Methods
-  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
+  @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr.map(_.asInstanceOf[ICTR]), ens)
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = {
     error(ctx, "Cannot write to LUT")
     error(ctx)
@@ -195,7 +195,7 @@ object FileLUT {
   @api override def size: I32 = dims.head
 
   /** Returns the value at `pos`. */
-  @api def apply(pos: I32): A = stage(LUTRead(this,Seq(pos),Set.empty))
+  @api def apply(pos: I32): A = stage(LUTRead(this,Seq(pos.to[ICTR]),Set.empty))
 }
 
 /** A 2-dimensional LUT with elements of type A. */
@@ -210,7 +210,7 @@ object FileLUT {
   @api def cols: I32 = dim1
 
   /** Returns the value at (`row`, `col`). */
-  @api def apply(row: I32, col: I32): A = stage(LUTRead(this,Seq(row,col),Set.empty))
+  @api def apply(row: I32, col: I32): A = stage(LUTRead(this,Seq(row.to[ICTR],col.to[ICTR]),Set.empty))
 }
 
 /** A 3-dimensional LUT with elements of type A. */
@@ -224,7 +224,7 @@ object FileLUT {
   def rank: Int = 3
 
   /** Returns the value at (`d0`,`d1`,`d2`). */
-  @api def apply(d0: I32, d1: I32, d2: I32): A = stage(LUTRead(this,Seq(d0,d1,d2),Set.empty))
+  @api def apply(d0: I32, d1: I32, d2: I32): A = stage(LUTRead(this,Seq(d0.to[ICTR],d1.to[ICTR],d2.to[ICTR]),Set.empty))
 }
 
 /** A 4-dimensional LUT with elements of type A. */
@@ -239,7 +239,7 @@ object FileLUT {
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`). */
   @api def apply(d0: I32, d1: I32, d2: I32, d3: I32): A = {
-    stage(LUTRead(this,Seq(d0,d1,d2,d3),Set.empty))
+    stage(LUTRead(this,Seq(d0.to[ICTR],d1.to[ICTR],d2.to[ICTR],d3.to[ICTR]),Set.empty))
   }
 }
 
@@ -255,7 +255,7 @@ object FileLUT {
 
   /** Returns the value at (`d0`,`d1`,`d2`,`d3`,`d4`). */
   @api def apply(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): A = {
-    stage(LUTRead(this,Seq(d0,d1,d2,d3,d4),Set.empty))
+    stage(LUTRead(this,Seq(d0.to[ICTR],d1.to[ICTR],d2.to[ICTR],d3.to[ICTR],d4.to[ICTR]),Set.empty))
   }
 }
 

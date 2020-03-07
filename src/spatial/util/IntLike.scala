@@ -35,6 +35,15 @@ object IntLike {
     def fromInt(a: Int): I32 = I32(a)
   }
 
+  implicit object ICTRIsIntLike extends IntLike[ICTR] {
+    @api def plus(a: ICTR, b: ICTR): ICTR = a + b
+    @api def minus(a: ICTR, b: ICTR): ICTR = a - b
+    @api def times(a: ICTR, b: ICTR): ICTR = a * b
+    @api def divide(a: ICTR, b: ICTR): ICTR = a / b
+    @api def modulus(a: ICTR, b: ICTR): ICTR = a % b
+    def fromInt(a: Int): ICTR = ICTR(a)
+  }
+
   implicit object IdxIsIntLike extends IntLike[Idx] {
     // This is why we don't generally support mixed precision computation without explicit casting
     @rig private def map[S,I](a: Idx, b: Idx)(func: (Fix[S,I,_0],Fix[S,I,_0]) => Fix[S,I,_0]): Idx = {

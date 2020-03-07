@@ -38,13 +38,13 @@ import scala.collection.mutable.Queue
   @api def enqVec(data: Vec[A]): Void = this.enqVec(data, true)
 
   /** Creates a vector enqueue (write) port to this FIFO of `data` enabled by `en`. **/
-  @api def enqVec(data: Vec[A], en: Bit): Void = stage(FIFOVecEnq(this,data,Seq(I32(0)),Set(en)))
+  @api def enqVec(data: Vec[A], en: Bit): Void = stage(FIFOVecEnq(this,data,Seq(ICTR(0)),Set(en)))
 
   /** Creates a vector dequeue (write) port with multiple elements in parallel to this FIFO of `data`. **/
-  @api def deqVec(numel: scala.Int): Vec[A] = this.deqVec(Seq.tabulate(numel){i => I32(i)}, true)
+  @api def deqVec(numel: scala.Int): Vec[A] = this.deqVec(Seq.tabulate(numel){i => ICTR(i)}, true)
 
   /** Creates a conditional vector dequeue (write) port to this FIFO of `data` enabled by `en`. **/
-  @api def deqVec(addr: Seq[I32], en: Bit): Vec[A] = {
+  @api def deqVec(addr: Seq[ICTR], en: Bit): Vec[A] = {
     implicit val VA: Vec[A] = Vec.bits[A](addr.size) 
     stage(FIFOVecDeq(this,addr,Set(en)))
   }

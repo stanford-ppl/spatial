@@ -18,8 +18,8 @@ import spatial.lang._
   */
 @op case class LockDRAMRead[A:Bits,C[T]](
     mem:  LockDRAM[A,C],
-    addr: Seq[Idx],
-    lock: Option[LockWithKeys[I32]],
+    addr: Seq[ICTR],
+    lock: Option[LockWithKeys[ICTR]],
     ens:  Set[Bit])
   extends Reader[A,A]
 
@@ -32,8 +32,8 @@ import spatial.lang._
 @op case class LockDRAMWrite[A:Bits,C[T]](
     mem:  LockDRAM[A,C],
     data: Bits[A],
-    addr: Seq[Idx],
-    lock: Option[LockWithKeys[I32]],
+    addr: Seq[ICTR],
+    lock: Option[LockWithKeys[ICTR]],
     ens: Set[Bit])
   extends Writer[A]
 
@@ -45,9 +45,9 @@ import spatial.lang._
   */
 @op case class LockDRAMBankedRead[A:Bits,C[T]](
     mem:  LockDRAM[A,C],
-    bank: Seq[Seq[Idx]],
-    ofs:  Seq[Idx],
-    lock: Option[Seq[LockWithKeys[I32]]],
+    bank: Seq[Seq[ICTR]],
+    ofs:  Seq[ICTR],
+    lock: Option[Seq[LockWithKeys[ICTR]]],
     enss: Seq[Set[Bit]]
     )(implicit val vT: Type[Vec[A]])
   extends BankedReader[A]
@@ -62,9 +62,9 @@ import spatial.lang._
 @op case class LockDRAMBankedWrite[A:Bits,C[T]](
     mem:  LockDRAM[A,C],
     data: Seq[Sym[A]],
-    bank: Seq[Seq[Idx]],
-    ofs:  Seq[Idx],
-    lock: Option[Seq[LockWithKeys[I32]]],
+    bank: Seq[Seq[ICTR]],
+    ofs:  Seq[ICTR],
+    lock: Option[Seq[LockWithKeys[ICTR]]],
     enss: Seq[Set[Bit]])
   extends BankedWriter[A]
 
@@ -83,8 +83,8 @@ import spatial.lang._
   */
 @op case class LockSRAMRead[A:Bits,C[T]](
     mem:  LockSRAM[A,C],
-    addr: Seq[Idx],
-    lock: Option[LockWithKeys[I32]],
+    addr: Seq[ICTR],
+    lock: Option[LockWithKeys[ICTR]],
     ens:  Set[Bit])
   extends Reader[A,A]
 
@@ -97,8 +97,8 @@ import spatial.lang._
 @op case class LockSRAMWrite[A:Bits,C[T]](
     mem:  LockSRAM[A,C],
     data: Bits[A],
-    addr: Seq[Idx],
-    lock: Option[LockWithKeys[I32]],
+    addr: Seq[ICTR],
+    lock: Option[LockWithKeys[ICTR]],
     ens: Set[Bit])
   extends Writer[A]
 
@@ -111,9 +111,9 @@ import spatial.lang._
   */
 @op case class LockSRAMBankedRead[A:Bits,C[T]](
     mem:  LockSRAM[A,C],
-    bank: Seq[Seq[Idx]],
-    ofs:  Seq[Idx],
-    lock: Option[Seq[LockWithKeys[I32]]],
+    bank: Seq[Seq[ICTR]],
+    ofs:  Seq[ICTR],
+    lock: Option[Seq[LockWithKeys[ICTR]]],
     enss: Seq[Set[Bit]]
     )(implicit val vT: Type[Vec[A]])
   extends BankedReader[A]
@@ -128,9 +128,9 @@ import spatial.lang._
 @op case class LockSRAMBankedWrite[A:Bits,C[T]](
     mem:  LockSRAM[A,C],
     data: Seq[Sym[A]],
-    bank: Seq[Seq[Idx]],
-    ofs:  Seq[Idx],
-    lock: Option[Seq[LockWithKeys[I32]]],
+    bank: Seq[Seq[ICTR]],
+    ofs:  Seq[ICTR],
+    lock: Option[Seq[LockWithKeys[ICTR]]],
     enss: Seq[Set[Bit]])
   extends BankedWriter[A]
 

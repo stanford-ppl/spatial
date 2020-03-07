@@ -109,7 +109,7 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     println(header)
     Foreach(0 until matrix.rows){ i =>
       Foreach(0 until matrix.cols){ j =>
-        print(matrix.gimme(i, j).toString + "\t")
+//        print(matrix(i, j).toString + "\t")
       }
       println("")
     }
@@ -122,7 +122,7 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
     Foreach(0 until tensor.dim0) { i =>
       Foreach(0 until tensor.dim1) { j =>
         Foreach(0 until tensor.dim2) { k =>
-          print(tensor.gimme(i, j, k).toString + "\t")
+//          print(tensor(i, j, k).toString + "\t")
         }
         println("")
       }

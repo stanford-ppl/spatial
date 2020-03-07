@@ -143,6 +143,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 /** Fixed point arithmetic shift right from division*/
 @op case class FixDivSRA[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[TRUE,_16,_0]) extends FixOp1[S,I,F] {
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
+    case (x, Const(y)) if y >= x.nbits => R.from(0)
     case (x, Literal(0))      => x
     case _ => super.rewrite
   }
@@ -176,6 +177,7 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   @rig override def rewrite: Fix[S,I,F] = (a,b) match {
     case (Const(x), Const(y)) if y >= 0 => R.from(x >> y)
     case (Const(x), Const(y)) if y < 0 => R.from(x << -y)
+    case (x, Const(y)) if y >= x.nbits => R.from(0)
     case (x, Literal(0))      => x
     case _ => super.rewrite
   }

@@ -4,7 +4,7 @@
 #2+ = args
 
 if [[ $1 = "Zynq" ]]; then
-	REGRESSION_HOME="/home/mattfel/sp_zynq/spatial"
+	REGRESSION_HOME="/home/mattfel/sp_zynq_dual/spatial"
 elif [[ $1 = "ZCU" ]]; then
 	REGRESSION_HOME="/home/mattfel/sp_zcu/spatial"
 elif [[ $1 = "AWS" ]]; then

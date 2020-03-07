@@ -179,7 +179,7 @@ object SRAM {
 
   /** Updates the value at (`row`,`col`) to `data`. */
   @api def update(row: I32, col: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(row.to[ICTR],col.to[ICTR]), Set.empty))
-//  @api def setme(row: ICTR, col: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
+  @api def setme(row: ICTR, col: ICTR, data: A): Void = stage(SRAMWrite(this, data, Seq(row,col), Set.empty))
 
 }
 

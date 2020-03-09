@@ -86,7 +86,7 @@ trait ScalaGenFixPt extends ScalaGenBits {
 
       case FixSLA(x, y) => emit(src"val $lhs = $x << $y")
       case FixSRA(x, y) => emit(src"val $lhs = $x >> $y")
-      case FixDivSRA(x, y) => emit(src"val $lhs = $x / scala.math.pow(2,$y)")
+      case FixDivSRA(x, y) => emit(src"val $lhs = $x >> $y") // TODO: Does this work? emit(s"val ${quote(lhs)} = ${quote(x)} / ${scala.math.pow(2,y)}")
       case FixSRU(x, y) => emit(src"val $lhs = $x >>> $y")
 
       case SatAdd(x, y) => emit(src"val $lhs = $x +! $y")

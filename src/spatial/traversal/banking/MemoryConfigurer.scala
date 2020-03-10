@@ -713,7 +713,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val conflicts  = getInstanceConflict(a, b)
 
       if (spatialConfig.enablePIR) Some("Do not merge accesses for plasticine")
-      else if (commonCtrl.nonEmpty && !isGlobal)
+      else if (commonCtrl.nonEmpty && !isGlobal && !mem.shouldIgnoreConflicts)
         Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
       else if (conflicts.nonEmpty)
         Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")

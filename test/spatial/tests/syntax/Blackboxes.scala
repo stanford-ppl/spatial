@@ -115,10 +115,10 @@ class SpatialPrimitiveInline extends SpatialPrimitive(false)
 
     // Find idx where pow3 of in0-5 add up to the largest value and the smallest value
     def minmax(idx: Int, scalar: I32, in0: I32, in1: I32, in2: I32, in3: I32, in4: I32, in5: I32): (Int, I32, Int, I32) = {
-      val max_val_reg = Reg[I32](0).conflictable
-      val max_idx_reg = Reg[Int](-1).conflictable
-      val min_val_reg = Reg[I32](0).conflictable
-      val min_idx_reg = Reg[Int](-1).conflictable
+      val max_val_reg = Reg[I32](0)
+      val max_idx_reg = Reg[Int](-1)
+      val min_val_reg = Reg[I32](0)
+      val min_idx_reg = Reg[Int](-1)
 
       // This function just makes the blackbox body have lots more nodes unless if you choose one of these random values for your input :)
       def randomOps(x: I32): I32 = {

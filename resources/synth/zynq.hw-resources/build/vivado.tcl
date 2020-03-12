@@ -26,6 +26,9 @@ add_files -norecurse [glob *.sv]
 
 switch $TARGET {
   "Virtex7" {
+    ## Create application-specific IP
+    source bigIP.tcl
+
     ## synth_design -mode out_of_context -top SpatialIP_v1_0
     synth_design -mode out_of_context -top SpatialIP
     report_utilization -packthru -file ./synth_utilization.rpt

@@ -432,8 +432,8 @@ package object memory {
     def isBreaker: Boolean = metadata[Breaker](s).exists(_.flag)
     def isBreaker_=(flag: Boolean): Unit = metadata.add(s, Breaker(flag))
 
-    def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag).headOption
-    def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag)
+    def getBroadcastAddr: Option[Boolean] = metadata[BroadcastAddress](s).map(_.flag == true).headOption
+    def isBroadcastAddr: Boolean = metadata[BroadcastAddress](s).exists(_.flag == true)
     def isBroadcastAddr_=(flag: Boolean): Unit = metadata.add(s, BroadcastAddress(flag))
 
     /** Find Fringe<Dense/Sparse><Load/Store> streams associated with this DRAM */

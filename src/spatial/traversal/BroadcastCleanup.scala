@@ -20,7 +20,10 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
         block.stms.reverse.foreach{sym => 
           sym match {
             case Op(_: StatusReader[_]) => sym.isBroadcastAddr = false
-            case Op(_: BankedEnqueue[_]) => 
+            case Op(_: Accumulator[_]) =>
+              sym.isBroadcastAddr = false
+              sym.nestedInputs.foreach{in => in.isBroadcastAddr = false}
+            case Op(_: BankedEnqueue[_]) =>
               sym.isBroadcastAddr = false
               sym.nestedInputs.foreach{in => in.isBroadcastAddr = false}
             case Op(_: BankedDequeue[_]) => 
@@ -32,7 +35,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                 case (b, i) if (b > 0) => 
                   dbgs(s"  - Reader $sym, lane $i is broadcast")
                   if (x.bank.size > i) {
-                    x.bank(i).map{y => (y.nestedInputs ++ x.bank(i)).foreach{in => 
+                    x.bank(i).foreach{ y => (y.nestedInputs ++ x.bank(i)).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr) else true
                     }}
@@ -40,7 +43,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr) else true
                     }
-                    x.enss(i).map{y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{in => 
+                    x.enss(i).foreach{ y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr) else true
                     }}
@@ -48,7 +51,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                 case (b, i) if (b == 0) => 
                   dbgs(s"  - Reader $sym, lane $i is NOT broadcast")
                   if (x.bank.size > i) {
-                    x.bank(i).map{y => (y.nestedInputs ++ x.bank(i)).foreach{in => 
+                    x.bank(i).foreach{ y => (y.nestedInputs ++ x.bank(i)).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = false
                     }}
@@ -56,7 +59,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = false
                     }
-                    x.enss(i).map{y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{in => 
+                    x.enss(i).foreach{ y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = false
                     }}
@@ -74,7 +77,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                 case (b, i) if (b > 0) => 
                   dbgs(s"  - Writer $sym, lane $i is broadcast")
                   if (x.bank.size > i) {
-                    x.bank(i).map{y => (y.nestedInputs ++ x.bank(i)).foreach{in => 
+                    x.bank(i).foreach{ y => (y.nestedInputs ++ x.bank(i)).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr) else true
                     }}
@@ -82,7 +85,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr) else true
                     }
-                    x.enss(i).map{y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{in => 
+                    x.enss(i).foreach{ y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = if (in.getBroadcastAddr.isDefined) (in.isBroadcastAddr) else true
                     }}
@@ -94,7 +97,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                 case (b, i) if (b == 0) => 
                   dbgs(s"  - Writer $sym, lane $i is NOT broadcast")
                   if (x.bank.size > i) {
-                    x.bank(i).map{y => (y.nestedInputs ++ x.bank(i)).foreach{in => 
+                    x.bank(i).foreach{ y => (y.nestedInputs ++ x.bank(i)).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = false
                     }}
@@ -102,7 +105,7 @@ case class BroadcastCleanupAnalyzer(IR: State) extends AccelTraversal {
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = false
                     }
-                    x.enss(i).map{y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{in => 
+                    x.enss(i).foreach{ y => (y.nestedInputs ++ x.enss(i).toSeq).foreach{ in =>
                       dbgs(s"  - Propogating info to $in")
                       in.isBroadcastAddr = false
                     }}

@@ -104,7 +104,7 @@ for line in src:
 src.close()
 dst.close()
 
- Step 3: Use URAMs for SRAM size > 1024
+# Step 3: Use URAMs for SRAM size > 1024
 import re
 p = re.compile(r'WORDS\((\d+)\)') # Pattern to match WORDS(#)
 src = open(design_dir + 'SpatialIP.v')
@@ -126,5 +126,4 @@ src.close()
 dst.close()
 os.system('cp -f ' + design_dir + 'SpatialIP.v ' + design_dir + 'SpatialIP.v.orig')
 os.system('mv -f ' + design_dir + 'SpatialIP.v_copy ' + design_dir + 'SpatialIP.v')
->>>>>>> origin/multiverse
 

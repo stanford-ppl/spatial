@@ -106,6 +106,7 @@ aws-F1-hw:
 	# First use chisel to create the verilog
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs aws"
 	cat aws.hw-resources/SRAMVerilogAWS.v >> ${AWS_V_DIR}/SpatialIP.v
+	cat aws.hw-resources/SRAMVerilogDualRead.v >> ${AWS_V_DIR}/SpatialIP.v
 	cat aws.hw-resources/RetimeShiftRegister.sv >> ${AWS_V_DIR}/SpatialIP.v
 	mv ${BIGIP_SCRIPT} ${AWS_V_DIR}/
 	# Make a copy of the template directory

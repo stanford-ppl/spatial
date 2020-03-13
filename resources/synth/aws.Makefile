@@ -69,7 +69,7 @@ aws-sim-hw:
 	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
 	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
 	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
-    fi; fi; fi;
+	fi; fi; fi;
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}
@@ -111,8 +111,8 @@ aws-F1-hw:
 	if [ "${KEEP_HIERARCHY}" = "1" ] && [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\", RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
 	else if [ "${KEEP_HIERARCHY}" = "1" ]; then sed -i "s/^module/(* DONT_TOUCH = \"yes\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
 	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${AWS_V_DIR}/SpatialIP.v; \
-    fi; fi; fi;
-    mv ${BIGIP_SCRIPT} ${AWS_V_DIR}/
+	fi; fi; fi;
+	mv ${BIGIP_SCRIPT} ${AWS_V_DIR}/
 	# Make a copy of the template directory
 	rm -rf $(AWS_HOME)/hdk/cl/examples/${app_name}
 	cp -r $(AWS_HOME)/hdk/cl/examples/cl_dram_dma $(AWS_HOME)/hdk/cl/examples/${app_name}

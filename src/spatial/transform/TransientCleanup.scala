@@ -161,6 +161,13 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
         dbgs(s"node: $node, block: $block")
         statelessSubstRules.getOrElse(node, Nil).map{case (s1, s2) => s1 -> s2() } ++
           statelessSubstRules.getOrElse(block, Nil).map{case (s1, s2) => s1 -> s2() }
+      case Blk.SpatialBlackbox(s) =>
+        // Add substitutions for this node (ctrl.node) and for the current block (ctrl)
+        val node  = (s, Blk.SpatialBlackbox(s))
+        val block = (s, blk)
+        dbgs(s"node: $node, block: $block")
+        statelessSubstRules.getOrElse(node, Nil).map{case (s1, s2) => s1 -> s2() } ++
+          statelessSubstRules.getOrElse(block, Nil).map{case (s1, s2) => s1 -> s2() }
     }
     if (rules.nonEmpty) rules.foreach{rule => dbgs(s"  ${rule._1} -> ${rule._2}") }
     isolateSubstWith(escape, rules: _*){ block }

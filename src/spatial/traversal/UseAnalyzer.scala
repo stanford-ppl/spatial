@@ -75,12 +75,14 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     block.result.blk match {
       case Blk.Host =>
       case Blk.Node(ctrl,_) => addUse(ctrl, block.inputs.toSet, blk)
+      case Blk.SpatialBlackbox(ctrl) => addUse(ctrl, block.inputs.toSet, blk)
     }
 
     val result = super.visitBlock(block)
     block.result.blk match {
       case Blk.Host =>
       case Blk.Node(ctrl,_) => addUse(ctrl, PendingUses(block.result), blk)
+      case Blk.SpatialBlackbox(ctrl) => addUse(ctrl, PendingUses(block.result), blk)
     }
 
     boundSyms = saveBounds

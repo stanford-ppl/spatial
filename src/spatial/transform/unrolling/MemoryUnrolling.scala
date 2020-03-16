@@ -69,6 +69,9 @@ trait MemoryUnrolling extends UnrollingBase {
   def duplicateMemory(mem: Sym[_])(implicit ctx: SrcCtx): Seq[(Sym[_], Int)] = {
     val op = mem.op.getOrElse{ throw new Exception("Could not duplicate memory with no def") }
     dbgs(s"Duplicating ${stm(mem)}")
+    mem.alias.foreach { alias =>
+      mem.alias = substituteSym(alias)
+    }
     mem.duplicates.zipWithIndex.map{case (inst,d) =>
       dbgs(s"  #$d: $inst")
       val mem2 = mirror(mem.asInstanceOf[Sym[Any]],op.asInstanceOf[Op[Any]])

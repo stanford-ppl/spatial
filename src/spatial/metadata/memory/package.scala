@@ -398,6 +398,15 @@ package object memory {
       case _ => false
     }
 
+    def alias: Option[Sym[_]] = {
+      metadata[SparseAlias](mem).map(_.alias)
+    }
+    def alias_=(sym: Sym[_]): Unit = {
+      metadata.add(mem, SparseAlias(sym)) 
+    }
+    def alias(sym: Sym[_]): Unit = {
+      metadata.add(mem, SparseAlias(sym)) 
+    }
   }
 
 

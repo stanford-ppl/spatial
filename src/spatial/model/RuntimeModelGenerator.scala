@@ -102,7 +102,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
           emit(src"${lhs}_dim$d = ${alloc.dims(d)}")
         }
         alloc.rank.length
-      case _ => throw new Exception(s"Unknown memory type for symbol $mem")
+      case _ => throw new Exception(s"Unknown memory  if mem.type for symbol $mem")
     }
     emit(src"${lhs}_dims = [${(1 to rank).map{d => src"${lhs}_dim$d" }.mkString(",")}]")
     emit(src"${lhs}_pa modelrs = [${(1 to rank).map{d => src"${lhs}_P$d" }.mkString(",")}]")
@@ -411,7 +411,26 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, Left(${lhs.rawSchedule.toString}), CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
+    // Used for plasticine DSE 
+    case SRAMNew(dims) => 
+      emit(src"val $lhs = new MemModel(Seq($dims), ${bitWidth(lhs.tp.typeArgs.head)})") 
+      emit(src"${lhs.parent.s.get}.registerMemChild($lhs)")
+      lhs.blocks.foreach{block => visitBlock(block) }
+//      emit(src"${lhs.parent.s.get}.registerMem($lhs)")
+
+    case SRAMRead(mem, _, _) => 
+      emit(src"${lhs.parent.s.get}.registerMemRead($mem)")
+      lhs.blocks.foreach{block => visitBlock(block) }
+
+    case SRAMWrite(mem, _, _, _) =>  
+      emit(src"${lhs.parent.s.get}.registerMemWrite($mem)")
+      lhs.blocks.foreach{block => visitBlock(block) }
+
+    case MemDenseAlias(_, mem, _) if lhs.isSRAM =>
+      emit(src"val $lhs = new AliasMemModel($mem)")
+
     case _ => lhs.blocks.foreach{block => visitBlock(block) }
+
   }
 
   override def copyDependencies(out: String): Unit = {

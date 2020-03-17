@@ -193,13 +193,40 @@ object Runtime {
   }
 
   // Needed for plasticine memory dse analysis
+  // Alias memory used for mem reduce
+  case class AliasMemModel(val mem: MemModel) {
+    def physSize: Int = mem.physSize
+    def size: Int = mem.size
+    def memRead(readParent: ControllerModel): Unit = {
+      mem.memRead(readParent)
+    }
+    def memWrite(writeParent: ControllerModel): Unit = {
+      mem.memWrite(writeParent)
+    } 
+  }
+
   case class MemModel(
-    val dims:Seq[Int],
+    val dims:Seq[Int], val bitwidth:Int
   ) {
     var parent: Option[ControllerModel] = None
+    val readers = scala.collection.mutable.ListBuffer[ControllerModel]()
+    val writers = scala.collection.mutable.ListBuffer[ControllerModel]()
 
+    def roundUp(n: Int, t: Int): Int = {
+      if (n == 0) 0 else {((n + t - 1).toDouble / t.toDouble).toInt * t}
+    }
+    val pmuSize = 256*1024/4 // elements  //* 8 // bits
+    def physSize: Int = roundUp(this.size, pmuSize) / pmuSize  
     def size: Int = {
       dims.reduceLeft(_*_) 
+    }
+    def memRead(readParent: ControllerModel): Unit = {
+       readers += readParent
+       readParent.memReads += this
+    } 
+    def memWrite(writeParent: ControllerModel): Unit = {
+        writers += writeParent
+        writeParent.memWrites += this
     }
    
   }
@@ -350,9 +377,26 @@ object Runtime {
     def depth = this.ancestors.size
     var parent: Option[ControllerModel] = None
     val children = scala.collection.mutable.ListBuffer[ControllerModel]()
+    val memChildren = scala.collection.mutable.ListBuffer[MemModel]()
+    val memReads = scala.collection.mutable.ListBuffer[MemModel]()
+    val memWrites = scala.collection.mutable.ListBuffer[MemModel]()
+    
     def registerChild(child: ControllerModel): Unit = {
       child.parent = Some(this)
       children += child
+    }
+    def registerMemChild(memChild: MemModel): Unit = {
+      memChild.parent = Some(this)
+      memChildren += memChild
+    }
+
+    def registerMemRead(memChild: MemModel): Unit = {
+      memChild.readers += this
+      memReads += memChild
+    }
+    def registerMemWrite(memChild: MemModel): Unit = {
+      memChild.writers += this
+      memWrites += memChild
     }
 
     /** Extract num iters from cchain, or else 1 */
@@ -369,6 +413,9 @@ object Runtime {
     /** Extract sum of all children or else 1 */
     def sumChildren: Int = if (children.size >= 1) children.map(_.cycles_per_iter).sum else 1
 
+    def maxAdjacentChildren: Int = children.map(_.cycles_per_iter).sliding(2).map(_.sum).toList.max
+
+    def memSplitAdjustment: Int  = memReads.map(_.physSize).product * memWrites.map(_.physSize).product
 
     /** Get ancestors of current node */
     def ancestors: Seq[ControllerModel] = {
@@ -383,9 +430,8 @@ object Runtime {
             if (cchain.size <= 1) startup + shutdown + sumChildren * cchainIters + seqSync * children.size * cchainIters + cchainIters * seqAdvance
             else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
           } else {
-            emit(s"ctx: ${ctx.id} sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}, childSize: ${children.size}")
-            //(2*maxChild * cchainIters) min (sumChildren * cchainIters) //+ seqSync * children.size*cchain.head.N
-            (sumChildren * cchainIters) //+ seqSync * children.size*cchain.head.N
+            emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, memAdjustment: ${memSplitAdjustment}, maxAdjChild: ${maxAdjacentChildren}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}, childSize: ${children.size}")
+            ((sumChildren min maxAdjacentChildren) * cchainIters) //+ seqSync * children.size*cchain.head.N
             
           }
         case Pipelined      => 
@@ -393,7 +439,7 @@ object Runtime {
             if (cchain.size <= 1) startup + shutdown + maxChild * (cchainIters - 1) + children.map(_.cycsPerParent).sum + metaSync * cchainIters * children.size
             else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
           } else {
-            emit(s"maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
+            emit(s"ctx: ${ctx.id}, maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
             if (cchain.size <= 1) maxChild * (cchainIters)
             else (maxChild max cchain.last.N) * (cchain.head.N) 
           }
@@ -425,7 +471,10 @@ object Runtime {
       case InnerControl => resolvedSchedule match {
         case Sequenced => 
           if (fpga) cchainIters*L + startup + shutdown
-          else cchainIters*L + plastSeq              
+          else {
+           emit(s"ctx: ${ctx.id}, memAdj: $memSplitAdjustment") 
+           (cchainIters*L + plastSeq) 
+           }
         case _ => 
           if (fpga) (cchainIters - 1)*II + L + startup + shutdown + dpMask
           else cchainIters*II 

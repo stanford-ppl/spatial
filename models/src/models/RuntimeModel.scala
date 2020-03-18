@@ -390,6 +390,15 @@ object Runtime {
       memChildren += memChild
     }
 
+    def registerMemRead(memChild: AliasMemModel): Unit = {
+      memChild.mem.readers += this
+      memReads += memChild.mem
+    }
+    def registerMemWrite(memChild: AliasMemModel): Unit = {
+      memChild.mem.writers += this
+      memWrites += memChild.mem
+    }
+
     def registerMemRead(memChild: MemModel): Unit = {
       memChild.readers += this
       memReads += memChild

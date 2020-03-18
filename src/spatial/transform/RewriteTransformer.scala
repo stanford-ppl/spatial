@@ -67,7 +67,8 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
       val qs = List(stage(FixDivSRA(a, exps.head))) ++ exps.drop(1).zip(cs).map{case (e,cc) => stage(FixDivSRA(a * cc, e))}
       val rs = List(stage(FixAnd(a, Type[Fix[S,I,F]].from(t)))) ++ qs.map{qi => stage(FixAnd(qi * c, Type[Fix[S,I,F]].from(t)))}
       val q = qs.reduceTree{_+_}
-      val r = rs.head + {if (rs.length > 1) rs.drop(1).zip(qs).map{case (a,b) => mux( b != 0, a, Type[Fix[S,I,F]].from(0))}.reduceTree{_+_} else Type[Fix[S,I,F]].from(0)}
+//      val r = rs.head + {if (rs.length > 1) rs.drop(1).zip(qs).map{case (a,b) => mux( b != 0, a, Type[Fix[S,I,F]].from(0))}.reduceTree{_+_} else Type[Fix[S,I,F]].from(0)}
+      val r = rs.head + {if (rs.length > 1) rs.drop(1).reduceTree{_+_} else Type[Fix[S,I,F]].from(0)}
       // Step 4: figure out how many t's are in r
       val boundaries = Seq.tabulate(levels + 1){i => r - t * i}
       val correction = stage(PriorityMux(boundaries.map{ b => b < t}, Seq.tabulate(levels){i => Type[Fix[S,I,F]].from(i)}))
@@ -86,7 +87,7 @@ case class RewriteTransformer(IR: State) extends MutateTransformer with AccelTra
     if (spatialConfig.useCrandallMod) { // TODO: Is one version always better than the other?
       crandallDivMod(a, mod, c)._2
     } else {
-      // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
+        // Magical rewrite rules, based loosely on http://homepage.divms.uiowa.edu/~jones/bcd/mod.shtml#exmod7
       implicit val S: BOOL[S] = a.fmt.s
       implicit val I: INT[I] = a.fmt.i
       implicit val F: INT[F] = a.fmt.f

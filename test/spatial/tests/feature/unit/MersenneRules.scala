@@ -11,7 +11,7 @@ import spatial.metadata.control._
   override def runtimeArgs: Args = "201972803"
 
   def main(args: Array[String]): Unit = {
-    val max_exp = 14
+    val max_exp = 13
     val mods = List.tabulate(max_exp){i => scala.math.pow(2,i + 2)-1}
     val argouts = List.tabulate(max_exp){i => ArgOut[Int]}
     val N = ArgIn[Int]

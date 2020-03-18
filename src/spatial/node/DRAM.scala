@@ -43,3 +43,6 @@ abstract class DRAMNew[A:Bits,C[T]](implicit C: Type[C[A]]) extends MemAlloc[A,C
 @op case class GetLockMem[A:Bits,C[T]](dram: LockDRAM[A,C], data: Tensor1[A]) extends Op2[A,Void] {
   override def effects: Effects = Effects.Writes(data)
 }
+@op case class CompressDRAM[A:Bits,C[T]](dram: DRAM[A,C], tileSize: Int) extends Op2[A,Void] {
+  override def effects: Effects = Effects.Writes(dram)
+}

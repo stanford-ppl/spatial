@@ -88,6 +88,8 @@ object Bounded {
 
 case class Count(c:Long) extends Data[Count](SetBy.User)
 
+case class Iter(iter:Long) extends Data[Iter](SetBy.User)
+
 /*
  * Metadata set on bound indicating the const value contains actually a vector 
  * of values as supposed to be a single one. Used in vectorizing inner loop

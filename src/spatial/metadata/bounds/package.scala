@@ -29,6 +29,9 @@ package object bounds {
 
     def count: Option[Long] = metadata[Count](s).map { _.c }
     def count_=(c: Long): Unit = metadata.add(s, Count(c))
+
+    def iter: Option[Long] = metadata[Iter](s).map(_.iter)
+    def iter_=(iter: Long): Unit = metadata.add(s, Iter(iter))
   }
 
 }

@@ -815,6 +815,7 @@ package object control {
 
     def progorder: Option[Int] = metadata[ProgramOrder](s).map(_.id)
     def progorder_=(id: Int): Unit = metadata.add(s, ProgramOrder(id))
+
   }
 
   implicit class ScopeOperations(scp: Scope) extends ScopeHierarchyOps(scp.s) {

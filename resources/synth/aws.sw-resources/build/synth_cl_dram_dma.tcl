@@ -122,6 +122,15 @@ update_compile_order -fileset sources_1
 puts "\nRunning synth_design for $CL_MODULE $CL_DIR/build/scripts \[[clock format [clock seconds] -format {%a %b %d %H:%M:%S %Y}]\]"
 eval [concat synth_design -top $CL_MODULE -verilog_define XSDB_SLV_DIS $VDEFINES -part [DEVICE_TYPE] -mode out_of_context $synth_options -directive $synth_directive]
 
+report_timing_summary -file ./synth_timing_summary.rpt
+report_utilization -packthru -file ./synth_utilization.rpt
+report_utilization -packthru -hierarchical -hierarchical_depth 20 -hierarchical_percentages -file ./synth_utilization_hierarchical.rpt
+report_ram_utilization -detail -file ./synth_ram_utilization.rpt
+# HACK TO QUIT HERE IF DESIRED
+if { [info exists ::env(SYNTH_ONLY)] } {
+    exit
+}
+
 set failval [catch {exec grep "FAIL" failfast.csv}]
 if { $failval==0 } {
 	puts "AWS FPGA: FATAL ERROR--Resource utilization error; check failfast.csv for details"

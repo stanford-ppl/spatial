@@ -52,6 +52,7 @@ package object math {
 
   /** Check if int can be expressed as the sum or subtraction of two powers of 2, to be used for multiplication optimizations */
   def isSumOfPow2(x: Int, radius: Int = 2): Boolean = {
+    assert(radius == 2, "isSumOfPow2 is not yet implemented for radius > 2!!")
     (x.toBinaryString.count(_ == '1') == 2) || (x.toBinaryString.indexOf("01") == -1)
   }
 
@@ -83,7 +84,7 @@ package object math {
     var i = 0
     while (qs(i) > 0) {
       qs(i+1) = floor(qs(i) * c / m).toInt
-      rs(i+1) = (qs(i) * c) % m
+      rs(i+1) = qs(i) % m
       i = i + 1
       q = q + qs(i)
       r = r + rs(i)

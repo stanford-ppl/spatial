@@ -117,7 +117,7 @@ trait ChiselGenMem extends ChiselGenCommon {
         val flatCoord = coords.zipWithIndex.map{ case (b,j) => 
           b * dims.drop(j+1).product
         }.sum
-        src"${quoteAsScala(inits(flatCoord))}.toDouble"
+        src"(${quoteAsScala(inits(flatCoord))}).toDouble"
       }
       else 
         "0.toDouble"

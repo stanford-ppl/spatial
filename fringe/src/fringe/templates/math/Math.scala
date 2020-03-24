@@ -673,7 +673,7 @@ object Math {
     val latency = delay.getOrElse(0.0).toInt
     val result = Wire(new FloatingPoint(m0.fmt))
     // TODO: Module naming is wrong!
-    result.r := globals.bigIP.fadd(globals.bigIP.fmul(m0.r, m1.r, m0.m, m0.e, latency, flow, myName), getRetimed(add.r, latency, flow), m0.m, m0.e, 0, flow, "")
+    result.r := globals.bigIP.ffma(m0.r, m1.r, add.r, m0.m, m0.e, latency, flow, myName)
     result
   }
 

@@ -56,7 +56,7 @@ package object memory {
     def onlyBlockCyclic_=(flag: Boolean): Unit = metadata.add(s, OnlyBlockCyclic(flag))
 
     def blockCyclicBs: Seq[Int] = metadata[BlockCyclicBs](s).map(_.bs).getOrElse {
-      Seq(2, 4, 8, 16, 32, 64, 128, 256)
+      Seq(2, 4, 8, 16, 32, 64, 3, 7, 15, 31, 63)
     }
     def blockCyclicBs_=(bs: Seq[Int]): Unit = metadata.add(s, BlockCyclicBs(bs))
 

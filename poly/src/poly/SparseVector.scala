@@ -55,8 +55,8 @@ case class SparseVector[K](cols: Map[K,Int], c: Int, allIters: Map[K,Seq[K]])
     import utils.math.{gcd, allLoops}
     import utils.implicits.collections._
     val P_raw = cols.values.map{v => val posV = ((v % N) + N) % N; if (posV == 0 && B == 1) 1 else N*B/gcd(N,posV)}
-    val allBanksAccessible = 
-      if (cols.size > 0) allLoops(P_raw.toList, cols.values.toList, B, Nil).map{x => (x+c)%N}.distinct.map{x => ((x%N) + N) % N}.distinct.sorted
+    val allBanksAccessible =
+      if (cols.size > 0) allLoops(P_raw.toList.distinct, cols.values.toList, B, Nil).map{x => (x+c)%N}.distinct.map{x => ((x%N) + N) % N}.distinct.sorted
       else Seq(c%N)
     if (allBanksAccessible.size == N) ResidualGenerator(1,0,N)
     else if (allBanksAccessible.stepSizeUnderMod(N).isDefined) ResidualGenerator(allBanksAccessible.stepSizeUnderMod(N).get, 0, N)

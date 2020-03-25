@@ -159,8 +159,8 @@ trait ChiselGenCommon extends ChiselCodegen {
       case Def.Node(id,_) => x match {
         case Op(SimpleStruct(fields)) => 
           var shift = 0
-          fields.map{f => // Used to be .reversed but not sure now
-            val x = src"(${quoteAsScala(f._2)} << $shift).toDouble"
+          fields.map{ f =>
+            val x = src"(${quoteAsScala(f._2)} * ${scala.math.pow(2, shift)})"
             shift = shift + bitWidth(f._2.tp)
             x
           }.mkString(" + ")

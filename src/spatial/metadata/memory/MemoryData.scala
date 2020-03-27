@@ -83,3 +83,11 @@ case class HotSwapPairings(pairings: Map[Sym[_], Set[Sym[_]]]) extends Data[HotS
   * Default: None
   */
 case class SparseAlias(alias: Sym[_]) extends Data[SparseAlias](SetBy.User)
+
+/** Alias from Sparse DRAM to Dense DRAM
+  *
+  * Getter:  sym.isRetimingFIFO
+  * Setter:  sym.retiming
+  * Default: None
+  */
+case class RetimingFIFO(isRetimingFIFO: Boolean) extends Data[RetimingFIFO](SetBy.User)

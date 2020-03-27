@@ -166,6 +166,9 @@ package object memory {
       }
     }
 
+    def isRetimingFIFO: Boolean = metadata[RetimingFIFO](s).map{_.isRetimingFIFO}.getOrElse(false)
+    def setRetiming: Unit = metadata.add(s, RetimingFIFO(true))
+
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {

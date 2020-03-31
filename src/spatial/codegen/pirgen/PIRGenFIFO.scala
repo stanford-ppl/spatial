@@ -12,7 +12,8 @@ trait PIRGenFIFO extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@FIFONew(Expect(size))    => 
-      stateMem(lhs, src"FIFO().retiming(${lhs.isRetimingFIFO})", depth=Some(size.toInt))
+      val retime = if (lhs.isRetimingFIFO) s".retiming(${lhs.isRetimingFIFO})" else ""
+      stateMem(lhs, src"FIFO()$retime", depth=Some(size.toInt))
     case FIFOIsEmpty(fifo,_) => error(s"Cannot check FIFO.isEmpty on Plasticine")
     case FIFOIsFull(fifo,_)  => error(s"Cannot check FIFO.isFull on Plasticine")
 

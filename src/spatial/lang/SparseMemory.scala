@@ -71,6 +71,9 @@ abstract class SparseSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SparseSRAM[A
   def nonbuffer: C[A] = { this.isNonBuffer = true; me }
   def mustmerge: C[A] = { this.isMustMerge = true; me }
 
+  /** Do not remove this memory or accesses to this memory, even if anything appears unused*/
+  def dontTouch: C[A] = { this.keepUnused = true; me }
+
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
   /** Allow "unsafe" banking, where two writes can technically happen simultaneously and one will be dropped.
     * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously

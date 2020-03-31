@@ -63,7 +63,9 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
   /** Specify banking search effort for this memory */
   def effort(e: Int): C[A] = { this.bankingEffort = e; me }
-
+  /** Do not remove this memory or accesses to this memory, even if anything appears unused*/
+  def dontTouch: C[A] = { this.keepUnused = true; me }
+  
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = read(addr, ens)
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = write(data, addr, ens)

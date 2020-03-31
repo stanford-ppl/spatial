@@ -67,6 +67,11 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     */
   def mustmerge: C[A] = { this.isMustMerge = true; me }
   def skipbanking: C[A] = {this.noBankingAnalysis = true; me}
+  /** Do not remove this memory or accesses to this memory, even if anything appears unused*/
+  def dontTouch: C[A] = { this.keepUnused = true; me }
+
+//  def dualportedread: C[A] = { this.isDualPortedRead = true; me}
+//  def dualportedwrite: C[A] = { throw new Exception(s"Memories with Dual Write Ports are currently not supported.  They can be implemented pretty easily, but we have not needed them yet.")}
 
   def nohierarchical: C[A] = {throw new Exception(s".nohierarchical has been deprecated.  Please use .flat instead")}
   def noflat: C[A] = {throw new Exception(s".noflat has been deprecated.  Please use .hierarchical instead")}

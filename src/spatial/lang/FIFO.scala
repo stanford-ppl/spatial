@@ -65,6 +65,7 @@ import scala.collection.mutable.Queue
   def conflictable: FIFO[A] = { this.shouldIgnoreConflicts = true; me }
   /** Do not attempt to bank memory by duplication */
   def noduplicate: FIFO[A] = { this.isNoFission = true; me }
+  def retiming: FIFO[A] = { this.setRetiming; me }
 
   // --- Typeclass Methods
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(FIFODeq(this,ens))

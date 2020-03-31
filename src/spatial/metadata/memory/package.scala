@@ -169,6 +169,9 @@ package object memory {
       }
     }
 
+    def isRetimingFIFO: Boolean = metadata[RetimingFIFO](s).map{_.isRetimingFIFO}.getOrElse(false)
+    def setRetiming: Unit = metadata.add(s, RetimingFIFO(true))
+
   }
 
   implicit class BankedAccessOps(s: Sym[_]) {
@@ -401,6 +404,15 @@ package object memory {
       case _ => false
     }
 
+    def alias: Option[Sym[_]] = {
+      metadata[SparseAlias](mem).map(_.alias)
+    }
+    def alias_=(sym: Sym[_]): Unit = {
+      metadata.add(mem, SparseAlias(sym)) 
+    }
+    def alias(sym: Sym[_]): Unit = {
+      metadata.add(mem, SparseAlias(sym)) 
+    }
   }
 
 

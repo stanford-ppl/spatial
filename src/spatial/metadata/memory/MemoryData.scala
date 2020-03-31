@@ -76,3 +76,18 @@ case class DephasedAccess(accesses: Set[Sym[_]]) extends Data[DephasedAccess](Se
   */
 case class HotSwapPairings(pairings: Map[Sym[_], Set[Sym[_]]]) extends Data[HotSwapPairings](SetBy.Analysis.Self)
 
+/** Alias from Sparse DRAM to Dense DRAM
+  *
+  * Getter:  sym.alias
+  * Setter:  sym.alias = Sym[_]
+  * Default: None
+  */
+case class SparseAlias(alias: Sym[_]) extends Data[SparseAlias](SetBy.User)
+
+/** Alias from Sparse DRAM to Dense DRAM
+  *
+  * Getter:  sym.isRetimingFIFO
+  * Setter:  sym.retiming
+  * Default: None
+  */
+case class RetimingFIFO(isRetimingFIFO: Boolean) extends Data[RetimingFIFO](SetBy.User)

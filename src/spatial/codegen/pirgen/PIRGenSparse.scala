@@ -13,7 +13,7 @@ trait PIRGenSparse extends PIRCodegen {
       stateMem(lhs, "SparseMem(false)")
 
     case op@SparseDRAMNew(dims, par)       => 
-      stateMem(lhs, s"SparseMem(true, $par)")
+      stateMem(lhs, src"SparseMem(true, $par).alias.update(${lhs.alias})")
 
     case op@SparseSRAMBankedRead(sram,bank,ofs,barriers,ens)       => 
       stateAccess(lhs, sram, ens) {
@@ -47,7 +47,7 @@ trait PIRGenSparse extends PIRCodegen {
         ////src".lock(${lock.map { lock => assertOne(lock) }})"
       //}
     case op@BarrierNew(init) => 
-      state(lhs)(src"Barrier(${lhs.parent.s.get}.getCtrl,$init)")
+      state(lhs)(src"""Barrier(${lhs.parent.s.get}.getCtrl,$init).srcCtx("${lhs.ctx}").name("${lhs.name}")""")
     case op@BarrierPush(barrier) =>
       state(lhs, tp=Some("(Barrier, Boolean)"))(src"($barrier,true)")
     case op@BarrierPop(barrier) =>
@@ -55,5 +55,3 @@ trait PIRGenSparse extends PIRCodegen {
     case _ => super.genAccel(lhs, rhs)
   }
 }
-
-

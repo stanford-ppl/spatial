@@ -23,7 +23,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
     }
 
     LocalMemories.all.foreach{mem =>
-      if (mem.isReg && ((mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker)) {
+      if (!mem.keepUnused && mem.isReg && ((mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker)) {
         mem.isUnusedMemory = true
         if (mem.name.isDefined) {
           warn(mem.ctx, s"${mem.name.get} is defined here but never read. Unused writes will be dropped.")

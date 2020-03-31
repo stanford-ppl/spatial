@@ -441,6 +441,15 @@ case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
   */
 case class MustMerge(flag: Boolean) extends Data[MustMerge](SetBy.User)
 
+/** Flag set by the user force compiler to keep unused reads and writes in the IR
+  *
+  * Getter:  sym.keepUnused
+  * Setter:  sym.keepUnused = (true | false)
+  * Default: false
+  */
+case class KeepUnused(flag: Boolean) extends Data[KeepUnused](SetBy.User)
+
+
 /** Flag set by the user to let compiler assume memory has dual read ports.
   *
   * Getter:  sym.isDualPortedRead

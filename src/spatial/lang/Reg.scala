@@ -30,6 +30,8 @@ import spatial.metadata.memory._
     * due to data-dependent control flow or that you don't care if one write gets dropped
     */
   def conflictable: Reg[A] = { this.shouldIgnoreConflicts = true; me }
+  /** Do not remove this memory or accesses to this memory, even if anything appears unused*/
+  def dontTouch: C[A] = { this.keepUnused = true; me }
 
   // --- Typeclass Methods
   @rig def __sread(): A = Reg.read(this)

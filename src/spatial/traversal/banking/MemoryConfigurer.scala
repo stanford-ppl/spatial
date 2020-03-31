@@ -121,7 +121,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     mem.duplicates = duplicates
 
     instances.zipWithIndex.foreach{case (inst, dispatch) =>
-      List(inst.reads.iterator, inst.writes.iterator).foreach { 
+      List(inst.reads.iterator, inst.writes.iterator).foreach {
         _.zipWithIndex.foreach { case (grp, i) =>
           grp.foreach { a =>
             a.access.addGroupId(a.unroll, Set(i))
@@ -152,14 +152,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val used = instances.flatMap(_.accesses).toSet
     val unused = mem.accesses diff used
     unused.foreach{access =>
-      if (mem.name.isDefined) {
+      if (mem.name.isDefined && !mem.keepUnused) {
         val msg = if (access.isReader) s"Read of memory ${mem.name.get} was unused. Read will be removed."
                   else s"Write to memory ${mem.name.get} is never used. Write will be removed."
         warn(access.ctx, msg)
         warn(access.ctx)
       }
 
-      access.isUnusedAccess = true
+      if (!mem.keepUnused) access.isUnusedAccess = true
 
       dbgs(s"  Unused access: ${stm(access)}")
     }
@@ -610,7 +610,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Seq[Instance]] = {
     val reads = rdGroups.flatten
     val ctrls = reads.map(_.parent)
-    val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
+    val writes = if (mem.keepUnused) wrGroups.flatten else reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     // All possible combinations of banking characteristics
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))

@@ -61,6 +61,7 @@ import spatial.lang._
     op: String,
     order: String,
     barriers: Seq[BarrierTransaction],
+    remoteAddr:Boolean,
     ens: Set[Bit])
   extends RMWDoer[A,A]
 
@@ -114,5 +115,6 @@ import spatial.lang._
     op: String,
     order: String,
     barriers: Seq[BarrierTransaction],
+    remoteAddr:Boolean,
     enss: Seq[Set[Bit]])(implicit val vT: Type[Vec[A]])
   extends BankedRMWDoer[A]

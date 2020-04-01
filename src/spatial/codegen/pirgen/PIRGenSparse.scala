@@ -27,9 +27,9 @@ trait PIRGenSparse extends PIRCodegen {
         src".addr(${assertOne(bank)})" +
         src".barriers($barriers)"
       }
-    case op@SparseSRAMBankedRMW(sram,data,bank,ofs,opcode,order,barriers,ens) => 
+    case op@SparseSRAMBankedRMW(sram,data,bank,ofs,opcode,order,barriers,remoteAddr,ens) => 
       stateAccess(lhs, sram, ens) {
-        src"""SparseRMW("$opcode","$order")""" +
+        src"""SparseRMW("$opcode","$order",$remoteAddr)""" +
         src".addr(${assertOne(bank)})" + 
         src".input(${assertOne(data)})" +
         src".barriers($barriers)"

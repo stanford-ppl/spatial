@@ -31,19 +31,19 @@ package object access {
       case x@SparseSRAMBankedRead(_,_,_,bs,_) => bs
       case x@SparseSRAMWrite(_,_,_,bs,_) => bs
       case x@SparseSRAMBankedWrite(_,_,_,_,bs,_) => bs
-      case x@SparseSRAMRMW(_,_,_,_,_,bs,_) => bs
-      case x@SparseSRAMBankedRMW(_,_,_,_,_,_,bs,_) => bs
+      case x:SparseSRAMRMW[_,_] => x.barriers
+      case x:SparseSRAMBankedRMW[_,_] => x.barriers
       case _ => Seq()
     }
 
     def getSparseOp: String = op match {
-      case x@SparseSRAMRMW(_,_,_,op,_,_,_) => op
-      case x@SparseSRAMBankedRMW(_,_,_,_,op,_,_,_) => op
+      case x:SparseSRAMRMW[_,_] => x.op
+      case x:SparseSRAMBankedRMW[_,_] => x.op
       case _ => ""
     }
     def getSparseOrder: String = op match {
-      case x@SparseSRAMRMW(_,_,_,_,order,_,_) => order
-      case x@SparseSRAMBankedRMW(_,_,_,_,_,order,_,_) => order
+      case x:SparseSRAMRMW[_,_] => x.order
+      case x:SparseSRAMBankedRMW[_,_] => x.order
       case _ => ""
     }
 

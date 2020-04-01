@@ -540,8 +540,8 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LUTRead[_,_]     => UVecReadSym(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
     case _:RegFileRead[_,_] => UVecReadSym(stage(RegFileVectorRead(mem.asInstanceOf[RegFilex[A]], bank, enss)))
     case _:SRAMRead[_,_]    => UVecReadSym(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
-    case _:SparseSRAMRMW[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMW(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, node.getSparseOp, node.getSparseOrder, barriers, enss)))
-    case _:SparseSRAMRead[_,_]    => UVecReadSym(stage(SparseSRAMBankedRead(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, barriers, enss)))
+    case op:SparseSRAMRMW[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMW(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, node.getSparseOp, node.getSparseOrder, barriers, op.remoteAddr, enss)))
+    case op:SparseSRAMRead[_,_]    => UVecReadSym(stage(SparseSRAMBankedRead(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, barriers, enss)))
     case _:StreamInRead[_]  => UVecReadSym(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
     case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))

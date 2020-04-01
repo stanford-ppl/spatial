@@ -114,9 +114,9 @@ object SparseDRAM {
   @api def apply(pos: I32): A = stage(SparseSRAMRead(this,Seq(pos),Seq(),Set.empty))
   @api def barrierRead(pos: I32, bs: Seq[BarrierTransaction]): A = stage(SparseSRAMRead(this,Seq(pos),bs,Set.empty))
 
-  @api def RMW(pos: I32, data: A, op: String, order: String, bs: Seq[BarrierTransaction] = Seq()): A = {
+  @api def RMW(pos: I32, data: A, op: String, order: String, bs: Seq[BarrierTransaction] = Seq(), remoteAddr:Boolean=false): A = {
     warn(s"Currently no syntax for input token to RMW, but it can be added.")
-    stage(SparseSRAMRMW(this,data,Seq(pos),op,order,bs,Set.empty))
+    stage(SparseSRAMRMW(this,data,Seq(pos),op,order,bs,remoteAddr,Set.empty))
   }
   /** Updates the value at `pos` to `data`. */
   @api def update(pos: I32, data: A): Void = stage(SparseSRAMWrite(this,data,Seq(pos),Seq(), Set.empty))

@@ -148,6 +148,8 @@ object Runtime {
     }
   }
 
+  case class StreamCtrModel(id: Int, ctx:Ctx) extends AskBase(id, s"expected number of iterations inf stream will run (int)", ctx, 1)
+
   object CtrModel {
     def apply(start: Int, stop: Int, stride: Int, par: Int) =                                                                   new CtrModel[Int,Int,Int,Int](Locked(-1, start), Locked(-1, stop), Locked(-1, stride), Locked(-1, par))
     def apply[K4](start: Int, stop: Int, stride: Int, par: ModelValue[K4,Int]) =                                                new CtrModel[Int,Int,Int,K4](Locked(-1, start), Locked(-1, stop), Locked(-1, stride), par)
@@ -440,6 +442,7 @@ object Runtime {
             else startup + shutdown + (sumChildren + cchain.last.N) * cchain.head.N + seqSync * children.size * cchain.head.N + cchain.head.N * seqAdvance
           } else {
             emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, memAdjustment: ${memSplitAdjustment}, maxAdjChild: ${maxAdjacentChildren}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}, childSize: ${children.size}")
+            emit(s"ctx: ${ctx.id}, children.cycs_per_iter: ${children.map(_.cycles_per_iter)}")
             ((sumChildren min maxAdjacentChildren) * cchainIters) //+ seqSync * children.size*cchain.head.N
             
           }
@@ -460,14 +463,22 @@ object Runtime {
 //            if (cchain.size <= 1) maxChild * (cchainIters)
 //            else (maxChild max cchain.last.N) * (cchain.head.N) 
             emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
-            ((maxChild max cchain.last.N) + plastMemReduceII) * cchainIters
+            ((maxChild max cchain.last.N) + 24 ) * cchainIters//plastMemReduceII) * cchainIters
           }
         case ForkJoin        => 
           if (fpga) startup + shutdown + maxChild * cchainIters + metaSync
           else maxChild * cchainIters
         case Streaming       => 
-          if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
-          else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
+          if (fpga) {
+            emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainSize: ${cchain.size}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
+            if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
+            else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
+          } else {
+            emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainSize: ${cchain.size}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
+            emit(s"ctx: ${ctx.id}, children.cycs_per_iter: ${children.map(_.cycles_per_iter)}")
+            if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
+            else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
+          }
         case Fork            => 
           val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Branch(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
           children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
@@ -481,7 +492,7 @@ object Runtime {
         case Sequenced => 
           if (fpga) cchainIters*L + startup + shutdown
           else {
-           emit(s"ctx: ${ctx.id}, memAdj: $memSplitAdjustment") 
+           emit(s"ctx: ${ctx.id}, memAdj: $memSplitAdjustment, cchainIters: ${cchainIters}, L: $L") 
            (cchainIters*L + plastSeq) 
            }
         case _ => 
@@ -511,6 +522,7 @@ object Runtime {
           case InnerControl => cycsPerParent * this.num_iters
         }
       }
+      // FIXME: This might not be cofrrect. 
       if (!fpga && this.num_iters <= 1) num_cycles = plastPipeDepth max num_cycles
       cycles_per_iter = if (num_iters > 0) num_cycles / num_iters else num_cycles
     }

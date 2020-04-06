@@ -213,7 +213,10 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       else if (sfx.contains("_fsm")) s"expected # iters for fsm"
       else "ctr stop"
     val stp = stop match {
-                 case _ if forever => "Some(5)"
+                 case _ if forever => lhs.iter match {
+                    case Some(s) => src"${s.toInt}"
+                    case None => src"""Ask(${lhs.hashCode}, "$question", $ctx)"""
+                 }
                  case Final(s) => src"$s"
                  case Upper(s) => undefinedSyms += stop; src"""Ask(${stop.hashCode}, "$question", $ctx)"""
                  case Expect(s) if isTuneable(stop) => src"""Tuneable("${stop.name.get}", $s, "${stop}") """
@@ -223,7 +226,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case _ => src"""Ask(${stop.hashCode}, "$question", $ctx)"""
                 }
     val ste = step match {
-                 case _ if forever => "Some(0)"
+                 case _ if forever => "1" //"Some(1)"
                  case Final(s) => src"$s"
                  case Upper(s) => undefinedSyms += step; src"""Ask(${step.hashCode}, "ctr step", $ctx)"""
                  case Expect(s) if isTuneable(step) => src"""Tuneable("${step.name.get}", $s, "${step}") """
@@ -233,6 +236,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
                  case _ => src"""Ask(${step.hashCode}, "ctr step", $ctx)"""
                 }
     val p = par match {
+                 case _ if forever => "1"
                  case Final(s) => src"$s"
                  case Upper(s) => undefinedSyms += par; src"""Ask(${par.hashCode}, "ctr par", $ctx)"""
                  case Expect(s) if isTuneable(par) => src"""Tuneable("${par.name.get}", $s, "${par}") """
@@ -399,19 +403,22 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      visitBlock(body)
       emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, OuterControl, Left(${lhs.rawSchedule.toString}), CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      visitBlock(body)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     case SwitchCase(body) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
-      visitBlock(body)
       emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, Left(${lhs.rawSchedule.toString}), CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      visitBlock(body)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
     // Used for plasticine DSE 
+    case ForeverNew() => 
+      createCtrObject(lhs, Bits[I32].zero, Bits[I32].zero, Bits[I32].one, Bits[I32].one, true) 
+
     case SRAMNew(dims) => 
       emit(src"val $lhs = new MemModel(Seq($dims), ${bitWidth(lhs.tp.typeArgs.head)})") 
       emit(src"${lhs.parent.s.get}.registerMemChild($lhs)")

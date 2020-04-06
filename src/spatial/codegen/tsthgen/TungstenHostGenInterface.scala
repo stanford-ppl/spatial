@@ -122,7 +122,7 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
     case CompressDRAM(dram, tileSize) =>
       val tp = dram.tp.typeArgs.head
       val dims = dram.stagedDims.map { case Expect(c) => c; case x => x }
-      emit(src"$dram = Compress<$tp>($dram, ${dims.mkString("*")} * sizeof($tp), $tileSize * sizeof($tp));")
+      emit(src"$dram = Compress<$tp,16>($dram, ${dims.mkString("*")} * sizeof($tp), $tileSize * sizeof($tp));")
 
     case SetMem(dram, data) =>
       emit(src"memcpy($dram, &(*${data})[0], (*${data}).size() * sizeof(${dram.tp.typeArgs.head}));")

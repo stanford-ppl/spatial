@@ -9,7 +9,8 @@ trait PIRGenSRAM extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op: SRAMNew[_,_] => 
-      stateMem(lhs, "SRAM()")
+      val accum = if (lhs.isMemReduceAccum) s".isMemReduceAccum(true)" else ""
+      stateMem(lhs, src"SRAM()$accum")
     case op@SRAMBankedRead(sram,bank,ofs,ens)       => 
       stateAccess(lhs, sram, ens) {
         src"BankedRead()" +

@@ -123,7 +123,7 @@ trait PlasticineTest extends DSLTest { test =>
     }
 
     def parseMake(line:String) = {
-      if (line.contains("error") || line.contains("exception")) Fail
+      if (line.contains("error") || line.contains("exception") || line.contains("failed")) Fail
       else if (line.contains("Runtime")) Pass
       else Unknown
     }

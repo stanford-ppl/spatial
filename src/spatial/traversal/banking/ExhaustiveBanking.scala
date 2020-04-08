@@ -104,6 +104,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         var grpId = 0
         var placed = false
         while (!placed & grpId < projectionsToBank.size) {
+          Console.println(s"here")
           val prevAccs = projectionsToBank(grpId)
           // Check if this access is "already handled" by a different dimension.
           //  "Already handled" means that EITHER the prior- or post- complement access has a non-conflicting dimension,
@@ -202,7 +203,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         val autoFullBank: FullBanking = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1)))))
       }
-      else if (mem.explicitBanking.isDefined) {
+      else if (mem.explicitBanking.isDefined && mem.forceExplicitBanking) {
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(mem.explicitScheme)))
       }
       else {
@@ -356,7 +357,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
       val N = Ns.next()
       val As = aStricts.expand(rank, N, stagedDims, axes)
       val numAs = aStricts.expand(rank, N, stagedDims, axes).toList.size
-//      dbgs(s"possible as ${aStricts.expand(rank, N, stagedDims, axes).toList}")
+      // TODO: Will forced banking memory even make it to this line?
       if (mem.forceExplicitBanking) {
         val alpha = As.next()
         val allP = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
@@ -376,8 +377,8 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           banking = Some(banking.getOrElse(Seq[ModBanking]()) ++ forEachP)
           validSchemesFound = validSchemesFound + 1
         }
-        else if (!mem.noBlockCyclic) {
-          val B = if (mem.explicitBanking.isDefined) Some(mem.explicitBs(axes.head)) else mem.blockCyclicBs.find{b => checkBlockCyclic(mem,N,b,alpha,grps,dualPortHalve) }
+        else if (!mem.noBlockCyclic && (mem.explicitBanking.isEmpty || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) != 1))) {
+          val B = (if (mem.explicitBanking.isDefined) mem.explicitBs else mem.blockCyclicBs).find{b => checkBlockCyclic(mem,N,b,alpha,grps,dualPortHalve) }
           val numBs = B.size
           val scheme: Option[Seq[ModBanking]] = B.collectFirst{case b if coprime(Seq(b) ++ alpha) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")

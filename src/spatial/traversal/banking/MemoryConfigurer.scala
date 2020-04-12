@@ -732,7 +732,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   3. The merged instance costs more than the total cost of the two separate instances
     */
   protected def getMergeError(i1: Instance, i2: Instance, i3: Instance): Option[String] = {
-    if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
+    if (mem.isMustMerge) None
+    else if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
       Some("Buffer conflict")
     else if (i3.cost > (i1.cost + i2.cost) && !mem.hasDestructiveReads && !mem.isReg && !mem.isLockSRAM)
       Some(s"Too expensive to merge addressable instances: ${i3.cost} > ${i1.cost + i2.cost}")

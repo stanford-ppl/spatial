@@ -145,8 +145,12 @@ trait PlasticineTest extends DSLTest { test =>
       else Unknown
     }
 
-    def runtst(name:String="runtst", timeout:Int=6000) = {
-      val runArg = runtimeArgs.cmds.headOption.getOrElse("")
+    def runtst(
+      name:String="runtst", 
+      timeout:Int=6000, 
+      runArg:String = 
+      runtimeArgs.cmds.headOption.getOrElse("")
+    ) = {
       val res = scommand(name, s"$timer ./tungsten $runArg".split(" "), timeout=timeout, parseTst, RunError.apply, wd=IR.config.genDir+"/tungsten")
       res match {
         case Unknown => Pass

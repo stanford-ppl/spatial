@@ -32,6 +32,9 @@ package object bounds {
 
     def iter: Option[Long] = metadata[Iter](s).map(_.iter)
     def iter_=(iter: Long): Unit = metadata.add(s, Iter(iter))
+    
+    def truePercent: Option[Long] = metadata[TruePercent](s).map(_.tp)
+    def truePercent_=(tp: Long): Unit = metadata.add(s, TruePercent(tp))
   }
 
 }

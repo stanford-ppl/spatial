@@ -40,6 +40,7 @@ object Runtime {
   case object SparseStore extends CtrlSchedule // modeled as a schedule
   case object SparseLoad  extends CtrlSchedule // modeled as a schedule
   case object MemReduce   extends CtrlSchedule // modeled as a schedule, used for plasticine only
+  case object Reduce      extends CtrlSchedule // modeled as a schedule, used for plasticine only
 
 
   /** Control node level. */
@@ -286,6 +287,12 @@ object Runtime {
       case Right(x) if x.lookup == "false" => true
       case _ => false
     }
+
+    def isReduce = schedule match {
+      case Left(x) if (ctx.op == "OpReduce") => true
+      case _ => false
+    }
+
     def resolvedSchedule = schedule match {
       case Left(x) if (!fpga && ctx.op == "OpMemReduce") => MemReduce 
       case Left(x) => x
@@ -373,6 +380,8 @@ object Runtime {
     var cycles_per_iter = 1
     var plasticine_latency = 0
 
+    var forkPercent = List(1) 
+
     def iters_per_parent = this.num_iters / (if (parent.isDefined) parent.get.num_iters else 1)
 
     // Structure fields
@@ -387,6 +396,7 @@ object Runtime {
       child.parent = Some(this)
       children += child
     }
+
     def registerMemChild(memChild: MemModel): Unit = {
       memChild.parent = Some(this)
       memChildren += memChild
@@ -396,6 +406,7 @@ object Runtime {
       memChild.mem.readers += this
       memReads += memChild.mem
     }
+
     def registerMemWrite(memChild: AliasMemModel): Unit = {
       memChild.mem.writers += this
       memWrites += memChild.mem
@@ -405,9 +416,14 @@ object Runtime {
       memChild.readers += this
       memReads += memChild
     }
+
     def registerMemWrite(memChild: MemModel): Unit = {
       memChild.writers += this
       memWrites += memChild
+    }
+
+    def registerForkPct(fp: List[Int]): Unit = {
+        forkPercent = fp
     }
 
     /** Extract num iters from cchain, or else 1 */
@@ -480,8 +496,11 @@ object Runtime {
             else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
           }
         case Fork            => 
-          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Branch(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
-          children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
+//          val dutyCycles = children.dropRight(1).zipWithIndex.map{case (c,i) => Branch(c.hashCode, s"expected % of the time condition #$i will run (0-100)", ctx)}.map(_.lookup)
+//          emit(s"${children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum))}")
+//          children.map(_.cycsPerParent).zip(dutyCycles :+ (100-dutyCycles.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
+//          emit(s"${children.map(_.cycsPerParent).zip(forkPercent :+ (100-forkPercent.sum))}")
+          children.map(_.cycsPerParent).zip(forkPercent :+ (100-forkPercent.sum)).map{case (a,b) => a * b.toDouble/100.0}.sum.toInt
         case DenseLoad            => if (fpga) congestionModel(competitors()) else congestionModelPlasticine(competitors(), false)
         case DenseStore           => if (fpga) congestionModel(competitors()) else congestionModelPlasticine(competitors(), true)
         case GatedDenseStore      => if (fpga) congestionModel(competitors()) else congestionModelPlasticine(competitors(), true)
@@ -492,9 +511,12 @@ object Runtime {
         case Sequenced => 
           if (fpga) cchainIters*L + startup + shutdown
           else {
-           emit(s"ctx: ${ctx.id}, memAdj: $memSplitAdjustment, cchainIters: ${cchainIters}, L: $L") 
-           (cchainIters*L + plastSeq) 
-           }
+            if (isReduce) (cchainIters*L + plastSeq)
+            else {
+              emit(s"ctx: ${ctx.id}, memAdj: $memSplitAdjustment, cchainIters: ${cchainIters}, L: $L") 
+              (cchainIters*L + plastSeq) 
+            }
+          }
         case _ => 
           if (fpga) (cchainIters - 1)*II + L + startup + shutdown + dpMask
           else cchainIters*II 

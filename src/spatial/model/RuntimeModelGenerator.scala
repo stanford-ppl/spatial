@@ -399,11 +399,14 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
 
-    case Switch(_, body) =>
+    case Switch(cond, body) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
       emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, OuterControl, Left(${lhs.rawSchedule.toString}), CChainModel(List()), ${lat.toInt} + 2, ${ii.toInt} + 2, $ctx)") // TODO: Add 2 because it seems to be invisible latency?
+      val condPct = cond.dropRight(1).map{_.truePercent}.zipWithIndex.map{case (Some(c), i) => s"""${c.toInt}"""
+                                                                          case (_, i) => s"""Branch(${lhs.hashCode}, "expected % of the time condition #$i will run (0-100)", $ctx).lookup.toInt"""}
+      emit(src"$lhs.registerForkPct(List($condPct))")
       visitBlock(body)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 

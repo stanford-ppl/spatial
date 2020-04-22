@@ -209,7 +209,9 @@ object Runtime {
   }
 
   case class MemModel(
-    val dims:Seq[Int], val bitwidth:Int
+    val id:String, 
+    val dims:Seq[Int],
+    val bitwidth:Int
   ) {
     var parent: Option[ControllerModel] = None
     val readers = scala.collection.mutable.ListBuffer[ControllerModel]()
@@ -231,7 +233,10 @@ object Runtime {
         writers += writeParent
         writeParent.memWrites += this
     }
-   
+
+    def writersMaxCycles: Int = if (writers.size >= 1) writers.toList.map(_.cycles_per_iter).max else 1
+
+    override def toString: String = s"mem: $id"
   }
 
   case class CChainModel(
@@ -378,7 +383,9 @@ object Runtime {
     var num_iters = 1
     var num_iters_d = 1.0
     var cycles_per_iter = 1
-    var plasticine_latency = 0
+
+    // TODO: Add in latency
+    var plastLatency = 0
 
     var forkPercent = List(1) 
 
@@ -391,7 +398,47 @@ object Runtime {
     val memChildren = scala.collection.mutable.ListBuffer[MemModel]()
     val memReads = scala.collection.mutable.ListBuffer[MemModel]()
     val memWrites = scala.collection.mutable.ListBuffer[MemModel]()
-    
+
+    def isLeaf: Boolean = !(children.size >= 1)
+ 
+    def childMemReads: List[MemModel] = if (children.size >= 1) children.map(_.childMemReads).foldRight(memReads.toList)(_++_) else memReads.toList
+    def childMemWrites: List[MemModel] = if (children.size >= 1) children.map(_.childMemWrites).foldRight(memWrites.toList)(_++_) else memWrites.toList
+
+    def memReadChain: List[(MemModel, List[ControllerModel])] = if (children.size >= 1) 
+        children.map(_.memReadChain.map{case (m, l) => (m, this :: l)}).foldRight(memReads.toList.map{case s => (s, List(this))})(_++_) else
+        memReads.toList.map{case s => (s, List(this))}
+
+/*
+    def memReadChainD: List[(MemModel, Int)] = if (children.size >= 1) children.map(_.memReadChain.map{case (m, l) => (m, l.size)}).foldRight(List(): List[(MemModel, Int)])(_++_) else List() : List[(MemModel, Int)]
+    def memWriteChainD: List[(MemModel, Int)] = if (children.size >= 1) children.map(_.memWriteChain.map{case (m, l) => (m, l.size)}).foldRight(List(): List[(MemModel, Int)])(_++_) else List(): List[(MemModel, Int)]
+
+    def hasLoopII: Boolean = { 
+      for (e1 <- memReadChainD) {
+        for (e2 <- memWriteChainD) {
+          if (e1._1 == e2._1 && e1._2 != e2._2)
+            true
+        }
+      }
+      false 
+    }    
+*/    
+    def plastLoopII: Int = {
+      var out: Int = 1
+      for (mRead <- memReadChain) {
+        for (mWrite <- memWriteChain) {
+          if (mRead._1 == mWrite._1 && mRead._2.size != mWrite._2.size)
+            out = mRead._2.map(_.cycles_per_iter).sum + mWrite._2.map(_.cycles_per_iter).sum
+            //out = mRead._2.drop(1).map(_.cycles_per_iter).sum + mWrite._2.drop(1).map(_.cycles_per_iter).sum
+        }
+      }
+      out
+    }
+
+    def memWriteChain: List[(MemModel, List[ControllerModel])] = if (children.size >= 1) 
+      children.map(_.memWriteChain.map{case (m, l) => (m, this :: l)}).foldRight(memWrites.toList.map{case s => (s, List(this))})(_++_) else
+      memWrites.toList.map{case s => (s, List(this))}
+    //def plastMemLoop:  
+ 
     def registerChild(child: ControllerModel): Unit = {
       child.parent = Some(this)
       children += child
@@ -444,6 +491,11 @@ object Runtime {
 
     def memSplitAdjustment: Int  = memReads.map(_.physSize).product * memWrites.map(_.physSize).product
 
+    def plastMemII: Int = if (childMemReads.size >= 1) childMemReads.map(_.writersMaxCycles).max else 1
+
+    def plastMaxLatency: Int = maxChild max plastMemII
+    def plastSumLatency: Int = sumChildren max plastMemII
+
     /** Get ancestors of current node */
     def ancestors: Seq[ControllerModel] = {
       if (parent.isDefined) Seq(parent.get) ++ parent.get.ancestors
@@ -459,8 +511,12 @@ object Runtime {
           } else {
             emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, memAdjustment: ${memSplitAdjustment}, maxAdjChild: ${maxAdjacentChildren}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}, childSize: ${children.size}")
             emit(s"ctx: ${ctx.id}, children.cycs_per_iter: ${children.map(_.cycles_per_iter)}")
-            ((sumChildren min maxAdjacentChildren) * cchainIters) //+ seqSync * children.size*cchain.head.N
-            
+            emit(s"ctx: ${ctx.id}, childMemReads (writers): ${childMemReads.map(_.writers)}, childMemReads: ${childMemReads}, plastMemII: $plastMemII")
+            emit(s"plastLoopII: $plastLoopII")
+            //emit(s"memReadChain: $memReadChain")
+            //emit(s"memWritechain: $memWriteChain")
+            val interval = (sumChildren min maxAdjacentChildren) max plastLoopII
+            ((interval) * cchainIters) //+ seqSync * children.size*cchain.head.N
           }
         case Pipelined      => 
           if (fpga) {
@@ -468,8 +524,13 @@ object Runtime {
             else startup + shutdown + (maxChild max cchain.last.N) * (cchain.head.N - 1) + children.map(_.cycsPerParent).sum + metaSync * cchain.head.N * children.size
           } else {
             emit(s"ctx: ${ctx.id}, maxChild: ${maxChild}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
-            if (cchain.size <= 1) maxChild * (cchainIters)
-            else (maxChild max cchain.last.N) * (cchain.head.N) 
+            emit(s"ctx: ${ctx.id}, childMemReads (writers): ${childMemReads.map(_.writers)}, memReadChain: $memReadChain, plastMemII: $plastMemII")
+            emit(s"plastLoopII: $plastLoopII")
+            //emit(s"memReadChain: $memReadChain")
+            //emit(s"memWritechain: $memWriteChain")
+            val interval = maxChild max plastLoopII
+            if (cchain.size <= 1) interval * (cchainIters)
+            else (interval max cchain.last.N) * (cchain.head.N) 
           }
         case MemReduce       =>
           if (fpga) {
@@ -492,6 +553,7 @@ object Runtime {
           } else {
             emit(s"ctx: ${ctx.id}, sumChild: ${sumChildren}, maxChild: ${maxChild}, cchainSize: ${cchain.size}, cchainIters: ${cchainIters}, lastN: ${cchain.last.N}, headN ${cchain.head.N}")
             emit(s"ctx: ${ctx.id}, children.cycs_per_iter: ${children.map(_.cycles_per_iter)}")
+            emit(s"ctx: ${ctx.id}, childMemReads (writers): ${childMemReads.map(_.writers)}, childMemReads: ${childMemReads}, memReadChain: $memReadChain, plastMemII: $plastMemII")
             if (cchain.size <= 1) startup + shutdown + maxChild * cchainIters + metaSync 
             else startup + shutdown + (maxChild max cchain.last.N) * cchain.head.N + metaSync 
           }

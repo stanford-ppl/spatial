@@ -423,7 +423,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       createCtrObject(lhs, Bits[I32].zero, Bits[I32].zero, Bits[I32].one, Bits[I32].one, true) 
 
     case SRAMNew(dims) => 
-      emit(src"val $lhs = new MemModel(Seq($dims), ${bitWidth(lhs.tp.typeArgs.head)})") 
+      emit(src"""val $lhs = new MemModel("$lhs", Seq($dims), ${bitWidth(lhs.tp.typeArgs.head)})""") 
       emit(src"${lhs.parent.s.get}.registerMemChild($lhs)")
       lhs.blocks.foreach{block => visitBlock(block) }
 //      emit(src"${lhs.parent.s.get}.registerMem($lhs)")

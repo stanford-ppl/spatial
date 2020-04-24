@@ -73,16 +73,42 @@ abstract class RegFile[A:Bits,C[T]](implicit val evMem: C[A] <:< RegFile[A,C]) e
 }
 object RegFile {
   /** Allocates a [[RegFile1]] with capacity for `length` elements of type A. */
-  @api def apply[A:Bits](length: I32): RegFile1[A] = stage(RegFileNew[A,RegFile1](Seq(length),None))
-  @api def apply[A:Bits](length: I32, inits: Seq[Bits[A]]): RegFile1[A] = stage(RegFileNew[A,RegFile1](Seq(length),Some(inits)))
+  @api def apply[A:Bits](length: I32): RegFile1[A] = {
+    if (!length.isParam && !length.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile1](Seq(length), None))
+  }
+  @api def apply[A:Bits](length: I32, inits: Seq[Bits[A]]): RegFile1[A] = {
+    if (!length.isParam && !length.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile1](Seq(length), Some(inits)))
+  }
 
   /** Allocates a [[RegFile2]] with size `rows` x `cols` and elements of type A. */
-  @api def apply[A:Bits](rows: I32, cols: I32): RegFile2[A] = stage(RegFileNew[A,RegFile2](Seq(rows,cols),None))
-  @api def apply[A:Bits](rows: I32, cols: I32, inits: Seq[Bits[A]]): RegFile2[A] = stage(RegFileNew[A,RegFile2](Seq(rows,cols),Some(inits)))
+  @api def apply[A:Bits](rows: I32, cols: I32): RegFile2[A] = {
+    if (!rows.isParam && !rows.isConst && !cols.isParam && !cols.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile2](Seq(rows, cols), None))
+  }
+  @api def apply[A:Bits](rows: I32, cols: I32, inits: Seq[Bits[A]]): RegFile2[A] = {
+    if (!rows.isParam && !rows.isConst && !cols.isParam && !cols.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile2](Seq(rows, cols), Some(inits)))
+  }
 
   /** Allocates a [[RegFile3]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): RegFile3[A] = stage(RegFileNew[A,RegFile3](Seq(d0,d1,d2),None))
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, inits: Seq[Bits[A]]): RegFile3[A] = stage(RegFileNew[A,RegFile3](Seq(d0,d1,d2),Some(inits)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): RegFile3[A] = {
+    if (!d0.isParam && !d0.isConst && !d1.isParam && !d1.isConst &&
+      !d2.isParam && !d2.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile3](Seq(d0, d1, d2), None))
+  }
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, inits: Seq[Bits[A]]): RegFile3[A] = {
+    if (!d0.isParam && !d0.isConst && !d1.isParam && !d1.isConst &&
+      !d2.isParam && !d2.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile3](Seq(d0, d1, d2), Some(inits)))
+  }
 }
 
 

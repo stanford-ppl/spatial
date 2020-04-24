@@ -104,7 +104,6 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         var grpId = 0
         var placed = false
         while (!placed & grpId < projectionsToBank.size) {
-          Console.println(s"here")
           val prevAccs = projectionsToBank(grpId)
           // Check if this access is "already handled" by a different dimension.
           //  "Already handled" means that EITHER the prior- or post- complement access has a non-conflicting dimension,

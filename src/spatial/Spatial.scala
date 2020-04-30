@@ -103,6 +103,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val transientCleanup      = TransientCleanup(state)
     lazy val unrollTransformer     = UnrollingTransformer(state)
     lazy val rewriteTransformer    = RewriteTransformer(state)
+    lazy val memoryCleanup         = MemoryCleanupTransformer(state)
     lazy val laneStaticTransformer = LaneStaticTransformer(state)
     lazy val flatteningTransformer = FlatteningTransformer(state)
     lazy val bindingTransformer    = BindingTransformer(state)
@@ -175,6 +176,7 @@ trait Spatial extends Compiler with ParamLoader {
         rewriteAnalyzer     ==>
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         rewriteTransformer  ==> printer ==> transformerChecks ==>
+        memoryCleanup  ==> printer ==> transformerChecks ==>
         /** Pipe Flattening */
         flatteningTransformer ==> bindingTransformer ==>
         /** Update buffer depths */

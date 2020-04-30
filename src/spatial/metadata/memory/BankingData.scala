@@ -536,7 +536,7 @@ sealed trait NStrictness extends SearchPriority {
 case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
   @stateful def P = 9
   def isRelaxed = false
-  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = if (axes.size > 1) Ns.toList else axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
   @stateful def P = 1

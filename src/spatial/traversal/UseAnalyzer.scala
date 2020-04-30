@@ -51,7 +51,6 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       super.visit(lhs, rhs)
     }
 
-    dbgs(s" aoeu visiting $lhs wchic is a control? ${lhs.isControl}")
     if (lhs.isControl | lhs.isCtrlBlackbox) {
       lhs.transientReadMems = Set()
       lhs match {

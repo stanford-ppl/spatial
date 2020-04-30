@@ -19,7 +19,6 @@ case class MemoryCleanupTransformer(IR: State) extends MutateTransformer with Bl
       Invalid.asInstanceOf[Sym[A]] // Drop
 
     case _ =>
-      Console.println(s"touch $lhs")
       super.transform(lhs,rhs)
   }
 

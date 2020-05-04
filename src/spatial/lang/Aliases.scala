@@ -89,6 +89,7 @@ trait ExternalAliases extends InternalAliases {
   type LUT4[A] = spatial.lang.LUT4[A]
   type LUT5[A] = spatial.lang.LUT5[A]
   lazy val LUT = spatial.lang.LUT
+  lazy val FileLUT = spatial.lang.FileLUT
 
   type RegFile[A,C[T]] = spatial.lang.RegFile[A,C]
   type RegFile1[A] = spatial.lang.RegFile1[A]

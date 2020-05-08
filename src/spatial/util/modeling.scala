@@ -299,7 +299,7 @@ object modeling {
     }
 
     /** If these accesses were banked as part of the same group, then we don't need to treat them as a true AAA cycle */
-    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{case (a,b) if a.getGroupId(List()).nonEmpty => a.getGroupId(List()).head == b.getGroupId(List()).head; case _ => false}
+    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{case (a,b) if a.getGroupId(List()).nonEmpty && b.getGroupId(List()).nonEmpty => a.getGroupId(List()).head == b.getGroupId(List()).head; case _ => false}
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.filter{case (_, accesses) => !bankedTogether(accesses)}.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose) {

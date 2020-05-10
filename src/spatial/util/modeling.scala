@@ -299,9 +299,14 @@ object modeling {
     }
 
     /** If these accesses were banked as part of the same group, then we don't need to treat them as a true AAA cycle */
-    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{case (a,b) if a.getGroupId(List()).nonEmpty && b.getGroupId(List()).nonEmpty => a.getGroupId(List()).head == b.getGroupId(List()).head; case _ => false}
+    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{
+      case (a,b) if !(a.isWriter ^ b.isWriter) && a.getGroupId(List()).nonEmpty && b.getGroupId(List()).nonEmpty =>
+        a.getGroupId(List()).head == b.getGroupId(List()).head
+      case _ => false
+    }
+//    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{case (a,b) if a.originalSym.isDefined => a.originalSym.get == b.originalSym.get; case _ => false}
 
-    def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.filter{case (_, accesses) => !bankedTogether(accesses)}.flatMap{case (mem,accesses) =>
+    def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.filter{case (_, accesses) => bankedTogether(accesses)}.flatMap{case (mem,accesses) =>
       if (accesses.nonEmpty && verbose) {
         dbgs(s"Multiplexed accesses for memory $mem: ")
         accesses.foreach { access => dbgs(s"  ${stm(access)}") }
@@ -317,7 +322,6 @@ object modeling {
           val muxes = access.ports(0).values.map(_.muxPort)
           (access, paths.getOrElse(access, 0.0), muxes.maxOrElse(0))
         }
-        val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
 
         // Keep accesses with the same mux index together, even if they have different delays
         // TODO: This whole analysis seems suspicious but it works.  Probably worth redoing it though since it probably adds unnecessary latency
@@ -344,6 +348,8 @@ object modeling {
             }
           }
         }
+//        val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
+        val length = paths(orderedMuxPairs.head.head._1) - paths(orderedMuxPairs.last.head._1)
 
         AAACycle(accesses, mem, length)
       }

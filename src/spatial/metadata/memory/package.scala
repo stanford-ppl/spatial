@@ -342,6 +342,7 @@ package object memory {
       }
 
     def isSingleton: Boolean = isReg || isArgIn || isArgOut || isHostIO || isFIFOReg
+    def isAddressable: Boolean = isSRAM || isLineBuffer || isRegFile || isLUT
     def isReg: Boolean = mem.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgInNew[_]] }
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }

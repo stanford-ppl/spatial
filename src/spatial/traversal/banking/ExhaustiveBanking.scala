@@ -90,15 +90,20 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         }
       }
     }
-    def repackageGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): Seq[Seq[SparseMatrix[Idx]]] = {
+    /** This function converts full accesses into their lower complement, projection, and upper complement */
+    def projectGroup(grp: Seq[SparseMatrix[Idx]], dims: List[Int], isRd: Boolean): Seq[AccessView] = {
       val fullStrategy = Seq.tabulate(rank){i => i}
       // For hierarchical views, regroup accesses based on whether their "complements" are non-interfering AND their projection is not unique
       val grpViews: Seq[AccessView] = grp.map{mat =>
         val t = AccessView(dims, fullStrategy, mat)
-        if (isRd) lowRankMapping += (t.activeAccess -> {lowRankMapping.getOrElse(t.activeAccess, Set()) ++ Set(mat)}) 
+        if (isRd) lowRankMapping += (t.activeAccess -> {lowRankMapping.getOrElse(t.activeAccess, Set()) ++ Set(mat)})
         t
       }
-      dbgs(s"")
+      grpViews
+    }
+
+    /** This function repackages full accesses as projections based on whether their complements are non-interfering and if their projections are unique within a group */
+    def repackageGroup(grpViews: Seq[AccessView], dims: List[Int], isRd: Boolean): Seq[Seq[SparseMatrix[Idx]]] = {
       val projectionsToBank = ArrayBuffer(ArrayBuffer[AccessView]())
       grpViews.foreach { current: AccessView =>
         var grpId = 0
@@ -225,26 +230,33 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
             val rawBanking: Seq[Map[AccessGroups, Option[PartialBankingChoices]]] = view.expand().map{axes =>
               lowRankMapping.clear()
               myReads.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
-              val selWrGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) myWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else myWrites.map(_.toSet)
-              val selRdGrps: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) {myReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet)} else {myReads.map(_.toSet)}
-              val selGrps: Set[Set[SparseMatrix[Idx]]] = selWrGrps ++ {if (axes.forall(regroup.dims.contains)) Set() else selRdGrps}
-              selGrps.zipWithIndex.foreach{case (grp,i) =>
-                dbgs(s"Banking group #$i has (${grp.size} accesses)")
+              val projectedWrites: Set[Seq[AccessView]] = myWrites.map{grp => projectGroup(grp, axes, false)}
+              val projectedReads: Set[Seq[AccessView]] = myReads.map{grp => projectGroup(grp, axes, true)}
+              val regroupedWrites: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) projectedWrites.flatMap{grp => repackageGroup(grp, axes, false)}.map(_.toSet) else projectedWrites.map(_.map(_.activeAccess).toSet)
+              val regroupedReads: Set[Set[SparseMatrix[Idx]]] = if (axes.size < rank) projectedReads.flatMap{grp => repackageGroup(grp, axes, true)}.map(_.toSet) else projectedReads.map(_.map(_.activeAccess).toSet)
+              val regroupedAccs: Set[Set[SparseMatrix[Idx]]] = regroupedWrites ++ {if (axes.forall(regroup.dims.contains)) Set() else regroupedReads}
+              val unmodifiedAccs = projectedWrites.map(_.map(_.activeAccess).toSet) ++ {if (axes.forall(regroup.dims.contains)) Set() else projectedReads.map(_.map(_.activeAccess).toSet)}
+              unmodifiedAccs.zipWithIndex.foreach{case (grp,i) =>
+                dbgs(s"Original banking group #$i has (${grp.size} accesses)")
+                grp.foreach{matrix => dbgss("    ", matrix.toString) }
+              }
+              regroupedAccs.zipWithIndex.foreach{case (grp,i) =>
+                dbgs(s"Regrouped banking group #$i has (${grp.size} accesses)")
                 grp.foreach{matrix => dbgss("    ", matrix.toString) }
               }
               // If only 1 acc left per group, Unit banking, otherwise search
               val axisBankingScheme: Option[PartialBankingChoices] = {
-                if (solutionCache.contains((selGrps, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${selGrps.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job! (scheme ${solutionCache.get((selGrps, nStricts, aStricts, axes))})")
-                solutionCache.getOrElseUpdate((selGrps, nStricts, aStricts, axes), {
-                  if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(Seq(ModBanking.Unit(1, axes)))
-                  else if (selGrps.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(Seq(ModBanking.Unit(rank, axes)))
+                if (solutionCache.contains((regroupedAccs, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${regroupedAccs.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job! (scheme ${solutionCache.get((regroupedAccs, nStricts, aStricts, axes))})")
+                solutionCache.getOrElseUpdate((regroupedAccs, nStricts, aStricts, axes), {
+                  if (regroupedAccs.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(Seq(ModBanking.Unit(1, axes)))
+                  else if (regroupedAccs.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(Seq(ModBanking.Unit(rank, axes)))
                   else {
-                    val x = findBanking(selGrps, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem, firstSearch)
+                    val x = findBanking(regroupedAccs, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem, firstSearch)
                     firstSearch = false
                     x
                   }
                 })}
-              if (axes.forall(regroup.dims.contains)) selRdGrps.flatMap{x => x.map{a => Set(reverseAM(a)) -> axisBankingScheme }}.toMap else Map(selRdGrps.map{ x => x.flatMap(reverseAM(_)) ++ hostReads} -> axisBankingScheme)
+              if (axes.forall(regroup.dims.contains)) projectedReads.flatMap{x => x.map{a => Set(reverseAM(a.activeAccess)) -> axisBankingScheme }}.toMap else Map(projectedReads.map{ x => x.flatMap{a => reverseAM(a.activeAccess)}.toSet ++ hostReads} -> axisBankingScheme)
             }
             if (rawBanking.forall{m => m.toSeq.map(_._2).forall{b => b.isDefined}}) {
               val bankingIds: List[List[Int]] = combs(rawBanking.toList.map{b => List.tabulate(b.size){i => i}})
@@ -266,7 +278,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               val validBanking: Map[AccessGroups, FullBankingChoices] = banking.flatMap { case (accs, fullOpts) =>
                 val prunedGrps = (accs.map(_.map(_.matrix)) ++ myWrites).map { grp => grp.map { mat => mat.sliceDims(dimsInStrategy) }.toSeq.distinct }
                 // TODO: Should we actually reject based on group sizes at this point?  Presumably we only landed on ones that are valid
-                //       prunedGrps also doesn't maintain projection filtering the same way selGrps did up above so it rejects valid schemes now for Gibbs
+                //       prunedGrps also doesn't maintain projection filtering the same way regroupedAccs did up above so it rejects valid schemes now for Gibbs
                 val(validOpts, rejectedOpts) = fullOpts.distinct.partition { case opt => true } //isValidBanking(opt, prunedGrps) }
                 validOpts.foreach{opt =>
                   dbgs(s"Banking scheme $opt accepted!")
@@ -322,7 +334,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     }
 
     // Step 2: Find schemes for these grps
-    findSchemes(newReads, newWrites, hostReads.toSet.asInstanceOf[SingleAccessGroup])
+    findSchemes(newReads, newWrites, hostReads.toSet)
   }
 
   /** True if this is a valid banking strategy for the given sets of access matrices. */
@@ -332,17 +344,17 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     grps.forall{a => a.toList.lengthLessThan(banks+1)}
   }
 
-  protected def findBanking(grps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_], firstSearch: Boolean): Option[PartialBankingChoices] = {
+  protected def findBanking(regroupedGrps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_], firstSearch: Boolean): Option[PartialBankingChoices] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
-    val Nmin_base_r: Int = grps.filter(_.size > 0).filter(_.head.isReader).map(_.size).maxOrElse(1)
-    val Nmin_base_w: Int = grps.filter(_.size > 0).filter(!_.head.isReader).map(_.size).maxOrElse(1)
+    val Nmin_base_r: Int = regroupedGrps.filter(_.size > 0).filter(_.head.isReader).map(_.size).maxOrElse(1)
+    val Nmin_base_w: Int = regroupedGrps.filter(_.size > 0).filter(!_.head.isReader).map(_.size).maxOrElse(1)
     val dualPortHalve = mem.isDualPortedRead && firstSearch
     val Nmin = scala.math.max(Nmin_base_w, {if (dualPortHalve) scala.math.ceil(Nmin_base_r.toFloat / 2.0).toInt else Nmin_base_r})
     val Ncap = filteredStagedDims.product max Nmin
-    val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)
-//    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, grps.map(_.size).toList, axes)}")
+    val possibleNs = nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, regroupedGrps.map(_.size).toList, axes)
+//    dbgs(s"possible Ns: ${nStricts.expand(Nmin, Ncap, filteredStagedDims.toList, regroupedGrps.map(_.size).toList, axes)}")
     val Ns = possibleNs.iterator
-    val numChecks = grps.map{x => nCr(x.size, {if (dualPortHalve) 3 else 2})}.sum
+    val numChecks = regroupedGrps.map{x => nCr(x.size, {if (dualPortHalve) 3 else 2})}.sum
     val rank = axes.length
     var banking: Option[PartialBankingChoices] = None
 
@@ -369,7 +381,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         val alpha = As.next()
         if (attempts < 50) dbgs(s"     Checking N=$N and alpha=$alpha")
         attempts = attempts + 1
-        if (!mem.onlyBlockCyclic && (mem.explicitBanking.isEmpty || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(mem,N,alpha,grps,dualPortHalve)) {
+        if (!mem.onlyBlockCyclic && (mem.explicitBanking.isEmpty || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) == 1)) && checkCyclic(mem,N,alpha,regroupedGrps,dualPortHalve)) {
           dbgs(s"     Success on N=$N, alpha=$alpha, B=1")
           val allP = computeP(N,1,alpha,stagedDims,bug(s"Could not fence off a region for banking scheme N=$N, B=1, alpha=$alpha (memory $mem ${mem.ctx})"))
           val forEachP = allP.map{P => ModBanking(N,1,alpha,axes,P,numAs*possibleNs.size,numChecks)}
@@ -377,7 +389,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
           validSchemesFound = validSchemesFound + 1
         }
         else if (!mem.noBlockCyclic && (mem.explicitBanking.isEmpty || (mem.explicitBanking.isDefined && mem.explicitBs(axes.head) != 1))) {
-          val B = (if (mem.explicitBanking.isDefined) mem.explicitBs else mem.blockCyclicBs).find{b => checkBlockCyclic(mem,N,b,alpha,grps,dualPortHalve) }
+          val B = (if (mem.explicitBanking.isDefined) mem.explicitBs else mem.blockCyclicBs).find{b => checkBlockCyclic(mem,N,b,alpha,regroupedGrps,dualPortHalve) }
           val numBs = B.size
           val scheme: Option[Seq[ModBanking]] = B.collectFirst{case b if coprime(Seq(b) ++ alpha) =>
             dbgs(s"     Success on N=$N, alpha=$alpha, B=$b")

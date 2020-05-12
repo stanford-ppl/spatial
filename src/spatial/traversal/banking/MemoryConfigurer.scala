@@ -631,6 +631,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
+    dbgs(s"solution bankings are $bankings")
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
         latestSchemesInfo.clear()
@@ -656,7 +657,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         bankings.foreach{case (scheme,banking) => banking.head._2.zipWithIndex.foreach{ case (b,optId) => dbgs(s"Cost: ${costs((scheme,optId))} for version $optId of $scheme")}}
         dbgs(s"**************************************************************************************")
         val winningScheme: ((BankingOptions, Int), Double) = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
-        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map{case (acgrp, opts) => acgrp -> opts(winningScheme._1._2) }.toMap
+        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map { case (acgrp, opts) => acgrp -> opts(winningScheme._1._2) }
         Right(
           winner.flatMap { case (winningRdGrps, winningBanking) =>
             val padding = mem.stagedDims.map(_.toInt).zip(winningBanking.flatMap(_.Ps)).map { case (d, p) => (p - d % p) % p }

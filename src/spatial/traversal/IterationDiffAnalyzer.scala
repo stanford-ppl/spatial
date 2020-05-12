@@ -209,7 +209,7 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
       super.visit(lhs,rhs)
       
     case _ => 
-      if (inHw) setProgramOrder(lhs)
+      if (inHw || inBBox) setProgramOrder(lhs)
       super.visit(lhs, rhs)
   }
 

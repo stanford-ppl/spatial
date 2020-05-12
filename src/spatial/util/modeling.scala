@@ -301,13 +301,14 @@ object modeling {
     /** If these accesses were banked as part of the same group, then we don't need to treat them as a true AAA cycle */
     def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{
       case (a,b) if !(a.isWriter ^ b.isWriter) && a.getGroupId(List()).nonEmpty && b.getGroupId(List()).nonEmpty =>
-        a.getGroupId(List()).head == b.getGroupId(List()).head
+        (a.getGroupId(List()).toSet intersect b.getGroupId(List()).toSet).nonEmpty
       case _ => false
     }
 //    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{case (a,b) if a.originalSym.isDefined => a.originalSym.get == b.originalSym.get; case _ => false}
 
     def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors
         .filter{case (mem, accesses) => !mem.isAddressable || bankedTogether(accesses)}
+        .toSeq.sortBy{_._2.head.progorder.getOrElse(0)} // Prevent pushing later nodes out of alignment when they were previously aligned
         .flatMap { case (mem, accesses) =>
           if (accesses.nonEmpty && verbose) {
             dbgs(s"Multiplexed accesses for memory $mem: ")
@@ -350,7 +351,7 @@ object modeling {
               }
             }
             //        val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
-            val length = paths(orderedMuxPairs.head.head._1) - paths(orderedMuxPairs.last.head._1)
+            val length = if (orderedMuxPairs.length > 0) paths(orderedMuxPairs.head.head._1) - paths(orderedMuxPairs.last.head._1) else 0
 
             AAACycle(accesses, mem, length)
           }
@@ -468,9 +469,9 @@ object modeling {
     val pseudoWarCycles = findPseudoWARCycles(schedule)
     val warCycles = trueWarCycles ++ pseudoWarCycles
 
-    val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
-    val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    val allCycles: Seq[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSortedSeq
+    dbgs(s"ALL ACCUMS ${accumInfo.writers} ++ ${accumInfo.readers}")
+    val aaaCycles = pushMultiplexedAccesses(accumInfo.writers ++ accumInfo.readers)
+    val allCycles: Seq[Cycle] = (aaaCycles ++ warCycles).toSortedSeq
 
     if (verbose) {
       if (allCycles.nonEmpty) {

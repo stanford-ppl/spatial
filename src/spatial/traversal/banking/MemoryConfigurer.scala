@@ -121,7 +121,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     mem.duplicates = duplicates
 
     instances.zipWithIndex.foreach{case (inst, dispatch) =>
-      List(inst.reads.iterator, inst.writes.iterator).foreach { 
+      List(inst.reads.iterator, inst.writes.iterator).foreach {
         _.zipWithIndex.foreach { case (grp, i) =>
           grp.foreach { a =>
             a.access.addGroupId(a.unroll, Set(i))
@@ -152,14 +152,14 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val used = instances.flatMap(_.accesses).toSet
     val unused = mem.accesses diff used
     unused.foreach{access =>
-      if (mem.name.isDefined) {
+      if (mem.name.isDefined && !mem.keepUnused) {
         val msg = if (access.isReader) s"Read of memory ${mem.name.get} was unused. Read will be removed."
                   else s"Write to memory ${mem.name.get} is never used. Write will be removed."
         warn(access.ctx, msg)
         warn(access.ctx)
       }
 
-      access.isUnusedAccess = true
+      if (!mem.keepUnused) access.isUnusedAccess = true
 
       dbgs(s"  Unused access: ${stm(access)}")
     }
@@ -610,7 +610,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   protected def bankGroups(rdGroups: Set[Set[AccessMatrix]], wrGroups: Set[Set[AccessMatrix]]): Either[Issue,Seq[Instance]] = {
     val reads = rdGroups.flatten
     val ctrls = reads.map(_.parent)
-    val writes = reachingWrites(reads,wrGroups.flatten,isGlobal)
+    val writes = if (mem.keepUnused) wrGroups.flatten else reachingWrites(reads,wrGroups.flatten,isGlobal)
     val reachingWrGroups = wrGroups.map{grp => grp intersect writes }.filterNot(_.isEmpty)
     // All possible combinations of banking characteristics
     val bankingOptionsIds: List[List[Int]] = combs(List(List.tabulate(bankViews.size){i => i}, List.tabulate(nStricts.size){i => i}, List.tabulate(aStricts.size){i => i}, List.tabulate(dimensionDuplication.size){i => i}))
@@ -631,6 +631,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val (metapipe, bufPorts, issue) = computeMemoryBufferPorts(mem, reads.map(_.access), writes.map(_.access))
     val depth = bufPorts.values.collect{case Some(p) => p}.maxOrElse(0) + 1
     val bankings: Map[BankingOptions, Map[Set[Set[AccessMatrix]], Seq[Seq[Banking]]]] = strategy.bankAccesses(mem, rank, rdGroups, reachingWrGroups, attemptDirectives, depth)
+    dbgs(s"solution bankings are $bankings")
     val result = if (bankings.nonEmpty) {
       if (issue.isEmpty) {
         latestSchemesInfo.clear()
@@ -656,7 +657,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
         bankings.foreach{case (scheme,banking) => banking.head._2.zipWithIndex.foreach{ case (b,optId) => dbgs(s"Cost: ${costs((scheme,optId))} for version $optId of $scheme")}}
         dbgs(s"**************************************************************************************")
         val winningScheme: ((BankingOptions, Int), Double) = costs.toSeq.sortBy(_._2).headOption.getOrElse(throw new Exception(s"Could not bank $mem!"))
-        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map{case (acgrp, opts) => acgrp -> opts(winningScheme._1._2) }.toMap
+        val winner: Map[Set[Set[AccessMatrix]], Seq[Banking]] = bankings(winningScheme._1._1).map { case (acgrp, opts) => acgrp -> opts(winningScheme._1._2) }
         Right(
           winner.flatMap { case (winningRdGrps, winningBanking) =>
             val padding = mem.stagedDims.map(_.toInt).zip(winningBanking.flatMap(_.Ps)).map { case (d, p) => (p - d % p) % p }
@@ -732,7 +733,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     *   3. The merged instance costs more than the total cost of the two separate instances
     */
   protected def getMergeError(i1: Instance, i2: Instance, i3: Instance): Option[String] = {
-    if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
+    if (mem.isMustMerge) None
+    else if (i1.metapipe.isDefined && i2.metapipe.isDefined && !spatialConfig.enableBufferCoalescing)
       Some("Buffer conflict")
     else if (i3.cost > (i1.cost + i2.cost) && !mem.hasDestructiveReads && !mem.isReg && !mem.isLockSRAM)
       Some(s"Too expensive to merge addressable instances: ${i3.cost} > ${i1.cost + i2.cost}")

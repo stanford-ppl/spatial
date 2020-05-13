@@ -57,17 +57,16 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
         // Only use data dependencies
         val consumers = s.consumers.filter(_.nonBlockInputs.contains(s))
         consumers diff c1.symbols.toSet
-      }.toSortedSeq
+      }.toSortedSeq.filter{case Op(RegWrite(c2,_,_)) => c2.originalSym != c1.memory.originalSym; case _ => true}
 
       // Intermediate accumulator values are allowed to be consumed by writes
       // as long as the value is not actually visible until the end of the accumulation
       val intermediates = c1.writer match {
-        case Op(RegWrite(_,data,_)) => Seq(data)
+        case Op(RegWrite(c2,data,_)) if (c2.originalSym != c1.memory.originalSym) => Seq(data)
         case _ => Nil
       }
 
       val isDisjoint      = overlapping.isEmpty
-
       val isClosedCycle   = (c1.symbols.toSet diff intermediates.toSet).forall{s => externalUses(s).isEmpty }
       val noIntermediates = intermediates.forall{s => externalUses(s).isEmpty }
       val noEscaping      = c1.memory.accumType == AccumType.Reduce || noIntermediates

@@ -255,8 +255,6 @@ trait MemoryUnrolling extends UnrollingBase {
           Seq((bankedAccess[A](rhs, mem2, data2.getOrElse(Nil), bank.getOrElse(Nil), ofs.getOrElse(Nil), locks, ens2), vecIds.toList, 0))
         }
 
-        dbgs(s"banked is $banked")
-
         // hack for issue #90
         val newOfs = mems.map{case UnrollInstance(m,_,_,p,_,_) => (m,p)}.take(i).count(_ == (mem2,port))
         

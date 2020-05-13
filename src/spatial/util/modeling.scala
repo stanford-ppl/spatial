@@ -299,58 +299,65 @@ object modeling {
     }
 
     /** If these accesses were banked as part of the same group, then we don't need to treat them as a true AAA cycle */
-    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = {
-      // TODO: Poor man's way of checking if two accesses were part of the same banking group is to check if they came
-      //       from the same pre-unrolled symbol.  Must actually check banking group of each access, perhaps by adding
-      //       some kind of bank group hash metadata.
-      accesses.forallPairs{case (a,b) => a.originalSym.isDefined && a.originalSym == b.originalSym}
+    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{
+      case (a,b) if !(a.isWriter ^ b.isWriter) && a.getGroupId(List()).nonEmpty && b.getGroupId(List()).nonEmpty =>
+        (a.getGroupId(List()).toSet intersect b.getGroupId(List()).toSet).nonEmpty
+      case _ => false
     }
+//    def bankedTogether(accesses: Seq[Sym[_]]): Boolean = accesses.forallPairs{case (a,b) if a.originalSym.isDefined => a.originalSym.get == b.originalSym.get; case _ => false}
 
-    def pushMultiplexedAccesses(accessors: Map[Sym[_],Seq[Sym[_]]]) = accessors.filter{case (_, accesses) => !bankedTogether(accesses)}.flatMap{case (mem,accesses) =>
-      if (accesses.nonEmpty && verbose) {
-        dbgs(s"Multiplexed accesses for memory $mem: ")
-        accesses.foreach { access => dbgs(s"  ${stm(access)}") }
-      }
-
-      // NOTE: After unrolling there should be only one mux index per access
-      // unless the common parent is a Switch
-      val instances = if (mem.getDuplicates.isDefined) mem.duplicates.length else 0
-      (0 to instances - 1).map { id =>
-        val accs = accesses.filter(_.dispatches.values.exists(_.contains(id))).filter(!_.op.get.isInstanceOf[FIFOPeek[_]])
-
-        val muxPairs = accs.map { access =>
-          val muxes = access.ports(0).values.map(_.muxPort)
-          (access, paths.getOrElse(access, 0.0), muxes.maxOrElse(0))
+    def pushMultiplexedAccesses(accessors: Seq[(Sym[_],Seq[Sym[_]])]) = {
+      accessors
+        .filter { case (mem, accesses) => !mem.isAddressable || bankedTogether(accesses) }
+        .sortBy {
+        _._2.head.progorder.getOrElse(0)
+      } // Prevent pushing later nodes out of alignment when they were previously aligned
+        .flatMap { case (mem, accesses) =>
+        if (accesses.nonEmpty && verbose) {
+          dbgs(s"Multiplexed accesses for memory $mem: ")
+          accesses.foreach { access => dbgs(s"  ${stm(access)}") }
         }
-        val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
 
-        // Keep accesses with the same mux index together, even if they have different delays
-        // TODO: This whole analysis seems suspicious but it works.  Probably worth redoing it though since it probably adds unnecessary latency
-        val groupedMuxPairs = muxPairs.groupBy(_._3) // Group by maximum mux port
-        val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy { pairs => pairs.map(_._2).max }
-        var writeStage = 0.0
-        orderedMuxPairs.foreach { pairs =>
-          val dlys = pairs.map(_._2) :+ writeStage
-          val writeDelay = dlys.max
-          writeStage = writeDelay + 1
-          pairs.foreach { case (access, _, _) =>
-            val oldPath = paths(access)
-            dbgs(s"Pushing ${stm(access)} by ${writeDelay - oldPath} to $writeDelay due to muxing.")
-            if (writeDelay - oldPath > 0) {
-              paths(access) = writeDelay
-              dbgs(s"  Also pushing these by ${writeDelay - oldPath}:")
-              // Attempted fix for issue #54. Not sure how this interacts with cycles
-              val affectedNodes = consumersDfs(access.consumers, Set(), scope.toSet) intersect scope
-              affectedNodes.foreach { case x if paths.contains(x) =>
-                dbgs(s"  $x")
-                paths(x) = paths(x) + (writeDelay - oldPath)
-              case _ =>
+        // NOTE: After unrolling there should be only one mux index per access
+        // unless the common parent is a Switch
+        val instances = if (mem.getDuplicates.isDefined) mem.duplicates.length else 0
+        (0 to instances - 1).map { id =>
+          val accs = accesses.filter(_.dispatches.values.exists(_.contains(id))).filter(!_.op.get.isInstanceOf[FIFOPeek[_]])
+
+          val muxPairs = accs.map { access =>
+            val muxes = access.ports(0).values.map(_.muxPort)
+            (access, paths.getOrElse(access, 0.0), muxes.maxOrElse(0))
+          }
+          // Keep accesses with the same mux index together, even if they have different delays
+          // TODO: This whole analysis seems suspicious but it works.  Probably worth redoing it though since it probably adds unnecessary latency
+          val groupedMuxPairs = muxPairs.groupBy(_._3) // Group by maximum mux port
+          val orderedMuxPairs = groupedMuxPairs.values.toSeq.sortBy { pairs => pairs.map(_._2).max }
+          var writeStage = 0.0
+          orderedMuxPairs.foreach { pairs =>
+            val dlys = pairs.map(_._2) :+ writeStage
+            val writeDelay = dlys.max
+            writeStage = writeDelay + 1
+            pairs.foreach { case (access, _, _) =>
+              val oldPath = paths(access)
+              dbgs(s"Pushing ${stm(access)} by ${writeDelay - oldPath} to $writeDelay due to muxing.")
+              if (writeDelay - oldPath > 0) {
+                paths(access) = writeDelay
+                dbgs(s"  Also pushing these by ${writeDelay - oldPath}:")
+                // Attempted fix for issue #54. Not sure how this interacts with cycles
+                val affectedNodes = consumersDfs(access.consumers, Set(), scope.toSet) intersect scope
+                affectedNodes.foreach { case x if paths.contains(x) =>
+                  dbgs(s"  $x")
+                  paths(x) = paths(x) + (writeDelay - oldPath)
+                case _ =>
+                }
               }
             }
           }
-        }
+          val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
+//          val length = if (orderedMuxPairs.nonEmpty) orderedMuxPairs.head.head._2 - orderedMuxPairs.last.head._2 else 0
 
-        AAACycle(accesses, mem, length)
+          AAACycle(accesses, mem, length)
+        }
       }
     }
 
@@ -466,9 +473,8 @@ object modeling {
     val pseudoWarCycles = findPseudoWARCycles(schedule)
     val warCycles = trueWarCycles ++ pseudoWarCycles
 
-    val wawCycles = pushMultiplexedAccesses(accumInfo.writers)
-    val rarCycles = pushMultiplexedAccesses(accumInfo.readers)
-    val allCycles: Seq[Cycle] = (wawCycles ++ rarCycles ++ warCycles).toSortedSeq
+    val aaaCycles = pushMultiplexedAccesses(accumInfo.writers.toSeq ++ accumInfo.readers.toSeq)
+    val allCycles: Seq[Cycle] = (aaaCycles ++ warCycles).toSortedSeq
 
     if (verbose) {
       if (allCycles.nonEmpty) {

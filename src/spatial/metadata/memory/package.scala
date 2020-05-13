@@ -35,6 +35,9 @@ package object memory {
     def isInnerAccum: Boolean = metadata[InnerAccum](s).map(_.isInnerAccum).getOrElse(false)
     def isInnerAccum_=(v: Boolean): Unit = metadata.add(s, InnerAccum(v))
 
+    def keepUnused: Boolean = metadata[KeepUnused](s).map(_.flag).getOrElse(false)
+    def keepUnused_=(v: Boolean): Unit = metadata.add(s, KeepUnused(v))
+
     def isInnerReduceOp: Boolean = metadata[InnerReduceOp](s).map(_.flag).getOrElse(false)
     def isInnerReduceOp_=(v: Boolean): Unit = metadata.add(s, InnerReduceOp(v))
   }
@@ -339,6 +342,7 @@ package object memory {
       }
 
     def isSingleton: Boolean = isReg || isArgIn || isArgOut || isHostIO || isFIFOReg
+    def isAddressable: Boolean = isSRAM || isLineBuffer || isRegFile || isLUT
     def isReg: Boolean = mem.isInstanceOf[Reg[_]]
     def isArgIn: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgInNew[_]] }
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }

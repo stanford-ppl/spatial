@@ -66,6 +66,8 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * Only use this if you know exactly what you are doing! 
     */
   def mustmerge: C[A] = { this.isMustMerge = true; me }
+  /** Do not remove this memory or accesses to this memory, even if anything appears unused*/
+  def dontTouch: C[A] = { this.keepUnused = true; me }
 
   def dualportedread: C[A] = { this.isDualPortedRead = true; me}
   def dualportedwrite: C[A] = { throw new Exception(s"Memories with Dual Write Ports are currently not supported.  They can be implemented pretty easily, but we have not needed them yet.")}
@@ -125,19 +127,40 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 }
 object SRAM {
   /** Allocates a 1-dimensional [[SRAM1]] with capacity of `length` elements of type A. */
-  @api def apply[A:Bits](length: I32): SRAM1[A] = stage(SRAMNew[A,SRAM1](Seq(length)))
+  @api def apply[A:Bits](length: I32): SRAM1[A] = {
+    if (!length.isParam && !length.isConst) error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(SRAMNew[A,SRAM1](Seq(length)))
+  }
 
   /** Allocates a 2-dimensional [[SRAM2]] with `rows` x `cols` elements of type A. */
-  @api def apply[A:Bits](rows: I32, cols: I32): SRAM2[A] = stage(SRAMNew[A,SRAM2](Seq(rows,cols)))
+  @api def apply[A:Bits](rows: I32, cols: I32): SRAM2[A] = {
+    if (!rows.isParam && !rows.isConst && !cols.isParam && !cols.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(SRAMNew[A,SRAM2](Seq(rows,cols)))
+  }
 
   /** Allocates a 3-dimensional [[SRAM3]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): SRAM3[A] = stage(SRAMNew[A,SRAM3](Seq(d0,d1,d2)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32): SRAM3[A] = {
+    if (!d0.isParam && !d0.isConst && !d1.isParam && !d1.isConst && !d2.isParam && !d2.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(SRAMNew[A,SRAM3](Seq(d0,d1,d2)))
+  }
 
   /** Allocates a 4-dimensional [[SRAM4]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32): SRAM4[A] = stage(SRAMNew[A,SRAM4](Seq(d0,d1,d2,d3)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32): SRAM4[A] = {
+    if (!d0.isParam && !d0.isConst && !d1.isParam && !d1.isConst &&
+      !d2.isParam && !d2.isConst && !d3.isParam && !d3.isConst)
+        error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(SRAMNew[A,SRAM4](Seq(d0,d1,d2,d3)))
+  }
 
   /** Allocates a 5-dimensional [[SRAM5]] with the given dimensions and elements of type A. */
-  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): SRAM5[A] = stage(SRAMNew[A,SRAM5](Seq(d0,d1,d2,d3,d4)))
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): SRAM5[A] = {
+    if (!d0.isParam && !d0.isConst && !d1.isParam && !d1.isConst &&
+      !d2.isParam && !d2.isConst && !d3.isParam && !d3.isConst && !d4.isParam && !d4.isConst)
+        error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(SRAMNew[A,SRAM5](Seq(d0,d1,d2,d3,d4)))
+  }
 }
 
 /** A 1-dimensional SRAM with elements of type A. */

@@ -441,6 +441,15 @@ case class NoFlatBank(flag: Boolean) extends Data[NoFlatBank](SetBy.User)
   */
 case class MustMerge(flag: Boolean) extends Data[MustMerge](SetBy.User)
 
+/** Flag set by the user force compiler to keep unused reads and writes in the IR
+  *
+  * Getter:  sym.keepUnused
+  * Setter:  sym.keepUnused = (true | false)
+  * Default: false
+  */
+case class KeepUnused(flag: Boolean) extends Data[KeepUnused](SetBy.User)
+
+
 /** Flag set by the user to let compiler assume memory has dual read ports.
   *
   * Getter:  sym.isDualPortedRead
@@ -527,7 +536,7 @@ sealed trait NStrictness extends SearchPriority {
 case class UserDefinedN(Ns: Seq[Int]) extends NStrictness {
   @stateful def P = 9
   def isRelaxed = false
-  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = axes.map(Ns).toList
+  @stateful def expand(min: Int, max: Int, stagedDims: List[Int], numAccesses: List[Int], axes: Seq[Int]): List[Int] = if (axes.size > 1) Ns.toList else axes.map(Ns).toList
 }
 case object NPowersOf2 extends NStrictness {
   @stateful def P = 1

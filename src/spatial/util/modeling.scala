@@ -353,7 +353,8 @@ object modeling {
               }
             }
           }
-          val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
+          // Need to re-lookup the delay since it may have changed
+          val length = muxPairs.map{x => paths(x._1)}.maxOrElse(0) - muxPairs.map{x => paths(x._1)}.minOrElse(0) + 1
 //          val length = if (orderedMuxPairs.nonEmpty) orderedMuxPairs.head.head._2 - orderedMuxPairs.last.head._2 else 0
 
           AAACycle(accesses, mem, length)

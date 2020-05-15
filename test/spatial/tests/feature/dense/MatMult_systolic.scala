@@ -10,7 +10,7 @@ import spatial.dsl._
 
   type X = FixPt[TRUE,_32,_0]
 
-  val outerTile = 8
+  val outerTile = 4
   val innerTile = 32
   val redPar = 4
 

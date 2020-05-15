@@ -475,7 +475,23 @@ object modeling {
     val warCycles = trueWarCycles ++ pseudoWarCycles
 
     val aaaCycles = pushMultiplexedAccesses(accumInfo.writers.toSeq ++ accumInfo.readers.toSeq)
-    val allCycles: Seq[Cycle] = (aaaCycles ++ warCycles).toSortedSeq
+
+    schedule.foreach{
+      case x if x.isWriter && x.writtenMem.isDefined =>
+        if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
+        if (x.writtenMem.get.isReg) protectRAWCycle(x)
+      case x =>
+    }
+
+    pushSegmentationAccesses()
+    pushRetimeGates()
+
+    // Recompute cycle lengths
+    val allCycles: Seq[Cycle] = (aaaCycles.map{ case AAACycle(accesses, mem, length) =>
+      val newLength = accesses.map{paths(_)}.maxOrElse(0) - accesses.map{paths(_)}.minOrElse(0) + 1
+      if (newLength != length) dbgs(s"length of cycle $accesses on $mem changed from $length to $newLength!")
+      AAACycle(accesses, mem, newLength)
+    } ++ warCycles).toSortedSeq
 
     if (verbose) {
       if (allCycles.nonEmpty) {
@@ -489,16 +505,6 @@ object modeling {
         debugs(s"  [${dly(node)}] ${stm(node)}")
       }
     }
-
-    schedule.foreach{
-      case x if x.isWriter && x.writtenMem.isDefined => 
-        if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
-        if (x.writtenMem.get.isReg) protectRAWCycle(x)
-      case x =>
-    }
-
-    pushSegmentationAccesses()
-    pushRetimeGates()
 
     (paths.toMap, allCycles)
   }

@@ -28,12 +28,20 @@ object modeling {
     else nextBounds.toSortedSeq
   }
 
-  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = frontier.flatMap{x: Sym[_] =>
-    if (scope.contains(x) && !nodes.contains(x)) {
-      consumersDfs(x.consumers, nodes + x, scope)
+  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    val nodeset = nodes.to[mutable.Set]
+    consumersDfs_helper(frontier, nodeset, scope)
+    nodeset.toSortedSeq
+  }
+
+  def consumersDfs_helper(frontier: Set[Sym[_]], nodes: mutable.Set[Sym[_]], scope: Set[Sym[_]]): Unit = {
+    frontier.foreach { x: Sym[_] =>
+      if (scope.contains(x) && !nodes.contains(x)) {
+        nodes += x
+        consumersDfs_helper(x.consumers, nodes, scope)
+      } else scala.collection.mutable.Set.empty[Sym[_]]
     }
-    else nodes
-  }.toSortedSeq
+  }
 
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }

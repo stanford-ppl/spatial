@@ -28,12 +28,22 @@ object modeling {
     else nextBounds.toSortedSeq
   }
 
+  @stateful def consumersSearch(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    if (spatialConfig.dfsAnalysis) consumersDfs(frontier, nodes, scope)
+    else consumersBfs(frontier, nodes, scope)
+  }
   def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = frontier.flatMap{x: Sym[_] =>
     if (scope.contains(x) && !nodes.contains(x)) {
       consumersDfs(x.consumers, nodes + x, scope)
     }
     else nodes
   }.toSortedSeq
+
+  def consumersBfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    val newFrontier: Set[Sym[_]] = frontier.flatMap{x: Sym[_] => x.consumers}.filter{x => !nodes.contains(x) && scope.contains(x)}
+    if (newFrontier.nonEmpty) consumersBfs(newFrontier, nodes ++ frontier, scope)
+    else (nodes ++ frontier).toSortedSeq
+  }
 
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
@@ -344,7 +354,7 @@ object modeling {
                 paths(access) = writeDelay
                 dbgs(s"  Also pushing these by ${writeDelay - oldPath}:")
                 // Attempted fix for issue #54. Not sure how this interacts with cycles
-                val affectedNodes = consumersDfs(access.consumers, Set(), scope.toSet) intersect scope
+                val affectedNodes = consumersSearch(access.consumers, Set(), scope.toSet) intersect scope
                 affectedNodes.foreach { case x if paths.contains(x) =>
                   dbgs(s"  $x")
                   paths(x) = paths(x) + (writeDelay - oldPath)
@@ -399,7 +409,7 @@ object modeling {
           // Place reader at this latency
           val originalReadLatency = paths(reader)
           paths(reader) = baseLatency + 2 /*sram load latency*/
-          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope.toSet) intersect scope).toSortedSeq diff Seq(reader)
+          val affectedNodes = (consumersSearch(reader.consumers, Set(), scope.toSet) intersect scope).toSortedSeq diff Seq(reader)
           dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
           // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
           affectedNodes.foreach{case x if paths.contains(x) =>
@@ -435,7 +445,7 @@ object modeling {
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
         warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
-        val affectedNodes = (consumersDfs(r.consumers, Set(), scope.toSet) intersect scope) :+ r
+        val affectedNodes = (consumersSearch(r.consumers, Set(), scope.toSet) intersect scope) :+ r
         affectedNodes.foreach{
           case x if paths.contains(x) =>
             dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")

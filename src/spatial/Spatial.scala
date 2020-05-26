@@ -322,6 +322,14 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.numSchemesPerRegion = t
     }.text("""Specify how many valid schemes to look for in each region [Default: 2]""")
 
+    cli.opt[Unit]("bfsAnalysis").action{ (_,_) =>
+      spatialConfig.dfsAnalysis = false
+    }.text("""Use BFS when searching for consumers in IR [Default: DFS]""")
+
+    cli.opt[Unit]("dfsAnalysis").action{ (_,_) =>
+      spatialConfig.dfsAnalysis = true
+    }.text("""Use DFS when searching for consumers in IR [Default: DFS]""")
+
     cli.opt[Int]("mersenneRadius").action{ (t,_) =>
       spatialConfig.mersenneRadius = t
     }.text(

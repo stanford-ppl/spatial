@@ -31,13 +31,14 @@ hw:
 	cat kcu1500.hw-resources/SRAMVerilogAWS.v >> ${KCU1500_V_DIR}/SpatialIP.v
 	echo "$$(date +%s)" > end.log
 	echo "1) Run the following:"
-	echo "  cp ${KCU_1500_V_DIR}/SpatialIP.v $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp/hdl/SpatialIP.v"
-	echo "  cp python/TopHost.py $$TIMETOOL_HOME/software/scripts/TopHost.py"
-	echo "  cp python/_AccelTop.py $$TIMETOOL_HOME/software/scripts/_AccelTop.py"
+	echo "  cp verilog-kcu1500/SpatialIP.v $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp/hdl/SpatialIP.v"
+	echo "  cp rogue/TopHost.py $$TIMETOOL_HOME/software/scripts/TopHost.py"
+	echo "  cp rogue/_AccelUnit.py $$TIMETOOL_HOME/software/scripts/_AccelTop.py"
 	echo "Then run the rest of the flow in the ROGUE framwork:"
 	echo "  cd $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp"
 	echo "  make clean && make vcs"
-	echo "Follow the steps that ROGUE gives you and then run `$$TIMETOOL_HOME/software/scripts/HostWrapper.py --dev sim` after you start the FPGA simulator with `simv`"
+	echo "Follow the steps that ROGUE gives you and then, for running with waveforms and the gui, run `$$TIMETOOL_HOME/software/scripts/HostWrapper.py --dev sim` after you start the FPGA simulator with `simv`"
+	echo "Otherwise, you can just do command-line execution (I dont think it generates vcd or vpd) with `$$TIMETOOL_HOME/software/scripts/HostWrapper.py --dev sim` after you start the FPGA simulator with `simv`"
 #ifeq (,$(wildcard $$TIMETOOL_HOME/firmware))
 #	$(error timetool-spatial repo not found.  Please clone from https://github.com/slaclab/timetool-spatial and export TIMETOOL_HOME to point to it.)
 #endif

@@ -27,18 +27,26 @@ object modeling {
     if (toCheckExpanded.nonEmpty) toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}.toSortedSeq
     else nextBounds.toSortedSeq
   }
+  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    val nodeset = nodes.to[mutable.Set]
+    consumersDfs_helper(frontier, nodeset, scope)
+    nodeset.toSortedSeq
+  }
 
+  def consumersDfs_helper(frontier: Set[Sym[_]], nodes: mutable.Set[Sym[_]], scope: Set[Sym[_]]): Unit = {
+    frontier.foreach { x: Sym[_] =>
+      if (scope.contains(x) && !nodes.contains(x)) {
+        nodes += x
+        consumersDfs_helper(x.consumers, nodes, scope)
+      } else scala.collection.mutable.Set.empty[Sym[_]]
+    }
+  }
+      
   @stateful def consumersSearch(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
     if (spatialConfig.dfsAnalysis) consumersDfs(frontier, nodes, scope)
     else consumersBfs(frontier, nodes, scope)
   }
-  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = frontier.flatMap{x: Sym[_] =>
-    if (scope.contains(x) && !nodes.contains(x)) {
-      consumersDfs(x.consumers, nodes + x, scope)
-    }
-    else nodes
-  }.toSortedSeq
-
+      
   def consumersBfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
     val newFrontier: Set[Sym[_]] = frontier.flatMap{x: Sym[_] => x.consumers}.filter{x => !nodes.contains(x) && scope.contains(x)}
     if (newFrontier.nonEmpty) consumersBfs(newFrontier, nodes ++ frontier, scope)

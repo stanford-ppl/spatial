@@ -29,6 +29,7 @@ hw:
 	else if [ "${USE_BRAM}" = "1" ]; then sed -i "s/^module/(* RAM_STYLE = \"block\" *) module/g" ${KCU1500_V_DIR}/SpatialIP.v; \
 	fi; fi; fi;
 	cat kcu1500.hw-resources/SRAMVerilogAWS.v >> ${KCU1500_V_DIR}/SpatialIP.v
+	cat kcu1500.hw-resources/build/RetimeShiftRegister.sv >> ${KCU1500_V_DIR}/SpatialIP.v
 	echo "$$(date +%s)" > end.log
 	echo "1) Run the following:"
 	echo "  cp verilog-kcu1500/SpatialIP.v $$TIMETOOL_HOME/firmware/targets/GenericSpatialApp/hdl/SpatialIP.v"

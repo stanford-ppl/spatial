@@ -24,6 +24,7 @@ object globals {
   def NUM_CHANNELS: Int = target.num_channels
 
   var retime = false
+  var perpetual = false
   var enableModular: Boolean = true
   var enableVerbose: Boolean = false
   var enableDebugRegs: Boolean = true

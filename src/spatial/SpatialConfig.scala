@@ -55,6 +55,7 @@ class SpatialConfig extends Config {
   var enableAsyncMem = false
   var dualReadPort = false
   var dfsAnalysis = true
+  var perpetualIP = false
   var enableRetiming = true
   var enableLooseIterDiffs = false
   var optimizeMul = true

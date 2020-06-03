@@ -569,6 +569,7 @@ trait ChiselGenController extends ChiselGenCommon {
       emit (s"globals.target.fixsub_latency = ${latencyOption("FixSub", Some(1))}")
       emit (s"globals.target.fixmod_latency = ${latencyOption("FixMod", Some(1))}")
       emit (s"globals.target.fixeql_latency = ${latencyOption("FixEql", None)}.toInt")
+      emit (s"globals.perpetual = ${spatialConfig.perpetualIP}")
       // emit (s"tight_control   = ${spatialConfig.enableTightControl}")
       emit (s"globals.target.mux_latency    = ${latencyOption("Mux", None)}.toInt")
       emit (s"globals.target.sramload_latency    = ${latencyOption("SRAMBankedRead", None)}.toInt")

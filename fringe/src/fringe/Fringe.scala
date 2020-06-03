@@ -131,7 +131,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
 
   val command = regs.io.argIns(0)
   val curStatus = regs.io.argIns(1).asTypeOf(new StatusReg)
-  val localEnable = command(0) === 1.U & !curStatus.done
+  val localEnable = if (globals.perpetual) 1.U else command(0) === 1.U & !curStatus.done
   val localReset = command(1) === 1.U | reset.toBool
   io.enable := localEnable
   io.reset := localReset

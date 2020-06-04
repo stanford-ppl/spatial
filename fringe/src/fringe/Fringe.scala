@@ -84,7 +84,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     val (loads, absStores) = channelAssignment.partition(_ < NUM_LOAD_STREAMS)
     val stores = absStores.map{ _ - NUM_LOAD_STREAMS } // Compute indices into stores array
 
-//    println(s"[Fringe] Creating Stream Arbiter $i, assignment: $channelAssignment, Loads: $loads, Stores: $stores")
+    println(s"[Fringe] Creating Stream Arbiter $i, assignment: $channelAssignment, Loads: $loads, Stores: $stores")
     val loadStreams = loads.map{ io.memStreams.loads(_) }
     val storeStreams = stores.map{ io.memStreams.stores(_) }
 

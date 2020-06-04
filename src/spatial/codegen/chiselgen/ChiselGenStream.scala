@@ -173,13 +173,7 @@ trait ChiselGenStream extends ChiselGenCommon {
           emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) & (${strm}.TID.r === $tid.U) & (${strm}.TDEST.r === $tdest.U)""")
         case AxiStream512Bus(tid, tdest) if lhs.tp.typeArgs.head.isInstanceOf[AxiStream512] =>
           warn(s"Not exactly sure what to do with tid = $tid and $tdest = $tdest for reading StreamIn of AxiStream type...")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := ${strm}.TDATA.r }")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TSTRB.r := ${strm}.TSTRB.r }")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TKEEP.r := ${strm}.TKEEP.r }")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TID.r := ${strm}.TID.r }")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDEST.r := ${strm}.TDEST.r }")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TLAST := ${strm}.TLAST }")
-          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TUSER.r := ${strm}.TUSER.r }")
+          emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).TDATA.r := Cat(${strm}.TUSER.r, ${strm}.TDEST.r, ${strm}.TID.r, ${strm}.TLAST.r, ${strm}.TKEEP.r, ${strm}.TSTRB.r, ${strm}.TDATA.r)}")
         case AxiStream512Bus(tid, tdest) => // If Stream was not declared as AxiStream type, assume user only cares about the tdata
           emit(src"(0 until ${ens.length}).map{ i => ${lhs}(i).r := ${strm}.TDATA.r }")
           emit(src"""${strm}.ready := ${and(ens.flatten.toSet)} & ($datapathEn) & (${strm}.TID.r === $tid.U) & (${strm}.TDEST.r === $tdest.U)""")

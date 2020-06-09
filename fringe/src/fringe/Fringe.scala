@@ -84,7 +84,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     val (loads, absStores) = channelAssignment.partition(_ < NUM_LOAD_STREAMS)
     val stores = absStores.map{ _ - NUM_LOAD_STREAMS } // Compute indices into stores array
 
-//    println(s"[Fringe] Creating Stream Arbiter $i, assignment: $channelAssignment, Loads: $loads, Stores: $stores")
+    println(s"[Fringe] Creating Stream Arbiter $i, assignment: $channelAssignment, Loads: $loads, Stores: $stores")
     val loadStreams = loads.map{ io.memStreams.loads(_) }
     val storeStreams = stores.map{ io.memStreams.stores(_) }
 
@@ -131,7 +131,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
 
   val command = regs.io.argIns(0)
   val curStatus = regs.io.argIns(1).asTypeOf(new StatusReg)
-  val localEnable = command(0) === 1.U & !curStatus.done
+  val localEnable = if (globals.perpetual) 1.U else command(0) === 1.U & !curStatus.done
   val localReset = command(1) === 1.U | reset.toBool
   io.enable := localEnable
   io.reset := localReset

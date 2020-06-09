@@ -27,13 +27,31 @@ object modeling {
     if (toCheckExpanded.nonEmpty) toCheckExpanded.flatMap{y => mutatingBounds(y, visited ++ toCheckExpanded, nextBounds)}.toSortedSeq
     else nextBounds.toSortedSeq
   }
+  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    val nodeset = nodes.to[mutable.Set]
+    consumersDfs_helper(frontier, nodeset, scope)
+    nodeset.toSortedSeq
+  }
 
-  def consumersDfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = frontier.flatMap{x: Sym[_] =>
-    if (scope.contains(x) && !nodes.contains(x)) {
-      consumersDfs(x.consumers, nodes + x, scope)
+  def consumersDfs_helper(frontier: Set[Sym[_]], nodes: mutable.Set[Sym[_]], scope: Set[Sym[_]]): Unit = {
+    frontier.foreach { x: Sym[_] =>
+      if (scope.contains(x) && !nodes.contains(x)) {
+        nodes += x
+        consumersDfs_helper(x.consumers, nodes, scope)
+      } else scala.collection.mutable.Set.empty[Sym[_]]
     }
-    else nodes
-  }.toSortedSeq
+  }
+      
+  @stateful def consumersSearch(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    if (spatialConfig.dfsAnalysis) consumersDfs(frontier, nodes, scope)
+    else consumersBfs(frontier, nodes, scope)
+  }
+      
+  def consumersBfs(frontier: Set[Sym[_]], nodes: Set[Sym[_]], scope: Set[Sym[_]]): Seq[Sym[_]] = {
+    val newFrontier: Set[Sym[_]] = frontier.flatMap{x: Sym[_] => x.consumers}.filter{x => !nodes.contains(x) && scope.contains(x)}
+    if (newFrontier.nonEmpty) consumersBfs(newFrontier, nodes ++ frontier, scope)
+    else (nodes ++ frontier).toSortedSeq
+  }
 
   def blockNestedScheduleAndResult(block: Block[_]): (Seq[Sym[_]], Seq[Sym[_]]) = {
     val schedule = block.nestedStms.filter{e => e.isBits | e.isVoid }
@@ -344,7 +362,7 @@ object modeling {
                 paths(access) = writeDelay
                 dbgs(s"  Also pushing these by ${writeDelay - oldPath}:")
                 // Attempted fix for issue #54. Not sure how this interacts with cycles
-                val affectedNodes = consumersDfs(access.consumers, Set(), scope.toSet) intersect scope
+                val affectedNodes = consumersSearch(access.consumers, Set(), scope.toSet) intersect scope
                 affectedNodes.foreach { case x if paths.contains(x) =>
                   dbgs(s"  $x")
                   paths(x) = paths(x) + (writeDelay - oldPath)
@@ -353,7 +371,8 @@ object modeling {
               }
             }
           }
-          val length = muxPairs.map(_._2).maxOrElse(0) - muxPairs.map(_._2).minOrElse(0) + 1
+          // Need to re-lookup the delay since it may have changed
+          val length = muxPairs.map{x => paths(x._1)}.maxOrElse(0) - muxPairs.map{x => paths(x._1)}.minOrElse(0) + 1
 //          val length = if (orderedMuxPairs.nonEmpty) orderedMuxPairs.head.head._2 - orderedMuxPairs.last.head._2 else 0
 
           AAACycle(accesses, mem, length)
@@ -398,7 +417,7 @@ object modeling {
           // Place reader at this latency
           val originalReadLatency = paths(reader)
           paths(reader) = baseLatency + 2 /*sram load latency*/
-          val affectedNodes = (consumersDfs(reader.consumers, Set(), scope.toSet) intersect scope).toSortedSeq diff Seq(reader)
+          val affectedNodes = (consumersSearch(reader.consumers, Set(), scope.toSet) intersect scope).toSortedSeq diff Seq(reader)
           dbgs(s"consumers of $reader are ${reader.consumers}, all affected are $affectedNodes")
           // Push everyone who depends on this reader by baseLatency + its original relative latency to the read
           affectedNodes.foreach{case x if paths.contains(x) =>
@@ -434,7 +453,7 @@ object modeling {
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
         warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
-        val affectedNodes = (consumersDfs(r.consumers, Set(), scope.toSet) intersect scope) :+ r
+        val affectedNodes = (consumersSearch(r.consumers, Set(), scope.toSet) intersect scope) :+ r
         affectedNodes.foreach{
           case x if paths.contains(x) =>
             dbgs(s"  $x - Originally at ${paths(x)}, but must push by $dist due to RAW cycle ${paths(regWrite)} - ${paths(r)}")
@@ -474,7 +493,23 @@ object modeling {
     val warCycles = trueWarCycles ++ pseudoWarCycles
 
     val aaaCycles = pushMultiplexedAccesses(accumInfo.writers.toSeq ++ accumInfo.readers.toSeq)
-    val allCycles: Seq[Cycle] = (aaaCycles ++ warCycles).toSortedSeq
+
+    schedule.foreach{
+      case x if x.isWriter && x.writtenMem.isDefined =>
+        if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
+        if (x.writtenMem.get.isReg) protectRAWCycle(x)
+      case x =>
+    }
+
+    pushSegmentationAccesses()
+    pushRetimeGates()
+
+    // Recompute cycle lengths
+    val allCycles: Seq[Cycle] = (aaaCycles.map{ case AAACycle(accesses, mem, length) =>
+      val newLength = accesses.map{paths(_)}.maxOrElse(0) - accesses.map{paths(_)}.minOrElse(0) + 1
+      if (newLength != length) dbgs(s"length of cycle $accesses on $mem changed from $length to $newLength!")
+      AAACycle(accesses, mem, newLength)
+    } ++ warCycles).toSortedSeq
 
     if (verbose) {
       if (allCycles.nonEmpty) {
@@ -488,16 +523,6 @@ object modeling {
         debugs(s"  [${dly(node)}] ${stm(node)}")
       }
     }
-
-    schedule.foreach{
-      case x if x.isWriter && x.writtenMem.isDefined => 
-        if (x.writtenMem.get.isBreaker) pushBreakNodes(x)
-        if (x.writtenMem.get.isReg) protectRAWCycle(x)
-      case x =>
-    }
-
-    pushSegmentationAccesses()
-    pushRetimeGates()
 
     (paths.toMap, allCycles)
   }

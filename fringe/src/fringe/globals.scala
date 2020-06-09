@@ -24,6 +24,7 @@ object globals {
   def NUM_CHANNELS: Int = target.num_channels
 
   var retime = false
+  var perpetual = false
   var enableModular: Boolean = true
   var enableVerbose: Boolean = false
   var enableDebugRegs: Boolean = true
@@ -53,8 +54,8 @@ object globals {
   var storeStreamInfo: List[StreamParInfo] = Nil
   var gatherStreamInfo: List[StreamParInfo] = Nil
   var scatterStreamInfo: List[StreamParInfo] = Nil
-  var axiStreamInsInfo: List[AXI4StreamParameters] = Nil
-  var axiStreamOutsInfo: List[AXI4StreamParameters] = Nil
+  var axiStreamInsInfo: List[AXI4StreamParameters] = List(AXI4StreamParameters(64,8,64))
+  var axiStreamOutsInfo: List[AXI4StreamParameters] = List(AXI4StreamParameters(64,8,64))
 
   var numAllocators: Int = 0
 

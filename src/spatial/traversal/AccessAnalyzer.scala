@@ -31,7 +31,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
     iters ++= is
     iterStarts ++= is.indices.map{i => is(i) -> istarts(i)}
     loops ++= is.map{_ -> loop}
-    scopes ++= is.map{i => (i -> modeling.consumersDfs(i.consumers,Set(), scope)) }
+    scopes ++= is.map{i => (i -> modeling.consumersSearch(i.consumers,Set(), scope)) }
     visitBlock(block)
 
     iters = saveIters

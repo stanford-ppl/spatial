@@ -93,6 +93,10 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
     case (_,Op(FixAdd(c,x))) if c == a => -x // a - (a + x) = -x
 
     case (Op(FixAdd(x,Const(r))), Const(q)) => stage(FixAdd(x, Type[Fix[S,I,F]].from(r - q)))
+    case (Op(FixAdd(x,y)), Op(FixAdd(w,z))) if x == w => stage(FixSub(y, z))
+    case (Op(FixAdd(x,y)), Op(FixAdd(w,z))) if x == z => stage(FixSub(y, w))
+    case (Op(FixAdd(x,y)), Op(FixAdd(w,z))) if y == w => stage(FixSub(x, z))
+    case (Op(FixAdd(x,y)), Op(FixAdd(w,z))) if y == z => stage(FixSub(x, w))
     case (Op(FixSub(x,Const(r))), Const(q)) => stage(FixSub(x, Type[Fix[S,I,F]].from(r + q)))
     case (Const(q), Op(FixAdd(x,Const(r)))) => stage(FixSub(Type[Fix[S,I,F]].from(q - r), x))
     case (Const(q), Op(FixSub(x,Const(r)))) => stage(FixAdd(Type[Fix[S,I,F]].from(q + r), x))

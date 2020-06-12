@@ -362,7 +362,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       }
 
       if (s.isSingleControl && s.rawSchedule == Pipelined)  s.rawSchedule = Sequenced
-      if (s.isInnerControl && s.rawSchedule == Streaming)   s.rawSchedule = Pipelined
+      // TODO: Why are Streaming controllers forced to be Pipelined controllers?!
+//      if (s.isInnerControl && s.rawSchedule == Streaming)   s.rawSchedule = Pipelined
       if (isSingleChildOuter && s.rawSchedule == Pipelined) s.rawSchedule = Sequenced
       if (s.isUnitPipe && s.rawSchedule == Fork) s.rawSchedule = Sequenced // Undo transfer of metadata copied from Switch in PipeInserter
 

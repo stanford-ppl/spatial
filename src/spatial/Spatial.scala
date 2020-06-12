@@ -322,6 +322,14 @@ trait Spatial extends Compiler with ParamLoader {
       spatialConfig.numSchemesPerRegion = t
     }.text("""Specify how many valid schemes to look for in each region [Default: 2]""")
 
+    cli.opt[Unit]("bfsAnalysis").action{ (_,_) =>
+      spatialConfig.dfsAnalysis = false
+    }.text("""Use BFS when searching for consumers in IR [Default: DFS]""")
+
+    cli.opt[Unit]("dfsAnalysis").action{ (_,_) =>
+      spatialConfig.dfsAnalysis = true
+    }.text("""Use DFS when searching for consumers in IR [Default: DFS]""")
+
     cli.opt[Int]("mersenneRadius").action{ (t,_) =>
       spatialConfig.mersenneRadius = t
     }.text(
@@ -385,6 +393,9 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Unit]("noFuseFMA").action{(_,_) => spatialConfig.fuseAsFMA = false}.text("Do not fuse patterns in the form of Add(Mul(a,b),c) as FMA(a,b,c) [false]")
     cli.opt[Unit]("forceFuseFMA").action{(_,_) => spatialConfig.forceFuseFMA = true}.text("Force all Add(Mul(a,b),c) patterns to become FMA(a,b,c), even if they increase initiation interval.  --noFuseFMA takes priority [false]")
+
+    cli.opt[Unit]("perpetualIP").action{(_,_) => spatialConfig.perpetualIP = true}.text("Force SpatialIP external enable signal to be hardcoded to true.  Good for apps where you plan to rip the SpatialIP verilog and plug it into something else [false]")
+    cli.opt[String]("dmaChannelAssignment").action{(t,_) => spatialConfig.channelAssignment = t}.text("Select how app load/store channels are allocated to DRAM channels. The number of channels is FPGA specific. Options are AllToOne, BasicRoundRobin, ColoredRoundRobin, AdvancedColored [AllToOne]")
 
     cli.opt[Unit]("noOptimizeMul").action{(_,_) => spatialConfig.optimizeMul = false}.text("Do not optimize multiplications if they can be rewritten as sum/subtraction of two pow2 multiplies")
     cli.opt[Unit]("noOptimizeMod").action{(_,_) => spatialConfig.optimizeMod = false}.text("Do not optimize modulo if they can be rewritten shifts and adds using Mersenne numbers")

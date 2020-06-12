@@ -54,7 +54,7 @@ case class DSEAreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: Latenc
     totalArea = area
     println(s"$total $area")
 
-    if (config.enDbg) { areaModel.reportMissing() }
+    //if (config.enDbg) { areaModel.reportMissing() }
 
     super.postprocess(block)
   }

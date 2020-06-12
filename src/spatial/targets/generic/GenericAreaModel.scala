@@ -37,7 +37,7 @@ class GenericAreaModel(target: HardwareTarget, mlModel: AreaEstimator) extends A
     val totalSLICEL = logicSlices + design(SLICEL) + regSlices
     val totalSlices = totalSLICEM + totalSLICEL
 
-    val areaReport = if (config.enInfo) {
+    val areaReport = if (false) {
       s"""
         |Resource Estimate Breakdown:
         |----------------------------

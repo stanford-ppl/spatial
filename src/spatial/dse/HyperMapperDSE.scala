@@ -61,7 +61,7 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |    "number_of_trees": 20
              |  },
              |  "max_number_of_predictions": 1000000,
-             |  "optimization_iterations": 5,
+             |  "optimization_iterations": ${spatialConfig.hypermapper_iters},
              |  "number_of_cpus": 6,
              |  "number_of_repetitions": 1,
              |  "hypermapper_mode": {
@@ -81,7 +81,7 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |  "output_pareto_file": "${config.name}_output_pareto.csv",
              |  "design_of_experiment": {
              |    "doe_type": "random sampling",
-             |    "number_of_samples": 10000
+             |    "number_of_samples": ${spatialConfig.hypermapper_doeSamples}
              |  },
              |  "output_image": {
              |    "output_image_pdf_file": "${config.name}_output_pareto.pdf",

@@ -44,6 +44,8 @@ class SpatialConfig extends Config {
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false
   var codeWindow: Int = 50
+  var hypermapper_doeSamples: Int = 10000
+  var hypermapper_iters: Int = 5
 
   var enableArchDSE: Boolean = false
 

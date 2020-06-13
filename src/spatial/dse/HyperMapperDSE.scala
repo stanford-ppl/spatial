@@ -53,9 +53,9 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
     val workDir = config.cwd + "/dse_hm"
 
     println("Creating Hypermapper config JSON file")
-    withLog(workDir, jsonFile){
-      log(s"{")
-      log(s"""  "application_name": "${config.name}",
+    withGen(workDir, jsonFile){
+      emit(s"{")
+      emit(s"""  "application_name": "${config.name}",
              |  "models": {
              |    "model": "random_forest",
              |    "number_of_trees": 20
@@ -92,15 +92,15 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |  },
              |  "input_parameters": {""".stripMargin)
       space.zipWithIndex.foreach{case (domain, i) =>
-        log(s"""    "${domain.name}": {
+        emit(s"""    "${domain.name}": {
              |      "parameter_type" : "${domain.tp}",
              |      "values" : [${domain.optionsString}],
              |      "parameter_default" : ${domain.valueString},
              |      "prior" : ${domain.prior}
              |    }${if (i == space.length-1) "" else ","}""".stripMargin)
       }
-      log("  }")
-      log("}")
+      emit("  }")
+      emit("}")
     }
 
     case class SpatialError(t: Throwable) extends Throwable

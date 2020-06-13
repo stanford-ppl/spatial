@@ -37,7 +37,7 @@ class XilinxAreaModel(target: XilinxDevice, mlModel: AreaEstimator) extends Area
     val totalSLICEL = logicSlices + design(SLICEL) + regSlices
     val totalSlices = totalSLICEM + totalSLICEL
 
-    val areaReport = if (config.enInfo) {
+    val areaReport = if (false) {
       s"""
         |Resource Estimate Breakdown:
         |----------------------------

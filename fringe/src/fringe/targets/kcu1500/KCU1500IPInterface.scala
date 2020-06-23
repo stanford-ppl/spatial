@@ -12,6 +12,7 @@ class KCU1500IPInterface extends SpatialIPInterface {
   val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 4)
   val axiParams = new AXI4BundleParameters(ADDR_WIDTH, 512, 4)
 
+  val axil_s_clk = Input(Bool())
   val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 

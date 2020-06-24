@@ -62,6 +62,7 @@ switch $TARGET {
 
     # Set axil s clock
     connect_bd_net [get_bd_pins SpatialIP_0/io_axil_s_clk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_aresetn] [get_bd_pins SpatialIP_0/reset]
 
     # # Enable EMIO reset
     # set_property -dict [list CONFIG.PSU__GPIO_EMIO__PERIPHERAL__ENABLE {1}] [get_bd_cells zynq_ultra_ps_e_0]

@@ -85,7 +85,7 @@ switch $TARGET {
 
     # Not sure if this is correct or safe
     connect_bd_net [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins SpatialIP_0/io_axil_s_clk]
-    connect_bd_net [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins SpatialIP_0/reset]
+    # connect_bd_net [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins SpatialIP_0/reset]
 
     ### HP0 Begin {
       # Enable HP0, connect faster clock

@@ -102,6 +102,7 @@ trait TungstenHostGenInterface extends TungstenHostCodegen with CppGenCommon {
       val cdims = dims.map { case Expect(c) => c; case d => quote(d) }
       genAlloc(lhs, dims.forall { _.isConst }) { 
         emit(src"$lhs = malloc(sizeof($tp) * ${cdims.mkString("*")} + ${bytePerBurst});")
+        emit(src"memset($lhs, 0, sizeof($tp) * ${cdims.mkString("*")} + ${bytePerBurst});")
         emit(src"$lhs = (void *) (((uint64_t) ${lhs} + $bytePerBurst - 1) / $bytePerBurst * $bytePerBurst);")
         emit(src"""cout << "Allocate ${lhs.name.getOrElse(lhs)} of size "<< ${cdims.mkString(""" << " * " << """)} << " at " << ($tp*)${lhs} << " (" << (long)$lhs << ")" << endl;""")
       }

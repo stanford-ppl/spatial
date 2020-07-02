@@ -91,7 +91,7 @@ object SparseSRAM {
   /** Allocates a 1-dimensional [[SparseSRAM1]] with capacity of `length` elements of type A. */
   @api def apply[A:Bits](length: I32): SparseSRAM1[A] = 
     stage(SparseSRAMNew[A,SparseSRAM1](Seq(length))).conflictable.mustmerge
-  @api def apply[A:Bits](par:scala.Int)(length: I32): SparseSRAM1[A] = 
+  @api def apply[A:Bits](par:scala.Int, length: I32): SparseSRAM1[A] = 
     stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par)).conflictable.mustmerge
 }
 

@@ -9,7 +9,13 @@ trait MiscAPI {
 
   def * = new Wildcard
 
-  @api def Scan(bv: U32) = stage(ScannerNew(bv))
+  @api def Scan(bv: U512) = stage(ScannerNew(bv, 1))
+  @api def Scan(bvs: U512*): List[Counter[I32]] = {
+    bvs.map{ bv => stage(ScannerNew(bv, 1)) }.toList
+  }
+  @api def Scan(par: scala.Int, bvs: U512*): List[Counter[I32]] = {
+    bvs.map{ bv => stage(ScannerNew(bv, par)) }.toList
+  }
 
   @api def splitter(addr: I32)(func: => Any): Unit = {
     stage(SplitterStart(Seq(addr)))

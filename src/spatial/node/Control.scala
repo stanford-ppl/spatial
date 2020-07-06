@@ -12,7 +12,7 @@ import spatial.lang._
 @op case class ForeverNew() extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
-@op case class ScannerNew(bits: U32) extends Alloc[Counter[I32]] {
+@op case class ScannerNew(bits: U512, par: scala.Int) extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 

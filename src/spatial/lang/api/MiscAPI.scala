@@ -14,7 +14,11 @@ trait MiscAPI {
     bvs.map{ bv => stage(ScannerNew(bv, 1)) }.toList
   }
   @api def Scan(par: scala.Int, bvs: U32*): List[Counter[I32]] = {
-    bvs.map{ bv => stage(ScannerNew(bv, par)) }.toList
+    val n = bvs.size
+    bvs.zipWithIndex.map{ case (bv, i) => 
+      if (i == n-1) stage(ScannerNew(bv, par))
+      else stage(ScannerNew(bv, 1))
+    }.toList
   }
 
   @api def splitter(addr: I32)(func: => Any): Unit = {

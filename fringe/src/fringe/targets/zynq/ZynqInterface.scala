@@ -12,6 +12,7 @@ class ZynqInterface extends SpatialIPInterface {
   val axiLiteParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH, 1)
   val axiParams = new AXI4BundleParameters(ADDR_WIDTH, DATA_WIDTH * WORDS_PER_STREAM, 32)
 
+  val axil_s_clk = Input(Bool())
   val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
   val M_AXI = Vec(NUM_CHANNELS, new AXI4Inlined(axiParams))
 

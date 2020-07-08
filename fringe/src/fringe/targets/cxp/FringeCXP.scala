@@ -9,7 +9,6 @@ import fringe.templates.axi4._
 
 /** Top module for CXP FPGA shell
   * @param blockingDRAMIssue TODO: What is this?
-  * @param axiLiteParams TODO: What is this?
   * @param axiParams TODO: What is this?
   */
 class FringeCXP(

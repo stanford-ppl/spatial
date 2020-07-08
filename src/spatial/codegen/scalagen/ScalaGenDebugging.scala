@@ -3,6 +3,7 @@ package spatial.codegen.scalagen
 import argon._
 import argon.node._
 import spatial.metadata.retiming._
+import spatial.node.RetimeGate
 
 trait ScalaGenDebugging extends ScalaCodegen {
 

@@ -82,6 +82,7 @@ package object control {
       case _:FringeDenseStore[_,_]  => true
       case _:FringeSparseLoad[_,_]  => true
       case _:FringeSparseStore[_,_] => true
+      case _:FringeCoalStore[_,_]   => true
       case _ => false
     }
 
@@ -94,6 +95,7 @@ package object control {
     def isTileStore: Boolean = op match {
       case _:FringeDenseStore[_,_]  => true
       case _:FringeSparseStore[_,_] => true
+      case _:FringeCoalStore[_,_]   => true
       case _ => false
     }
 
@@ -114,6 +116,7 @@ package object control {
 
     def isScatter: Boolean = op match {
       case _:FringeSparseStore[_,_] => true
+      case _:FringeCoalStore[_,_]   => true
       case _ => false
     }
   }

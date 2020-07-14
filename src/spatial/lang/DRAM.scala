@@ -104,6 +104,12 @@ object DRAM {
     stage(DenseTransfer(this,local,isLoad = false, forceAlign=true))
   }
 
+  /** Creates a coalescing transfer from an on-chip data/valid memory with a 
+   *  defined maximum size
+    **/
+  @api def coalesce[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], valid: Local[Bit], len: I32)(implicit tp: Type[Local[A]]): Void = {
+    stage(CoalesceStore(this, data, valid, base, len))
+  }
 }
 
 object DRAM1 {
@@ -214,6 +220,17 @@ object DRAM5 {
   @api def scatter[Local[T]<:LocalMem1[T,Local]](local: Local[A])(implicit L: Type[Local[A]]): Void = {
     stage(SparseTransfer(this,local,isGather = false))
   }
+
 }
+
+// /** A sparse, 1-dimensional region of DRAM with elements of type A. */
+// @ref class DRAMCoalTile[A:Bits] extends DRAM[A,DRAMCoalTile] with Ref[Array[Any],DRAMCoalTile[A]] {
+  // def rank: Seq[Int] = Seq(0)
+// 
+  // /** Creates a coalescing transfer from the on-chip `data` to this sparse region of main memory. */
+  // @api def coalesce[Local[T]<:LocalMem1[T,Local]](data: Local[A], valBits: Local[Bit])(implicit L: Type[Local[A]]): Void = {
+    // stage(CoalesceStore(this,data,valBits))
+  // }
+// }
 
 

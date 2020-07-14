@@ -34,7 +34,8 @@ import spatial.lang._
 // auto-increment the base address.
 @op case class FringeCoalStore[A:Bits,C[T]](
     dram:      DRAM[A,C],
-    cmdStream: StreamOut[Tup3[A,I64,Bit]],
+    setupStream: StreamOut[Tup2[I64,I32]],
+    cmdStream: StreamOut[Tup2[A,Bit]],
     ackStream: StreamIn[Bit])
   extends FringeNode[A,Void] {
   override def effects: Effects = Effects.Writes(ackStream, dram)
@@ -76,7 +77,8 @@ object Fringe {
 
   @rig def coalStore[A:Bits,C[T]](
     dram:      DRAM[A,C],
-    cmdStream: StreamOut[Tup3[A,I64,Bit]],
+    setupStream: StreamOut[Tup2[I64,I32]],
+    cmdStream: StreamOut[Tup2[A,Bit]],
     ackStream: StreamIn[Bit]
-  ): Void = stage(FringeCoalStore[A,C](dram,cmdStream,ackStream))
+  ): Void = stage(FringeCoalStore[A,C](dram,setupStream,cmdStream,ackStream))
 }

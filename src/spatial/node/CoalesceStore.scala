@@ -87,19 +87,20 @@ object CoalesceStore {
       val validFIFO = valid.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
 
       // Coalesce
-      val cmdBus = StreamOut[Tup3[A,I64,Bit]](CoalesceCmdBus[A]())
+      val setupBus = StreamOut[Tup2[I64,I32]](CoalesceCmdBus[A]())
+      val cmdBus = StreamOut[Tup2[A,Bit]](CoalesceSetupBus[A]())
       val ackBus = StreamIn[Bit](CoalesceAckBus)
 
       // Send TODO
+      setupBus := (pack(base.to[I64]+dram.address, len), dram.isAlloc)
       Foreach(len par p){i =>
-        // val addr: I64  = ((origin + addrs.__read(Seq(i), Set.empty)) * bytesPerWord).to[I64] + dram.address
-        val addr: I64  = if (i == 0) { base.to[I64] + dram.address } else { -1.to[I64] }
+        // val addr: I64  = if (i == 0) { base.to[I64] + dram.address } else { -1.to[I64] }
         val data       = local.__read(Seq(i), Set.empty)
         val dat_val    = valid.__read(Seq(i), Set.empty)
-        cmdBus := (pack(data, addr, dat_val), dram.isAlloc)
+        cmdBus := (pack(data, dat_val), dram.isAlloc)
       }
       // Fringe
-      val store = Fringe.coalStore(dram, cmdBus, ackBus)
+      val store = Fringe.coalStore(dram, setupBus, cmdBus, ackBus)
       transferSyncMeta(old, store)
       // Receive
       Foreach(len by 1 par p){i =>

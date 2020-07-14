@@ -13,6 +13,12 @@ import spatial.lang._
     )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 
+@op case class SparseParSRAMNew[A:Bits,C[T]](
+    dims: Seq[I32],
+    par: Int
+    )(implicit val tp: Type[C[A]])
+  extends MemAlloc[A,C]
+
 @op case class SparseDRAMNew[A:Bits,C[T]](
     dims: Seq[I32],
     par: Int

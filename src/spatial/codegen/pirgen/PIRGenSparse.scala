@@ -10,10 +10,13 @@ trait PIRGenSparse extends PIRCodegen {
 
   override protected def genAccel(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case op@SparseSRAMNew(dims)       => 
-      stateMem(lhs, "SparseMem(false)")
+      stateMem(lhs, src"""SparseMem("SRAM")""")
+
+    case op@SparseParSRAMNew(dims, par)       => 
+      stateMem(lhs, src"""SparseMem("ParSRAM", $par)""")
 
     case op@SparseDRAMNew(dims, par)       => 
-      stateMem(lhs, src"SparseMem(true, $par).alias.update(${lhs.alias})")
+      stateMem(lhs, src"""SparseMem("ParDRAM", $par).alias.update(${lhs.alias})""")
 
     case op@SparseSRAMBankedRead(sram,bank,ofs,barriers,ens)       => 
       stateAccess(lhs, sram, ens) {

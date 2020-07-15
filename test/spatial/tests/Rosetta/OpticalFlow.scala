@@ -10,36 +10,27 @@
 //@spatial abstract class CleanOpticalFlow(version: scala.Int) extends SpatialTest {
 //
 //  type Pixel = FixPt[TRUE, _9, _23]
+//  @struct case class Velocity(x: Pixel, y: Pixel)
 //  @struct case class Gradient(x: Pixel, y: Pixel, z: Pixel)
 //  @struct case class Outer(xx: Pixel, yy: Pixel, zz: Pixel, xy: Pixel, xz: Pixel, yz: Pixel)
 //  @struct case class Tensor(xx: Pixel, yy: Pixel, zz: Pixel, xy: Pixel, xz: Pixel, yz: Pixel)
-//  type Input = FixPt[TRUE, _9, _23]
+//  @struct case class Input(a1: I8, a2: I8, a3: I8, a4: I8, a5: I8, pad: FixPt[FALSE,_24,_0])
 //  type PixelLong = FixPt[TRUE, _9, _23] //55]
 //
 //  def main(args: Array[String]): Void = {
 //    val max_height = 436
 //    val max_width = 1024
 //
-//    /* Input */
-//    val frame1 = DRAM[Input](max_height, max_width)
-//    val frame2 = DRAM[Input](max_height, max_width)
-//    val frame3_a = DRAM[Input](max_height, max_width)
-//    val frame3_b = DRAM[Input](max_height, max_width)
-//    val frame4 = DRAM[Input](max_height, max_width)
-//    val frame5 = DRAM[Input](max_height, max_width)
-//
-//
-//    Accel {
-//      def original_gradient_xy_calc(frame: SRAM2[Input], gx: SRAM2[Pixel], gy: SRAM2[Pixel]): Unit = {
+//   def original_gradient_xy_calc(frame: SRAM2[I8], gx: SRAM2[Pixel], gy: SRAM2[Pixel]): Unit = {
 //        Sequential.Foreach(frame.rows + 2 by 1, frame.cols + 2 by 1) { (r, c) =>
-//          val lilbuf = SRAM[Input](5)
-//          val bigbuf = SRAM[Input](5, max_width)
-//          val window = RegFile[Input](5, 5)
+//          val lilbuf = SRAM[Pixel](5)
+//          val bigbuf = SRAM[Pixel](5, max_width)
+//          val window = RegFile[Pixel](5, 5)
 //          val grad_weights = LUT[I16](5)(1, -8, 0, 8, 1)
 //
 //          Foreach(4 by 1) { i => lilbuf(i) = bigbuf(i + 1, c) }
-//          if (r < max_height && c < max_width) lilbuf(4) = frame(r, c)
-//          else lilbuf(4) = 0
+//          if (r < max_height && c < max_width) lilbuf(4) = frame(r, c).to[Pixel]
+//          else lilbuf(4) = 0.to[Pixel]
 //
 //          // wtf is this bs?
 //          if (r < max_height && c < max_width) {
@@ -61,10 +52,10 @@
 //          val grad_y = Reg[Pixel](0)
 //          if (r >= 4 && r < max_height && c >= 4 && c < max_width) {
 //            Reduce(grad_x)(5 by 1) { i =>
-//              window(2, i) * grad_weights(i).to[Input]
+//              window(2, i) * grad_weights(i).to[Pixel]
 //            } {_ + _}
 //            Reduce(grad_y)(5 by 1) { i =>
-//              window(i, 2) * grad_weights(i).to[Input]
+//              window(i, 2) * grad_weights(i).to[Pixel]
 //            } {_ + _}
 //            gx(r - 2, c - 2) = grad_x.value / 12
 //            gy(r - 2, c - 2) = grad_y.value / 12
@@ -75,11 +66,11 @@
 //
 //        }
 //      }
-//      def original_gradient_z_calc(frame_1: SRAM2[Input], frame_2: SRAM2[Input], frame_3: SRAM2[Input], frame_4: SRAM2[Input], frame_5: SRAM2[Input], gz: SRAM2[Pixel]): Unit = {
-//        val grad_weights = LUT[I16](5)(1, -8, 0, 8, 1)
+//      def original_gradient_z_calc(frame_1: SRAM2[I8], frame_2: SRAM2[I8], frame_3: SRAM2[I8], frame_4: SRAM2[I8], frame_5: SRAM2[I8], gz: SRAM2[Pixel]): Unit = {
+//        val grad_weights = LUT[I8](5)(1, -8, 0, 8, 1)
 //        Foreach(max_height by 1, max_width by 1) { (r, c) =>
-//          gz(r, c) = (frame_1(r, c) * grad_weights(0).to[Pixel] + frame_2(r, c) * grad_weights(1).to[Pixel] +
-//                      frame_3(r, c) * grad_weights(2).to[Pixel] + frame_4(r, c) * grad_weights(3).to[Pixel] + frame_5(r, c) * grad_weights(4).to[Pixel]) / 12
+//          gz(r, c) = ((frame_1(r, c) * grad_weights(0) + frame_2(r, c) * grad_weights(1) +
+//                      frame_3(r, c) * grad_weights(2) + frame_4(r, c) * grad_weights(3) + frame_5(r, c) * grad_weights(4)) / 12).to[Pixel]
 //        }
 //      }
 //
@@ -99,13 +90,13 @@
 //      }
 //
 //      def original_gradient_weight_x(y_filt: SRAM2[Gradient], filt_grad: SRAM2[Gradient]): Unit = {
-//        val buf = RegFile[Gradient](7)
+//        val buf = RegFile[Gradient](1,7)
 //        val grad_filter = LUT[Pixel](7)(0.0755, 0.133, 0.1869, 0.2903, 0.1869, 0.133, 0.0755)
 //        Foreach(max_height by 1, max_width+3 by 1){ (r,c) =>
-//            buf(*) <<= mux(c < max_width, y_filt(r,c), Gradient(0,0,0))
-//            val accx = Reduce(Reg[Pixel])(7 by 1) {i => buf(i).x * grad_filter(i)}{_+_}
-//            val accy = Reduce(Reg[Pixel])(7 by 1) {i => buf(i).y * grad_filter(i)}{_+_}
-//            val accz = Reduce(Reg[Pixel])(7 by 1) {i => buf(i).z * grad_filter(i)}{_+_}
+//            buf(1,*) <<= mux(c < max_width, y_filt(r,c), Gradient(0,0,0))
+//            val accx = Reduce(Reg[Pixel])(7 by 1) {i => buf(0,i).x * grad_filter(i)}{_+_}
+//            val accy = Reduce(Reg[Pixel])(7 by 1) {i => buf(0,i).y * grad_filter(i)}{_+_}
+//            val accz = Reduce(Reg[Pixel])(7 by 1) {i => buf(0,i).z * grad_filter(i)}{_+_}
 //            filt_grad(r,c-3) = mux (c >= 3, Gradient(accx, accy, accz), Gradient(0.to[Pixel],0.to[Pixel],0.to[Pixel]))
 //        }
 //      }
@@ -115,37 +106,59 @@
 //        val lut = LUT[Pixel](3)(0.3243, 0.3513, 0.3243)
 //        Foreach(max_height+1 by 1, max_width by 1) {(r,c) =>
 //          Foreach(1 until 3 by 1){i => buf(i-1,c) = buf(i,c)}
-//          buf(2, c) = mux(r < max_height, outer(r,c), Outer(0,0,0,0,0,0))
+//          buf(2, c) = mux(r < max_height, outer(r,c), Outer(0.to[Pixel],0.to[Pixel],0.to[Pixel],0.to[Pixel],0.to[Pixel],0.to[Pixel]))
 //          val acc = Reg[Tensor]
-//          Foreach(3 by 1){ i =>
-//            acc := Tensor(acc)
-//
-//        }
-//      }
-//
-//
-//      tensor_t acc;
-//      TENSOR_WEIGHT_Y_ACC_INIT: for(int k =0; k<6; k++)
-//        acc.val[k] = 0;
-//
-//      if (r >= 2 && r < MAX_HEIGHT)
-//      {
-//        TENSOR_WEIGHT_Y_TMP_OUTER: for(int i=0; i<3; i++)
-//        {
-//          tmp = buf.getval(i,c);
-//          pixel_t k = TENSOR_FILTER[i];
-//          TENSOR_WEIGHT_Y_TMP_INNER: for(int component=0; component<6; component++)
-//          {
-//            acc.val[component] += tmp.val[component]*k;
+//          if (r >= 2 && r < max_height) {
+//            Foreach(3 by 1) { i =>
+//              val k = lut(i)
+//              val tmp = buf(i,c)
+//              acc := Tensor(acc.xx + tmp.xx * k, acc.yy + tmp.yy * k, acc.zz + tmp.zz * k, acc.xy + tmp.xy * k, acc.xz + tmp.xz * k, acc.yz + tmp.yz * k)
+//            }
 //          }
+//          if (r >= 1) tensor_y(r-1,c) = acc.value
 //        }
 //      }
-//      if(r >= 1)
-//      {
-//        tensor_y[r-1][c] = acc;
+//
+//      def original_tensor_weight_x(tensor_y: SRAM2[Tensor], tensor: SRAM2[Tensor]): Unit = {
+//        val buf = SRAM[Tensor](3)
+//        val lut = LUT[Pixel](3)(0.3243, 0.3513, 0.3243)
+//        Foreach(max_height by 1, max_width + 1 by 1) {(r,c) =>
+//          Foreach(1 until 3 by 1){i => buf(i-1) = buf(i)}
+//          buf(2) = mux(c < max_width, tensor_y(r,c), Tensor(0,0,0,0,0,0))
+//          val acc = Reg[Tensor]
+//          if (c >= 2 && c < max_width) {
+//            Foreach(3 by 1) { i =>
+//              val k = lut(i)
+//              val tmp = buf(i)
+//              acc := Tensor(acc.xx + tmp.xx * k, acc.yy + tmp.yy * k, acc.zz + tmp.zz * k, acc.xy + tmp.xy * k, acc.xz + tmp.xz * k, acc.yz + tmp.yz * k)
+//            }
+//          }
+//          if (c >= 1) tensor(r,c-1) = acc.value
+//        }
 //      }
-//    }
-//  }
+//
+//      def original_flow_calc(tensors: SRAM2[Tensor], outputs: SRAM1[Velocity]): Unit = {
+//        val buf = Reg[Velocity]
+//        Foreach(max_height by 1, max_width by 1) { (r, c) =>
+//          val tmp_tensor = tensors(r, c)
+//          if (r >= 2 && r < max_height - 2 && c >= 2 && c < max_width - 2) {
+//            val t1 = tmp_tensor.xx
+//            val t2 = tmp_tensor.yy
+//            val t3 = tmp_tensor.zz
+//            val t4 = tmp_tensor.xy
+//            val t5 = tmp_tensor.xz
+//            val t6 = tmp_tensor.yz
+//            val denom = t1 * t2 - t4 * t4
+//            val numer0 = t6 * t4 - t5 * t2
+//            val numer1 = t5 * t4 - t6 * t1
+//            buf := mux(denom == 0, Velocity(0,0), Velocity(numer0 / denom, numer1 / denom))
+//          } else
+//            buf := Velocity(0,0)
+//          outputs(r * max_width + c) = buf.value
+//        }
+//
+//      }
+//
 //      def original_outer_product(gradient: SRAM2[Gradient], outer_prod: SRAM2[Outer]): Unit = {
 //        Foreach(max_height by 1, max_width by 1){(r,c) =>
 //          val g = gradient(r,c)
@@ -153,31 +166,66 @@
 //        }
 //      }
 //
-//      def native_gradient_xy_calc(frame: SRAM2[Input], gx: SRAM2[Pixel], gy: SRAM2[Pixel]): Unit = {
+//      def native_gradient_xy_calc(frame: SRAM2[I8], gx: SRAM2[Pixel], gy: SRAM2[Pixel]): Unit = {
 //        Sequential.Foreach(frame.rows + 2 by 1, frame.cols + 2 by 1) { (r, c) =>
 //          if (r >= 2 && c >= 2) {
-//            gx(r-2, c-2) = mux(r >= 4 && r < max_height && c >= 4 && c < max_width, List.tabulate(5){i => frame(2+r,i+c)}.reduceTree{_+_} / 12, 0.to[Pixel])
-//            gy(r-2, c-2) = mux(r >= 4 && r < max_height && c >= 4 && c < max_width, List.tabulate(5){i => frame(i+r,2+c)}.reduceTree{_+_} / 12, 0.to[Pixel])
+//            gx(r-2, c-2) = mux(r >= 4 && r < max_height && c >= 4 && c < max_width, (List.tabulate(5){i => frame(2+r,i+c)}.reduceTree{_+_} / 12).to[Pixel], 0.to[Pixel])
+//            gy(r-2, c-2) = mux(r >= 4 && r < max_height && c >= 4 && c < max_width, (List.tabulate(5){i => frame(i+r,2+c)}.reduceTree{_+_} / 12).to[Pixel], 0.to[Pixel])
 //          }
 //
 //        }
 //      }
 //
-//      val frame1_a = SRAM[Input](max_height, max_width)
-//      val frame2_a = SRAM[Input](max_height, max_width)
-//      val frame3_a = SRAM[Input](max_height, max_width)
-//      val frame3_b = SRAM[Input](max_height, max_width)
-//      val frame4_a = SRAM[Input](max_height, max_width)
-//      val frame5_a = SRAM[Input](max_height, max_width)
-//      val gradient_x = SRAM[Pixel](max_height, max_width)
-//      val gradient_y = SRAM[Pixel](max_height, max_width)
-//      val gradient_z = SRAM[Pixel](max_height, max_width)
+//    /* Input */
+//    val frame = DRAM[Input](max_height, max_width)
+//
+//    /* Output */
+//    val out = DRAM[Velocity](max_height * max_width)
+//
+//
+//    Accel {
 //
 //      if (version == 0) {
+//        val frame1_a = SRAM[I8](max_height, max_width)
+//        val frame2_a = SRAM[I8](max_height, max_width)
+//        val frame3_a = SRAM[I8](max_height, max_width)
+//        val frame3_b = SRAM[I8](max_height, max_width)
+//        val frame4_a = SRAM[I8](max_height, max_width)
+//        val frame5_a = SRAM[I8](max_height, max_width)
+//        // Populate frames
+//        val buffer = SRAM[Input](max_height, max_width)
+//        buffer load frame
+//        Foreach(max_height by 1, max_width by 1) { (i,j) =>
+//          val tmp = buffer(i,j)
+//          frame1_a(i,j) = tmp.a1
+//          frame2_a(i,j) = tmp.a2
+//          frame3_a(i,j) = tmp.a3
+//          frame3_b(i,j) = tmp.a3
+//          frame4_a(i,j) = tmp.a4
+//          frame5_a(i,j) = tmp.a5
+//        }
+//        val gradient_x = SRAM[Pixel](max_height, max_width)
+//        val gradient_y = SRAM[Pixel](max_height, max_width)
+//        val gradient_z = SRAM[Pixel](max_height, max_width)
+//        val y_filtered = SRAM[Gradient](max_height, max_width)
+//        val filtered_gradient = SRAM[Gradient](max_height, max_width)
+//        val out_product = SRAM[Outer](max_height, max_width)
+//        val tensor_y = SRAM[Tensor](max_height, max_width)
+//        val tensor = SRAM[Tensor](max_height, max_width)
+//        val outputs = SRAM[Velocity](max_height * max_width)
 //        original_gradient_xy_calc(frame3_a, gradient_x, gradient_y)
-//        original_gradient_z_calc(frame1_a, frame2_a, frame3_b, frame4_a, frame5_a, gradient_z);
+//        original_gradient_z_calc(frame1_a, frame2_a, frame3_b, frame4_a, frame5_a, gradient_z)
+//        original_gradient_weight_y(gradient_x, gradient_y, gradient_z, y_filtered)
+//        original_gradient_weight_x(y_filtered, filtered_gradient)
+//        original_outer_product(filtered_gradient, out_product)
+//        original_tensor_weight_y(out_product, tensor_y)
+//        original_tensor_weight_x(tensor_y, tensor)
+//        original_flow_calc(tensor, outputs)
+//        out store outputs
 //      }
 //    }
+//
+//    printArray(getMem(out), "Received")
 //  }
 //}
 //

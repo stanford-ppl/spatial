@@ -28,6 +28,7 @@ import spatial.util.modeling.target
     valid:    Local[Bit],
     base:     I32,
     len:      I32,
+    p:        scala.Int,
     ens:      Set[Bit] = Set.empty,
   )(implicit
     val A:     Bits[A],
@@ -38,7 +39,7 @@ import spatial.util.modeling.target
   extends EarlyBlackBox[Void] {
 
   override def effects: Effects = Effects.Writes(dram) 
-  @rig def lower(old:Sym[Void]): Void = CoalesceStore.transfer(old, dram,data,valid,base,len,ens)
+  @rig def lower(old:Sym[Void]): Void = CoalesceStore.transfer(old, dram,data,valid,base,len,p,ens)
   // @rig def pars: Seq[I32] = {
     // Seq(dram.addrs[_32]().sparsePars().values.head)
   // }
@@ -58,6 +59,7 @@ object CoalesceStore {
     valid:   Local[Bit],
     base:    I32,
     len:     I32,
+    p:       scala.Int,
     ens:     Set[Bit],
   )(implicit
     A:     Bits[A],
@@ -76,7 +78,7 @@ object CoalesceStore {
     // val pars: Map[Int,I32] = dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
     // val p = pars.toSeq.maxBy(_._1)._2
     // TODO: fixthis
-    val p = 1
+    // val p = 1
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 
     assert(spatialConfig.enablePIR)
@@ -91,7 +93,6 @@ object CoalesceStore {
       val cmdBus = StreamOut[Tup2[A,Bit]](CoalesceSetupBus[A]())
       val ackBus = StreamIn[Bit](CoalesceAckBus)
 
-      // Send TODO
       setupBus := (pack(base.to[I64]+dram.address, len), dram.isAlloc)
       Foreach(len par p){i =>
         // val addr: I64  = if (i == 0) { base.to[I64] + dram.address } else { -1.to[I64] }
@@ -100,10 +101,10 @@ object CoalesceStore {
         cmdBus := (pack(data, dat_val), dram.isAlloc)
       }
       // Fringe
-      val store = Fringe.coalStore(dram, setupBus, cmdBus, ackBus)
+      val store = Fringe.coalStore(dram, setupBus, cmdBus, ackBus, p)
       transferSyncMeta(old, store)
       // Receive
-      Foreach(len by 1 par p){i =>
+      Foreach(len by p par 1){i =>
         val ack = ackBus.value()
       }
     }

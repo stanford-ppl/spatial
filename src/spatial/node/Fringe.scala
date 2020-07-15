@@ -36,7 +36,8 @@ import spatial.lang._
     dram:      DRAM[A,C],
     setupStream: StreamOut[Tup2[I64,I32]],
     cmdStream: StreamOut[Tup2[A,Bit]],
-    ackStream: StreamIn[Bit])
+    ackStream: StreamIn[Bit],
+    par: scala.Int)
   extends FringeNode[A,Void] {
   override def effects: Effects = Effects.Writes(ackStream, dram)
 }
@@ -79,6 +80,7 @@ object Fringe {
     dram:      DRAM[A,C],
     setupStream: StreamOut[Tup2[I64,I32]],
     cmdStream: StreamOut[Tup2[A,Bit]],
-    ackStream: StreamIn[Bit]
-  ): Void = stage(FringeCoalStore[A,C](dram,setupStream,cmdStream,ackStream))
+    ackStream: StreamIn[Bit],
+    par: scala.Int
+  ): Void = stage(FringeCoalStore[A,C](dram,setupStream,cmdStream,ackStream, par))
 }

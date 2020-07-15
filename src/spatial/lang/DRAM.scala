@@ -108,7 +108,10 @@ object DRAM {
    *  defined maximum size
     **/
   @api def coalesce[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], valid: Local[Bit], len: I32)(implicit tp: Type[Local[A]]): Void = {
-    stage(CoalesceStore(this, data, valid, base, len))
+    stage(CoalesceStore(this, data, valid, base, len, 1))
+  }
+  @api def coalesce_vec[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], valid: Local[Bit], len: I32)(implicit tp: Type[Local[A]]): Void = {
+    stage(CoalesceStore(this, data, valid, base, len, 16))
   }
 }
 

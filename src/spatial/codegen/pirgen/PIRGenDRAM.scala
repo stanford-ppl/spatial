@@ -55,10 +55,10 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
         src""".ack(MemWrite().setMem($ackStream).data)"""
       )
 
-    case e@FringeCoalStore(dram,setupStream,cmdStream,ackStream) =>
+    case e@FringeCoalStore(dram,setupStream,cmdStream,ackStream,par) =>
       state(lhs)(
-        src"""FringeCoalStore($dram)""" +
-        src""".addr(MemRead().setMem(${Lhs(setupStream,Some("_1"))}))""" + 
+        src"""FringeCoalStore($dram, $par)""" +
+        src""".offset(MemRead().setMem(${Lhs(setupStream,Some("_1"))}))""" + 
         src""".size(MemRead().setMem(${Lhs(setupStream,Some("_2"))}))""" + 
         src""".data(MemRead().setMem(${Lhs(cmdStream,Some("_1"))}))""" +
         src""".valid(MemRead().setMem(${Lhs(cmdStream,Some("_2"))}))""" +

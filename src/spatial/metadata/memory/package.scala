@@ -354,6 +354,9 @@ package object memory {
     }
     def isDRAMAccel: Boolean = mem.op.exists{ case _: DRAMAccelNew[_,_] => true; case _ => false}
 
+    def explicitName: Option[String] = metadata[ExplicitName](mem).map(_.name).headOption
+    def explicitName_=(name: String): Unit = metadata.add(mem, ExplicitName(name))
+
     def isStreamIn: Boolean = mem.isInstanceOf[StreamIn[_]]
     def isStreamOut: Boolean = mem.isInstanceOf[StreamOut[_]]
     def isInternalStream: Boolean = (mem.isStreamIn || mem.isStreamOut) && mem.parent != Ctrl.Host

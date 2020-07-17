@@ -92,7 +92,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
 //  def quitAfter(x: Int): C[A] = { this.quitAfter = x; me }
   /** Do not attempt to bank memory by duplication */
   def nofission: C[A] = { this.isNoFission = true; me }
-  def noduplicate: C[A] = { warn(s".noduplicate will be deprecated.  Please use .nofission instead!"); this.isNoFission = true; me }
+  def noduplicate: C[A] = { println(s"[WARNING] .noduplicate will be deprecated.  Please use .nofission instead!"); this.isNoFission = true; me }
   /** Only attempt to bank with N's from the "likely" category */
   def nBest: C[A] = { this.nConstraints = this.nConstraints :+ NBestGuess; me }
   /** Only attempt to bank with N's from the "relaxed" category */

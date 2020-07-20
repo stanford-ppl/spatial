@@ -166,6 +166,8 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
             case Op(_@FringeSparseStore(d,_,_)) =>
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
+            case Op(_@FringeCoalStore(d,_,_,_)) =>
+              s.writtenDRAMs += d.asInstanceOf[Sym[_]]
             case Op(_@DRAMAlloc(d,_)) => 
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
               s.readDRAMs += d.asInstanceOf[Sym[_]]
@@ -216,12 +218,13 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     *   6. Outer controllers with only one child cannot be Pipelined - override these to Sequenced
     */
   @flow def controlSchedule(s: Sym[_], op: Op[_]): Unit = op match {
-    case _: ParallelPipe         => s.rawSchedule = ForkJoin
-    case _: Switch[_]            => s.rawSchedule = Fork
-    case _: IfThenElse[_]        => s.rawSchedule = Fork
-    case _: SwitchCase[_]        => s.rawSchedule = Sequenced
-    case _: DenseTransfer[_,_,_] => s.rawSchedule = Pipelined
-    case _: SparseTransfer[_,_]  => s.rawSchedule = Pipelined
+    case _: ParallelPipe           => s.rawSchedule = ForkJoin
+    case _: Switch[_]              => s.rawSchedule = Fork
+    case _: IfThenElse[_]          => s.rawSchedule = Fork
+    case _: SwitchCase[_]          => s.rawSchedule = Sequenced
+    case _: DenseTransfer[_,_,_]   => s.rawSchedule = Pipelined
+    case _: CoalesceStore[_,_,_]   => s.rawSchedule = Pipelined
+    case _: SparseTransfer[_,_]    => s.rawSchedule = Pipelined
     case ctrl: Control[_] =>
       logs(s"Determining schedule of $s = $op")
       logs(s"  User Schedule:    ${s.getUserSchedule}")

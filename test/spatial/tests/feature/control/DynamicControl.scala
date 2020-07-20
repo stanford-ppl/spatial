@@ -14,9 +14,13 @@ import spatial.dsl._
       val sram = SRAM[Int](512)
       Foreach(512 by 1) { i => sram(i) = -1 }
 
-      val bv = Reg[U512]
-      bv := 0xF0A5.to[U512]
-      Foreach(Scan(bv)) { i => sram(i) = i }
+      val bv = FIFO[U32](16)
+      Foreach (16 by 16 par 16) { i =>
+        bv.enq(0xF0A5)
+      }
+      // val bv = Reg[U512]
+      // bv := 0xF0A5.to[U512]
+      Foreach(Scan(bv.deq)) { i => sram(i) = i }
 
       dram store sram
     }
@@ -25,6 +29,41 @@ import spatial.dsl._
     assert(true)
   }
 }
+
+@spatial class MultiScanLoop extends SpatialTest {
+  override def runtimeArgs: Args = "32"
+  type T = FixPt[TRUE, _16, _16]
+
+  def main(args: Array[String]): Unit = {
+
+    val dram = DRAM[Int](512)
+
+    Accel {
+      val sram = SRAM[Int](512)
+      Foreach(512 by 1) { i => sram(i) = -1 }
+
+      val bv1 = FIFO[U32](16)
+      val bv2 = FIFO[U32](16)
+
+      Foreach (16 by 16 par 16) { i =>
+        bv1.enq(0xF0A5)
+        bv2.enq(0x7183)
+      }
+
+      // val bv1 = Reg[U512]
+      // bv1 := 0xF0A5.to[U512]
+      // val bv2 = Reg[U512]
+      // bv2 := 0x7183.to[U512]
+      Foreach(Scan(par = 16, bv1.deq, bv2.deq)) { case List(a,b) => if (a != -1 && b != -1) sram(a) = a + b }
+
+      dram store sram
+    }
+
+    printArray(getMem(dram), "Got: ")
+    assert(true)
+  }
+}
+
 
 @spatial class SplitterLoop extends SpatialTest {
   override def runtimeArgs: Args = "32"

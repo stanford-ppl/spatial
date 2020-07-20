@@ -29,6 +29,18 @@ import spatial.lang._
   override def effects: Effects = Effects.Writes(dataStream)
 }
 
+// Fringe-defined coalescing store. Commands are defined as <data, base, val>
+// If base is >= 0, reset the base address for future commands. Otherwise, 
+// auto-increment the base address.
+@op case class FringeCoalStore[A:Bits,C[T]](
+    dram:      DRAM[A,C],
+    setupStream: StreamOut[Tup2[I64,I32]],
+    cmdStream: StreamOut[Tup2[A,Bit]],
+    ackStream: StreamIn[Bit])
+  extends FringeNode[A,Void] {
+  override def effects: Effects = Effects.Writes(ackStream, dram)
+}
+
 @op case class FringeSparseStore[A:Bits,C[T]](
     dram:      DRAM[A,C],
     cmdStream: StreamOut[Tup2[A,I64]],
@@ -36,7 +48,6 @@ import spatial.lang._
   extends FringeNode[A,Void] {
   override def effects: Effects = Effects.Writes(ackStream, dram)
 }
-
 
 object Fringe {
   @rig def denseLoad[A:Bits,C[T]](
@@ -63,4 +74,11 @@ object Fringe {
     cmdStream: StreamOut[Tup2[A,I64]],
     ackStream: StreamIn[Bit]
   ): Void = stage(FringeSparseStore[A,C](dram,cmdStream,ackStream))
+
+  @rig def coalStore[A:Bits,C[T]](
+    dram:      DRAM[A,C],
+    setupStream: StreamOut[Tup2[I64,I32]],
+    cmdStream: StreamOut[Tup2[A,Bit]],
+    ackStream: StreamIn[Bit]
+  ): Void = stage(FringeCoalStore[A,C](dram,setupStream,cmdStream,ackStream))
 }

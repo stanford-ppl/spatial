@@ -82,6 +82,7 @@ package object control {
       case _:FringeDenseStore[_,_]  => true
       case _:FringeSparseLoad[_,_]  => true
       case _:FringeSparseStore[_,_] => true
+      case _:FringeCoalStore[_,_]   => true
       case _ => false
     }
 
@@ -94,6 +95,7 @@ package object control {
     def isTileStore: Boolean = op match {
       case _:FringeDenseStore[_,_]  => true
       case _:FringeSparseStore[_,_] => true
+      case _:FringeCoalStore[_,_]   => true
       case _ => false
     }
 
@@ -114,6 +116,7 @@ package object control {
 
     def isScatter: Boolean = op match {
       case _:FringeSparseStore[_,_] => true
+      case _:FringeCoalStore[_,_]   => true
       case _ => false
     }
   }
@@ -965,7 +968,13 @@ package object control {
     @stateful def start: Sym[F] = if (x.isForever || x.isScanner) I32(0).asInstanceOf[Sym[F]] else x.node.start
     @stateful def step: Sym[F] = if (x.isForever || x.isScanner) I32(1).asInstanceOf[Sym[F]] else x.node.step
     @stateful def end: Sym[F] = if (x.isForever || x.isScanner) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
-    @stateful def ctrPar: I32 = if (x.isForever || x.isScanner) I32(1) else x.node.par
+    @stateful def ctrPar: I32 = {
+      x.asInstanceOf[Counter[I32]] match {
+        case Op(c: CounterNew[_]) => c.par
+        case Op(c: ForeverNew) => I32(1)
+        case Op(c: ScannerNew) => c.par
+      }
+    }
     @stateful def ctrParOr1: Int = ctrPar.toInt
     @rig def ctrWidth: Int = if (x.isForever) 32 else x.node.A.nbits
     @stateful def isStatic: Boolean = (start,step,end) match {

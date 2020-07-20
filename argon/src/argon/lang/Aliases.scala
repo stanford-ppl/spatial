@@ -162,6 +162,9 @@ trait ExternalAliases extends InternalAliases {
   type Tup2[A,B] = argon.lang.Tup2[A,B]
   lazy val Tup2 = argon.lang.Tup2
 
+  type Tup3[A,B,C] = argon.lang.Tup3[A,B,C]
+  lazy val Tup3 = argon.lang.Tup3
+
   type Var[A] = argon.lang.Var[A]
   lazy val Var = argon.lang.Var
 

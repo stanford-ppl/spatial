@@ -109,6 +109,7 @@ case class TransientCleanup(IR: State) extends MutateTransformer with BlkTravers
     // Remove unused counters and counterchains
     case _:(CounterNew[_])   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
     case _:(ScannerNew)   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
+    case _:(DataScannerNew)   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
     case _:CounterChainNew   => if (lhs.getOwner.isEmpty) Invalid else inCtrl(lhs.owner){ updateWithContext(lhs, rhs) }
 
     case RegWrite(reg,value,en) =>

@@ -166,7 +166,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
             case Op(_@FringeSparseStore(d,_,_)) =>
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
-            case Op(_@FringeCoalStore(d,_,_,_)) =>
+            case Op(_@FringeCoalStore(d,_,_,_,_)) =>
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]
             case Op(_@DRAMAlloc(d,_)) => 
               s.writtenDRAMs += d.asInstanceOf[Sym[_]]

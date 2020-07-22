@@ -310,6 +310,7 @@ package object control {
       case Some(op: Control[_]) => op.cchains.exists(_._1.isScanner)
       case Some(op: CounterChainNew) => op.counters.exists(_.isScanner)
       case Some(_: ScannerNew) => true
+      case Some(_: DataScannerNew) => true
       case _ => false
     }
 
@@ -973,6 +974,7 @@ package object control {
         case Op(c: CounterNew[_]) => c.par
         case Op(c: ForeverNew) => I32(1)
         case Op(c: ScannerNew) => c.par
+        case Op(c: DataScannerNew) => I32(1)
       }
     }
     @stateful def ctrParOr1: Int = ctrPar.toInt

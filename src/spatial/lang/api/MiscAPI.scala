@@ -2,7 +2,7 @@ package spatial.lang.api
 
 import argon._
 import forge.tags._
-import spatial.node.{ScannerNew, SplitterEnd, SplitterStart}
+import spatial.node.{DataScannerNew, ScannerNew, SplitterEnd, SplitterStart}
 
 trait MiscAPI {
   def void: Void = Void.c
@@ -19,6 +19,9 @@ trait MiscAPI {
       if (i == n-1) stage(ScannerNew(bv, par))
       else stage(ScannerNew(bv, 1))
     }.toList
+  }
+  @api def DataScan(dat: I32) : List[Counter[I32]] = {
+    List(stage(DataScannerNew(dat, false)), stage(DataScannerNew(dat, true)))
   }
 
   @api def splitter(addr: I32)(func: => Any): Unit = {

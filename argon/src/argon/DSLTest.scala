@@ -184,9 +184,11 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
         None
       })
 
+      val timeoutDuration = if (timeout >= 0) duration.Duration(timeout, "sec") else duration.Duration.Inf
+
       try {
         val f = Future{ scala.concurrent.blocking{ cmd.block(wd) } }
-        val code = Await.result(f, duration.Duration(timeout, "sec"))
+        val code = Await.result(f, timeoutDuration)
         val lines = cmd.stdout()
         val errs  = cmd.errors()
         lines.foreach{ll => val l = ll.replaceAll("[<>]","").replaceAll("&gt","").replaceAll("&lt",""); parse(l); cmdLog.println(l) } // replaceAll to prevent JUnit crash

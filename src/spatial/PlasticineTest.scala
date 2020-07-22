@@ -98,7 +98,8 @@ trait PlasticineTest extends DSLTest { test =>
     def pirpass(pass:String, args:List[String]) = {
       var cmd = pirArgList ++ args
       cmd ++= pirCliArgs
-      val timeout = 100000
+      //val timeout = 100000
+      val timeout = -1
       scommand(pass, cmd, timeout, parsepir _, RunError.apply)
     }
 

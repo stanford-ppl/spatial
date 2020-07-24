@@ -12,7 +12,10 @@ import spatial.lang._
 @op case class ForeverNew() extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
-@op case class ScannerNew(bits: U32, par: scala.Int) extends Alloc[Counter[I32]] {
+// New behavior: if outIdx is true, return the output index. Otherwise, return 
+// the input index (prefix sum), which is useful for reverse indexing (e.g., 
+// into a dense vector of inputs).
+@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Boolean) extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 

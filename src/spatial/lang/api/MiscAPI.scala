@@ -9,16 +9,20 @@ trait MiscAPI {
 
   def * = new Wildcard
 
-  @api def Scan(bv: U32) = stage(ScannerNew(bv, 1))
+  // Deprecated: use the new Scan() syntax instead
+  /* @api def Scan(bv: U32) = stage(ScannerNew(bv, 1))
   @api def Scan(bvs: U32*): List[Counter[I32]] = {
     bvs.map{ bv => stage(ScannerNew(bv, 1)) }.toList
-  }
-  @api def Scan(par: scala.Int, bvs: U32*): List[Counter[I32]] = {
+  } */
+  @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {
     val n = bvs.size
     bvs.zipWithIndex.map{ case (bv, i) => 
-      if (i == n-1) stage(ScannerNew(bv, par))
-      else stage(ScannerNew(bv, 1))
-    }.toList
+      if (i == n-1) {
+        List(stage(ScannerNew(count, bv, par, true)), stage(ScannerNew(count, bv, 1, false)))
+      } else { 
+        List(stage(ScannerNew(count, bv, 1, true)), stage(ScannerNew(count, bv, 1, false)))
+      }
+    }.toList.flatten
   }
   @api def DataScan(dat: I32) : List[Counter[I32]] = {
     List(stage(DataScannerNew(dat, false)), stage(DataScannerNew(dat, true)))

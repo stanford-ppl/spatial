@@ -20,8 +20,8 @@ trait PIRGenCounter extends PIRCodegen {
       } else {
         state(lhs)(src"ScanCounterDataFollower($par).tileCount(${count}).mask(${bits})")
       }
-    case DataScannerNew(input, data)                   =>
-      state(lhs)(src"DataScanCounter($data).mask(${input})")
+    case DataScannerNew(count, input, data)                   =>
+      state(lhs)(src"DataScanCounter($data).tileCount(${count}).mask(${input})")
     case LaneStatic(iter,elems)               => state(lhs)(src"Const(List(${elems.mkString(",")}))")
     case _ => super.genAccel(lhs, rhs)
   }

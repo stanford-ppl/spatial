@@ -24,8 +24,8 @@ trait MiscAPI {
       }
     }.toList.flatten
   }
-  @api def DataScan(dat: I32) : List[Counter[I32]] = {
-    List(stage(DataScannerNew(dat, false)), stage(DataScannerNew(dat, true)))
+  @api def DataScan(count: I32, dat: I32) : List[Counter[I32]] = {
+    List(stage(DataScannerNew(count, dat, false)), stage(DataScannerNew(count, dat, true)))
   }
 
   @api def splitter(addr: I32)(func: => Any): Unit = {

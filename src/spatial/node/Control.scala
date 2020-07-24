@@ -19,7 +19,7 @@ import spatial.lang._
   override def effects: Effects = Effects.Unique
 }
 
-@op case class DataScannerNew(input: I32, data: scala.Boolean) extends Alloc[Counter[I32]] {
+@op case class DataScannerNew(count: I32, input: I32, data: scala.Boolean) extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 

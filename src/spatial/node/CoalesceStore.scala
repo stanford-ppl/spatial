@@ -84,6 +84,12 @@ object CoalesceStore {
     assert(spatialConfig.enablePIR)
     // val iters = requestLength
 
+    // You can use FIFORegs here too but small FIFOs may be better for performance.  Not sure.
+    val lenUse1 = FIFO[I32](2)
+    lenUse1.enq(len)
+    val lenUse2 = FIFO[I32](2)
+    lenUse2.enq(len)
+
     val top = Stream {
       val localFIFO = local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
       val validFIFO = valid.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
@@ -94,7 +100,7 @@ object CoalesceStore {
       val ackBus = StreamIn[Bit](CoalesceAckBus)
 
       setupBus := (pack(base.to[I64]+dram.address, len), dram.isAlloc)
-      Foreach(len par p){i =>
+      Foreach(lenUse1.deq() par p){i =>
         // val addr: I64  = if (i == 0) { base.to[I64] + dram.address } else { -1.to[I64] }
         val data       = local.__read(Seq(i), Set.empty)
         val dat_val    = valid.__read(Seq(i), Set.empty)
@@ -104,7 +110,7 @@ object CoalesceStore {
       val store = Fringe.coalStore(dram, setupBus, cmdBus, ackBus, p)
       transferSyncMeta(old, store)
       // Receive
-      Foreach(len by p par 1){i =>
+      Foreach(lenUse2.deq() by p par 1){i =>
         val ack = ackBus.value()
       }
     }

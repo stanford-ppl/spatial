@@ -108,10 +108,16 @@ object DRAM {
    *  defined maximum size
     **/
   @api def coalesce[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], valid: Local[Bit], len: I32)(implicit tp: Type[Local[A]]): Void = {
-    stage(CoalesceStore(this, data, valid, base, len, 1))
+    // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
+    //   Hacking this for now by catching it in a Unique node
+    val params = stage(CoalesceStoreParams(len, base))
+    stage(CoalesceStore(this, data, valid, params, 1))
   }
   @api def coalesce_vec[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], valid: Local[Bit], len: I32)(implicit tp: Type[Local[A]]): Void = {
-    stage(CoalesceStore(this, data, valid, base, len, 16))
+    // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
+    //   Hacking this for now by catching it in a Unique node
+    val params = stage(CoalesceStoreParams(len, base))
+    stage(CoalesceStore(this, data, valid, params, 16))
   }
 }
 

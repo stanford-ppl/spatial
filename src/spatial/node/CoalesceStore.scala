@@ -1,6 +1,7 @@
 package spatial.node
 
 import argon._
+import argon.node.Primitive
 import forge.tags._
 
 import spatial.lang._
@@ -11,6 +12,9 @@ import spatial.util.memops._
 import spatial.util.spatialConfig
 import spatial.util.modeling.target
 
+@op case class CoalesceStoreParams(base: I32, len: I32) extends Primitive[Tup2[I32,I32]] {
+  override def effects = Effects.Sticky
+}
 /** A coalescing store from on-chip to off-chip memory.
   *
   * @tparam A The type of elements being loaded/stored
@@ -26,8 +30,7 @@ import spatial.util.modeling.target
     dram:     Dram[A],
     data:     Local[A],
     valid:    Local[Bit],
-    base:     I32,
-    len:      I32,
+    params:   Tup2[I32,I32],
     p:        scala.Int,
     ens:      Set[Bit] = Set.empty,
   )(implicit
@@ -39,7 +42,7 @@ import spatial.util.modeling.target
   extends EarlyBlackBox[Void] {
 
   override def effects: Effects = Effects.Writes(dram) 
-  @rig def lower(old:Sym[Void]): Void = CoalesceStore.transfer(old, dram,data,valid,base,len,p,ens)
+  @rig def lower(old:Sym[Void]): Void = CoalesceStore.transfer(old, dram,data,valid,params,p,ens)
   // @rig def pars: Seq[I32] = {
     // Seq(dram.addrs[_32]().sparsePars().values.head)
   // }
@@ -57,8 +60,7 @@ object CoalesceStore {
     dram:    Dram[A],
     local:   Local[A],
     valid:   Local[Bit],
-    base:    I32,
-    len:     I32,
+    params:  Tup2[I32,I32],
     p:       scala.Int,
     ens:     Set[Bit],
   )(implicit
@@ -82,13 +84,9 @@ object CoalesceStore {
     val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
 
     assert(spatialConfig.enablePIR)
+    val len = params._1
+    val base = params._2
     // val iters = requestLength
-
-    // You can use FIFORegs here too but small FIFOs may be better for performance.  Not sure.
-    val lenUse1 = FIFO[I32](2)
-    lenUse1.enq(len)
-    val lenUse2 = FIFO[I32](2)
-    lenUse2.enq(len)
 
     val top = Stream {
       val localFIFO = local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
@@ -98,9 +96,10 @@ object CoalesceStore {
       val setupBus = StreamOut[Tup2[I64,I32]](CoalesceCmdBus[A]())
       val cmdBus = StreamOut[Tup2[A,Bit]](CoalesceSetupBus[A]())
       val ackBus = StreamIn[Bit](CoalesceAckBus)
+      val base64 = base.unbox.to[I64]
 
-      setupBus := (pack(base.to[I64]+dram.address, len), dram.isAlloc)
-      Foreach(lenUse1.deq() par p){i =>
+      setupBus := (pack(base64 + dram.address, len.unbox), dram.isAlloc)
+      Foreach(len.unbox par p){i =>
         // val addr: I64  = if (i == 0) { base.to[I64] + dram.address } else { -1.to[I64] }
         val data       = local.__read(Seq(i), Set.empty)
         val dat_val    = valid.__read(Seq(i), Set.empty)
@@ -110,7 +109,7 @@ object CoalesceStore {
       val store = Fringe.coalStore(dram, setupBus, cmdBus, ackBus, p)
       transferSyncMeta(old, store)
       // Receive
-      Foreach(lenUse2.deq() by p par 1){i =>
+      Foreach(len.unbox by p par 1){i =>
         val ack = ackBus.value()
       }
     }

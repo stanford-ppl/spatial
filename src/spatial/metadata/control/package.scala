@@ -967,6 +967,7 @@ package object control {
     }
 
     @stateful def start: Sym[F] = if (x.isForever || x.isScanner) I32(0).asInstanceOf[Sym[F]] else x.node.start
+    // @stateful def reset: Sym[F] = if (!x.isScanner) Bit(false).asInstanceOf[Sym[F]] else x.node.reset
     @stateful def step: Sym[F] = if (x.isForever || x.isScanner) I32(1).asInstanceOf[Sym[F]] else x.node.step
     @stateful def end: Sym[F] = if (x.isForever || x.isScanner) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
     @stateful def ctrPar: I32 = {

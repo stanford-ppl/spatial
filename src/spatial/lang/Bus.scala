@@ -66,6 +66,10 @@ case class CoalesceSetupBus[A:Bits]() extends DRAMBus[Tup2[I64, I32]]
 case class CoalesceCmdBus[A:Bits]() extends DRAMBus[Tup2[A, Bit]]
 case object CoalesceAckBus extends DRAMBus[Bit]
 
+case class DynStoreSetupBus[A:Bits]() extends DRAMBus[I64]
+case class DynStoreCmdBus[A:Bits]() extends DRAMBus[Tup2[A, Bit]]
+case object DynStoreAckBus extends DRAMBus[Bit]
+
 /** Abstract class for any bus which is specific to a particular target and 
   * is created directly in the host part of the spatial app
   */

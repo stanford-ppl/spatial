@@ -204,7 +204,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableSynth ? cppCodegen) ==>
         (spatialConfig.enableResourceReporter ? resourceReporter) ==>
         // (spatialConfig.useAreaModels ? areaModelReporter) ==>
-        (spatialConfig.enablePIR ? pirCodegen) ==>
+        printer ==> (spatialConfig.enablePIR ? pirCodegen) ==>
         (spatialConfig.enableTsth ? tsthCodegen)
     }
 

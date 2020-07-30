@@ -84,6 +84,7 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _:FringeCoalStore[_,_]   => true
       case _:FringeDynStore[_,_]   => true
+      case _:BVBuild   => true
       case _ => false
     }
 
@@ -98,6 +99,7 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _:FringeCoalStore[_,_]   => true
       case _:FringeDynStore[_,_]   => true
+      case _:BVBuild   => true
       case _ => false
     }
 
@@ -120,6 +122,7 @@ package object control {
       case _:FringeSparseStore[_,_] => true
       case _:FringeCoalStore[_,_]   => true
       case _:FringeDynStore[_,_]   => true
+      case _:BVBuild   => true
       case _ => false
     }
   }

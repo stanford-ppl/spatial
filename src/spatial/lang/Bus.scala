@@ -70,6 +70,14 @@ case class DynStoreSetupBus[A:Bits]() extends DRAMBus[I64]
 case class DynStoreCmdBus[A:Bits]() extends DRAMBus[Tup2[A, Bit]]
 case object DynStoreAckBus extends DRAMBus[Bit]
 
+//case class BVGenSetupBus() extends Bus // BlackBoxBus[Tup2[I32,I32]]
+//case class BVGenIdxBus() extends Bus // BlackBoxBus[I32]
+//case object BVGenRetBus extends Bus // BlackBoxBus[Tup2[U32,Bit]]
+
+case class BVGenSetupBus() extends DRAMBus[Tup2[I32,I32]]
+case class BVGenIdxBus() extends DRAMBus[I32]
+case object BVGenRetBus extends DRAMBus[Tup2[U32,Bit]]
+
 /** Abstract class for any bus which is specific to a particular target and 
   * is created directly in the host part of the spatial app
   */

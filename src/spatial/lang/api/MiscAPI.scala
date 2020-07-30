@@ -2,7 +2,9 @@ package spatial.lang.api
 
 import argon._
 import forge.tags._
-import spatial.node.{DataScannerNew, ScannerNew, SplitterEnd, SplitterStart}
+import spatial.node._
+// import spatial.node.{DataScannerNew, ScannerNew, SplitterEnd, SplitterStart}
+import spatial.lang.types._
 
 trait MiscAPI {
   def void: Void = Void.c
@@ -14,6 +16,14 @@ trait MiscAPI {
   @api def Scan(bvs: U32*): List[Counter[I32]] = {
     bvs.map{ bv => stage(ScannerNew(bv, 1)) }.toList
   } */
+  @api def gen_bitvector[Local[T]<:LocalMem1[T,Local]](tree: Boolean, shift: scala.Int, // Static config params
+    max: I32, len: I32, indices: Local[I32], // Runtime config and two outputs
+    bv: Local[U32], last: Local[Bit])  : Unit = {
+      val params = stage(CoalesceStoreParams(max, len))
+      stage(BitVecGenerator(tree, shift, indices, bv, last, params))
+
+    }
+
   @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {
     val n = bvs.size
     bvs.zipWithIndex.map{ case (bv, i) => 

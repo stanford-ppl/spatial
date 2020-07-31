@@ -11,6 +11,7 @@ import spatial.lang._
 
 @op case class FIFOEnq[A:Bits](mem: FIFO[A], data: Bits[A], ens: Set[Bit]) extends Enqueuer[A]
 @op case class FIFODeq[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends Dequeuer[A,A]
+@op case class FIFOPriorityDeq[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends Dequeuer[A,A]
 
 /** Node representing the possibility to dequeue.  To be used with Blackbox interfaces */
 @op case class FIFODeqInterface[A:Bits](mem: FIFO[A], ens: Set[Bit]) extends Dequeuer[A,A] {
@@ -53,4 +54,9 @@ import spatial.lang._
     )(implicit val vA: Type[Vec[A]])
   extends BankedDequeue[A]
 
+@op case class FIFOBankedPriorityDeq[A:Bits](
+    mem:  FIFO[A],
+    enss: Seq[Set[Bit]]
+    )(implicit val vA: Type[Vec[A]])
+  extends BankedDequeue[A]
 

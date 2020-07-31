@@ -516,6 +516,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:LockDRAMWrite[_,_]     => UWrite[A](stage(LockDRAMBankedWrite(mem.asInstanceOf[LockDRAM1[A]], data, bank, ofs, lock, enss)))
     case _:LockDRAMRead[_,_]     => UVecReadSym[A](stage(LockDRAMBankedRead(mem.asInstanceOf[LockDRAM1[A]], bank, ofs, lock, enss)))
     case _:FIFODeq[_]       => UVecReadSym(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], enss)))
+    case _:FIFOPriorityDeq[_]       => UVecReadSym(stage(FIFOBankedPriorityDeq(mem.asInstanceOf[FIFO[A]], enss)))
     case _:FIFODeqInterface[_]       => USymReadSym(stage(FIFODeqInterface(mem.asInstanceOf[FIFO[A]], enss.head)))
     case _:FIFOVecDeq[_]       => UVecReadVec(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], ArrayBuffer.fill(ofs.size)(enss.head))))
     case _:LIFOPop[_]       => UVecReadSym(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))

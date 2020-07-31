@@ -1325,9 +1325,19 @@ package object control {
   }
 
   @stateful def getReadStreams(ctrl: Ctrl): Set[Sym[_]] = {
-    LocalMemories.all.filter{mem => mem.readers.exists{_.parent.s == ctrl.s }}
+    LocalMemories.all.filter{mem => mem.readers.exists{ x =>
+          x.parent.s == ctrl.s && { x match { case Op(_:FIFOBankedPriorityDeq[_]) => false; case _ => true } }
+      }}
       .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox || mem.isInstanceOf[StreamStruct[_]]}
   }
+
+    @stateful def getReadPriorityStreams(ctrl: Ctrl): Set[Sym[_]] = {
+      LocalMemories.all.filter { mem =>
+        mem.readers.exists { x =>
+          x.parent.s == ctrl.s && { x match { case Op(_:FIFOBankedPriorityDeq[_]) => true; case _ => false } }
+        }
+      }
+    }
 
   @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {
     LocalMemories.all.filter{mem => mem.writers.exists{c => c.parent.s == ctrl.s }}

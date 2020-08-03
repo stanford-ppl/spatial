@@ -37,7 +37,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     run  = "bash scripts/regression_run.sh scalasim",
     model = "noninteractive"
   ) {
-    def shouldRun: Boolean = checkFlag("test.Scala")
+    override def shouldRun: Boolean = checkFlag("test.Scala")
     override def parseRunError(line: String): Result = {
       if (line.trim.startsWith("at")) RunError(prev) // Scala exception
       else if (line.trim.contains("Assertion failure")) RunError(line) // Assertion failure

@@ -15,7 +15,7 @@ trait DSLRunnable { self =>
     state.config.genDir = s"$cwd/gen/$name/"
     state.config.repDir = s"$cwd/reports/$name/"
     state.config.setV(1)
-    state.newScope(motion=false)  // Start a new scope (allows global declarations)
+    state.init()  // Start a new scope (allows global declarations)
     state
   }
 

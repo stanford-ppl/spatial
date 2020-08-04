@@ -134,6 +134,8 @@ object BitVecGeneratorTree {
           val vecRet = vecRetBus.value()
           bv.__write(vecRet, Seq(i), Set.empty)
         }
+      }
+      Stream (*) {
         val scalRet = scalRetBus.value()
         prevLen.__write(scalRet._1, Seq(), Set.empty)
         last.__write(scalRet._2, Seq(), Set.empty)

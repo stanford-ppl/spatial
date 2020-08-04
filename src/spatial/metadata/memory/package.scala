@@ -477,7 +477,7 @@ package object memory {
       case Op(FringeSparseStore(_,cmd,_)) => cmd //sic
       case Op(FringeCoalStore(_,_,cmd,_,_)) => cmd //sic
       case Op(FringeDynStore(_,_,cmd,_,_)) => cmd //sic
-      case Op(BVBuild(_,_,cmd,_,_)) => cmd //sic
+      //case Op(BVBuild(_,_,cmd,_,_)) => cmd //sic
       case _ => throw new Exception("No addrStream for $s")
     }
 
@@ -485,7 +485,7 @@ package object memory {
       case Op(FringeDenseStore(_,_,data,_)) => data
       case Op(FringeDenseLoad(_,_,data)) => data
       case Op(FringeSparseLoad(_,_,data)) => data
-      case Op(BVBuild(_,_,_,data,_)) => data //sic
+      //case Op(BVBuild(_,_,_,data,_)) => data //sic
       case _ => throw new Exception("No dataStream for $s")
     }
 
@@ -495,7 +495,7 @@ package object memory {
       case Op(FringeSparseStore(_,_,ack)) => ack
       case Op(FringeCoalStore(_,_,_,ack,_)) => ack
       case Op(FringeDynStore(_,_,_,ack,_)) => ack
-      case Op(BVBuild(_,_,_,_,ack)) => ack //sic
+      //case Op(BVBuild(_,_,_,_,ack)) => ack //sic
       case _ => throw new Exception("No ackStream for $s")
     }
   }

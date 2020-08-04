@@ -52,14 +52,23 @@ import spatial.lang._
   override def effects: Effects = Effects.Writes(ackStream, dram)
 }
 
-@op case class BVBuild(
-    tree: Boolean,
+@op case class BVBuildNoTree(
     shift: Int,
     setupStream: StreamOut[Tup2[I32,I32]],
     cmdStream: StreamOut[I32],
-    retStream: StreamIn[Tup2[U32,Bit]])
+    retStream: StreamIn[U32])
   extends FringeNode[I32,Void] {
   override def effects: Effects = Effects.Writes(retStream)
+}
+
+@op case class BVBuildTree(
+    shift: Int,
+    setupStream: StreamOut[I32],
+    cmdStream: StreamOut[I32],
+    vecOut: StreamIn[U32],
+    scalOut: StreamIn[Tup2[I32,Bit]])
+  extends FringeNode[I32,Void] {
+  override def effects: Effects = Effects.Writes(vecOut, scalOut)
 }
 
 @op case class FringeSparseStore[A:Bits,C[T]](
@@ -112,11 +121,18 @@ object Fringe {
     par: scala.Int
   ): Void = stage(FringeDynStore[A,C](dram,setupStream,cmdStream,ackStream, par))
 
-  @rig def bvBuild(
-    tree: Boolean,
+  @rig def bvBuildNoTree(
     shift: Int,
     setupStream: StreamOut[Tup2[I32,I32]],
     cmdStream: StreamOut[I32],
-    retStream: StreamIn[Tup2[U32,Bit]]
-  ): Void = stage(BVBuild(tree,shift,setupStream,cmdStream,retStream))
+    retStream: StreamIn[U32]
+  ): Void = stage(BVBuildNoTree(shift,setupStream,cmdStream,retStream))
+
+  @rig def bvBuildTree(
+    shift: Int,
+    setupStream: StreamOut[I32],
+    cmdStream: StreamOut[I32],
+    vecOut: StreamIn[U32],
+    scalOut: StreamIn[Tup2[I32,Bit]]
+  ): Void = stage(BVBuildTree(shift,setupStream,cmdStream,vecOut,scalOut))
 }

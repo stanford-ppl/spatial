@@ -16,12 +16,17 @@ trait MiscAPI {
   @api def Scan(bvs: U32*): List[Counter[I32]] = {
     bvs.map{ bv => stage(ScannerNew(bv, 1)) }.toList
   } */
-  @api def gen_bitvector[Local[T]<:LocalMem1[T,Local]](tree: Boolean, shift: scala.Int, // Static config params
+  @api def gen_bitvector[Local[T]<:LocalMem1[T,Local]](shift: scala.Int, // Static config params
     max: I32, len: I32, indices: Local[I32], // Runtime config and two outputs
-    bv: Local[U32], last: Local[Bit])  : Unit = {
+    bv: Local[U32])  : Unit = {
       val params = stage(CoalesceStoreParams(max, len))
-      stage(BitVecGenerator(tree, shift, indices, bv, last, params))
-
+      stage(BitVecGeneratorNoTree(shift, indices, bv, params))
+    }
+  @api def gen_bitvector_tree[Local[T]<:LocalMem1[T,Local]](shift: scala.Int, // Static config params
+    len: I32, indices: Local[I32], // Runtime config and two outputs
+    bv: Local[U32], prevLen: Local[I32], last: Local[Bit])  : Unit = {
+      val params = stage(CoalesceStoreParams(len, len))
+      stage(BitVecGeneratorTree(shift, indices, bv, prevLen, last, params))
     }
 
   @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {

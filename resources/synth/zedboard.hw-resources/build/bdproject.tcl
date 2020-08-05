@@ -44,6 +44,11 @@ switch $TARGET {
     create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 proc_sys_reset_fclk1
     connect_bd_net [get_bd_pins processing_system7_0/FCLK_CLK1] [get_bd_pins proc_sys_reset_fclk1/slowest_sync_clk]
     connect_bd_net [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins proc_sys_reset_fclk1/ext_reset_in]
+    # connect_bd_net [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins SpatialIP_0/reset]
+
+    # Not sure if this is correct or safe
+    connect_bd_net [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins SpatialIP_0/io_axil_s_clk]
+
     ### HP0 Begin {
       # Enable HP0, connect faster clock
       set_property -dict [list CONFIG.PCW_USE_S_AXI_HP0 {1}] [get_bd_cells processing_system7_0]

@@ -47,6 +47,11 @@ import spatial.metadata.memory._
 object Reg {
   @api def apply[A:Bits]: Reg[A] = Reg.alloc[A](zero[A])
   @api def apply[A:Bits](reset: A): Reg[A] = Reg.alloc[A](reset)
+  @api def apply[A:Bits](reset: A, name: Text): Reg[A] = {
+    val x = Reg.alloc[A](reset)
+    x.explicitName = name.toString
+    x
+  }
 
   @rig def alloc[A:Bits](reset: A): Reg[A] = stage(RegNew[A](Bits[A].box(reset)))
   @rig def read[A](reg: Reg[A]): A = {

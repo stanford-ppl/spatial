@@ -84,3 +84,12 @@ case class HotSwapPairings(pairings: Map[Sym[_], Set[Sym[_]]]) extends Data[HotS
   * Default: Map()
   */
 case class InterfaceStream(stream: Sym[_]) extends Data[InterfaceStream](SetBy.Analysis.Self)
+
+/**
+  * Explicit memory name
+  *
+  * Getter:  sym.explicitName
+  * Setter:  sym.explicitName = Some(String)
+  * Default: None
+  */
+case class ExplicitName(name: String) extends Data[ExplicitName](SetBy.User)

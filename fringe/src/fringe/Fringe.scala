@@ -56,11 +56,11 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
     val dram = Vec(NUM_CHANNELS, new DRAMStream(DATA_WIDTH, WORDS_PER_STREAM))
     val heap = Vec(numAllocators, new HeapIO())
 
-    // AXI Debuggers
-    val TOP_AXI = new AXI4Probe(axiLiteParams)
-    val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
-    val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
-    val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
+//    // AXI Debuggers
+//    val TOP_AXI = new AXI4Probe(axiLiteParams)
+//    val DWIDTH_AXI = new AXI4Probe(axiLiteParams)
+//    val PROTOCOL_AXI = new AXI4Probe(axiLiteParams)
+//    val CLOCKCONVERT_AXI = new AXI4Probe(axiLiteParams)
 
     //Accel stream IO
 //    val genericStreamsAccel = Flipped(new GenericStreams(streamInsInfo, streamOutsInfo))
@@ -193,11 +193,11 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   }
 
   dramArbs.zip(io.dram) foreach { case (dramarb, d) => dramarb.io.dram <> d }
-
-  dramArbs(debugChannelID).io.TOP_AXI <> io.TOP_AXI
-  dramArbs(debugChannelID).io.DWIDTH_AXI <> io.DWIDTH_AXI
-  dramArbs(debugChannelID).io.PROTOCOL_AXI <> io.PROTOCOL_AXI
-  dramArbs(debugChannelID).io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
+//
+//  dramArbs(debugChannelID).io.TOP_AXI <> io.TOP_AXI
+//  dramArbs(debugChannelID).io.DWIDTH_AXI <> io.DWIDTH_AXI
+//  dramArbs(debugChannelID).io.PROTOCOL_AXI <> io.PROTOCOL_AXI
+//  dramArbs(debugChannelID).io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   val alloc = curStatus.allocDealloc === 3.U
   val dealloc = curStatus.allocDealloc === 4.U

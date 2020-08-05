@@ -31,9 +31,9 @@ switch $TARGET {
 
     # Drop in ps-pl and Top (not sure if branching based on version is right..)
     if {[string match 2019* $ver]} {
-        create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.3 zynq_ultra_ps_e_0   
+        create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.3 zynq_ultra_ps_e_0
     # } elseif {[string match 2018* $ver]} {
-    #     create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.2 zynq_ultra_ps_e_0   
+    #     create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.2 zynq_ultra_ps_e_0
     } else {
         create_bd_cell -type ip -vlnv xilinx.com:ip:zynq_ultra_ps_e:3.0 zynq_ultra_ps_e_0
     }
@@ -60,25 +60,29 @@ switch $TARGET {
     # Disable unused interfaces
     set_property -dict [list CONFIG.PSU__PCIE__PERIPHERAL__ENABLE {0} CONFIG.PSU__DISPLAYPORT__PERIPHERAL__ENABLE {0}] [get_bd_cells zynq_ultra_ps_e_0]
 
+    # Set axil s clock
+    connect_bd_net [get_bd_pins SpatialIP_0/io_axil_s_clk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_aresetn] [get_bd_pins SpatialIP_0/reset]
+
     # # Enable EMIO reset
     # set_property -dict [list CONFIG.PSU__GPIO_EMIO__PERIPHERAL__ENABLE {1}] [get_bd_cells zynq_ultra_ps_e_0]
-    
+
     # Use HP
     set_property -dict [list CONFIG.PSU__USE__S_AXI_GP2 {0} CONFIG.PSU__USE__S_AXI_GP3 {0} CONFIG.PSU__USE__S_AXI_GP4 {0} CONFIG.PSU__USE__S_AXI_GP5 {0}] [get_bd_cells zynq_ultra_ps_e_0]
-    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp0_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
-    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp1_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
-    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp2_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
-    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp3_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp0_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp1_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp2_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihp3_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
     # connect_bd_intf_net [get_bd_intf_pins axi_dwidth_converter_0/M_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HP0_FPD]
     # connect_bd_intf_net [get_bd_intf_pins axi_dwidth_converter_1/M_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HP1_FPD]
     # Use ACP
     set_property -dict [list CONFIG.PSU__USE__S_AXI_ACP {0}] [get_bd_cells zynq_ultra_ps_e_0]
-    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxiacp_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxiacp_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
     # connect_bd_intf_net [get_bd_intf_pins axi_dwidth_converter_0/M_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_ACP_FPD]
     # Use HPC
     set_property -dict [list CONFIG.PSU__USE__S_AXI_GP0 {1} CONFIG.PSU__USE__S_AXI_GP1 {1}] [get_bd_cells zynq_ultra_ps_e_0]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihpc0_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihpc1_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] 
+    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihpc0_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
+    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxihpc1_fpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/pl_clk0]
     connect_bd_intf_net [get_bd_intf_pins axi_dwidth_converter_0/M_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HPC0_FPD]
     connect_bd_intf_net [get_bd_intf_pins axi_dwidth_converter_1/M_AXI] [get_bd_intf_pins zynq_ultra_ps_e_0/S_AXI_HPC1_FPD]
 
@@ -133,95 +137,95 @@ switch $TARGET {
     # set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {128} CONFIG.ID_WIDTH {6}] [get_bd_cells axi_clock_converter_2]
     # set_property -dict [list CONFIG.PROTOCOL {AXI4} CONFIG.DATA_WIDTH {128} CONFIG.ID_WIDTH {6}] [get_bd_cells axi_clock_converter_3]
 
-    # Loopback debuggers
-    # top signals
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARVALID]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arready] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARREADY]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARADDR] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARADDR]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_araddr] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARADDR]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLEN] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARLEN]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arlen] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLEN]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARSIZE] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARSIZE]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arsize] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARSIZE]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARID] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arid] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARID]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARBURST] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARBURST]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arburst] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARBURST]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLOCK] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARLOCK]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arlock] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLOCK]
-
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWVALID]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awready] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWREADY]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWADDR] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWADDR]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awaddr] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWADDR]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWLEN] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWLEN]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awlen] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWLEN]
-
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_RVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_RVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_rvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_RVALID]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_RREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_RREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_rready] [get_bd_pins SpatialIP_0/io_M_AXI_0_RREADY]
-
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_WVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_WVALID]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_WREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wready] [get_bd_pins SpatialIP_0/io_M_AXI_0_WREADY]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WDATA] [get_bd_pins SpatialIP_0/io_TOP_AXI_WDATA]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wdata] [get_bd_pins SpatialIP_0/io_M_AXI_0_WDATA]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WSTRB] [get_bd_pins SpatialIP_0/io_TOP_AXI_WSTRB]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wstrb] [get_bd_pins SpatialIP_0/io_M_AXI_0_WSTRB]
-
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_BVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_BVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_bvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_BVALID]
-    connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_BREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_BREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_bready] [get_bd_pins SpatialIP_0/io_M_AXI_0_BREADY]
-
-    # dwidth signals
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_araddr] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARADDR]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arlen] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARLEN]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arsize] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARSIZE]
-    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arburst] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARBURST]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arlock] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARLOCK]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awaddr] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWADDR]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awlen] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWLEN]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_rvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_RVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_rready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_RREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WREADY]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wdata] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WDATA]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wstrb] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WSTRB]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_bvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_BVALID]
-    connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_bready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_BREADY]
-
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_arvalid]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arready] [get_bd_pins axi_dwidth_converter_0/m_axi_arready]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_araddr] [get_bd_pins axi_dwidth_converter_0/m_axi_araddr]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arlen] [get_bd_pins axi_dwidth_converter_0/m_axi_arlen]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arsize] [get_bd_pins axi_dwidth_converter_0/m_axi_arsize]
-    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arid] [get_bd_pins axi_dwidth_converter_0/m_axi_arid]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arburst] [get_bd_pins axi_dwidth_converter_0/m_axi_arburst]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arlock] [get_bd_pins axi_dwidth_converter_0/m_axi_arlock]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_awvalid]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awready] [get_bd_pins axi_dwidth_converter_0/m_axi_awready]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awaddr] [get_bd_pins axi_dwidth_converter_0/m_axi_awaddr]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awlen] [get_bd_pins axi_dwidth_converter_0/m_axi_awlen]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_rvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_rvalid]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_rready] [get_bd_pins axi_dwidth_converter_0/m_axi_rready]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_wvalid]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wready] [get_bd_pins axi_dwidth_converter_0/m_axi_wready]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wdata] [get_bd_pins axi_dwidth_converter_0/m_axi_wdata]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wstrb] [get_bd_pins axi_dwidth_converter_0/m_axi_wstrb]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_bvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_bvalid]
-    connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_bready] [get_bd_pins axi_dwidth_converter_0/m_axi_bready]
+    # # Loopback debuggers
+    # # top signals
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARVALID]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arready] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARREADY]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARADDR] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARADDR]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_araddr] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARADDR]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLEN] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARLEN]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arlen] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLEN]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARSIZE] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARSIZE]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arsize] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARSIZE]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARID] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arid] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARID]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARBURST] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARBURST]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arburst] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARBURST]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLOCK] [get_bd_pins SpatialIP_0/io_TOP_AXI_ARLOCK]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_arlock] [get_bd_pins SpatialIP_0/io_M_AXI_0_ARLOCK]
+    #
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWVALID]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awready] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWREADY]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWADDR] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWADDR]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awaddr] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWADDR]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_AWLEN] [get_bd_pins SpatialIP_0/io_TOP_AXI_AWLEN]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_awlen] [get_bd_pins SpatialIP_0/io_M_AXI_0_AWLEN]
+    #
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_RVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_RVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_rvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_RVALID]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_RREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_RREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_rready] [get_bd_pins SpatialIP_0/io_M_AXI_0_RREADY]
+    #
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_WVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_WVALID]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_WREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wready] [get_bd_pins SpatialIP_0/io_M_AXI_0_WREADY]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WDATA] [get_bd_pins SpatialIP_0/io_TOP_AXI_WDATA]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wdata] [get_bd_pins SpatialIP_0/io_M_AXI_0_WDATA]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_WSTRB] [get_bd_pins SpatialIP_0/io_TOP_AXI_WSTRB]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_wstrb] [get_bd_pins SpatialIP_0/io_M_AXI_0_WSTRB]
+    #
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_BVALID] [get_bd_pins SpatialIP_0/io_TOP_AXI_BVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_bvalid] [get_bd_pins SpatialIP_0/io_M_AXI_0_BVALID]
+    # connect_bd_net [get_bd_pins SpatialIP_0/io_M_AXI_0_BREADY] [get_bd_pins SpatialIP_0/io_TOP_AXI_BREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/s_axi_bready] [get_bd_pins SpatialIP_0/io_M_AXI_0_BREADY]
+    #
+    # # dwidth signals
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_araddr] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARADDR]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arlen] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARLEN]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arsize] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARSIZE]
+    # # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arburst] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARBURST]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_arlock] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_ARLOCK]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awaddr] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWADDR]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_awlen] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_AWLEN]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_rvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_RVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_rready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_RREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WREADY]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wdata] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WDATA]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_wstrb] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_WSTRB]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_bvalid] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_BVALID]
+    # connect_bd_net [get_bd_pins axi_dwidth_converter_0/m_axi_bready] [get_bd_pins SpatialIP_0/io_DWIDTH_AXI_BREADY]
+    #
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_arvalid]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arready] [get_bd_pins axi_dwidth_converter_0/m_axi_arready]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_araddr] [get_bd_pins axi_dwidth_converter_0/m_axi_araddr]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arlen] [get_bd_pins axi_dwidth_converter_0/m_axi_arlen]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arsize] [get_bd_pins axi_dwidth_converter_0/m_axi_arsize]
+    # # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arid] [get_bd_pins axi_dwidth_converter_0/m_axi_arid]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arburst] [get_bd_pins axi_dwidth_converter_0/m_axi_arburst]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_arlock] [get_bd_pins axi_dwidth_converter_0/m_axi_arlock]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_awvalid]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awready] [get_bd_pins axi_dwidth_converter_0/m_axi_awready]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awaddr] [get_bd_pins axi_dwidth_converter_0/m_axi_awaddr]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_awlen] [get_bd_pins axi_dwidth_converter_0/m_axi_awlen]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_rvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_rvalid]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_rready] [get_bd_pins axi_dwidth_converter_0/m_axi_rready]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_wvalid]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wready] [get_bd_pins axi_dwidth_converter_0/m_axi_wready]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wdata] [get_bd_pins axi_dwidth_converter_0/m_axi_wdata]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_wstrb] [get_bd_pins axi_dwidth_converter_0/m_axi_wstrb]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_bvalid] [get_bd_pins axi_dwidth_converter_0/m_axi_bvalid]
+    # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/saxigp0_bready] [get_bd_pins axi_dwidth_converter_0/m_axi_bready]
 
     # # clockconverter signals
     # connect_bd_net [get_bd_pins axi_clock_converter_0/m_axi_arvalid] [get_bd_pins SpatialIP_0/io_CLOCKCONVERT_AXI_ARVALID]
@@ -292,7 +296,7 @@ switch $TARGET {
     # connect_bd_net [get_bd_pins axi_clock_converter_2/m_axi_aresetn] [get_bd_pins axi_clock_converter_3/s_axi_aresetn]
     # connect_bd_net [get_bd_pins axi_clock_converter_3/s_axi_aresetn] [get_bd_pins axi_clock_converter_3/m_axi_aresetn]
     # connect_bd_net [get_bd_pins axi_clock_converter_0/m_axi_aresetn] [get_bd_pins rst_ps8_0_${RST_FREQ}M/peripheral_aresetn]
-    
+
     # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] [get_bd_pins axi_clock_converter_0/s_axi_aclk]
     # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] [get_bd_pins axi_clock_converter_1/s_axi_aclk]
     # connect_bd_net [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] [get_bd_pins axi_clock_converter_2/s_axi_aclk]
@@ -327,7 +331,7 @@ set_property top design_1_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 # Copy required files here
-if { [file exists ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v] == 1} {               
+if { [file exists ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v] == 1} {
     file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v ./design_1.v
 } else {
     file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/sim/design_1.v ./design_1.v

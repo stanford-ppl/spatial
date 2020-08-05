@@ -15,6 +15,11 @@ trait NamedCodegen extends Codegen {
   // Quote for sym without looking up in scoped
   def local(s: Sym[_]): String = s"${s}"
 
+  def memNameOr(s: Sym[_], default: String): String = {
+    // Hacky
+    s"${s}_${s.nameOr(default)}${s.explicitName.getOrElse("").replace("Const(","").replace("\"","").replace(")","")}"
+  }
+
   override def named(s: Sym[_], id: Int): String = s.op match {
     case Some(rhs) => rhs match {
       case _: AccelScope       => if (s.isInnerControl) s"${s}_inr_RootController${s._name}" else s"${s}_outr_RootController${s._name}"
@@ -33,13 +38,13 @@ trait NamedCodegen extends Codegen {
       case DRAMAccelNew(_) => s"${s}_${s.nameOr("dramaccel")}"
       case ArgInNew(_)  => s"${s}_${s.nameOr("argIn")}"
       case ArgOutNew(_) => s"${s}_${s.nameOr("argOut")}"
-      case RegNew(_)    => s"${s}_${s.nameOr("reg")}"
-      case FIFORegNew(_)    => s"${s}_${s.nameOr("fiforeg")}"
-      case RegFileNew(_,_) => s"${s}_${s.nameOr("regfile")}"
-      case LineBufferNew(_,_,_) => s"${s}_${s.nameOr("linebuf")}"
-      case FIFONew(_)   => s"${s}_${s.nameOr("fifo")}"
-      case LIFONew(_)   => s"${s}_${s.nameOr("lifo")}"
-      case SRAMNew(_)   => s"${s}_${s.nameOr("sram")}" + {if (spatialConfig.dualReadPort || s.isDualPortedRead) "_dualread" else ""}
+      case RegNew(_)    => s"${memNameOr(s,"reg")}"
+      case FIFORegNew(_)    => s"${memNameOr(s,"fiforeg")}"
+      case RegFileNew(_,_) => s"${memNameOr(s,"regfile")}"
+      case LineBufferNew(_,_,_) => s"${memNameOr(s,"linebuf")}"
+      case FIFONew(_)   => s"${memNameOr(s,"fifo")}"
+      case LIFONew(_)   => s"${memNameOr(s,"lifo")}"
+      case SRAMNew(_)   => s"${memNameOr(s,"sram")}" + {if (spatialConfig.dualReadPort || s.isDualPortedRead) "_dualread" else ""}
       case LUTNew(_,_)  => s"${s}_${s.nameOr("lut")}"
 
       case SetReg(reg,_)      => s"${s}_${s.nameOr(src"set_${local(reg)}")}"

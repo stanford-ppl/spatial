@@ -30,6 +30,7 @@ class FringeZynq(
 
   val io = IO(new Bundle {
     // Host scalar interface
+    val axil_s_clk = Input(Bool())
     val S_AXI = Flipped(new AXI4Lite(axiLiteParams))
 
     // DRAM interface
@@ -68,16 +69,18 @@ class FringeZynq(
   // Common Fringe
   val fringeCommon = Module(new Fringe(blockingDRAMIssue, axiParams))
   fringeCommon.io <> DontCare
+  fringeCommon.io.argEchos <> io.argEchos
 
-  fringeCommon.io.TOP_AXI <> io.TOP_AXI
-  fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI
-  fringeCommon.io.PROTOCOL_AXI <> io.PROTOCOL_AXI
-  fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
+//  fringeCommon.io.TOP_AXI <> io.TOP_AXI
+//  fringeCommon.io.DWIDTH_AXI <> io.DWIDTH_AXI
+//  fringeCommon.io.PROTOCOL_AXI <> io.PROTOCOL_AXI
+//  fringeCommon.io.CLOCKCONVERT_AXI <> io.CLOCKCONVERT_AXI
 
   // AXI-lite bridge
   if (target.isInstanceOf[targets.kcu1500.KCU1500]) {
     val axiLiteBridge = Module(new AXI4LiteToRFBridgeKCU1500(ADDR_WIDTH, DATA_WIDTH))
     axiLiteBridge.io.S_AXI <> io.S_AXI
+    axiLiteBridge.clock := io.axil_s_clk.asClock()
 
     fringeCommon.reset := reset.toBool
     fringeCommon.io.raddr := axiLiteBridge.io.raddr
@@ -89,6 +92,7 @@ class FringeZynq(
   else if (target.isInstanceOf[targets.zynq.Zynq] || target.isInstanceOf[targets.zedboard.ZedBoard]) {
     val axiLiteBridge = Module(new AXI4LiteToRFBridge(ADDR_WIDTH, DATA_WIDTH))
     axiLiteBridge.io.S_AXI <> io.S_AXI
+    axiLiteBridge.clock := io.axil_s_clk.asClock()
 
     // fringeCommon.reset := ~reset.toBool
     fringeCommon.io.raddr := axiLiteBridge.io.raddr
@@ -100,6 +104,7 @@ class FringeZynq(
   else if (target.isInstanceOf[targets.zcu.ZCU]) {
     val axiLiteBridge = Module(new AXI4LiteToRFBridgeZCU(ADDR_WIDTH, DATA_WIDTH))
     axiLiteBridge.io.S_AXI <> io.S_AXI
+    axiLiteBridge.clock := io.axil_s_clk.asClock()
 
     // fringeCommon.reset := ~reset.toBool
     fringeCommon.io.raddr := axiLiteBridge.io.raddr

@@ -40,6 +40,11 @@ package object access {
       case _ => false
     }
 
+    def isPriorityDeq: Boolean = op match {
+      case _:FIFOBankedPriorityDeq[_] => true
+      case _ => false
+    }
+
     def isVectorAccess: Boolean = op match {
       case _: FIFOVecDeq[_] => true
       case _: FIFOVecEnq[_] => true

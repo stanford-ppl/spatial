@@ -40,6 +40,9 @@ import spatial.dsl._
 
       'F.Pipe{ println(sum.value) }
 
+      val regs = List.tabulate(5){i => Reg[Int](0, "meta_reg_" + i)}
+
+      print(regs.map(_.value).reduceTree{_+_})
       println(b.value)
       println(sum.value)
 

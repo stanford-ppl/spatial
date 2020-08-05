@@ -32,7 +32,9 @@ trait LUTConstReadRewriteRules extends RewriteRules {
           val faddr = bank.map { addrs =>
             flattenND(addrs.asInstanceOf[Seq[Int]], dims.asInstanceOf[Seq[Int]])
           }
-          Some(stage(VecAlloc[a](faddr.map { a => elems(a)})(op.A.asInstanceOf[Bits[a]], op.vT.asInstanceOf[Vec[a]])))
+          Some(stage(VecAlloc[a](faddr.map { a =>
+            assert(a < elems.length, s"Constant address $a not valid for LUT $elems defined at: ${op.mem.ctx}, Read at: $ctx")
+            elems(a)})(op.A.asInstanceOf[Bits[a]], op.vT.asInstanceOf[Vec[a]])))
       }
     case _ => None
   })

@@ -67,7 +67,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     emit(src"$lhs.activeOut := $mem.active(${activesMap(lhs)}).out")
   }
 
-  private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]]): Unit = {
+  private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], enString: String = ""): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
     
     lhs.tp match {
@@ -81,7 +81,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    emit(src"""$lhs.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
+    emit(src"""$lhs.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
   }
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {
@@ -314,6 +314,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     case FIFONumel(fifo,_)   => emit(createWire(quote(lhs),remap(lhs.tp)));emit(src"$lhs.r := $fifo.numel")
     case op@FIFOBankedDeq(fifo, ens) => 
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
+      emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
+    case op@FIFOBankedPriorityDeq(fifo, ens) =>
+      emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens, src"&& !$fifo.empty")
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
     case op@FIFODeqInterface(fifo, ens) =>
       emitReadInterface(lhs, fifo, Seq(ens))

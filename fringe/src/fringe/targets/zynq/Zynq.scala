@@ -19,6 +19,7 @@ abstract class ZynqLike extends DeviceTarget {
 
     // Fringe <-> Host connections
     fringe.io.S_AXI <> io.S_AXI
+    fringe.io.axil_s_clk := io.axil_s_clk
 
     // Fringe <-> DRAM connections
     io.M_AXI <> fringe.io.M_AXI

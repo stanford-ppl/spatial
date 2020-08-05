@@ -21,6 +21,7 @@ class KCU1500 extends DeviceTarget {
     val fringe = Module(new FringeZynq(blockingDRAMIssue, io.axiLiteParams, io.axiParams))
 
     // Fringe <-> Host connections
+    fringe.io.axil_s_clk := io.axil_s_clk
     fringe.io.S_AXI <> io.S_AXI
 
     // SpatialIP <-> AXIStream connections (note they go directly from accel to spatial IP)

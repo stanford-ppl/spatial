@@ -22,6 +22,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       rd.foreach{r => r.mem.readers += s; logs(s"  Readers of ${r.mem} is now: ${r.mem.readers}") }
 
     case x:RMWDoer[_,_] =>
+      x.mem.readers += s
       x.mem.writers += s
 
     case UnrolledAccessor(wr,rd) =>
@@ -154,13 +155,41 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
       op.blocks.zipWithIndex.foreach{case (block,bId) =>
         block.stms.foreach{lhs =>
           lhs match {
+            case RMWDoer(mem, _, _, _, _, _, _) =>
+              dbgs(s"Handle RMWDoer: $lhs mem: $mem")
+              dbgs(s"\tPrev written: ${s.writtenMems}")
+              dbgs(s"\tPrev read: ${s.readMems}")
+              s.writtenMems += mem
+              s.readMems += mem
+              dbgs(s"\tPost written: ${s.writtenMems}")
+              dbgs(s"\tPost read: ${s.readMems}")
+
             case Accessor(wr,rd) =>
+              dbgs(s"Handle Accessor: $lhs")
+              dbgs(s"\tPrev written: ${s.writtenMems}")
+              dbgs(s"\tPrev read: ${s.readMems}")
               wr.foreach{w => s.writtenMems += w.mem }
               rd.foreach{r => s.readMems += r.mem }
+              dbgs(s"\tPost written: ${s.writtenMems}")
+              dbgs(s"\tPost read: ${s.readMems}")
+
+            case BankedRMWDoer(mem, _, _, _, _, _, _, _) =>
+              dbgs(s"Handle Banked RMWDoer: $lhs mem: $mem")
+              dbgs(s"\tPrev written: ${s.writtenMems}")
+              dbgs(s"\tPrev read: ${s.readMems}")
+              s.writtenMems += mem
+              s.readMems += mem
+              dbgs(s"\tPost written: ${s.writtenMems}")
+              dbgs(s"\tPost read: ${s.readMems}")
 
             case UnrolledAccessor(wr,rd) =>
+              dbgs(s"Handle Unrolled Accessor: $lhs")
+              dbgs(s"\tPrev written: ${s.writtenMems}")
+              dbgs(s"\tPrev read: ${s.readMems}")
               wr.foreach{w => s.writtenMems += w.mem }
               rd.foreach{r => s.readMems += r.mem }
+              dbgs(s"\tPost written: ${s.writtenMems}")
+              dbgs(s"\tPost read: ${s.readMems}")
 
             case StatusReader(mem, _) => 
               s.readMems += mem

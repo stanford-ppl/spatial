@@ -497,6 +497,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   case class PartialUnroller(name: String, cchain: CounterChain, inds: Seq[Idx], isInnerLoop: Boolean, mop: Boolean) extends LoopUnroller {
     lazy val indices: Seq[Seq[I32]] = createBounds { (ctr, lane) => boundVar[I32] }
+    lazy val resets: Seq[Seq[Bit]] = createBounds { (ctr, lane) => boundVar[Bit] }
     lazy val indexValids:  Seq[Seq[Bit]] = createBounds { (ctr, lane) => boundVar[Bit] }
   }
 

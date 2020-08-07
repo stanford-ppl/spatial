@@ -109,7 +109,7 @@ object CoalesceStore {
       val store = Fringe.coalStore(dram, setupBus, cmdBus, ackBus, p)
       transferSyncMeta(old, store)
       // Receive
-      Foreach(len.unbox by p par 1){i =>
+      Foreach(1 by 1 par 1){i =>
         val ack = ackBus.value()
       }
     }

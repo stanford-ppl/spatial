@@ -117,7 +117,10 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
         val parent: Ctrl  = if (body.isPseudoStage) master else control
         ctrl.iters.foreach{b => b.rawParent = parent}
         ctrl match {
-          case ctrl:UnrolledLoop[_] => ctrl.valids.foreach{b => b.rawParent = parent}
+          case ctrl:UnrolledLoop[_] => {
+            ctrl.valids.foreach{b => b.rawParent = parent}
+            ctrl.resets.foreach{b => b.rawParent = parent}
+          }
           case _ =>
         }
 

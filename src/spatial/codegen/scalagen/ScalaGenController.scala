@@ -71,10 +71,10 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         }
 
         lhs match {
-          case Op(UnrolledForeach(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+          case Op(UnrolledForeach(_,_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
             warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
             open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
-          case Op(UnrolledReduce(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+          case Op(UnrolledReduce(_,_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
             warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
             open(src"while(hasItems_$lhs && !${stopWhen.get}.value) {")
           case _ => open(src"while(hasItems_$lhs) {")
@@ -84,10 +84,10 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
       }
       else {
         lhs match {
-          case Op(UnrolledForeach(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+          case Op(UnrolledForeach(_,_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
             warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
             open(src"$cchain($i).takeWhile(!${stopWhen.get}.value){case (is,vs) => ")
-          case Op(UnrolledReduce(_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
+          case Op(UnrolledReduce(_,_,_,_,_,_,stopWhen)) if stopWhen.isDefined => 
             warn("breakWhen detected!  Note scala break occurs at the end of the loop, while --synth break occurs immediately")
             open(src"$cchain($i).takeWhile(!${stopWhen.get}.value){case (is,vs) => ")
           case _ => open(src"$cchain($i).foreach{case (is,vs) => ")
@@ -188,7 +188,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledForeach(ens,cchain,func,iters,valids,_) =>
+    case UnrolledForeach(ens,cchain,func,iters,valids,_,_) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)
@@ -196,7 +196,7 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         emitControlDone(lhs)
       }
 
-    case UnrolledReduce(ens,cchain,func,iters,valids,_) =>
+    case UnrolledReduce(ens,cchain,func,iters,valids,_,_) =>
       emitControlObject(lhs, ens, func) {
         emitUnrolledLoop(lhs, cchain, iters, valids) {
           emitControlBlock(lhs, func)

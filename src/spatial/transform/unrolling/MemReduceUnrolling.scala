@@ -112,6 +112,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val redLanes = FullUnroller(s"${lhs}_red", cchainRed, itersRed, true, mop)
     val isMap2   = mapLanes.indices
     val mvs      = mapLanes.indexValids
+    val mrs      = mapLanes.resets
     val start    = cchainMap.counters.map(_.start.asInstanceOf[I32])
     val redType  = reduce.result.reduceType
     val intermed = func.result
@@ -143,7 +144,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     
     }
 
-    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs, stopWhen)){lhs2 =>
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs, mrs, stopWhen)){lhs2 =>
       transferData(lhs,lhs2)
     }
     //accumulatesTo(lhs2) = accum
@@ -198,7 +199,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, Nil, mapLanes, redLanes, mop)
       }
 
-      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, None))
+      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, Seq(), None))
     }
 
     val lhs2 = stageWithFlow(UnitPipe(enables ++ ens, blk, stopWhen)){lhs2 =>
@@ -236,6 +237,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
     val isMap2   = mapLanes.indices
     val isRed2   = redLanes.indices
     val mvs      = mapLanes.indexValids
+    val mrs      = mapLanes.resets
     val rvs      = redLanes.indexValids
     val start    = cchainMap.counters.map(_.start.asInstanceOf[I32])
     val redType  = reduce.result.reduceType
@@ -264,10 +266,10 @@ trait MemReduceUnrolling extends ReduceUnrolling {
         unrollMemReduceAccumulate(lhs, accum, ident, intermed, fold, reduce, loadRes, loadAcc, storeAcc, redType, itersMap, itersRed, start, mapLanes, redLanes, mop)
       }
 
-      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, stopWhen))
+      stage(UnrolledForeach(Set.empty, cchainRed, rBlk, isRed2, rvs, Seq(), stopWhen))
     }
 
-    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs, stopWhen)){lhs2 =>
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchainMap, blk, isMap2, mvs, mrs, stopWhen)){lhs2 =>
       transferData(lhs,lhs2)
     }
     //accumulatesTo(lhs2) = accum
@@ -309,6 +311,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
     val mems = mapLanes.map{_ => memories((intermed,0)) } // TODO: Just use the first duplicate always?
     val mvalids = () => mapLanes.valids.map{_.andTree}
+    // val mresets = () => mapLanes.resets.map{_.orTree}
 
     val values: Seq[Seq[A]] = inReduce(redType,isInner = false){
       mapLanes.map{ case List(i) =>
@@ -339,7 +342,7 @@ trait MemReduceUnrolling extends ReduceUnrolling {
 
         val isFirst = mapLanes match {
           case unroller: PartialUnroller =>
-            unroller.indices.map(_.head).zip(start).map { case (i, st) => i === st }.andTree
+            unroller.indices.map(_.head).zip(start).map { case (i, st) => (i === st) }.andTree
           case _ =>
             Bit(true)
         }

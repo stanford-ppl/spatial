@@ -87,15 +87,15 @@ case class BindingTransformer(IR: State) extends MutateTransformer with AccelTra
   }
 
   private def transformCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case UnrolledForeach(ens, cchain, blk, is, vs, stopWhen) if spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1 =>
+    case UnrolledForeach(ens, cchain, blk, is, vs, rs, stopWhen) if spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1 =>
       val bundling = precomputeBundling(lhs)
       if (bundling.toList.size < lhs.children.size) {
-        stageWithFlow(UnrolledForeach(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
+        stageWithFlow(UnrolledForeach(ens, cchain, applyBundling(bundling, blk), is, vs, rs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
-    case UnrolledReduce(ens, cchain, blk, is, vs, stopWhen) if spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1 =>
+    case UnrolledReduce(ens, cchain, blk, is, vs, rs, stopWhen) if spatialConfig.enableParallelBinding && lhs.isOuterControl && (lhs.isPipeControl || lhs.isSeqControl) && lhs.children.length > 1 =>
       val bundling = precomputeBundling(lhs)
       if (bundling.toList.size < lhs.children.size) {
-        stageWithFlow(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
+        stageWithFlow(UnrolledReduce(ens, cchain, applyBundling(bundling, blk), is, vs, rs, stopWhen)){lhs2 => transferData(lhs, lhs2)}  
       } else super.transform(lhs,rhs)
     case SwitchCase(blk) if spatialConfig.enableParallelBinding && lhs.isOuterControl && lhs.children.length > 1 =>
       Type[A] match {

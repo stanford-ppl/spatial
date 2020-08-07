@@ -31,5 +31,4 @@ class ForeachClass(opt: CtrlOpt) {
       opt.set(pipe)
     }
   }
-
 }

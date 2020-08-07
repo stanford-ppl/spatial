@@ -48,6 +48,7 @@ abstract class Control[R:Type] extends DSLOp[R] {
   override def inputs: Seq[Sym[_]] = super.inputs diff iters
   override def binds: Set[Sym[_]] = super.binds ++ iters.toSet
   def iters: Seq[I32]
+  // def resets: Seq[Bit]
   def cchains: Seq[(CounterChain, Seq[I32])]
   def bodies: Seq[ControlBody]
 }
@@ -72,12 +73,14 @@ abstract class Loop[R:Type] extends Pipeline[R]
 abstract class UnrolledLoop[R:Type] extends Loop[R] {
   def iterss: Seq[Seq[I32]]
   def validss: Seq[Seq[Bit]]
+  def resetss: Seq[Seq[Bit]]
   def cchainss: Seq[(CounterChain, Seq[Seq[I32]])]
   def bodiess: Seq[(Seq[Seq[I32]], Seq[Block[_]])]
   final override def iters: Seq[I32] = iterss.flatten
   final def valids: Seq[Bit] = validss.flatten
-  override def inputs: Seq[Sym[_]] = super.inputs diff (iters ++ valids)
-  override def binds: Set[Sym[_]] = super.binds ++ (iters ++ valids).toSet
+  final def resets: Seq[Bit] = resetss.flatten
+  override def inputs: Seq[Sym[_]] = super.inputs diff (iters ++ valids ++ resets)
+  override def binds: Set[Sym[_]] = super.binds ++ (iters ++ valids ++ resets).toSet
   final override def cchains = cchainss.map{case (ctr,itrss) => ctr -> itrss.flatten }
   final override def bodies = {
     bodiess.map{case (itrss, blocks) => PseudoStage(blocks.map{blk => itrss.flatten -> blk }:_*) }

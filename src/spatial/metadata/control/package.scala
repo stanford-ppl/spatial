@@ -430,11 +430,11 @@ package object control {
     /** Return breakWhen node for controller if it has one */
     def breaker: Option[Sym[_]] = s match {
       case Some(Op(_@OpForeach(_,_,_,_,breakWhen))) => breakWhen
-      case Some(Op(_@UnrolledForeach(_,_,_,_,_,breakWhen))) => breakWhen
+      case Some(Op(_@UnrolledForeach(_,_,_,_,_,_,breakWhen))) => breakWhen
       case Some(Op(_@UnitPipe(_,_,breakWhen))) => breakWhen
       case Some(Op(_@OpReduce(_,_,_,_,_,_,_,_,_,_,breakWhen))) => breakWhen
       case Some(Op(_@OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,breakWhen))) => breakWhen
-      case Some(Op(_@UnrolledReduce(_,_,_,_,_,breakWhen))) => breakWhen
+      case Some(Op(_@UnrolledReduce(_,_,_,_,_,_,breakWhen))) => breakWhen
       case _ => None
     }
 
@@ -973,7 +973,7 @@ package object control {
     }
 
     @stateful def start: Sym[F] = if (x.isForever || x.isScanner) I32(0).asInstanceOf[Sym[F]] else x.node.start
-    // @stateful def reset: Sym[F] = if (!x.isScanner) Bit(false).asInstanceOf[Sym[F]] else x.node.reset
+    // @stateful def reset: Sym[Bit] = if (!x.isScanner) Bit(false).asInstanceOf[Sym[Bit]] else x.node.reset
     @stateful def step: Sym[F] = if (x.isForever || x.isScanner) I32(1).asInstanceOf[Sym[F]] else x.node.step
     @stateful def end: Sym[F] = if (x.isForever || x.isScanner) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
     @stateful def ctrPar: I32 = {

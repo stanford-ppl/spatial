@@ -7,6 +7,7 @@ import spatial.lang._
 
 @op case class CounterNew[A:Num](start: Num[A], end: Num[A], step: Num[A], par: I32) extends Alloc[Counter[A]] {
   val A: Num[A] = Num[A]
+  // val reset: Bit = Bit(false)
   override def effects: Effects = Effects.Unique
 }
 @op case class ForeverNew() extends Alloc[Counter[I32]] {
@@ -15,7 +16,7 @@ import spatial.lang._
 // New behavior: if outIdx is true, return the output index. Otherwise, return 
 // the input index (prefix sum), which is useful for reverse indexing (e.g., 
 // into a dense vector of inputs).
-@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Boolean, mode: String) extends Alloc[Counter[I32]] {
+@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Boolean, mode: String, truePar: scala.Int) extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 
@@ -74,6 +75,7 @@ import spatial.lang._
   ident:  Option[A],
   fold:   Option[A],
   iters:  List[I32],
+  // resets:  List[Bit],
   stopWhen:  Option[Reg[Bit]]
 )(implicit val A: Bits[A]) extends Loop[Void] {
   override def binds: Set[Sym[_]] = super.binds ++ reduce.inputs
@@ -133,6 +135,7 @@ import spatial.lang._
   func:    Block[Void],
   iterss:  Seq[Seq[I32]],
   validss: Seq[Seq[Bit]],
+  resetss: Seq[Seq[Bit]],
   stopWhen: Option[Reg[Bit]]
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)
@@ -145,6 +148,7 @@ import spatial.lang._
   func:    Block[Void],
   iterss:  Seq[Seq[I32]],
   validss: Seq[Seq[Bit]],
+  resetss: Seq[Seq[Bit]],
   stopWhen: Option[Reg[Bit]]
 ) extends UnrolledLoop[Void] {
   override def cchainss = Seq(cchain -> iterss)

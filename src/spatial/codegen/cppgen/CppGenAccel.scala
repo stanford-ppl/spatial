@@ -105,13 +105,13 @@ trait CppGenAccel extends CppGenCommon {
       visitBlock(func)
       controllerStack.pop()
 
-    case UnrolledForeach(_, _,func, _, _,_) if inHw =>
+    case UnrolledForeach(_, _,func, _, _, _,_) if inHw =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)
       controllerStack.pop()
 
-    case UnrolledReduce(_, _,func, _, _,_) =>
+    case UnrolledReduce(_, _,func, _, _, _,_) =>
       controllerStack.push(lhs)
       if (inHw) instrumentCounters = instrumentCounters :+ (lhs, controllerStack.length)
       visitBlock(func)

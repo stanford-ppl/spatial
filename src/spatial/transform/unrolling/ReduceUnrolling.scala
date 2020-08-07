@@ -44,6 +44,7 @@ trait ReduceUnrolling extends UnrollingBase {
     func:   Block[A],
     reduce: Lambda2[A,A,A],
     iters:  Seq[I32],
+    // resets:  Seq[Bit],
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
@@ -56,6 +57,8 @@ trait ReduceUnrolling extends UnrollingBase {
       inLanes(redLanes) {
         val foldValid: Option[Bit] = fold.map(_ => Bit(true))
         val valids: () => Seq[Bit] = () => foldValid.toSeq ++ mapLanes.valids.map { vs => vs.andTree }
+        // val foldReset: Option[Bit] = fold.map(_ => Bit(false))
+        // val resets: () => Seq[Bit] = () => foldReset.toSeq ++ mapLanes.resets.map { rs => rs.orTree }
         val values: Seq[A] = unroll(func, mapLanes)
         val inputs: Seq[A] = fold.toSeq ++ values
 
@@ -94,6 +97,7 @@ trait ReduceUnrolling extends UnrollingBase {
     func:   Block[A],               // Map function
     reduce: Lambda2[A,A,A],         // Reduce function
     iters:  Seq[I32],                // Bound iterators for map loop
+    // resets:  Seq[Bit],                // Bound reset for map loop
     stopWhen: Option[Reg[Bit]],
     mop: Boolean
   )(implicit A: Bits[A], ctx: SrcCtx): Void = {
@@ -101,26 +105,29 @@ trait ReduceUnrolling extends UnrollingBase {
     val mapLanes = PartialUnroller(s"$lhs", cchain, iters, lhs.isInnerControl, mop)
     val inds2 = mapLanes.indices
     val vs = mapLanes.indexValids
+    val rs = mapLanes.resets
     val start = cchain.counters.map(_.start.asInstanceOf[I32])
+    // val reset = cchain.counters.map(_.reset.asInstanceOf[Bit])
 
     val blk = stageLambda1(accum) {
       dbgs(s"Unrolling reduce map $lhs -> $accum")
       val valids: () => Seq[Bit] = () => mapLanes.valids.map{_.andTree}
+      val resets: () => Seq[Bit] = () => mapLanes.resets.map{_.orTree}
       val values: Seq[A] = unroll(func, mapLanes)
 
       if (lhs.isOuterControl) {
         dbgs("Unrolling unit pipe reduce")
         stage(UnitPipe(enables, stageBlock{
-          unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, isInner = false)
+          unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, resets(), isInner = false)
         }, stopWhen))
       }
       else {
         dbgs("Unrolling inner reduce")
-        unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, isInner = true)
+        unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, resets(), isInner = true)
       }
     }
 
-    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs, stopWhen)){lhs2 => transferData(lhs,lhs2) }
+    val lhs2 = stageWithFlow(UnrolledReduce(enables ++ ens, cchain, blk, inds2, vs, rs, stopWhen)){lhs2 => transferData(lhs,lhs2) }
     //accumulatesTo(lhs2) = accum
     dbgs(s"Created reduce ${stm(lhs2)}")
     accum.accumType = AccumType.Reduce
@@ -179,6 +186,7 @@ trait ReduceUnrolling extends UnrollingBase {
     store:  Lambda2[C[A],A,Void], // Store function to accumulator
     iters:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
     start:  Seq[I32],             // Start for each iterator
+    resets: Seq[Bit],             // Counter force-reset bits
     isInner: Boolean
   )(implicit ctx: SrcCtx): Void = {
     val redLanes = UnitUnroller(s"${accum}_accum", isInnerLoop = true)
@@ -201,7 +209,7 @@ trait ReduceUnrolling extends UnrollingBase {
         val result: A = inReduce(redType, isInner) {
           dbgs(s"Inlining load function in reduce")
           val accValue = load.reapply(accum)
-          val isFirst = iters.zip(start).map { case (i, st) => i === st }.andTree
+          val isFirst = resets.zip(iters.zip(start)).map { case (r, (i, st)) => r || (i === st) }.andTree
           fold match {
             // FOLD: On first iteration, use init value rather than zero
             case Some(init) =>

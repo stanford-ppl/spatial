@@ -33,9 +33,11 @@ trait MiscAPI {
     val n = bvs.size
     bvs.zipWithIndex.map{ case (bv, i) => 
       if (i == n-1) {
-        List(stage(ScannerNew(count, bv, 1, true, mode)), stage(ScannerNew(count, bv, par, false, mode)))
+        List(stage(ScannerNew(count, bv, 1, true, mode, par)), stage(ScannerNew(count, bv, par, false, mode, par)))
+        // List(stage(ScannerNew(count, bv, par, true, mode)), stage(ScannerNew(count, bv, par, false, mode)))
       } else { 
-        List(stage(ScannerNew(count, bv, 1, true, mode)), stage(ScannerNew(count, bv, 1, false, mode)))
+        List(stage(ScannerNew(count, bv, 1, true, mode, par)), stage(ScannerNew(count, bv, 1, false, mode, par)))
+        // List(stage(ScannerNew(count, bv, par, true, mode)), stage(ScannerNew(count, bv, par, false, mode)))
       }
     }.toList.flatten
   }

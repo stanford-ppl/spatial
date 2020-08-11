@@ -89,8 +89,19 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
         src""".len(MemRead().setMem($setupStream))""" + 
         src""".indices(MemRead().setMem($cmdStream))""" +
         src""".bv(MemWrite().setMem($vecOut).data)""" +
-        src""".prevSet(MemWrite().setMem(${Lhs(scalOut,Some("_1"))}).data)""" +
-        src""".last(MemWrite().setMem(${Lhs(scalOut,Some("_2"))}).data)"""
+        src""".prevSet(MemWrite().setMem($scalOut).data)""" // +
+       //  src""".prevSet(MemWrite().setMem(${Lhs(scalOut,Some("_1"))}).data)""" // +
+        // src""".last(MemWrite().setMem(${Lhs(scalOut,Some("_2"))}).data)"""
+      )
+
+    case e@BVBuildTreeLen(shift,setupStream,cmdStream,scalOut) =>
+      state(lhs)(
+        src"""BVBuildTreeLen(16, $shift)""" +
+        src""".len(MemRead().setMem($setupStream))""" + 
+        src""".indices(MemRead().setMem($cmdStream))""" +
+        src""".gen_len(MemWrite().setMem($scalOut).data)""" // +
+       //  src""".prevSet(MemWrite().setMem(${Lhs(scalOut,Some("_1"))}).data)""" // +
+        // src""".last(MemWrite().setMem(${Lhs(scalOut,Some("_2"))}).data)"""
       )
 
     case MemDenseAlias(cond, mems, _) =>

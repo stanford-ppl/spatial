@@ -27,6 +27,7 @@ import spatial.util.modeling.target
     data:     Local[A],
     done:     Local[Bit],
     params:   Tup2[I32,I32],
+    num_stored:     Local[I32],
     p:        scala.Int,
     ens:      Set[Bit] = Set.empty,
   )(implicit
@@ -38,7 +39,7 @@ import spatial.util.modeling.target
   extends EarlyBlackBox[Void] {
 
   override def effects: Effects = Effects.Writes(dram) 
-  @rig def lower(old:Sym[Void]): Void = DynamicStore.transfer(old, dram,data,done,params,p,ens)
+  @rig def lower(old:Sym[Void]): Void = DynamicStore.transfer(old, dram,data,done,params,num_stored,p,ens)
   // @rig def pars: Seq[I32] = {
     // Seq(dram.addrs[_32]().sparsePars().values.head)
   // }
@@ -57,6 +58,7 @@ object DynamicStore {
     local:   Local[A],
     done:    Local[Bit],
     params:  Tup2[I32,I32],
+    num_stored:     Local[I32],
     p:       scala.Int,
     ens:     Set[Bit],
   )(implicit
@@ -87,11 +89,12 @@ object DynamicStore {
     val top = Stream {
       val localFIFO = local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
       val doneFIFO = done.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
+      val numStoredFIFO = num_stored.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
 
       // Coalesce
       val setupBus = StreamOut[I64](DynStoreCmdBus[A]())
       val cmdBus = StreamOut[Tup2[A,Bit]](DynStoreSetupBus[A]())
-      val ackBus = StreamIn[Bit](DynStoreAckBus)
+      val ackBus = StreamIn[I32](DynStoreAckBus)
 
       setupBus := (base.unbox.to[I64]+dram.address, dram.isAlloc)
       // Foreach (128 by 1 par p) { i =>
@@ -109,6 +112,7 @@ object DynamicStore {
       // Receive
       Foreach(1 by 1 par 1){i =>
         val ack = ackBus.value()
+        num_stored.__write(ack, Seq(i), Set())
       }
     }
     // top.loweredTransfer = if (isLoad) SparseLoad else SparseStore // TODO: Work around @virtualize to set this metadata

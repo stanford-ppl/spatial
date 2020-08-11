@@ -83,14 +83,16 @@ object BitVecGeneratorNoTree {
     indices: Local[I32],
     bv:      Local[U32],
     prevLen:      Local[I32],
-    last:      Local[Bit],
+    // last:      Local[Bit],
     params:  Tup2[I32,I32], // discard and len
     ens:     Set[Bit] = Set.empty,
     )
   extends EarlyBlackBox[Void] {
 
-  override def effects: Effects = Effects.Writes(bv, last, prevLen) 
-  @rig def lower(old:Sym[Void]): Void = BitVecGeneratorTree.transfer(old, shift, indices, bv, prevLen, last, params, ens)
+  // override def effects: Effects = Effects.Writes(bv, last, prevLen) 
+  override def effects: Effects = Effects.Writes(bv, prevLen) 
+  // @rig def lower(old:Sym[Void]): Void = BitVecGeneratorTree.transfer(old, shift, indices, bv, prevLen, last, params, ens)
+  @rig def lower(old:Sym[Void]): Void = BitVecGeneratorTree.transfer(old, shift, indices, bv, prevLen, params, ens)
 }
 
 object BitVecGeneratorTree {
@@ -102,7 +104,7 @@ object BitVecGeneratorTree {
     indices: Local[I32],
     bv:      Local[U32],
     prevLen:      Local[I32],
-    last:      Local[Bit],
+    // last:      Local[Bit],
     params:  Tup2[I32,I32], // discard and len
     ens:     Set[Bit],
     ) : Void = {
@@ -115,12 +117,13 @@ object BitVecGeneratorTree {
       val indexFIFO   = indices.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
       val bvFIFO      = bv.asInstanceOf[Sym[_]]      match {case Op(_:FIFONew[_]) => true; case _ => false}
       val prevLenFIFO = prevLen.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
-      val lastFIFO    = last.asInstanceOf[Sym[_]]    match {case Op(_:FIFONew[_]) => true; case _ => false}
+      // val lastFIFO    = last.asInstanceOf[Sym[_]]    match {case Op(_:FIFONew[_]) => true; case _ => false}
 
       val setupBus = StreamOut[I32](BlackBoxBus[I32]("setupBus"))
       val idxBus = StreamOut[I32](BlackBoxBus[I32]("idxBus"))
       val vecRetBus = StreamIn[U32](BlackBoxBus[U32]("vecRetBus"))
-      val scalRetBus = StreamIn[Tup2[I32,Bit]](BlackBoxBus[Tup2[I32,Bit]]("scalRetBus"))
+      // val scalRetBus = StreamIn[Tup2[I32,Bit]](BlackBoxBus[Tup2[I32,Bit]]("scalRetBus"))
+      val scalRetBus = StreamIn[I32](BlackBoxBus[I32]("scalRetBus"))
 
       setupBus := len.unbox
       Foreach(len.unbox par 16){i =>
@@ -137,8 +140,61 @@ object BitVecGeneratorTree {
       }
       Stream (*) {
         val scalRet = scalRetBus.value()
-        prevLen.__write(scalRet._1, Seq(), Set.empty)
-        last.__write(scalRet._2, Seq(), Set.empty)
+        prevLen.__write(scalRet, Seq(), Set.empty)
+        // prevLen.__write(scalRet._1, Seq(), Set.empty)
+        // last.__write(scalRet._2, Seq(), Set.empty)
+      }
+    }
+  }
+}
+
+@op case class BitVecGeneratorTreeLen[Local[T]<:LocalMem[T,Local]](
+    shift:   Int,
+    indices: Local[I32],
+    gen_len:      Local[I32],
+    params:  Tup2[I32,I32], // discard and len
+    ens:     Set[Bit] = Set.empty,
+    )
+  extends EarlyBlackBox[Void] {
+
+  override def effects: Effects = Effects.Writes(gen_len) 
+  @rig def lower(old:Sym[Void]): Void = BitVecGeneratorTreeLen.transfer(old, shift, indices, gen_len, params, ens)
+}
+
+object BitVecGeneratorTreeLen {
+
+  @virtualize
+  @rig def transfer[Local[T]<:LocalMem[T,Local]](
+    old:     Sym[Void],
+    shift:   Int,
+    indices: Local[I32],
+    gen_len: Local[I32],
+    params:  Tup2[I32,I32], // discard and len
+    ens:     Set[Bit],
+    ) : Void = {
+
+    assert(spatialConfig.enablePIR)
+    val discard = params._1
+    val len = params._2
+
+    val top = Stream {
+      val indexFIFO   = indices.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
+      val lenFIFO    = gen_len.asInstanceOf[Sym[_]]    match {case Op(_:FIFONew[_]) => true; case _ => false}
+
+      val setupBus = StreamOut[I32](BlackBoxBus[I32]("setupBus"))
+      val idxBus = StreamOut[I32](BlackBoxBus[I32]("idxBus"))
+      val scalRetBus = StreamIn[I32](BlackBoxBus[I32]("scalRetBus"))
+
+      setupBus := len.unbox
+      Foreach(len.unbox par 16){i =>
+        val idx       = indices.__read(Seq(i), Set.empty)
+        idxBus := idx
+      }
+      // Fringe
+      val op = Fringe.bvBuildTreeLen(shift, setupBus, idxBus, scalRetBus)
+      Stream (*) {
+        val scalRet = scalRetBus.value()
+        gen_len.__write(scalRet, Seq(), Set.empty)
       }
     }
   }

@@ -16,7 +16,10 @@ import spatial.lang._
 // New behavior: if outIdx is true, return the output index. Otherwise, return 
 // the input index (prefix sum), which is useful for reverse indexing (e.g., 
 // into a dense vector of inputs).
-@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Boolean, mode: String, truePar: scala.Int) extends Alloc[Counter[I32]] {
+// Mode 0: dense index of input
+// Mode 1: output index
+// Mode 2: dense index of output
+@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Int, mode: String, truePar: scala.Int, index: scala.Int) extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 

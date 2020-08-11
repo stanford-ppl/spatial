@@ -68,7 +68,7 @@ case object CoalesceAckBus extends DRAMBus[Bit]
 
 case class DynStoreSetupBus[A:Bits]() extends DRAMBus[I64]
 case class DynStoreCmdBus[A:Bits]() extends DRAMBus[Tup2[A, Bit]]
-case object DynStoreAckBus extends DRAMBus[Bit]
+case object DynStoreAckBus extends DRAMBus[I32]
 
 //case class BVGenSetupBus() extends Bus // BlackBoxBus[Tup2[I32,I32]]
 //case class BVGenIdxBus() extends Bus // BlackBoxBus[I32]

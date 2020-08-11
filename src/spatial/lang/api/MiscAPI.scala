@@ -24,23 +24,38 @@ trait MiscAPI {
     }
   @api def gen_bitvector_tree[Local[T]<:LocalMem1[T,Local]](shift: scala.Int, // Static config params
     len: I32, indices: Local[I32], // Runtime config and two outputs
-    bv: Local[U32], prevLen: Local[I32], last: Local[Bit])  : Unit = {
+    // bv: Local[U32], prevLen: Local[I32], last: Local[Bit])  : Unit = {
+    bv: Local[U32], prevLen: Local[I32])  : Unit = {
       val params = stage(CoalesceStoreParams(len, len))
-      stage(BitVecGeneratorTree(shift, indices, bv, prevLen, last, params))
+      // stage(BitVecGeneratorTree(shift, indices, bv, prevLen, last, params))
+      stage(BitVecGeneratorTree(shift, indices, bv, prevLen, params))
+    }
+  @api def gen_bitvector_tree_len[Local[T]<:LocalMem1[T,Local]](shift: scala.Int, // Static config params
+    len: I32, indices: Local[I32], // Runtime config and two outputs
+    gen_len: Local[I32])  : Unit = {
+      val params = stage(CoalesceStoreParams(len, len))
+      stage(BitVecGeneratorTreeLen(shift, indices, gen_len, params))
     }
 
-  @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {
+  @api def Scan(par: scala.Int, count: I32, mode: String, bv: U32): List[Counter[I32]] = {
+    List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0)), stage(ScannerNew(count, bv, par, 0, mode, par, 0)))
+  }
+  @api def Scan(par: scala.Int, count: I32, mode: String, bvA: U32, bvB: U32): List[Counter[I32]] = {
+    List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0)),
+         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1)))
+  }
+  /* @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {
     val n = bvs.size
     bvs.zipWithIndex.map{ case (bv, i) => 
       if (i == n-1) {
-        List(stage(ScannerNew(count, bv, 1, true, mode, par)), stage(ScannerNew(count, bv, par, false, mode, par)))
+        List(stage(ScannerNew(count, bv, 1, true, mode, par, i)), stage(ScannerNew(count, bv, par, false, mode, par, i)))
         // List(stage(ScannerNew(count, bv, par, true, mode)), stage(ScannerNew(count, bv, par, false, mode)))
       } else { 
-        List(stage(ScannerNew(count, bv, 1, true, mode, par)), stage(ScannerNew(count, bv, 1, false, mode, par)))
+        List(stage(ScannerNew(count, bv, 1, true, mode, par, i)), stage(ScannerNew(count, bv, 1, false, mode, par, i)))
         // List(stage(ScannerNew(count, bv, par, true, mode)), stage(ScannerNew(count, bv, par, false, mode)))
       }
     }.toList.flatten
-  }
+  } */
   @api def DataScan(count: I32, dat: I32) : List[Counter[I32]] = {
     List(stage(DataScannerNew(count, dat, false)), stage(DataScannerNew(count, dat, true)))
   }

@@ -285,7 +285,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
-    case UnrolledForeach(_,cchain,_,_,_,_) if lhs.getLoweredTransfer.isDefined =>
+    case UnrolledForeach(_,cchain,_,_,_,_,_) if lhs.getLoweredTransfer.isDefined =>
       // TODO: Include last level counter?
       val gated = if (lhs.children.filter(_.s.get != lhs).size == 1) "Gated" else ""
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
@@ -294,7 +294,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       createCtrObject(lhs, Bits[I32].zero,lhs.loweredTransferSize._1,Bits[I32].one,lhs.loweredTransferSize._2, false, s"_ctrlast")
       emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, Left($gated${lhs.loweredTransfer.toString}), List($cchain, CChainModel(List(${lhs}_ctrlast))), ${lat.toInt}, ${ii.toInt}, $ctx, bitsPerCycle = ${lhs.loweredTransferSize._3}.toDouble)")
 
-    case UnrolledForeach(_,cchain,func, _, _, _) =>
+    case UnrolledForeach(_,cchain,func, _,_, _, _) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)
@@ -337,7 +337,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       visitBlock(store)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
 
-    case UnrolledReduce(_,cchain,func, _, _, _) =>
+    case UnrolledReduce(_,cchain,func, _, _,_, _) =>
       val ctx = s"""Ctx("$lhs", "${lhs.ctx.line}", "${getCtx(lhs).replace("\"","'")}", "${stm(lhs)}")"""
       val lat = if (lhs.isInnerControl) scrubNoise(lhs.bodyLatency.sum) else 0.0
       val ii = if (lhs.II <= 1 | lhs.isOuterControl) 1.0 else scrubNoise(lhs.II)

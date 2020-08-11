@@ -89,15 +89,18 @@ abstract class SparseSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SparseSRAM[A
 }
 object SparseSRAM {
   /** Allocates a 1-dimensional [[SparseSRAM1]] with capacity of `length` elements of type A. */
-  @api def apply[A:Bits](length: I32): SparseSRAM1[A] = 
-    stage(SparseSRAMNew[A,SparseSRAM1](Seq(length))).conflictable.mustmerge
-  @api def apply[A:Bits](par:scala.Int, length: I32): SparseSRAM1[A] = 
-    stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par)).conflictable.mustmerge
+  @api def apply[A:Bits](length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
+    stage(SparseSRAMNew[A,SparseSRAM1](Seq(length), autoBar)).conflictable.mustmerge
+}
+
+object SparseParSRAM {
+  @api def apply[A:Bits](par:scala.Int, length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
+    stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par, autoBar)).conflictable.mustmerge
 }
 
 object SparseDRAM {
-  @api def apply[A:Bits](par:scala.Int)(length: I32): SparseSRAM1[A] = 
-    stage(SparseDRAMNew[A,SparseSRAM1](Seq(length), par)).conflictable.mustmerge
+  @api def apply[A:Bits](par:scala.Int)(length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
+    stage(SparseDRAMNew[A,SparseSRAM1](Seq(length), par, autoBar)).conflictable.mustmerge
 }
 
 /** A 1-dimensional SparseSRAM with elements of type A. */
@@ -116,10 +119,17 @@ object SparseDRAM {
   @api def apply(pos: I32): A = stage(SparseSRAMRead(this,Seq(pos),Seq(),Set.empty))
   @api def barrierRead(pos: I32, bs: Seq[BarrierTransaction]): A = stage(SparseSRAMRead(this,Seq(pos),bs,Set.empty))
 
-  @api def RMW(pos: I32, data: A, op: String, order: String, bs: Seq[BarrierTransaction] = Seq(), remoteAddr:Boolean=false): A = {
+  @api def RMW(pos: I32, data: A, op: String, order: String, bs: Seq[BarrierTransaction] = Seq(), key:scala.Int = (-1), remoteAddr:Boolean=false): A = {
     warn(s"Currently no syntax for input token to RMW, but it can be added.")
-    stage(SparseSRAMRMW(this,data,Seq(pos),op,order,bs,remoteAddr,Set.empty))
+    stage(SparseSRAMRMW(this,data,Seq(pos),op,order,bs,key,remoteAddr,Set.empty))
   }
+
+  // Dummy address
+  @api def RMWData(addr: I32, key:scala.Int=(-1)): A = {
+    warn(s"Currently no syntax for input token to RMW, but it can be added.")
+    stage(SparseSRAMRMWData(this,Seq(addr),key,Set.empty))
+  }
+
   /** Updates the value at `pos` to `data`. */
   @api def update(pos: I32, data: A): Void = stage(SparseSRAMWrite(this,data,Seq(pos),Seq(), Set.empty))
   @api def barrierWrite(pos: I32, data: A, bs: Seq[BarrierTransaction]): Void = stage(SparseSRAMWrite(this, data, Seq(pos), bs, Set.empty))

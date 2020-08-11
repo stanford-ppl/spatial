@@ -119,17 +119,17 @@ object DRAM {
     val params = stage(CoalesceStoreParams(len, base))
     stage(CoalesceStore(this, data, valid, params, 16))
   }
-  @api def dynstore[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], last: Local[Bit])(implicit tp: Type[Local[A]]): Void = {
+  //@api def dynstore[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], last: Local[Bit])(implicit tp: Type[Local[A]]): Void = {
+    //// Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
+    ////   Hacking this for now by catching it in a Unique node
+    //val params = stage(CoalesceStoreParams(base, base))
+    //stage(DynamicStore(this, data, last, params, 1))
+  //}
+  @api def dynstore_vec[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], last: Local[Bit], num_stored: Local[I32])(implicit tp: Type[Local[A]]): Void = {
     // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
     //   Hacking this for now by catching it in a Unique node
     val params = stage(CoalesceStoreParams(base, base))
-    stage(DynamicStore(this, data, last, params, 1))
-  }
-  @api def dynstore_vec[Local[T]<:LocalMem1[T,Local]](base: I32, data: Local[A], last: Local[Bit])(implicit tp: Type[Local[A]]): Void = {
-    // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
-    //   Hacking this for now by catching it in a Unique node
-    val params = stage(CoalesceStoreParams(base, base))
-    stage(DynamicStore(this, data, last, params, 16))
+    stage(DynamicStore(this, data, last, params, num_stored, 16))
   }
 }
 

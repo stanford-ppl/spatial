@@ -47,7 +47,6 @@ package object access {
       case _ => ""
     }
 
-
     def isParEnq: Boolean = op match {
       // case _:LineBufferBankedEnq[_] => true
       case _:FIFOBankedEnq[_] => true

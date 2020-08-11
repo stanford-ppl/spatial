@@ -10,18 +10,21 @@ import spatial.lang._
   */
 @op case class SparseSRAMNew[A:Bits,C[T]](
     dims: Seq[I32],
+    autoBar: Boolean,
     )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 
 @op case class SparseParSRAMNew[A:Bits,C[T]](
     dims: Seq[I32],
-    par: Int
+    par: Int,
+    autoBar: Boolean,
     )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 
 @op case class SparseDRAMNew[A:Bits,C[T]](
     dims: Seq[I32],
-    par: Int
+    par: Int,
+    autoBar: Boolean,
     )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 
@@ -67,9 +70,17 @@ import spatial.lang._
     op: String,
     order: String,
     barriers: Seq[BarrierTransaction],
+    key:Int,
     remoteAddr:Boolean,
     ens: Set[Bit])
   extends RMWDoer[A,A]
+
+@op case class SparseSRAMRMWData[A:Bits,C[T]](
+    mem:  SparseSRAM[A,C],
+    addr: Seq[Idx], // dummy
+    key:  Int,
+    ens:  Set[Bit])
+  extends Reader[A,A]
 
 
 /** A banked read of a vector of elements from an SRAM.
@@ -121,6 +132,17 @@ import spatial.lang._
     op: String,
     order: String,
     barriers: Seq[BarrierTransaction],
+    key:Int,
     remoteAddr:Boolean,
     enss: Seq[Set[Bit]])(implicit val vT: Type[Vec[A]])
   extends BankedRMWDoer[A]
+
+@op case class SparseSRAMBankedRMWData[A:Bits,C[T]](
+    mem:  SparseSRAM[A,C],
+    bank: Seq[Seq[Idx]],
+    ofs:  Seq[Idx],
+    barriers: Seq[BarrierTransaction],
+    key:  Int,
+    enss: Seq[Set[Bit]]
+  )(implicit val vT: Type[Vec[A]])
+  extends BankedReader[A]

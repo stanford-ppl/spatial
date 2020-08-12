@@ -66,6 +66,9 @@ class Config {
   /** Codegen */
   var naming: Boolean = true
 
+  /** Host Codegen */
+  var max_cycles: Long = 10000000000L
+
 
   def create: Config = new Config
 

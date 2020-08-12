@@ -32,7 +32,9 @@ package object access {
       case x@SparseSRAMWrite(_,_,_,bs,_) => bs
       case x@SparseSRAMBankedWrite(_,_,_,_,bs,_) => bs
       case x:SparseSRAMRMW[_,_] => x.barriers
+      case x:SparseSRAMRMWData[_,_] => x.barriers
       case x:SparseSRAMBankedRMW[_,_] => x.barriers
+      case x:SparseSRAMBankedRMWData[_,_] => x.barriers
       case _ => Seq()
     }
 

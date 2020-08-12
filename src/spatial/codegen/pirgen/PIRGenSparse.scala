@@ -26,10 +26,9 @@ trait PIRGenSparse extends PIRCodegen {
       }
     case op@SparseSRAMBankedRMWData(sram,bank,ofs,barriers,key,ens)       => 
       stateAccess(lhs, sram, ens) {
-        src"SparseRead()" +
+        src"SparseRMWData($key)" +
         src".addr(${assertOne(bank)})" +
-        src".barriers($barriers)" +
-        src".key($key)"
+        src".barriers($barriers)"
       }
     case op@SparseSRAMBankedWrite(sram,data,bank,ofs,barriers,ens) => 
       stateAccess(lhs, sram, ens, data=Some(data)) {
@@ -37,13 +36,12 @@ trait PIRGenSparse extends PIRCodegen {
         src".addr(${assertOne(bank)})" +
         src".barriers($barriers)"
       }
-    case op@SparseSRAMBankedRMW(sram,data,bank,ofs,opcode,order,key,barriers,remoteAddr,ens) => 
+    case op@SparseSRAMBankedRMW(sram,data,bank,ofs,opcode,order,barriers,key,remoteAddr,ens) => 
       stateAccess(lhs, sram, ens) {
-        src"""SparseRMW("$opcode","$order",$remoteAddr)""" +
+        src"""SparseRMW("$opcode","$order",$remoteAddr,$key)""" +
         src".addr(${assertOne(bank)})" + 
         src".input(${assertOne(data)})" +
-        src".barriers($barriers)" + 
-        src".key($key)" 
+        src".barriers($barriers)" 
       }
     //case op@LockDRAMBankedRead(dram,bank,ofs,lock,ens)       => 
       //stateAccess(lhs, dram, ens) {

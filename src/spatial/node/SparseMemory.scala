@@ -78,6 +78,7 @@ import spatial.lang._
 @op case class SparseSRAMRMWData[A:Bits,C[T]](
     mem:  SparseSRAM[A,C],
     addr: Seq[Idx], // dummy
+    barriers: Seq[BarrierTransaction],
     key:  Int,
     ens:  Set[Bit])
   extends Reader[A,A]

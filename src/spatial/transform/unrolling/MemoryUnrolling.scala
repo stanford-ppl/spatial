@@ -544,7 +544,7 @@ trait MemoryUnrolling extends UnrollingBase {
     // case op:SparseSRAMRMWData[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMWData(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, node.getSparseOp, node.getSparseOrder, barriers, op.key, op.remoteAddr, enss)))
     // case op:SparseSRAMRMWData[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMWData(mem.asInstanceOf[SparseSRAM1[A]], op.key, enss)))
     case op:SparseSRAMRead[_,_]    => UVecReadSym(stage(SparseSRAMBankedRead(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, barriers, enss)))
-    case op:SparseSRAMRMWData[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMWData(mem.asInstanceOf[SparseSRAM1[A]], bank, ofs, barriers, op.key, enss)))
+    case op:SparseSRAMRMWData[_,_]    => UVecReadSym(stage(SparseSRAMBankedRMWData(mem.asInstanceOf[SparseSRAM1[A]], data, bank, ofs, "xxx", "xxx", barriers, op.key, false, enss)))
     case _:StreamInRead[_]  => UVecReadSym(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))
 
     case op:MergeBufferEnq[_] => UWrite[A](stage(MergeBufferBankedEnq(mem.asInstanceOf[MergeBuffer[A]], op.way, data, enss)))

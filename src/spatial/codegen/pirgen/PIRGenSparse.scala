@@ -24,10 +24,11 @@ trait PIRGenSparse extends PIRCodegen {
         src".addr(${assertOne(bank)})" +
         src".barriers($barriers)"
       }
-    case op@SparseSRAMBankedRMWData(sram,bank,ofs,barriers,key,ens)       => 
+    case op@SparseSRAMBankedRMWData(sram,data,bank,ofs,opcode,order,barriers,key,remoteAddr,ens)       => 
       stateAccess(lhs, sram, ens) {
         src"SparseRMWData($key)" +
         src".addr(${assertOne(bank)})" +
+        src".input(${assertOne(data)})" +
         src".barriers($barriers)"
       }
     case op@SparseSRAMBankedWrite(sram,data,bank,ofs,barriers,ens) => 

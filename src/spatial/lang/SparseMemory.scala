@@ -135,9 +135,9 @@ object SparseDRAM {
   }
 
   // Dummy address
-  @api def RMWData(addr: I32, bs: Seq[BarrierTransaction] = Seq(), key:scala.Int=(-1)): A = {
+  @api def RMWData(addr: I32, data:A, bs: Seq[BarrierTransaction] = Seq(), key:scala.Int=(-1)): A = {
     warn(s"Currently no syntax for input token to RMW, but it can be added.")
-    stage(SparseSRAMRMWData(this,Seq(addr),bs,key,Set.empty))
+    stage(SparseSRAMRMWData(this,data,Seq(addr),"xxx","xxx",bs,key,false,Set.empty))
   }
 
   /** Updates the value at `pos` to `data`. */

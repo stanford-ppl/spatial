@@ -80,6 +80,7 @@ abstract class SparseSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SparseSRAM[A
     * due to data-dependent control flow or that you don't care if one write gets dropped
     */
   def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
+  // def swizzle: C[A] = { this.shouldSwizzle = true; me }
 
 
   // --- Typeclass Methods
@@ -94,8 +95,17 @@ object SparseSRAM {
 }
 
 object SparseParSRAM {
-  @api def apply[A:Bits](par:scala.Int, length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
-    stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par, autoBar)).conflictable.mustmerge
+  //@api def apply[A:Bits](par:scala.Int, length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
+    //stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par, autoBar)).conflictable.mustmerge
+  @api def apply[A:Bits](par:scala.Int)(length: I32, autoBar:Boolean): SparseSRAM1[A] = 
+    stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par, autoBar, false)).conflictable.mustmerge
+}
+
+object SparseParSRAMSwizzle {
+  //@api def apply[A:Bits](par:scala.Int, length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
+    //stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par, autoBar)).conflictable.mustmerge
+  @api def apply[A:Bits](par:scala.Int)(length: I32, autoBar:Boolean): SparseSRAM1[A] = 
+    stage(SparseParSRAMNew[A,SparseSRAM1](Seq(length), par, autoBar, true)).conflictable.mustmerge
 }
 
 object SparseDRAM {

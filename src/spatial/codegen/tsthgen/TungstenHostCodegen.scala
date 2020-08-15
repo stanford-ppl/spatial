@@ -52,11 +52,26 @@ using namespace std;
     close("}")
 
     open("int main(int argc, char **argv) {");
-      emit("vector<string> *args = new vector<string>(argc-1);")
+      emit("vector<string> *args = new vector<string>(0);")
+      emit("vector<string> *W_pre = new vector<string>(0);")
+      emit("vector<string> *W_post = new vector<string>(0);")
       open("for (int i=1; i<argc; i++) {")
-        emit("(*args)[i-1] = std::string(argv[i]);")
+        emit(src"""if (std::string(argv[i]) == "--WPRE" || std::string(argv[i]) == "--WPOST")  {
+          assert(i+1 != argc);
+          if (std::string(argv[i]) == "--WPRE") {
+            std::cout << "Add pre-execution command: " << argv[i+1] << std::endl;
+            W_pre->push_back(argv[i+1]); 
+          } else {
+            std::cout << "Add post-execution command: " << argv[i+1] << std::endl;
+            W_post->push_back(argv[i+1]); 
+          }
+          i++;
+          continue;
+            }
+        """)
         emit(src"""if (std::string(argv[i]) == "--help" | std::string(argv[i]) == "-h") {printHelp();}""")
         emit(src"""if (std::string(argv[i]) == "--gen-link" | std::string(argv[i]) == "-l") {genLink();}""")
+        emit("(*args).push_back(std::string(argv[i]));")
       close("}")
       gen(block)
       emit(s"""cout << "Complete Simulation" << endl;""")

@@ -19,7 +19,7 @@ import spatial.lang._
 // Mode 0: dense index of input
 // Mode 1: output index
 // Mode 2: dense index of output
-@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Int, mode: String, truePar: scala.Int, index: scala.Int) extends Alloc[Counter[I32]] {
+@op case class ScannerNew(count: I32, bits: U32, par: scala.Int, outIdx: scala.Int, mode: String, truePar: scala.Int, index: scala.Int, reduce: scala.Boolean) extends Alloc[Counter[I32]] {
   override def effects: Effects = Effects.Unique
 }
 

@@ -13,7 +13,7 @@ trait TungstenHostGenAccel extends CppGenAccel {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
 
     case AccelScope(func) => 
-      emit("RunAccel();")
+      emit("RunAccel(*W_pre, *W_post);")
 
     case ExitIf(en) => 
       // Emits will only happen if outside the accel

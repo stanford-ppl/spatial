@@ -7,7 +7,7 @@ import spatial.lang._
 
 /** An allocation of a Barrier.
   */
-@op case class BarrierNew[A:Bits](init: scala.Int) extends MemAlloc[A,Barrier]{ def dims = Nil }
+@op case class BarrierNew[A:Bits](init: scala.Int, depth: scala.Int) extends MemAlloc[A,Barrier]{ def dims = Nil }
 
 abstract class BarrierOperator(mem: Barrier[_]) extends Primitive[BarrierTransaction]
 

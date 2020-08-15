@@ -14,13 +14,13 @@ trait PIRGenCounter extends PIRCodegen {
       state(lhs, tp=Some("List[Counter]"))(src"$ctrs")
     case ForeverNew()                   => 
       state(lhs)(src"ForeverCounter()")
-    case ScannerNew(count, bits, par, outIdxMode, mode, truePar, index)                   =>
+    case ScannerNew(count, bits, par, outIdxMode, mode, truePar, index, reduce)                   =>
       if (outIdxMode == 2) {
-        state(lhs)(src"""ScanCounter($par, $truePar, "${mode}", $index, true).tileCount(${count}).mask(${bits})""")
+        state(lhs)(src"""ScanCounter($par, $truePar, "${mode}", $index, true, $reduce).tileCount(${count}).mask(${bits})""")
       } else if (outIdxMode == 1) {
-        state(lhs)(src"""ScanCounter($par, $truePar, "${mode}", $index, false).tileCount(${count}).mask(${bits})""")
+        state(lhs)(src"""ScanCounter($par, $truePar, "${mode}", $index, false, $reduce).tileCount(${count}).mask(${bits})""")
       } else {
-        state(lhs)(src"ScanCounterDataFollower($par, $truePar, $index).tileCount(${count}).mask(${bits})")
+        state(lhs)(src"ScanCounterDataFollower($par, $truePar, $index, $reduce).tileCount(${count}).mask(${bits})")
       }
     case DataScannerNew(count, input, data)                   =>
       state(lhs)(src"DataScanCounter($data).tileCount(${count}).mask(${input})")

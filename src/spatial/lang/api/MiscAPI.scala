@@ -37,12 +37,19 @@ trait MiscAPI {
       stage(BitVecGeneratorTreeLen(shift, indices, gen_len, params))
     }
 
+  @api def ScanRed(par: scala.Int, count: I32, mode: String, bv: U32): List[Counter[I32]] = {
+    List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0, true)), stage(ScannerNew(count, bv, par, 0, mode, par, 0, true)))
+  }
+  @api def ScanRed(par: scala.Int, count: I32, mode: String, bvA: U32, bvB: U32): List[Counter[I32]] = {
+    List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0, true)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, true)),
+         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1, true)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1, true)))
+  }
   @api def Scan(par: scala.Int, count: I32, mode: String, bv: U32): List[Counter[I32]] = {
-    List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0)), stage(ScannerNew(count, bv, par, 0, mode, par, 0)))
+    List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0, false)), stage(ScannerNew(count, bv, par, 0, mode, par, 0, false)))
   }
   @api def Scan(par: scala.Int, count: I32, mode: String, bvA: U32, bvB: U32): List[Counter[I32]] = {
-    List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0)),
-         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1)))
+    List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0, false)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, false)),
+         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1, false)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1, false)))
   }
   /* @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {
     val n = bvs.size

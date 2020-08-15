@@ -23,7 +23,7 @@ import spatial.node._
 }
 
 object Barrier {
-  @api def apply[A:Bits](init: scala.Int): Barrier[A] = stage(BarrierNew[A](init))
+  @api def apply[A:Bits](init: scala.Int, depth: scala.Int = 65536): Barrier[A] = stage(BarrierNew[A](init, depth))
 }
 
 @ref class BarrierTransaction extends Top[BarrierTransaction] with Ref[Void,BarrierTransaction] {override def __neverMutable: Boolean = true}

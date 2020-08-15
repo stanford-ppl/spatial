@@ -56,8 +56,8 @@ trait PIRGenSparse extends PIRCodegen {
         //src".addr(${assertOne(ofs)})" + 
         ////src".lock(${lock.map { lock => assertOne(lock) }})"
       //}
-    case op@BarrierNew(init) => 
-      state(lhs)(src"""Barrier(stackTop[Ctrl].get.asInstanceOf[ControlTree],$init).srcCtx("${lhs.ctx}").name("${lhs.name}")""")
+    case op@BarrierNew(init, depth) => 
+      state(lhs)(src"""Barrier(stackTop[Ctrl].get.asInstanceOf[ControlTree],$init,$depth).srcCtx("${lhs.ctx}").name("${lhs.name}")""")
     case op@BarrierPush(barrier) =>
       state(lhs, tp=Some("(Barrier, Boolean)"))(src"($barrier,true)")
     case op@BarrierPop(barrier) =>

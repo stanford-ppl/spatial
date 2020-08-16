@@ -139,8 +139,11 @@ object BitVecGeneratorTree {
         }
       }
       Stream (*) {
-        val scalRet = scalRetBus.value()
-        prevLen.__write(scalRet, Seq(), Set.empty)
+        // TODO: make this a proper scalar EVERYWHERE
+        Foreach (16 par 16) { i =>
+          val scalRet = scalRetBus.value()
+          prevLen.__write(scalRet, Seq(), Set.empty)
+        }
         // prevLen.__write(scalRet._1, Seq(), Set.empty)
         // last.__write(scalRet._2, Seq(), Set.empty)
       }

@@ -35,13 +35,59 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
   /** Definition cache used for CSE */
   var cache: Map[Op[_], Sym[_]] = Map.empty
 
-  /** Set the scope to be empty. Should not mutate current value.
-    * NOTE: Should save and restore the scope surrounding this call.
+  case class ScopeBundle(impure: Vector[Impure], scope: Vector[Sym[_]], cache: Map[Op[_], Sym[_]])
+
+  val bundleStack = scala.collection.mutable.ArrayBuffer[ScopeBundle]()
+
+  /** Sets the current scope to the one described by bundle, and executes block in that context. Pops the scope
+    * afterwards.
+    *
+    * @param block The block to be executed
+    * @param bundle A tuple describing the current "state" of the engine.
+    * @return The result of block
     */
-  def newScope(motion: Boolean): Unit = {
-    scope = Vector.empty
-    impure = Vector.empty
-    if (!motion) cache = Map.empty // Empty the CSE cache in case code motion is disabled
+  def WithScope[R](block: => R, bundle: ScopeBundle): (R, ScopeBundle) = {
+    // saves existing bundle on top of stack
+    val curr_bundle = saveBundle()
+    bundleStack.append(curr_bundle)
+
+    // uses passed bundle as context for evaluating block
+    loadBundle(bundle)
+    val result = block
+
+    // capture effects of running block
+    val ret_bundle = saveBundle()
+
+    // restore old bundle
+    val old_bundle = bundleStack.last
+    loadBundle(old_bundle)
+
+    // pop old bundle off of stack
+    bundleStack.remove(bundleStack.size - 1)
+
+    (result, ret_bundle)
+  }
+
+  def WithNewScope[R](block: => R, motion: Boolean): (R, ScopeBundle) = {
+    val newBundle = ScopeBundle(Vector.empty, Vector.empty,
+      // Empty the CSE cache in case code motion is disabled
+      if (motion) cache else Map.empty
+    )
+    WithScope(block, newBundle)
+  }
+
+  private def loadBundle(bundle: ScopeBundle): Unit = {
+    impure = bundle.impure
+    scope = bundle.scope
+    cache = bundle.cache
+  }
+
+  private def saveBundle(): ScopeBundle = {
+    ScopeBundle(impure, scope, cache)
+  }
+
+  def init(): Unit = {
+    loadBundle(ScopeBundle(Vector.empty, Vector.empty, Map.empty))
   }
 
   /** Graph Metadata */

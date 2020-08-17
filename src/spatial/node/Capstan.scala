@@ -57,23 +57,27 @@ object BitVecGeneratorNoTree {
 
       setupBus := pack(max.unbox, len.unbox)
       Foreach(len.unbox par 16){i =>
-        val idx       = indices.__read(Seq(i), Set.empty)
-        idxBus := idx
+      // lStream (*) { 
+        // Foreach(16 par 16){i =>
+          val idx       = indices.__read(Seq(i), Set.empty)
+          idxBus := idx
+        // }
       }
       // Fringe
       val op = Fringe.bvBuildNoTree(shift, setupBus, idxBus, retBus)
       // transferSyncMeta(old, store)
       // Receive
       // Foreach(len.unbox by p par 1){i =>
-      //Stream (*) {
-        Foreach(max by 32 par 16){i =>
+      Stream (*) {
+        // Foreach(max by 32 par 16){i =>
+        Foreach(16 par 16){i =>
           val ret = retBus.value()
           // val bitvec = retBus.value()._1
           // val l = retBus.value()._2
           bv.__write(ret, Seq(i), Set.empty)
           //last.__write(ret._2, Seq(i), Set.empty)
         }
-      //}
+      }
     }
   }
 }
@@ -127,8 +131,11 @@ object BitVecGeneratorTree {
 
       setupBus := len.unbox
       Foreach(len.unbox par 16){i =>
-        val idx       = indices.__read(Seq(i), Set.empty)
-        idxBus := idx
+      // Stream (*) {
+        // Foreach(16 par 16){i =>
+          val idx       = indices.__read(Seq(i), Set.empty)
+          idxBus := idx
+        // }
       }
       // Fringe
       val op = Fringe.bvBuildTree(shift, setupBus, idxBus, vecRetBus, scalRetBus)
@@ -190,8 +197,11 @@ object BitVecGeneratorTreeLen {
 
       setupBus := len.unbox
       Foreach(len.unbox par 16){i =>
-        val idx       = indices.__read(Seq(i), Set.empty)
-        idxBus := idx
+      // Stream (*) {
+        // Foreach(16 par 16){i =>
+          val idx       = indices.__read(Seq(i), Set.empty)
+          idxBus := idx
+        // }
       }
       // Fringe
       val op = Fringe.bvBuildTreeLen(shift, setupBus, idxBus, scalRetBus)

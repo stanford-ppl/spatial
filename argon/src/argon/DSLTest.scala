@@ -258,7 +258,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     run  = "",
     model = ""
   ) {
-    def shouldRun: Boolean = true
+    override def shouldRun: Boolean = true
     override def runBackend(): Unit = {
       s"${test.name}" should s"have $errors compiler errors" in {
         compile(expectErrors = true).foreach{err =>
@@ -280,7 +280,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     run  = "",
     model = ""
   ) {
-    def shouldRun: Boolean = true
+    override def shouldRun: Boolean = true
     override def runBackend(): Unit = ignore should "compile, run, and verify" in { () }
   }
 

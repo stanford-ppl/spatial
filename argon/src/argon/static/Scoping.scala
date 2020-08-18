@@ -63,24 +63,16 @@ trait Scoping { this: Printing =>
     val scheduler = options.sched.getOrElse(defaultSched)
     if (state eq null) throw new Exception("Null state during stageScope")
 
-    val saveImpure = state.impure
-    val saveScope  = state.scope
-    val saveCache  = state.cache
-    val motion = saveScope != null && (scheduler.mustMotion || state.mayMotion)
+    val motion = state.scope != null && (scheduler.mustMotion || state.mayMotion)
     // In an isolated or sealed blocks, don't allow CSE with outside statements
     // CSE with outer scopes should only occur if symbols are not allowed to escape,
     // which isn't true in either of these cases
-    state.newScope(motion)
 
-    val result = reify(block)
-    val scope  = state.scope
-    val impure = state.impure
+    val (result, bundle) = state.WithNewScope({
+      reify(block)
+    }, motion)
 
-    state.cache  = saveCache
-    state.scope  = saveScope
-    state.impure = saveImpure
-
-    (result, scope, impure, scheduler, motion)
+    (result, bundle.scope, bundle.impure, scheduler, motion)
   }
 
 

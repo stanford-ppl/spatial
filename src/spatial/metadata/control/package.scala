@@ -229,13 +229,10 @@ package object control {
         val _loop  = Option(loop)
         val _level = Option(level)
         val _sched = Option(sched)
-        val ctrlLoop  = this.looping
-        val ctrlLevel = this.level
-        val ctrlSched = this.schedule
 
-        val hasLoop = _loop.isEmpty || _loop.contains(ctrlLoop)
-        val hasLevel = _level.isEmpty || _level.contains(ctrlLevel)
-        val hasSched = _sched.isEmpty || _sched.contains(ctrlSched)
+        val hasLoop = _loop.isEmpty || _loop.contains(this.looping)
+        val hasLevel = _level.isEmpty || _level.contains(this.level)
+        val hasSched = _sched.isEmpty || _sched.contains(this.schedule)
 
         isCtrl && hasLoop && hasLevel && hasSched
       }
@@ -1035,7 +1032,7 @@ package object control {
     @stateful def willFullyUnroll: Boolean = {
       if (x.isForever) false
       else (nIters,ctrPar) match {
-        case (Some(Expect(nIter)), Expect(par)) => par >= nIter
+        case (Some(Final(nIter)), Final(par)) => par >= nIter
         case _ => false
       }
     }

@@ -14,7 +14,7 @@ object Plasticine extends HardwareTarget {
 
   override def capacity: Area = Area()
 
-  protected def makeAreaModel: AreaModel = new PlasticineAreaModel(this)
+  protected def makeAreaModel(mlModel: AreaEstimator): AreaModel = new PlasticineAreaModel(this, mlModel)
   protected def makeLatencyModel: LatencyModel = new LatencyModel(this)
 
   case object SRAM_RESOURCE extends MemoryResource("SRAM") {

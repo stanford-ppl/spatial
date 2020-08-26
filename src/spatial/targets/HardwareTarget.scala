@@ -29,11 +29,11 @@ abstract class HardwareTarget {
   /** Device resource maximum, in terms of FIELDS */
   def capacity: Area
 
-  protected def makeAreaModel: AreaModel        // Area model for this target
+  protected def makeAreaModel(mlModel: AreaEstimator): AreaModel        // Area model for this target
   protected def makeLatencyModel: LatencyModel  // Latency model for this target
 
-  final def areaModel: AreaModel = {
-    if (__areaModel.isEmpty) __areaModel = Some(makeAreaModel)
+  final def areaModel(mlModel: AreaEstimator): AreaModel = {
+    if (__areaModel.isEmpty) __areaModel = Some(makeAreaModel(mlModel))
     __areaModel.get
   }
   final def latencyModel: LatencyModel = {
@@ -44,7 +44,7 @@ abstract class HardwareTarget {
   val memoryResources: List[MemoryResource]
   val defaultResource: MemoryResource
 
-  @stateful final def areaAnalyzer: AreaAnalyzer = AreaAnalyzer(state, makeAreaModel, makeLatencyModel)
+  @stateful final def areaAnalyzer(mlModel: AreaEstimator): DSEAreaAnalyzer = DSEAreaAnalyzer(state, makeAreaModel(mlModel), makeLatencyModel)
   @stateful final def cycleAnalyzer: LatencyAnalyzer = LatencyAnalyzer(state, makeLatencyModel)
 
 }

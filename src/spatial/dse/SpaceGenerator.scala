@@ -16,6 +16,8 @@ trait SpaceGenerator {
   }
 
   def domain(p: Sym[_], restricts: Iterable[Restrict])(implicit baseIR: State): Domain[Int] = {
+    val prior = p.getPrior
+
     if (restricts.nonEmpty) {
       val range = p.paramDomain match {
         case Left(x) => Left(x.toRange)
@@ -28,7 +30,7 @@ trait SpaceGenerator {
         setter = {(v: Int, state: State) => p.setIntValue(v)(state) },
         getter = {(state: State) => p.intValue(state).toInt },
         cond   = {state => restricts.forall(_.evaluate()(state)) },
-        tp     = Ordinal
+        tp     = Ordinal(prior)
       )
     }
     else {
@@ -42,7 +44,7 @@ trait SpaceGenerator {
         range = range,
         setter = { (v: Int, state: State) => p.setIntValue(v)(state) },
         getter = { (state: State) => p.intValue(state).toInt },
-        tp     = Ordinal
+        tp     = Ordinal(prior)
       )
     }
   }
@@ -69,7 +71,7 @@ trait SpaceGenerator {
         setter  = {(c: Boolean, state:State) => if (c) mp.setSchedValue(Pipelined)(state)
                                                 else   mp.setSchedValue(Sequenced)(state) },
         getter  = {(state: State) => mp.schedValue(state) == Pipelined },
-        tp      = Categorical
+        tp      = Categorical(Seq(0.5,0.5))
       )
     }
   }

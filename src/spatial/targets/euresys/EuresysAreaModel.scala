@@ -5,7 +5,7 @@ import argon._
 import forge.tags._
 import models._
 
-class EuresysAreaModel(target: EuresysDevice) extends AreaModel(target) {
+class EuresysAreaModel(target: EuresysDevice, mlModel: AreaEstimator) extends AreaModel(target, mlModel) {
   import EuresysDevice._
 
   @stateful override def summarize(area: Area): (Area, String) = {

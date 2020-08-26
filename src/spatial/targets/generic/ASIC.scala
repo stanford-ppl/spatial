@@ -8,7 +8,7 @@ import forge.tags._
 object ASIC extends HardwareTarget {
   override val AFIELDS: Array[String] = Array()
   val DSP_CUTOFF = 0
-  protected def makeAreaModel: AreaModel = new GenericAreaModel(this)
+  protected def makeAreaModel(mlModel: AreaEstimator): AreaModel = new GenericAreaModel(this, mlModel)
   protected def makeLatencyModel: LatencyModel = new LatencyModel(xilinx.Zynq)
 
   case object SRAM_RESOURCE extends MemoryResource("SRAM") {

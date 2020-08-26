@@ -6,10 +6,11 @@ import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.util.modeling._
+import models.AreaEstimator
 import utils.implicits.collections._
 import spatial.metadata.blackbox._
 
-case class MemoryReporter(IR: State) extends Pass {
+case class MemoryReporter(IR: State)(implicit mlModel: AreaEstimator) extends Pass {
   override def shouldRun: Boolean = config.enInfo
 
   protected def process[S](block: Block[S]): Block[S] = { run(); block }
@@ -18,7 +19,7 @@ case class MemoryReporter(IR: State) extends Pass {
     import scala.language.existentials
 
     val mems = LocalMemories.all.filter(!_.isCtrlBlackbox).map{case Stm(s,d) =>
-      val area = areaModel.areaOf(s, d, inHwScope = true, inReduce = false)
+      val area = areaModel(mlModel).areaOf(s, d, inHwScope = true, inReduce = false)
       s -> area
     }.toSeq.sortWith((a,b) => a._2 < b._2)
 
@@ -102,7 +103,6 @@ case class MemoryReporter(IR: State) extends Pass {
         emit("\n\n\n")
       }
     }
-
   }
 }
 

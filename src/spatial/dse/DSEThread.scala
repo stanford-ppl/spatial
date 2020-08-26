@@ -1,16 +1,13 @@
 package spatial.dse
 
+import java.util.concurrent.LinkedBlockingQueue
+
 import argon._
-import spatial.metadata._
-import poly.ISL
-import models.AreaEstimator
-import spatial.targets._
-import spatial.metadata.params._
-import spatial.metadata.bounds._
-import spatial.traversal._
-import java.util.concurrent.BlockingQueue
-import spatial.util.spatialConfig
 import models._
+import poly.ISL
+import spatial.metadata.params._
+import spatial.traversal._
+import spatial.util.spatialConfig
 
 case class DSEThread(
   threadId:  Int,
@@ -19,10 +16,10 @@ case class DSEThread(
   accel:     Sym[_],
   program:   Block[_],
   localMems: Seq[Sym[_]],
-  workQueue: BlockingQueue[Seq[BigInt]],
-  outQueue:  BlockingQueue[Array[String]],
+  workQueue: LinkedBlockingQueue[Seq[DesignPoint]],
+  outQueue:  LinkedBlockingQueue[Array[String]],
   PROFILING: Boolean
-)(implicit val state: State, val isl: ISL, val areamodel: models.AreaEstimator) extends Runnable { thread =>
+)(implicit val state: State, val isl: ISL, val mlModel: models.AreaEstimator) extends Runnable { thread =>
   // --- Thread stuff
   private var isAlive: Boolean = true
   private var hasTerminated: Boolean = false
@@ -60,7 +57,7 @@ case class DSEThread(
   private lazy val memoryAnalyzer = new MemoryAnalyzer(state)
 
   // private lazy val contentionAnalyzer = new ContentionAnalyzer(state)
-  private lazy val areaAnalyzer  = target.areaAnalyzer(state)
+  private lazy val areaAnalyzer  = target.areaAnalyzer(mlModel)(state)
   private lazy val cycleAnalyzer = target.cycleAnalyzer(state)
 
   def init(): Unit = {
@@ -109,18 +106,15 @@ case class DSEThread(
     hasTerminated = true
   }
 
-  def run(requests: Seq[BigInt]): Array[String] = {
+  def run(requests: Seq[DesignPoint]): Array[String] = {
     val array = new Array[String](requests.size)
     var i: Int = 0
-    val paramRewrites = requests.map{pt => indexedSpace.flatMap{case (domain,d) => Seq(domain.name, domain.options( ((pt / prods(d)) % dims(d)).toInt ))}}
-    // println(s"paramRewrites for thread $threadId = ${paramRewrites.mkString(" ")}")
+    val paramRewrites = requests.map{pt => pt.show(indexedSpace, prods, dims)}
+    if (paramRewrites.size >= 3) println(s"paramRewrites for thread $threadId = ${paramRewrites(0)} ${paramRewrites(1)} ${paramRewrites(2)} ...")
     val runtimes = evaluateLatency(paramRewrites)
     requests.foreach{pt =>
       state.resetErrors()
-      indexedSpace.foreach{case (domain,d) => 
-        val idx =  ((pt / prods(d)) % dims(d)).toInt 
-        domain.set( idx )(state) 
-      }
+      pt.set(indexedSpace, prods, dims)
 
       val area = evaluate(paramRewrites)
       val valid = area <= capacity && !state.hadErrors // Encountering errors makes this an invalid design point
@@ -150,7 +144,7 @@ case class DSEThread(
     // contentionAnalyzer.run()
     // if (PROFILING) endCon()
 
-    // areaAnalyzer.rerun(accel, program)
+    areaAnalyzer.rerun(accel, program)
     if (PROFILING) endArea()
 
     areaAnalyzer.totalArea._1

@@ -13,6 +13,7 @@ abstract class MemAlloc[A:Bits,C[T]](
 
   val A: Bits[A] = Bits[A]
 
+  @stateful def nbits: Int = A.nbits
   def dims: Seq[I32]
   def rank: Seq[Int] = Seq.tabulate(dims.length){i => i}
   override def effects: Effects = if (mutable) Effects.Mutable else super.effects

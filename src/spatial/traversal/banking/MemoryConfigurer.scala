@@ -2,26 +2,21 @@ package spatial.traversal
 package banking
 
 import argon._
-import poly.ISL
 import models.AreaEstimator
-import utils.implicits.collections._
-import utils.math._
-import utils.tags.instrument
-
-import utils.math.isPow2
+import poly.ISL
 import spatial.issues.UnbankableGroup
 import spatial.lang._
-import spatial.node._
 import spatial.metadata.access._
 import spatial.metadata.control._
-import spatial.metadata.retiming._
 import spatial.metadata.memory._
+import spatial.metadata.retiming._
+import spatial.metadata.types._
+import spatial.node._
 import spatial.util.spatialConfig
-import poly.{SparseMatrix, SparseVector}
+import utils.implicits.collections._
+import utils.math._
 
 import scala.collection.mutable.ArrayBuffer
-
-import spatial.metadata.types._
 
 class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit state: State, isl: ISL, areamodel: AreaEstimator) {
   protected lazy val rank: Int = mem.sparseRank.length

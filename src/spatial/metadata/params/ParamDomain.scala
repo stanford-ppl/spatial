@@ -40,3 +40,6 @@ case class IntParamValue(v: Int) extends Data[IntParamValue](SetBy.Analysis.Self
   * Default: 1
   */
 case class SchedParamValue(v: CtrlSchedule) extends Data[SchedParamValue](SetBy.Analysis.Self)
+
+case class ParamPrior(prior: Prior) extends Data[ParamPrior](SetBy.Analysis.Self)
+

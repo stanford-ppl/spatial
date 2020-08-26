@@ -39,6 +39,10 @@ package object params {
     @stateful def schedValue: CtrlSchedule = p.rawSchedule
     @stateful def setSchedValue(d: CtrlSchedule): Unit = p.rawSchedule = d
     @stateful def schedValue_=(d: CtrlSchedule): Unit = p.rawSchedule = d
+
+    @stateful def getPrior: Prior = metadata[ParamPrior](p).map(_.prior).getOrElse(Uniform)
+    @stateful def prior_=(pr: Prior) = metadata.add(p, ParamPrior(pr))
+
   }
 
   object Parameter {

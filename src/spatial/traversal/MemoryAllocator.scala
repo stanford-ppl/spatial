@@ -9,10 +9,11 @@ import spatial.util.modeling.{target, areaModel}
 import spatial.targets.MemoryResource
 import spatial.metadata.blackbox._
 
-case class MemoryAllocator(IR: State) extends Pass {
-  implicit def AREA_FIELDS: AreaFields[Double] = areaModel.RESOURCE_FIELDS
+case class MemoryAllocator(IR: State)(implicit mlModel: AreaEstimator) extends Pass {
+  implicit def AREA_FIELDS: AreaFields[Double] = areaModel(mlModel).RESOURCE_FIELDS
 
   override protected def process[R](block: Block[R]): Block[R] = {
+    println(s"TODO: un-gut memory allocator")
     allocate()
     block
   }
@@ -28,7 +29,7 @@ case class MemoryAllocator(IR: State) extends Pass {
 
 
     def areaMetric(mem: Sym[_], inst: Memory, resource: MemoryResource): Double = {
-      resource.summary(areaModel.rawMemoryArea(mem, inst, resource)) // sortBy: smallest to largest
+      resource.summary(areaModel(mlModel).rawMemoryArea(mem, inst, resource)) // sortBy: smallest to largest
     }
 
     // Memories which can use more specialized memory resources
@@ -79,7 +80,7 @@ case class MemoryAllocator(IR: State) extends Pass {
         while (capacity(resource.name) > 0 && sortedInsts.hasNext) {
           val ProfiledInstance(inst, _, area) = sortedInsts.next()
           val Instance(mem, dup, idx) = inst
-          val depth = areaModel.memoryBankDepth(mem, dup)
+          val depth = areaModel(mlModel).memoryBankDepth(mem, dup)
 
           if (area <= capacity && depth >= resource.minDepth) {
             dbg(s"  Assigned $mem#$idx to ${resource.name} (area: $area (<= $capacity), depth: $depth (>= ${resource.minDepth}))")

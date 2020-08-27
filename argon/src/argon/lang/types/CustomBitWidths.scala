@@ -160,6 +160,7 @@ trait _200 extends INT[_200] { val v = 200 }
 trait _240 extends INT[_240] { val v = 240 }
 trait _256 extends INT[_256] { val v = 256 }
 trait _512 extends INT[_512] { val v = 512 }
+trait _1024 extends INT[_1024] { val v = 1024 }
 
 /** Hack for working with customized bit widths, since Scala doesn't support integers as template parameters */
 object BOOL {
@@ -455,4 +456,5 @@ trait CustomBitWidths {
   type _240 = argon.lang.types._240
   type _256 = argon.lang.types._256
   type _512 = argon.lang.types._512
+  type _1024 = argon.lang.types._1024
 }

@@ -310,6 +310,7 @@ object INT {
   implicit lazy val INT240: INT[_240] = new _240 {}
   implicit lazy val INT256: INT[_256] = new _256 {}
   implicit lazy val INT512: INT[_512] = new _512 {}
+  implicit lazy val INT1024: INT[_1024] = new _1024 {}
 }
 
 trait CustomBitWidths {

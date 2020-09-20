@@ -3,6 +3,11 @@ package spatial.tests.feature.memories.lut
 import argon._
 import spatial.dsl._
 import spatial.node.LUTNew
+import spatial.node._
+import spatial.dsl._
+import argon.Block
+import argon.Op
+
 @spatial class LUTSimple extends SpatialTest {
   override def runtimeArgs: Args = "2"
 
@@ -126,6 +131,34 @@ import spatial.node.LUTNew
   override def checkIR(block: Block[_]): Result = {
     val luts = block.nestedStms.count { case Op(_: LUTNew[_,_]) => true; case _ => false }
     luts shouldBe 0
+    super.checkIR(block)
+  }
+}
+
+
+@spatial class LUTPartialStatic extends SpatialTest {
+  type T = Int
+
+  def main(args: Array[String]): Unit = {
+    val out = List.tabulate(32){i => ArgOut[T]}
+    Accel {
+      val lutA = LUT[T](32,2)(Seq.tabulate(64){i => i.to[T]}:_*)
+      Foreach(2 by 1) {i => out.zipWithIndex.foreach{case (o,j) => o := lutA(j,i)}}
+    }
+    List.tabulate(32){ i =>
+      val result = getArg(out(i))
+      val gold = i * 2 + 1
+      println("expect: " + gold)
+      println("result: " + result)
+      assert(result == gold)
+    }
+    ()
+  }
+  override def checkIR(block: Block[_]): Result = {
+    val lutcount = block.nestedStms.collect{case x@Op(sram:LUTNew[_,_]) => sram }.size
+
+    require(lutcount == 1, "Should only have 1 duplicate of LUT banked N=32,2")
+
     super.checkIR(block)
   }
 }

@@ -20,8 +20,7 @@ import java.nio.file.StandardOpenOption
 import java.nio.channels._
 import java.util.concurrent.{BlockingQueue, Executors, LinkedBlockingQueue, TimeUnit}
 
-case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: AreaEstimator) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
-  final val PROFILING = true
+case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val mlModel: AreaEstimator) extends argon.passes.Traversal with SpaceGenerator with HyperMapperDSE {
 
   override protected def process[R](block: Block[R]): Block[R] = {
     dbgs("Tile sizes: ")
@@ -77,7 +76,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
       case DSEMode.Heuristic => heuristicDSE(params, space, Restrictions.all, block, false)
       case DSEMode.Bruteforce => bruteForceDSE(params, space, block) 
       case DSEMode.Experiment => heuristicDSE(params, space, Restrictions.all, block, true)
-      case DSEMode.HyperMapper => hyperMapperDSE(space, block)
+      case DSEMode.HyperMapper => hyperMapperDSE(params, space, block)
     }
   
     dbg("Freezing parameters")
@@ -254,7 +253,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
           threadBasedDSE(points.length, params, prunedSpace, program, file = filename, overhead = legalCalcTime) { queue =>
             points.sliding(BLOCK_SIZE, BLOCK_SIZE).foreach { block =>
               //println(s"[Master] Submitting block of length ${block.length} to work queue")
-              queue.put(block)
+              queue.put(block.map{i => PointIndex(i) })
             }
           }
 
@@ -273,7 +272,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
 
         threadBasedDSE(points.length, params, prunedSpace, program) { queue =>
           points.sliding(BLOCK_SIZE, BLOCK_SIZE).foreach { block =>
-            queue.put(block)
+            queue.put(block.map{i => PointIndex(i) })
           }
         }
       }
@@ -284,7 +283,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
   }
 
   // P: Total space size
-  def threadBasedDSE(P: BigInt, params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_], file: String = config.name+"_data.csv", overhead: Long = 0L)(pointGen: BlockingQueue[Seq[BigInt]] => Unit): Unit = {
+  def threadBasedDSE(P: BigInt, params: Seq[Sym[_]], space: Seq[Domain[_]], program: Block[_], file: String = config.name+"_data.csv", overhead: Long = 0L)(pointGen: LinkedBlockingQueue[Seq[DesignPoint]] => Unit): Unit = {
     val names = params.map{p => p.name.getOrElse(p.toString) }
     val N = space.size
     val T = spatialConfig.threads
@@ -310,7 +309,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
     println(s"Using $T threads with block size of $BLOCK_SIZE")
     println(s"Writing results to file $filename")
 
-    val workQueue = new LinkedBlockingQueue[Seq[BigInt]](5000)  // Max capacity specified here
+    val workQueue = new LinkedBlockingQueue[Seq[DesignPoint]](5000)  // Max capacity specified here
     val fileQueue = new LinkedBlockingQueue[Array[String]](5000)
 
     val workerIds = (0 until T).toList
@@ -343,11 +342,11 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
         workQueue = workQueue,
         outQueue  = fileQueue,
         PROFILING = PROFILING
-      )(threadState, isl, areamodel)
+      )(threadState, isl, mlModel)
     }
     dbgs("Initializing models...")
 
-    // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
+      // Initializiation may not be threadsafe - only creates 1 area model shared across all workers
     workers.foreach{worker => worker.init() }
 
     //val superHeader = List.tabulate(names.length){i => if (i == 0) "INPUTS" else "" }.mkString(",") + "," +
@@ -383,7 +382,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
     println("[Master] Ending work queue.")
 
     // Poison the work queue (make sure to use enough to kill them all!)
-    workerIds.foreach{_ => workQueue.put(Seq.empty[BigInt]) }
+    workerIds.foreach{_ => workQueue.put(Seq.empty) }
 
     println("[Master] Waiting for workers to complete...")
 
@@ -449,7 +448,7 @@ case class DSEAnalyzer(val IR: State)(implicit val isl: ISL, val areamodel: Area
       var i = BigInt(0)
       while (i < P) {
         val len: Int = if (P - i < BLOCK_SIZE) (P - i).toInt else BLOCK_SIZE
-        if (len > 0) queue.put(i until i + len)
+        if (len > 0) queue.put((i until i + len).map{i => PointIndex(i) })
         i += BLOCK_SIZE
       }
     }

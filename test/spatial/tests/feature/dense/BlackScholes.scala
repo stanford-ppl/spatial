@@ -79,7 +79,7 @@ import spatial.dsl._
     val B  = loadParam("ts", 4 (96 -> 96 -> 19200))
     val op = loadParam("op", 1 (1 -> 2))
     val ip = loadParam("ip", 16 (1 -> 96))
-    val lp = loadParam("lp", 4 (1 -> 16))
+    val lp = loadParam("lp", 4 (1,2,4,8,16))
 
     val size = stypes.length; bound(size) = 9995328
 

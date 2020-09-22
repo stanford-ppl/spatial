@@ -8,6 +8,7 @@ object ZCU extends XilinxDevice {
   val name = "ZCU"
   def burstSize = 512
 
+  // TODO: Cut resource counts in half to make hypermapper work harder on smaller apps for R&D reasons
   override def capacity: Area = Area(
     SLICEL -> 34260,  // Can use any LUT
     SLICEM -> 17600,  // Can only use specialized LUTs

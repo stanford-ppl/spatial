@@ -1,19 +1,16 @@
 package spatial.traversal
 
 import argon._
-import argon.static.Printing
 import argon.codegen.Codegen
-import argon.passes.Pass
-import poly.ISL
 import models.AreaEstimator
-import spatial.util.spatialConfig
-
-import spatial.traversal.banking._
-import spatial.metadata.memory._
+import poly.ISL
 import spatial.lang._
 import spatial.lang.types._
 import spatial.metadata.memory.LocalMemories
 import spatial.metadata.blackbox._
+import spatial.metadata.memory._
+import spatial.traversal.banking._
+import spatial.util.spatialConfig
 
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator) extends Codegen { // Printing with Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()

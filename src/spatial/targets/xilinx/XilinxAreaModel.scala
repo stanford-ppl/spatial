@@ -5,11 +5,11 @@ import argon._
 import forge.tags._
 import models._
 
-class XilinxAreaModel(target: XilinxDevice) extends AreaModel(target) {
+class XilinxAreaModel(target: XilinxDevice, mlModel: AreaEstimator) extends AreaModel(target, mlModel) {
   import XilinxDevice._
 
   @stateful override def summarize(area: Area): (Area, String) = {
-    val design = area + model("Fringe")()
+    val design = area //+ model("Fringe")()
 
     val routingLUTs = 0 //calculateRoutingLUTs(design)
     val routingRegs = 0 //calculateRoutingRegs(design)
@@ -37,7 +37,7 @@ class XilinxAreaModel(target: XilinxDevice) extends AreaModel(target) {
     val totalSLICEL = logicSlices + design(SLICEL) + regSlices
     val totalSlices = totalSLICEM + totalSLICEL
 
-    val areaReport = if (config.enInfo) {
+    val areaReport = if (false) {
       s"""
         |Resource Estimate Breakdown:
         |----------------------------

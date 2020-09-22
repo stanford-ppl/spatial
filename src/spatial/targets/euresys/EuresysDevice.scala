@@ -82,7 +82,7 @@ abstract class EuresysDevice extends HardwareTarget {
     else             Area(RAM64M->N) * Math.ceil(depth/64.0)
   }
 
-  protected def makeAreaModel: AreaModel = new EuresysAreaModel(this)
+  protected def makeAreaModel(mlModel: AreaEstimator): AreaModel = new EuresysAreaModel(this, mlModel)
   protected def makeLatencyModel: LatencyModel = new LatencyModel(this)
 
 }

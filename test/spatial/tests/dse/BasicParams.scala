@@ -20,9 +20,9 @@ class BasicParamsV3 extends BasicParams(2,4,64,8,true)
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
-    val OP = op (1 -> 3)
-    val IP = ip (2 -> 2 -> 8)
-    val B  = bs (32 -> 32 -> 192)
+    val OP = op (1 -> 8)
+    val IP = ip (4 -> 2 -> 16)
+    val B  = bs (64 -> 64 -> 1024)
     val LP = lp (1, 2, 4, 8, 16)
 
     //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file

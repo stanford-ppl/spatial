@@ -46,6 +46,8 @@ class SpatialConfig extends Config {
   var unrollParallelOfMetapipes: Boolean = false
   var allowInsanity: Boolean = false
   var codeWindow: Int = 50
+  var hypermapper_doeSamples: Int = 10000
+  var hypermapper_iters: Int = 5
 
   var enableArchDSE: Boolean = false
 
@@ -65,6 +67,8 @@ class SpatialConfig extends Config {
   var optimizeDiv = false
   var fuseAsFMA = true
   var forceFuseFMA = false
+
+  lazy val HYPERMAPPER: String = sys.env.getOrElse("HYPERMAPPER_HOME", {throw new Exception("Please set the HYPERMAPPER_HOME environment variable."); sys.exit() })
 
   var enableBroadcast = true // Allow broadcasting reads
 

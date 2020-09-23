@@ -1,22 +1,21 @@
 package spatial.util
 
 import argon._
-import argon.node._
 import forge.tags.stateful
 import models.Area
 import spatial.lang._
-import spatial.node._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.retiming._
 import spatial.metadata.types._
+import spatial.node._
 import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
-
 import utils.implicits.collections._
+import models.AreaEstimator
 
-import scala.collection.mutable
 import scala.collection.immutable.SortedSet
+import scala.collection.mutable
 
 object modeling {
 
@@ -80,8 +79,8 @@ object modeling {
   }
 
   @stateful def target: HardwareTarget = spatialConfig.target
-  @stateful def areaModel: AreaModel = spatialConfig.target.areaModel
-  @stateful def NoArea: Area = areaModel.NoArea
+  @stateful def areaModel(mlModel: AreaEstimator): AreaModel = spatialConfig.target.areaModel(mlModel)
+  @stateful def NoArea: Area = areaModel(new AreaEstimator).NoArea
   @stateful def latencyModel: LatencyModel = spatialConfig.target.latencyModel
 
   @stateful def latencyOf(e: Sym[_], inReduce: Boolean = false): Double = {

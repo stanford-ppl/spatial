@@ -1,23 +1,20 @@
 package spatial.dse
 
 import argon._
+import models._
 import spatial.lang._
-import spatial.node._
-import spatial.util.spatialConfig
-import spatial.util.modeling._
 import spatial.metadata.bounds._
 import spatial.metadata.control._
-import spatial.metadata.control._
-import spatial.metadata.memory._
-import spatial.traversal._
+import spatial.node._
 import spatial.targets._
-import models._
-import argon.node._
+import spatial.traversal._
+import spatial.util.modeling._
 
 import scala.collection.mutable
 
-case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal  {
+case class DSEAreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyModel) extends RerunTraversal with AccelTraversal  {
   private def NoArea: Area = areaModel.NoArea
+  val mlModel = areaModel.mlModel
 
   var totalArea: (Area, String) = (NoArea, "")
   var scopeArea: Seq[Area] = Nil
@@ -55,13 +52,17 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
     val total = (saved +: scopeArea).fold(NoArea){_+_}
     val area = areaModel.summarize(total)
     totalArea = area
+    println(s"$total $area")
 
-    if (config.enDbg) { areaModel.reportMissing() }
+    //if (config.enDbg) { areaModel.reportMissing() }
 
     super.postprocess(block)
   }
 
-  def areaOf(e: Sym[_]): Area = areaModel.areaOf(e, inHw, inReduce)
+  def areaOf(e: Sym[_]): Area = {
+    val a = areaModel.areaOf(e, inHw, inReduce)
+    a
+  }
   def requiresRegisters(x: Sym[_], inReduce: Boolean): Boolean = latencyModel.requiresRegisters(x, inReduce)
   def retimingDelay(x: Sym[_], inReduce: Boolean): Int = if (requiresRegisters(x,inReduce)) latencyOf(x).toInt else 0
 
@@ -137,7 +138,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
       case AccelScope(block) =>
         inAccel{
           savedArea = scopeArea.fold(NoArea){_+_}
-          val body = areaOfBlock(block, lhs.isInnerControl, 1)
+          val body = areaOfBlock(block, false, 1)
           body
         }
 
@@ -148,21 +149,21 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         body + areaOf(lhs)
 
       case UnitPipe(_, block, _)     =>
-        val body = areaOfBlock(block, isInner = lhs.isInnerControl, 1)
+        val body = areaOfBlock(block, isInner = lhs.children.nonEmpty, 1)
         dbgs(s"UnitPipe: $lhs")
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
       case OpForeach(_, cchain, block, _, _) =>
         val P = cchain.constPars.product
-        val body = areaOfBlock(block, lhs.isInnerControl, P)
+        val body = areaOfBlock(block,  isInner = lhs.children.size > 0, P)
         dbgs(s"Foreach: $lhs (P = $P)")
         dbgs(s" - Body: $body")
         body + areaOf(lhs)
 
       case op@OpReduce(_, cchain, _, map, load, reduce, store, _, _, _, _) =>
         val P = cchain.constPars.product
-        val mapArea: Area = areaOfBlock(map, lhs.isInnerControl, P) // Map is duplicated P times
+        val mapArea: Area = areaOfBlock(map,  isInner = lhs.children.size > 0, P) // Map is duplicated P times
         /*
           Some simple math:
           A full binary (reduction) tree is a tree in which every node is either
@@ -186,14 +187,13 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         dbgs(s" - Tree:   $treeArea")
         dbgs(s" - Delays: $treeDelayArea")
         dbgs(s" - Cycle:  ${loadArea + storeArea + cycleArea}")
-
         mapArea + treeArea + treeDelayArea + loadArea + cycleArea + storeArea + areaOf(lhs)
 
       case op@OpMemReduce(en,cchainMap,cchainRed,accum,map,loadRes,loadAcc,reduce,storeAcc,ident,fold,itersMap,itersRed,_) =>
         val Pm = cchainMap.constPars.product
         val Pr = cchainRed.constPars.product
 
-        val mapArea = areaOfBlock(map,lhs.isInnerControl,Pm)
+        val mapArea = areaOfBlock(map, isInner = lhs.children.size > 0,Pm)
 
         val treeArea = areaOfPipe(reduce, 1)*Pm*Pr
         val reduceLength = latencyOfPipe(reduce)
@@ -213,7 +213,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
         mapArea + treeArea + treeDelayArea + loadResArea + loadAccArea + cycleArea + storeArea + areaOf(lhs)
 
       case Switch(selects,body) =>
-        val caseArea = areaOfBlock(body, lhs.isInnerControl, 1)
+        val caseArea = areaOfBlock(body,  isInner = lhs.children.size > 0, 1)
 
         dbgs(s"Switch: $lhs (#selects = ${selects.length})")
         dbgs(s" - Body: $caseArea")
@@ -221,7 +221,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
       case StateMachine(_,_,notDone,action,nextState) =>
         val notDoneArea   = areaOfBlock(notDone,isInner = true,1)
-        val actionArea    = areaOfBlock(action,lhs.isInnerControl,1)
+        val actionArea    = areaOfBlock(action, isInner = lhs.children.size > 0,1)
         val nextStateArea = areaOfBlock(nextState,isInner = true,1)
 
         dbgs(s"State Machine: $lhs")
@@ -239,6 +239,7 @@ case class AreaAnalyzer(IR: State, areaModel: AreaModel, latencyModel: LatencyMo
 
       case _ => areaOf(lhs) + rhs.blocks.map(blk => areaOfBlock(blk,isInner = false,1)).fold(NoArea){_+_}
     }
+
     scopeArea = area +: scopeArea
   }
 

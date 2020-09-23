@@ -110,8 +110,8 @@ object DenseTransfer {
         else        store(dramAddr, localAddr)
       }
       top.loweredTransfer = if (isLoad) DenseLoad else DenseStore
-      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
-      top.loweredTransferSize = (alignedSize, pars.last._2, lastPar*A.nbits)
+//      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
+      top.loweredTransferSize = (lens.last._2, pars.last._2, lastPar*A.nbits)
     }
     else {
       val top = Stream {
@@ -121,8 +121,8 @@ object DenseTransfer {
         else        store(dramAddr, localAddr)
       }
       top.loweredTransfer = if (isLoad) DenseLoad else DenseStore
-      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
-      top.loweredTransferSize = (alignedSize, pars.last._2, lastPar*A.nbits)
+//      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
+      top.loweredTransferSize = (lens.last._2, pars.last._2, lastPar*A.nbits)
     }
 
     // struc.loweredTransfer = if (isLoad) DenseLoad else DenseStore

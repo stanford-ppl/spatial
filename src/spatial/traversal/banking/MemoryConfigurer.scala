@@ -266,7 +266,9 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
           val noConflicts = if (isWrite) {
             if (conflicts.nonEmpty && !mem.shouldIgnoreConflicts) {
-              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+              val contexts = conflicts map {_.access.ctx}
+              val uids = conflicts map {_.unroll}
+              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${contexts.mkString(", ")} (uid: ${uids.mkString(", ")}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
               warn(s"    Consider either:")
               warn(s"       1) Remove parallelization on all ancestor controllers")
               warn(s"       2) Declare this memory inside the innermost outer controller with parallelization > 1")

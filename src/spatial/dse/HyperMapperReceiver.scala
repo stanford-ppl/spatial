@@ -99,6 +99,7 @@ case class HyperMapperReceiver(
 
             case "End"            => running = false
             case "Pareto"         => running = false
+            case "End of HyperMapper"  => running = false
           }
         }
       }

@@ -39,7 +39,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                                             else if (mem.explicitBanking.isDefined) Seq(UserDefinedAlpha(mem.explicitAlphas))
                                             else if (mem.alphaConstraints.isEmpty) Seq(AlphaBestGuess, AlphaRelaxed)
                                             else mem.alphaConstraints
-  lazy val dimensionDuplication: Seq[RegroupDims] = if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
+  lazy val dimensionDuplication: Seq[RegroupDims] = if (strategy.isInstanceOf[FullyBanked]) RegroupHelper.regroupNone
+                                                    else if (mem.explicitBanking.isDefined) RegroupHelper.regroupNone
                                                     else if (mem.isNoFission) RegroupHelper.regroupNone
                                                     else if (mem.isFullFission) RegroupHelper.regroupAll(rank)
                                                     else if (mem.duplicateOnAxes.isDefined) mem.duplicateOnAxes.get.map{x: Seq[Int] => RegroupDims(x.toList)}.toList

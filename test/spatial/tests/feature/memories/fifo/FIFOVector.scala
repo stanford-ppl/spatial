@@ -57,6 +57,6 @@ import spatial.dsl._
     printArray(dst, "Got:")
 
     println(r"PASS: ${gold == dst} (FIFOVector)")
-    // assert(gold == dst)
+    assert(gold == dst)
   }
 }

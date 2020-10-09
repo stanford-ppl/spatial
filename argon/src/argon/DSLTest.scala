@@ -107,7 +107,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
     def deleteAfter: Boolean = checkFlag("test.deleteAfter")
 
-    def shouldRun: Boolean
+    def shouldRun: Boolean = checkFlag(f"test.$name")
     override def toString: String = name
     def makeArgs: Seq[String] = make.split(" ").map(_.trim).filter(_.nonEmpty)
     def runArgs: Seq[String] = run.split(" ").map(_.trim).filter(_.nonEmpty)

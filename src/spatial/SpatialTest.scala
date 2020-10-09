@@ -55,7 +55,18 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     shouldRunModels = true
   ) {
     override def shouldRun: Boolean = checkFlag("test.VCS")
-    override val makeTimeout: Long = 3600
+    override val makeTimeout: Long = 130000
+  }
+
+  object VCSTest extends ChiselBackend(
+    name = "VCSTest",
+    args = "--synth --instrument --runtime --fpga VCS",
+    make = "make",
+    run  = "",
+    model  = ""
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.VCSTest")
+    override val makeTimeout: Long = 130000
   }
 
   object Zynq extends ChiselBackend(
@@ -77,7 +88,18 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     model = "noninteractive"
   ) {
     override def shouldRun: Boolean = checkFlag("test.ZCU")
-    override val makeTimeout: Long = 13000
+    override val makeTimeout: Long = 130000
+  }
+
+  object ZCUSynth extends ChiselBackend(
+    name = "ZCUS",
+    args = ZCU.args,
+    make = ZCU.make,
+    run = "bash scripts/scrape.sh ZCUS",
+    model = ZCU.model
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.ZCUS")
+    override val makeTimeout: Long = ZCU.makeTimeout
   }
 
   object AWS extends ChiselBackend(
@@ -107,6 +129,6 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP) ++ super.backends
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP, ZCUSynth, VCSTest) ++ super.backends
 
 }

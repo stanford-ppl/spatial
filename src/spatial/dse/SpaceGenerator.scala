@@ -71,7 +71,8 @@ trait SpaceGenerator {
         setter  = {(c: Boolean, state:State) => if (c) mp.setSchedValue(Pipelined)(state)
                                                 else   mp.setSchedValue(Sequenced)(state) },
         getter  = {(state: State) => mp.schedValue(state) == Pipelined },
-        tp      = Categorical(Seq(0.5,0.5))
+//        tp      = Categorical(Seq(0.5,0.5)) // With new HM changes, this doesn't do what we want
+        tp      = Ordinal(Uniform)
       )
     }
   }

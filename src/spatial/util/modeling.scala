@@ -451,7 +451,7 @@ object modeling {
       val readsAfter = parentScope.drop(writePosition).collect{case x if (x.isReader && paths.contains(x) && paths.contains(regWrite) && paths(x).toInt <= paths(regWrite).toInt && x.readMem.isDefined && x.readMem.get == reg && !reg.hotSwapPairings.getOrElse(x,Set()).contains(regWrite)) => x}
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
-        warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
+//        warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
         val affectedNodes = (consumersSearch(r.consumers, Set(), scope.toSet) intersect scope) :+ r
         affectedNodes.foreach{
           case x if paths.contains(x) =>

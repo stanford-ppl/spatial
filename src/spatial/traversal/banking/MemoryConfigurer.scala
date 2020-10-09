@@ -279,8 +279,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
               warn(s"    Note that banking analysis may hang or crash here...")
               true
             } else if (conflicts.nonEmpty && mem.shouldIgnoreConflicts) {
-              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
-              warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+//              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+//              warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
               false
             } else conflicts.isEmpty
           } else conflicts.isEmpty
@@ -355,8 +355,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict")
       var canConflict = conflict
       if (canConflict && mem.shouldIgnoreConflicts) {
-        warn(s"Detected potential conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${a.access.ctx} (uid: ${a.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
-        warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
+//        warn(s"Detected potential conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${a.access.ctx} (uid: ${a.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
+//        warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
         canConflict = false
       }
       samePort && !canConflict

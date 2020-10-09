@@ -64,10 +64,11 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
           emit(src"def hasItems_$lhs: Boolean = " + inputs.map(quote).map(_ + ".nonEmpty").mkString(" || "))
         }
         else {
-          emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
-          emit(src"val ${lhs}_iters_$i = Console.readLine.toInt")
-          emit(src"var ${lhs}_ctr_$i = 0")
-          emit(src"def hasItems_$lhs: Boolean = { val has = ${lhs}_ctr_$i < ${lhs}_iters_$i ; ${lhs}_ctr_$i += 1; has }")
+//          emit(s"""print("No Stream inputs detected for loop at ${lhs.ctx}. Enter number of iterations: ")""")
+//          emit(src"val ${lhs}_iters_$i = Console.readLine.toInt")
+//          emit(src"var ${lhs}_ctr_$i = 0")
+//          emit(src"def hasItems_$lhs: Boolean = { val has = ${lhs}_ctr_$i < ${lhs}_iters_$i ; ${lhs}_ctr_$i += 1; has }")
+          emit(src"def hasItems_$lhs: Boolean = true")
         }
 
         lhs match {
@@ -143,7 +144,8 @@ trait ScalaGenController extends ScalaGenControl with ScalaGenStream with ScalaG
         open("try {")
         if (spatialConfig.enableResourceReporter) emit("StatTracker.pushState(true)")
         globalMems = true
-        if (!lhs.willRunForever) {
+//        if (!lhs.willRunForever) {
+        if (true) {
           gen(func)
         }
         else {

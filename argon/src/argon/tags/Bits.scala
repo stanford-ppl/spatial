@@ -24,6 +24,17 @@ class Bits[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[
     val clsName = cls.fullName
 
     val cls2 = {
+
+      val implicits = cls.constructorArgs match {
+        case _ :: goodStuff :: _ => goodStuff
+        case _ => Seq.empty
+      }
+
+      val implicitNames = implicits map {
+        impli =>
+          impli.name
+      }
+
       cls.mixIn(tq"Bits[$clsName]")
          .injectMethod(
            q"""private def bitsCheck(op: java.lang.String)(func: => ${cls.fullName})(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
@@ -46,9 +57,9 @@ class Bits[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[
                  }
                  else List(..$nbitss).sum
                }""".asDef)
-         .injectMethod(q"""def zero(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("zero"){ ${obj.name}.apply(..$zeros)(ctx,state) }(ctx,state)""".asDef)
-         .injectMethod(q"""def one(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("one"){ ${obj.name}.apply(..$ones)(ctx,state) }(ctx,state)""".asDef)
-         .injectMethod(q"""def random(max: Option[$clsName])(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("random"){ ${obj.name}.apply(..$maxes)(ctx,state) }(ctx,state)""".asDef)
+         .injectMethod(q"""def zero(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("zero"){ ${obj.name}.apply(..$zeros)(ctx, state, ..$implicitNames) }(ctx, state)""".asDef)
+         .injectMethod(q"""def one(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("one"){ ${obj.name}.apply(..$ones)(ctx, state, ..$implicitNames) }(ctx, state)""".asDef)
+         .injectMethod(q"""def random(max: Option[$clsName])(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("random"){ ${obj.name}.apply(..$maxes)(ctx, state, ..$implicitNames) }(ctx, state)""".asDef)
     }
     val obj2 = obj
 

@@ -47,14 +47,14 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected var activesMap = HashMap[Sym[_], Int]()
 
   protected def instrumentCounterIndex(s: Sym[_]): Int = {
-    if (spatialConfig.enableInstrumentation) {
+    if (spatialConfig.enableInstrumentation && instrumentCounters.nonEmpty) {
       instrumentCounters.takeWhile(_._1 != s).map{x => 
         2 + {if (hasBackPressure(x._1.toCtrl) || hasForwardPressure(x._1.toCtrl)) 2 else 0}
       }.sum
     } else 0
   }
   protected def instrumentCounterArgs(): Int = {
-    if (spatialConfig.enableInstrumentation) {
+    if (spatialConfig.enableInstrumentation && instrumentCounters.nonEmpty) {
       val last = instrumentCounters.last._1
       instrumentCounterIndex(last) + 2 + {if (hasBackPressure(last.toCtrl) || hasForwardPressure(last.toCtrl)) 2 else 0}
     } else 0

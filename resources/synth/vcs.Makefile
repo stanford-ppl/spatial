@@ -36,7 +36,7 @@ hw:
 	echo "$$(date +%s)" > start.log
 	sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv
 	#if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
-	sed -i 's/vcdon = .*;/vcdon = 1;/g' *\.hw-resources/Top-harness.sv
+	#sed -i 's/vcdon = .*;/vcdon = 1;/g' *\.hw-resources/Top-harness.sv
 ifeq ($(FRINGELESS),1)
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs fringeless";
 	mv verilog-fringeless verilog-vcs

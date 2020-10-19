@@ -468,7 +468,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     def createBounds[T<:Bits[_]](bound:(Counter[_], Lane) => T): Seq[Seq[T]] = {
       if (mop) {
         cchain.counters.zipWithIndex.map { case (ctr, ci) =>
-          val par = if (vectorize) 1 else ctr.ctrPar.toInt
+          // val par = if (vectorize) 1 else ctr.ctrPar.toInt
+          val par = if (vectorize) 1 else ctr.trueCtrPar.toInt
           List.tabulate(par) { i =>
             val ctrIdxs = if (vectorize) List.tabulate(V) { p => parAddr(p)(ci) } else List(i)
             val b = bound(ctr, ctrIdxs)

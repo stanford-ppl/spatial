@@ -106,6 +106,9 @@ trait ReduceUnrolling extends UnrollingBase {
     val inds2 = mapLanes.indices
     val vs = mapLanes.indexValids
     val rs = mapLanes.resets
+    dbgs(s"Unroller indices: ${(inds2)}")
+    dbgs(s"Unroller valids: ${(vs)}")
+    dbgs(s"Unroller resets: ${(rs)}")
     val start = cchain.counters.map(_.start.asInstanceOf[I32])
     // val reset = cchain.counters.map(_.reset.asInstanceOf[Bit])
 

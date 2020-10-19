@@ -38,19 +38,42 @@ trait PIRGenController extends PIRCodegen {
     def quoteIdx(sym:Bits[_]):String = {
       sym.counter.lanes.toString
     }
-    iters.zipWithIndex.foreach { case (iters, i) =>
-      iters.zipWithIndex.foreach { case (iter, j) =>
-        state(iter)(src"CounterIter(${quoteIdx(iter)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${iter.tp})")
-      }
+    val cchain_valid = cchain match {
+      case Some(x) => true
+      case _ => false
     }
-    valids.zipWithIndex.foreach { case (valids, i) =>
-      valids.zipWithIndex.foreach { case (valid, j) =>
-        state(valid)(src"CounterValid(${quoteIdx(valid)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valid.tp})")
+
+    if (cchain_valid && cchain.get.isScanner) {
+      iters.transpose.zipWithIndex.foreach { case (iters_x, j) =>
+        iters_x.zipWithIndex.foreach { case (iter, i) =>
+          state(iter)(src"CounterIter(${quoteIdx(iters_x.head)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${iters_x.head.tp})")
+        }
       }
-    }
-    resets.zipWithIndex.foreach { case (resets, i) =>
-      resets.zipWithIndex.foreach { case (reset, j) =>
-        state(reset)(src"CounterReset(${quoteIdx(reset)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${reset.tp})")
+      valids.transpose.zipWithIndex.foreach { case (valids_x, j) =>
+        valids_x.zipWithIndex.foreach { case (valid, i) =>
+          state(valid)(src"CounterValid(${quoteIdx(valids_x.head)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valids_x.head.tp})")
+        }
+      }
+      resets.transpose.zipWithIndex.foreach { case (resets_x, j) =>
+        resets_x.zipWithIndex.foreach { case (reset, i) =>
+          state(reset)(src"CounterReset(${quoteIdx(resets_x.head)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${resets_x.head.tp})")
+        }
+      }
+    } else {
+      iters.zipWithIndex.foreach { case (iters, i) =>
+        iters.zipWithIndex.foreach { case (iter, j) =>
+          state(iter)(src"CounterIter(${quoteIdx(iter)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${iter.tp})")
+        }
+      }
+      valids.zipWithIndex.foreach { case (valids, i) =>
+        valids.zipWithIndex.foreach { case (valid, j) =>
+          state(valid)(src"CounterValid(${quoteIdx(valid)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valid.tp})")
+        }
+      }
+      resets.zipWithIndex.foreach { case (resets, i) =>
+        resets.zipWithIndex.foreach { case (reset, j) =>
+          state(reset)(src"CounterReset(${quoteIdx(reset)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${reset.tp})")
+        }
       }
     }
     blk

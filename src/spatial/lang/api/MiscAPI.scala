@@ -43,14 +43,17 @@ trait MiscAPI {
   @api def ScanRed(par: scala.Int, count: I32, mode: String, bvA: U32, bvB: U32): List[Counter[I32]] = {
     List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0, true)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, true)),
          stage(ScannerNew(count, bvB, 1, 2, mode, par, 1, true)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1, true)))
-  }
+  }  // TODO: fix*/
   @api def Scan(par: scala.Int, count: I32, mode: String, bv: U32): List[Counter[I32]] = {
-    List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0, false)), stage(ScannerNew(count, bv, par, 0, mode, par, 0, false)))
+    // List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0, false)), stage(ScannerNew(count, bv, par, 0, mode, par, 0, false)))
+    List(stage(ScannerNew(count, bv, par, 1, mode, par, 0, false)), stage(ScannerNew(count, bv, 1, 0, mode, par, 0, false)))
+    // val x = stage(ScannerNew(count, bv, par, 1, mode, par, 0, false))
+    // List(x, stage(ScanFollower(x)))
   }
   @api def Scan(par: scala.Int, count: I32, mode: String, bvA: U32, bvB: U32): List[Counter[I32]] = {
-    List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0, false)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, false)),
-         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1, false)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1, false)))
-  }
+    List(stage(ScannerNew(count, bvA, par, 1, mode, par, 0, false)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, false)),
+         stage(ScannerNew(count, bvB, 1,   2, mode, par, 1, false)), stage(ScannerNew(count, bvB, 1, 0, mode, par, 1, false)))
+  }  // TODO: fix */
   /* @api def Scan(par: scala.Int, count: I32, mode: String, bvs: U32*): List[Counter[I32]] = {
     val n = bvs.size
     bvs.zipWithIndex.map{ case (bv, i) => 

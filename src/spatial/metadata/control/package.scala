@@ -164,6 +164,10 @@ package object control {
 
     def isCounter: Boolean = s.exists(_.isInstanceOf[Counter[_]])
     def isCounterChain: Boolean = s.exists(_.isInstanceOf[CounterChain])
+    //def isScanCounterChain: Boolean = s.exists(x => x match {
+      //case y:CounterChain => y.ctrs.exists(_.isInstanceOf[ScannerNew])
+      //case _ => false
+    //})
 
     /** Returns the level of this controller (Outer or Inner). */
     def level: CtrlLevel = toCtrl match {
@@ -976,11 +980,21 @@ package object control {
     // @stateful def reset: Sym[Bit] = if (!x.isScanner) Bit(false).asInstanceOf[Sym[Bit]] else x.node.reset
     @stateful def step: Sym[F] = if (x.isForever || x.isScanner) I32(1).asInstanceOf[Sym[F]] else x.node.step
     @stateful def end: Sym[F] = if (x.isForever || x.isScanner) boundVar[I32].asInstanceOf[Sym[F]] else x.node.end
+    @stateful def trueCtrPar: I32 = {
+      x.asInstanceOf[Counter[I32]] match {
+        case Op(c: CounterNew[_]) => c.par
+        case Op(c: ForeverNew) => I32(1)
+        // case Op(c: ScannerNew) => c.par
+        case Op(c: ScannerNew) => c.truePar
+        case Op(c: DataScannerNew) => I32(1)
+      }
+    }
     @stateful def ctrPar: I32 = {
       x.asInstanceOf[Counter[I32]] match {
         case Op(c: CounterNew[_]) => c.par
         case Op(c: ForeverNew) => I32(1)
         case Op(c: ScannerNew) => c.par
+        // case Op(c: ScannerNew) => c.truePar
         case Op(c: DataScannerNew) => I32(1)
       }
     }

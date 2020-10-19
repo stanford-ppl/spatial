@@ -57,8 +57,8 @@ class Bits[Ctx <: blackbox.Context](override val c: Ctx) extends TypeclassMacro[
                  }
                  else List(..$nbitss).sum
                }""".asDef)
-         .injectMethod(q"""def zero(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("zero"){ ${obj.name}.apply(..$zeros)(ctx, state, ..$implicitNames) }(ctx, state, ..$implicitNames)""".asDef)
-         .injectMethod(q"""def one(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("one"){ ${obj.name}.apply(..$ones)(ctx, state, ..$implicitNames) }(ctx, state, ..$implicitNames)""".asDef)
+         .injectMethod(q"""def zero(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("zero"){ ${obj.name}.apply(..$zeros)(ctx, state, ..$implicitNames) }(ctx, state)""".asDef)
+         .injectMethod(q"""def one(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("one"){ ${obj.name}.apply(..$ones)(ctx, state, ..$implicitNames) }(ctx, state)""".asDef)
          .injectMethod(q"""def random(max: Option[$clsName])(implicit ctx: forge.SrcCtx, state: argon.State): $clsName = bitsCheck("random"){ ${obj.name}.apply(..$maxes)(ctx, state, ..$implicitNames) }(ctx, state)""".asDef)
     }
     val obj2 = obj

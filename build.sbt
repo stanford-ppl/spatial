@@ -167,7 +167,7 @@ lazy val apps = project.settings(common).dependsOn(spatial)
 /*lazy val test = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,*/
 /*featureTest)*/
 lazy val test = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax"),
+  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
 ).dependsOn(spatial)
 
 lazy val pirTest = project

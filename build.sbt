@@ -8,7 +8,7 @@ trapExit := false
 val base = Seq(
   organization := "edu.stanford.cs.dawn",
   scalaVersion := scala_version,
-  version := "1.1-SNAPSHOT",
+  version := "1.1-SNAPSHOT-nzhang",
   licenses += ("MIT", url("https://opensource.org/licenses/MIT")),
   isSnapshot := version.value.endsWith("-SNAPSHOT"),
 
@@ -167,7 +167,7 @@ lazy val apps = project.settings(common).dependsOn(spatial)
 /*lazy val test = project.settings(common).aggregate(appsTest, compilerTest, RosettaTest, syntaxTest,*/
 /*featureTest)*/
 lazy val test = project.settings(
-  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test"),
+  common ++ Seq(scalaSource in Test := baseDirectory.in(spatial).value/"test/spatial/tests/syntax"),
 ).dependsOn(spatial)
 
 lazy val pirTest = project

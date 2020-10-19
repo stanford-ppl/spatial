@@ -72,11 +72,6 @@ object StagedStructsMacro {
       cq"$pat => $foe;"
     }
 
-    val defaultImplicits = implicits map {
-      impli =>
-        impli.withRHS(q"implicitly[${impli.tpTree}]")
-    }
-
     val implicitNames = implicits map {
       impli =>
         impli.name

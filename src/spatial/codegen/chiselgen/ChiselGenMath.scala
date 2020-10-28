@@ -114,7 +114,7 @@ trait ChiselGenMath extends ChiselGenCommon {
     case FixOr(x,y)   => MathDL(lhs, rhs, latencyOption("FixOr", Some(bitWidth(lhs.tp))))
     case FixXor(x,y)  => MathDL(lhs, rhs, latencyOption("FixXor", Some(bitWidth(lhs.tp))))
     case FixPow(x,y)  => throw new Exception(s"FixPow($x, $y) should have transformed to either a multiply tree (constant exp) or reduce structure (variable exp)")
-    case VecApply(vector, i) => emit(createWire(quote(lhs),remap(lhs.tp))); emit(src"$lhs := $vector.apply($i)")
+//    case VecApply(vector, i) => emit(createWire(quote(lhs),remap(lhs.tp))); emit(src"$lhs := $vector.apply($i)")
 
     case FixLst(x,y) => MathDL(lhs, rhs, latencyOption("FixLst", Some(bitWidth(lhs.tp))))
     case FixLeq(x,y) => MathDL(lhs, rhs, latencyOption("FixLeq", Some(bitWidth(lhs.tp))))

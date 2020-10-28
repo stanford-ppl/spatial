@@ -25,7 +25,7 @@ trait ChiselGenDelay extends ChiselGenCommon {
           val dataname = quote(data).replaceFirst(".*\\(\"", "").replaceFirst("\"\\).*","")
           emit(src"""val $lhs = Wire(${lhs.tp}).suggestName("${lhs}_${dataname}_D$delay") """)
           lhs.tp match {
-            case a:Vec[_] => emit(src"(0 until ${a.width}).foreach{i => ${lhs}(i).r := ${DL(src"${data}(i).r", delay)}}")
+//            case a:Vec[_] => emit(src"(0 until ${a.width}).foreach{i => ${lhs}(i).r := ${DL(src"${data}(i).r", delay)}}")
             case _ =>        emit(src"""${lhs}.r := ${DL(src"${data}.r", delay, false)}""")
           }
       }

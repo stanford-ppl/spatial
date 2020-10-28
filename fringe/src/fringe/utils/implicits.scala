@@ -35,9 +35,10 @@ object implicits {
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.FP(s, d, f)
   }
 
-  implicit class VecOps[T](b: Vec[FixedPoint]) {
-    def raw: UInt = Cat(b.map{_.raw})
-    def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.FP(s, d, f)
+  implicit class VecOps[T <: Data](b: Vec[T]) {
+    def raw: UInt = Cat(b.map{_.asUInt})
+    def r: UInt = raw
+//    def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.FP(s, d, f)
   }
 
   implicit class BoolOps(b: Bool) {

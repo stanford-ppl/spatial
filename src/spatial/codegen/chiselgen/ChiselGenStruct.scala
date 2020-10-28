@@ -16,7 +16,9 @@ trait ChiselGenStruct extends ChiselGenCommon {
   override protected def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case SimpleStruct(st) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"$lhs.r := Cat(${st.reverse.map{f => if (bitWidth(f._2.tp) > 1) src"${f._2}.r" else src"${f._2}"}.mkString(",")})")
+      emit(src"$lhs.r := Cat(${st.reverse.map{f =>
+        if (bitWidth(f._2.tp) > 1) src"${f._2}.r" else src"${f._2}"}.mkString(",")})"
+      )
 
     case SimpleStreamStruct(st) =>
       val inportString = st.map { case (name, typ) => src""" ("$name" -> ${bitWidth(typ.tp)}) """ }.mkString("Map(", ",", ")")

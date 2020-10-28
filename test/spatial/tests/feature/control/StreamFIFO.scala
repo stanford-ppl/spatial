@@ -36,7 +36,7 @@ import spatial.dsl._
     printArray(result, "Result: ")
     printArray(result2, "Result: ")
     println(r"Pass: ${result == result2}")
-    assert(result == result2)
+    assert(result == result2, r"Expected: ${result}, received: ${result2}")
   }
 }
 

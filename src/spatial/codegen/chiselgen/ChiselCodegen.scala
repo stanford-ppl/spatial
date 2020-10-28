@@ -325,7 +325,6 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
     case FltPtType(m,e) => s"new FloatingPoint($m, $e)"
     case BitType() => "Bool()"
-    case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => super.remap(tp)
   }
@@ -338,7 +337,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _: Var[_] => "String"
     case FltPtType(_, _) => s"FloatingPoint"
     case BitType() => "Bool"
-    case tp: Vec[_] => src"Vec[${arg(tp.typeArgs.head)}]"
+    case tp: Vec[_] => src"UInt"
     case _: Struct[_] => s"UInt"
     case _: StreamStruct[_] => s"StreamStructInterface"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
@@ -367,7 +366,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
         bus match {
           case _: BurstDataBus[_] => "DecoupledIO[AppLoadData]"
           case BurstAckBus => "DecoupledIO[Bool]"
-          case _: GatherDataBus[_] => "DecoupledIO[Vec[UInt]]"
+          case _: GatherDataBus[_] => "DecoupledIO[UInt]"
           case ScatterAckBus => "DecoupledIO[Bool]"
           case AxiStream64Bus(_, _) => "AXI4Stream"
           case AxiStream256Bus(_, _) => "AXI4Stream"
@@ -396,7 +395,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     case _: Var[_] => "String"
     case FltPtType(_, _) => s"Input(${remap(tp)})"
     case BitType() => "Input(Bool())"
-    case tp: Vec[_] => src"Vec(${tp.width},${port(tp.typeArgs.head)})"
+//    case tp: Vec[_] => src"Vec(${tp.width},${port(tp.typeArgs.head)})"
+    case _: Vec[_] => src"Input(UInt(${bitWidth(tp)}.W))"
     case _: Struct[_] => s"Input(UInt(${bitWidth(tp)}.W))"
     case x: StreamStruct[_] =>
         val widths = x.fields.map{case (f,t) => s"""("$f" -> ${bitWidth(t)})"""}.mkString("Map(",",",")")
@@ -431,7 +431,8 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
           case BurstAckBus => "Flipped(Decoupled(Bool()))"
           case _: GatherDataBus[_] => 
             val (par,width) = x.readers.head match { case Op(e@StreamInBankedRead(_, ens)) => (ens.length, bitWidth(e.A.tp)) }
-            s"Flipped(Decoupled(Vec($par,UInt($width.W))))"
+//            s"Flipped(Decoupled(Vec($par,UInt($width.W))))"
+            s"Flipped(Decoupled(UInt(${width*par}.W)))"
           case ScatterAckBus => "Flipped(Decoupled(Bool()))"
           case AxiStream64Bus(_, _) => "new AXI4Stream(AXI4StreamParameters(64, 8, 32))"
           case AxiStream256Bus(_, _) => "new AXI4Stream(AXI4StreamParameters(256, 8, 32))"

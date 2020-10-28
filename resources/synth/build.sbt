@@ -8,7 +8,7 @@ name := "spatial-app"
 
 scalaVersion     := "2.12.6"
 
-scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls", "-Xsource:2.11")
+scalacOptions ++= Seq("-explaintypes", "-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls", "-Xsource:2.11")
 
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 // The following are the default development versions, not the "release" versions.
@@ -27,9 +27,11 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.6"
 )
 
-libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
-libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
-libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
+val spatialVersion = "1.1-SNAPSHOT-nzhang"
+
+libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % spatialVersion
+libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % spatialVersion
+libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % spatialVersion
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

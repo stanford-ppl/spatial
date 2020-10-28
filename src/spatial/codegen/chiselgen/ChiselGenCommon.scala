@@ -164,7 +164,15 @@ trait ChiselGenCommon extends ChiselCodegen {
             shift = shift + bitWidth(f._2.tp)
             x
           }.mkString(" + ")
-        case _ => throw new Exception(s"Cannot quote $x as a Scala type!") 
+        case Op(alloc@VecAlloc(elems)) =>
+          var shift = 0
+          elems.map{ f =>
+            val x = src"(${quoteAsScala(f.asInstanceOf[Sym[_]])} * ${scala.math.pow(2, shift)})"
+            shift = shift + bitWidth(alloc.tV.A)
+            x
+          }.mkString(" + ")
+
+        case _ => throw new Exception(s"Cannot quote $x as a Scala type!")
       }
       case _ => throw new Exception(s"Cannot quote $x as a Scala type!")
     }

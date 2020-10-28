@@ -69,10 +69,11 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def emitRead(lhs: Sym[_], mem: Sym[_], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], enString: String = ""): Unit = {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
-    
+
+    val tmpWire = quote(lhs) + "_vec"
     lhs.tp match {
-      case _: Vec[_] => emit(createWire(src"$lhs",src"Vec(${ens.length}, ${mem.tp.typeArgs.head})"))
-      case _ => emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
+      case _: Vec[_] => emit(createWire(tmpWire,src"Vec(${ens.length}, ${mem.tp.typeArgs.head})"))
+      case _ => emit(createWire(tmpWire, src"${mem.tp.typeArgs.head}"))
     }
 
     val banklist = bank.flatten.map{x => if (x.isBroadcastAddr) "0.U" else {quote(x) + ".r"}}
@@ -81,7 +82,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    emit(src"""$lhs.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
+    emit(src"""$tmpWire.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
+    emit(createWire(quote(lhs),remap(lhs.tp)))
+    emit(src"""$lhs.r := $tmpWire.r""")
   }
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {

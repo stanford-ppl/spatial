@@ -67,27 +67,3 @@ import spatial.dsl._
     assert(gold == dst)
   }
 }
-
-
-
-
-@spatial class bad extends SpatialTest {
-  // just used for the Bits
-  implicit val VecBits = Vec.fromSeq(Seq(I32(0), I32(0)))
-  @struct case class NestedStruct(index: I32, payload: Vec[I32])
-  def main(args: Array[String]): Unit = {
-    val y = ArgIn[NestedStruct]
-    val z = ArgOut[NestedStruct]
-    setArg(y, NestedStruct(I32(0), Vec.fromSeq(Seq(I32(0), I32(1)))))
-    Accel {
-      val payload: Vec[I32] = y.payload
-      z := NestedStruct(y.index + 1, Vec.fromSeq(Seq(payload(0) + 2, payload(2) + 3)))
-    }
-    println("z: " + getArg(z))
-    val zRes = getArg(z)
-    val zPayload: Vec[I32] = zRes.payload
-    assert(zRes.index == 1)
-    assert(zPayload(0) == 2)
-    assert(zPayload(1) == 3)
-  }
-}

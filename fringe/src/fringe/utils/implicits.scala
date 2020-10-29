@@ -37,6 +37,7 @@ object implicits {
 
   implicit class VecOps[T](b: Vec[FixedPoint]) {
     def raw: UInt = Cat(b.map{_.raw})
+    def r: UInt = raw
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.FP(s, d, f)
   }
 

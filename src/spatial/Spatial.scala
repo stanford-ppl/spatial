@@ -231,6 +231,7 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("experiment").action{(_,_) => spatialConfig.dseMode = DSEMode.Experiment; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable DSE experimental mode.").hidden()
     cli.opt[Unit]("hypermapper").action{(_,_) => spatialConfig.dseMode = DSEMode.HyperMapper; spatialConfig.enableArchDSE = true; spatialConfig.enableRuntimeModel = true }.text("Enable hypermapper dse.").hidden()
     cli.opt[Int]("threads").action{(t,_) => spatialConfig.threads = t }.text("Set number of threads to use in tuning.")
+    cli.opt[Int]("hypermapper_evalsPerIter").action{(t,_) => spatialConfig.hypermapper_doeSamples = t }.text("Set number of evaluations per optimization iteration hypermapper should use.")
     cli.opt[Int]("hypermapper_doeSamples").action{(t,_) => spatialConfig.hypermapper_doeSamples = t }.text("Set number of random samples hypermapper should use in design of experiment.")
     cli.opt[Int]("hypermapper_iters").action{(t,_) => spatialConfig.hypermapper_iters = t }.text("Set number of optimization iterations for hypermapper.")
 

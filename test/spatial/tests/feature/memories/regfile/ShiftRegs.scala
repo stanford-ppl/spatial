@@ -125,3 +125,34 @@ import spatial.dsl._
 
   }
 }
+
+
+@spatial class BufferedRF extends SpatialTest {
+  /** This app tests parallel reads (one full row, one full column) to a RegFile,
+    * where one of the elements is shared between the col and the row
+    */
+
+  def main(args: Array[String]): Unit = {
+    val results = List.tabulate(4){i => ArgOut[I32]}
+    Accel {
+      val rf = RegFile[I32](4).buffer
+      Foreach(8 by 1){j =>
+        Pipe{rf(0) = j}
+        Pipe{rf(1) = j}
+        Pipe{rf(2) = j}
+        Pipe{
+          rf(3) = j
+          retimeGate()
+          List.tabulate(4){ i => results(i) := rf(i) }
+        }
+      }
+    }
+
+    List.tabulate(4) {i =>
+      println(r"Result $i = ${getArg(results(i))}")
+      assert(getArg(results(i)) == 7)
+      ()
+    }
+    ()
+  }
+}

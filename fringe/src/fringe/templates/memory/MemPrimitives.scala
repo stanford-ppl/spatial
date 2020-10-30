@@ -553,7 +553,6 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
            WMapping: List[Access], RMapping: List[Access],
            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, numActives: Int, myName: String) = this(MemParams(ShiftRegFileInterfaceType, logicalDims,bitWidth,banks,blocks,neighborhood,WMapping,RMapping,BankedMemory,inits,syncMem,fracBits, isBuf, numActives, myName))
 
-
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until p.volume).map{ i =>
     val coords = p.Ds.zipWithIndex.map{ case (b,j) =>
@@ -570,53 +569,92 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
   def decrementAxisCoord(l: List[Int], x: Int): List[Int] = {l.take(x) ++ List(l(x) - 1) ++ l.drop(x+1)}
 
   // Handle Writes
-  m.foreach{ mem =>
+  m.foreach { mem =>
     val initval = mem._3
     val flatCoord = mem._4
     // See which W ports can see this mem
-    val connectedNormals: Seq[(W_Port, Seq[Int])] = p.WMapping.zipWithIndex.collect{
-      case (x,i) if x.shiftAxis.isEmpty && canSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.Ns) => (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.Ns))
+    val connectedNormals: Seq[(W_Port, Seq[Int])] = p.WMapping.zipWithIndex.collect {
+      case (x, i) if x.shiftAxis.isEmpty && canSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.Ns) => (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks, mem._2, p.Ns))
     }
-    val connectedShifters: Seq[(W_Port, Seq[Int], Int)] = p.WMapping.zipWithIndex.collect{
-      case (x,i) if x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.Ns.patch(x.shiftAxis.get,Nil,1)) =>
-        (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks.map{case (rg,i) => (rg.patch(x.shiftAxis.get,Nil,1), i)}, mem._2.patch(x.shiftAxis.get,Nil,1), p.Ns.patch(x.shiftAxis.get,Nil,1)), x.shiftAxis.get)
+    val connectedShifters: Seq[(W_Port, Seq[Int], Int)] = p.WMapping.zipWithIndex.collect {
+      case (x, i) if x.shiftAxis.isDefined && canSee(p.WMapping(i).coreBroadcastVisibleBanks.map { case (rg, i) => (rg.patch(x.shiftAxis.get, Nil, 1), i) }, mem._2.patch(x.shiftAxis.get, Nil, 1), p.Ns.patch(x.shiftAxis.get, Nil, 1)) =>
+        (io.wPort(i), lanesThatCanSee(p.WMapping(i).coreBroadcastVisibleBanks.map { case (rg, i) => (rg.patch(x.shiftAxis.get, Nil, 1), i) }, mem._2.patch(x.shiftAxis.get, Nil, 1), p.Ns.patch(x.shiftAxis.get, Nil, 1)), x.shiftAxis.get)
     }
 
     val (normalEns, normalDatas) = if (connectedNormals.nonEmpty) {
-      connectedNormals.map{case (port, lanes) => 
-        val lane_enables:    Seq[Bool]          = lanes.map(port.en)
-        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map{case(r,j) => r.expand(p.Ds(j))})
-        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.Ns.size).toSeq)
-        val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}.reduce{_&&_}}
-        val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
-        val datas:           Seq[UInt]          = lanes.map(port.data)
-        (ens,datas)
-      }.reduce[(Seq[Bool], Seq[UInt])]{case 
+      connectedNormals.map { case (port, lanes) =>
+        val lane_enables: Seq[Bool] = lanes.map(port.en)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.map { case (r, j) => r.expand(p.Ds(j)) })
+        val banks_for_lane: Seq[Seq[UInt]] = lanes.map(port.banks.grouped(p.Ns.size).toSeq)
+        val bank_matches: Seq[Bool] = banks_for_lane.zip(visible_in_lane).map { case (wireBanks, visBanks) => (wireBanks, mem._2, visBanks).zipped.map { case (a, b, c) => if (c.size == 1) true.B else {
+          a === b.U
+        }
+        }.reduce {
+          _ && _
+        }
+        }
+        val ens: Seq[Bool] = lane_enables.zip(bank_matches).map { case (a, b) => a && b }
+        val datas: Seq[UInt] = lanes.map(port.data)
+        (ens, datas)
+      }.reduce[(Seq[Bool], Seq[UInt])] { case
         (
-         a: (Seq[Bool], Seq[UInt]),
-         b: (Seq[Bool], Seq[UInt])
-        ) => (a._1 ++ b._1, a._2 ++ b._2)}
-      } else (Seq(), Seq())
+          a: (Seq[Bool], Seq[UInt]),
+          b: (Seq[Bool], Seq[UInt])
+          ) => (a._1 ++ b._1, a._2 ++ b._2)
+      }
+    } else (Seq(), Seq())
     val (shiftEns, shiftDatas) = if (connectedShifters.nonEmpty) {
-      connectedShifters.map{case (port, lanes, axis) => 
-        val lane_enables:    Seq[Bool]          = lanes.map(port.shiftEn)
-        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.patch(axis,Nil,1).map{case(r,j) => r.expand(p.Ds(j))})
-        val banks_for_lane:  Seq[Seq[UInt]]     = lanes.map(port.banks.grouped(p.Ns.size).map(_.patch(axis,Nil,1)).toSeq)
-        val bank_matches:    Seq[Bool]          = banks_for_lane.zip(visible_in_lane).map{case (wireBanks, visBanks) => val matches = (wireBanks, mem._2, visBanks).zipped.map{case (a,b,c) => if (c.size == 1) true.B else {a === b.U}}; if (matches.isEmpty) true.B else matches.reduce{_&&_}}
-        val ens:             Seq[Bool]          = lane_enables.zip(bank_matches).map{case (a,b) => a && b}
-        val datas:           Seq[UInt]          = if (mem._2(axis) == 0) lanes.map(port.data) else m.collect{case (m,coords,_,_) if coords(axis) == mem._2(axis)-1 && coords.patch(axis,Nil,1) == mem._2.patch(axis,Nil,1) => m} // Pray there is only one lane connected to this line
-        (ens,datas)
-      }.reduce[(Seq[Bool], Seq[UInt])]{case 
+      connectedShifters.map { case (port, lanes, axis) =>
+        val lane_enables: Seq[Bool] = lanes.map(port.shiftEn)
+        val visible_in_lane: Seq[Seq[Seq[Int]]] = lanes.map(port.visibleBanks).map(_.zipWithIndex.patch(axis, Nil, 1).map { case (r, j) => r.expand(p.Ds(j)) })
+        val banks_for_lane: Seq[Seq[UInt]] = lanes.map(port.banks.grouped(p.Ns.size).map(_.patch(axis, Nil, 1)).toSeq)
+        val bank_matches: Seq[Bool] = banks_for_lane.zip(visible_in_lane).map { case (wireBanks, visBanks) => val matches = (wireBanks, mem._2, visBanks).zipped.map { case (a, b, c) => if (c.size == 1) true.B else {
+          a === b.U
+        }
+        };
+          if (matches.isEmpty) true.B else matches.reduce {
+            _ && _
+          }
+        }
+        val ens: Seq[Bool] = lane_enables.zip(bank_matches).map { case (a, b) => a && b }
+        val datas: Seq[UInt] = if (mem._2(axis) == 0) lanes.map(port.data) else m.collect { case (m, coords, _, _) if coords(axis) == mem._2(axis) - 1 && coords.patch(axis, Nil, 1) == mem._2.patch(axis, Nil, 1) => m } // Pray there is only one lane connected to this line
+        (ens, datas)
+      }.reduce[(Seq[Bool], Seq[UInt])] { case
         (
-         a: (Seq[Bool], Seq[UInt]),
-         b: (Seq[Bool], Seq[UInt])
-        ) => (a._1 ++ b._1, a._2 ++ b._2)}
-      } else (Seq(), Seq())
+          a: (Seq[Bool], Seq[UInt]),
+          b: (Seq[Bool], Seq[UInt])
+          ) => (a._1 ++ b._1, a._2 ++ b._2)
+      }
+    } else (Seq(), Seq())
 
     if (shiftEns.nonEmpty || normalEns.nonEmpty) {
       val finalChoice = fatMux("PriorityMux", normalEns ++ shiftEns, normalDatas ++ shiftDatas)
-      if (p.isBuf) mem._1 := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en, io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord), Mux(io.reset, initval, Mux((normalEns ++ shiftEns).reduce{_||_}, finalChoice(0), mem._1)))
-      else mem._1 := Mux(io.reset, initval, Mux((normalEns ++ shiftEns).reduce{_||_}, finalChoice(0), mem._1))
+      if (p.isBuf) {
+        mem._1 := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en,
+          io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord),
+          Mux(io.reset,
+            initval,
+            Mux((normalEns ++ shiftEns).reduce {
+              _ || _
+            },
+              finalChoice(0),
+              mem._1
+            )
+          )
+        )
+      }
+      else mem._1 := Mux(io.reset, initval, Mux((normalEns ++ shiftEns).reduce {
+        _ || _
+      }, finalChoice(0), mem._1))
+    }
+    else if (p.isBuf) {
+      mem._1 := Mux(io.asInstanceOf[ShiftRegFileInterface].dump_en,
+        io.asInstanceOf[ShiftRegFileInterface].dump_in(flatCoord),
+        Mux(io.reset,
+          initval,
+          mem._1
+        )
+      )
     }
     else mem._1 := mem._1
   }

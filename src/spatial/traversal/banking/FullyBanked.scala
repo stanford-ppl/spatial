@@ -277,8 +277,9 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
     val N = filteredStagedDims.head // Should only have this strategy if banking hierarchically
     val numChecks = 1
     val rank = axes.length
-    if (checkCyclic(N, Seq(1), grps)) Option(Seq(ModBanking.Simple(N, axes, 1)))
-    else None
+    Option(Seq(ModBanking.Simple(N, axes, 1)))
+//    if (checkCyclic(N, Seq(1), grps)) Option(Seq(ModBanking.Simple(N, axes, 1)))
+//    else None
   }
 
   implicit class SeqMath(a: Seq[Int]) {

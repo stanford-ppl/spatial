@@ -77,7 +77,7 @@ object StagedStructsMacro {
         impli.name
     }
 
-    var cls2 = q"class ${cls.name}[..${cls.tparams}](..${implicits}) extends spatial.lang.Struct[${cls.fullName}]".asClass
+    var cls2 = q"class ${cls.name}[..${cls.tparams}](implicit ..${implicits}) extends spatial.lang.Struct[${cls.fullName}]".asClass
     var obj2 = obj
     fields.foreach{field =>
       cls2 = cls2.injectMethod(

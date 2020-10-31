@@ -75,7 +75,7 @@ trait HyperMapperDSE extends argon.passes.Traversal { this: DSEAnalyzer =>
              |    "enable_feasible_predictor": true
              |  },
              |  "timestamp": "Timestamp",
-             |  "evaluations_per_optimization_iteration": 100,
+             |  "evaluations_per_optimization_iteration": ${spatialConfig.hypermapper_evalsPerIter},
              |  "run_directory": "$dir",
              |  "output_data_file": "${config.name}_output_dse_samples.csv",
              |  "output_pareto_file": "${config.name}_output_pareto.csv",

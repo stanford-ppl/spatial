@@ -144,7 +144,7 @@ case object Uniform extends Prior { override def toString = "uniform" }
 
 sealed trait SpaceType
 case class Ordinal(prior: Prior) extends SpaceType { override def toString = "ordinal" }
-case class Categorical(prior: Seq[Double]) extends SpaceType { override def toString = "categorical" }
+case class Categorical(prior: Prior) extends SpaceType { override def toString = "categorical" }
 
 case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) => Unit, getter: State => T, tp: SpaceType) {
   def apply(i: Int): T = options(i)
@@ -180,7 +180,8 @@ case class Domain[T](name: String, id: Int, options: Seq[T], setter: (T,State) =
   }
   @stateful def prior: String = tp match {
     case Ordinal(prior)     => "\"" + prior + "\""
-    case Categorical(prior) => s"[${prior.mkString(",")}]"
+//    case Categorical(prior) => s"[${prior.mkString(",")}]"
+    case Categorical(prior) => "\"" + prior + "\""
   }
 
 

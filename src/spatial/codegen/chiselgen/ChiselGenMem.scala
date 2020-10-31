@@ -81,7 +81,8 @@ trait ChiselGenMem extends ChiselGenCommon {
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    emit(src"""$lhs.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
+    val connectRPortCall = src"$mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})"
+    emit(src"""$lhs.toSeq.zip($connectRPortCall).foreach{case (a,b) => a.r := b.r}""")
   }
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {
@@ -316,7 +317,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens)
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
     case op@FIFOBankedPriorityDeq(fifo, ens) =>
-      emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens, src"&& !$fifo.empty")
+      emitRead(lhs, fifo, Seq.fill(ens.length)(Seq()), Seq(), ens, src"&& !$fifo.empty /* FifoBankedPriorityDeq */")
       emit(src"$fifo.connectAccessActivesIn(${activesMap(lhs)}, (${or(ens.map{e => "(" + and(e) + ")"})}))")
     case op@FIFODeqInterface(fifo, ens) =>
       emitReadInterface(lhs, fifo, Seq(ens))

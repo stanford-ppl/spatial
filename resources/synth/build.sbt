@@ -27,9 +27,11 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.12.6"
 )
 
-libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
-libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
-libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT"
+val spatialVersion = "1.1-SNAPSHOT"
+
+libraryDependencies += "edu.stanford.cs.dawn" %% {"fringe" + sys.env.get("FRINGE_PACKAGE").getOrElse("")} % spatialVersion
+libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % spatialVersion
+libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % spatialVersion
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

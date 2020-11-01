@@ -26,6 +26,7 @@ import spatial.lang._
     dims: Seq[I32],
     par: Int,
     autoBar: Boolean,
+    seqLoad: Boolean,
     )(implicit val tp: Type[C[A]])
   extends MemAlloc[A,C]
 

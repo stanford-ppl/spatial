@@ -79,7 +79,7 @@ object DynamicStore {
     // val p = pars.toSeq.maxBy(_._1)._2
     // TODO: fixthis
     // val p = 1
-    val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
+    val bytesPerWord = (A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)).to[I64]
 
     assert(spatialConfig.enablePIR)
     val base = params._1
@@ -96,7 +96,7 @@ object DynamicStore {
       val cmdBus = StreamOut[Tup2[A,Bit]](DynStoreSetupBus[A]())
       val ackBus = StreamIn[I32](DynStoreAckBus)
 
-      setupBus := (base.unbox.to[I64]+dram.address, dram.isAlloc)
+      setupBus := (base.unbox.to[I64]*bytesPerWord+dram.address, dram.isAlloc)
       // Foreach (128 by 1 par p) { i =>
       Stream(*) {
         Foreach (16 by 1 par 16) { i =>

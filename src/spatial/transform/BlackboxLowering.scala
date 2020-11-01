@@ -72,6 +72,7 @@ case class BlackboxLowering(IR: State, lowerTransfers: Boolean) extends MutateTr
     case op: SparseTransfer[_,_] if lowerTransfers => op.lower(lhs)
     case op: CoalesceStore[_,_,_] if lowerTransfers => op.lower(lhs)
     case op: DynamicStore[_,_,_] if lowerTransfers => op.lower(lhs)
+    case op: StreamLoad[_,_,_] if lowerTransfers => op.lower(lhs)
     case op: BitVecGeneratorNoTree[_] if lowerTransfers => op.lower(lhs)
     case op: BitVecGeneratorTree[_] if lowerTransfers => op.lower(lhs)
     case op: BitVecGeneratorTreeLen[_] if lowerTransfers => op.lower(lhs)

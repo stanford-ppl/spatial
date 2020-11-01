@@ -74,6 +74,14 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
         src""".ack(MemWrite().setMem($ackStream).data)"""
       )
 
+    case e@FringeStreamLoad(dram,setupStream,dataStream,par) =>
+      state(lhs)(
+        src"""FringeStreamLoad($dram, $par)""" +
+        src""".offset(MemRead().setMem(${Lhs(setupStream,Some("_1"))}))""" + 
+        src""".size(MemRead().setMem(${Lhs(setupStream,Some("_2"))}))""" + 
+        src""".data(MemWrite().setMem($dataStream).data)"""
+      )
+
     case e@BVBuildNoTree(shift,setupStream,cmdStream,ackStream) =>
       state(lhs)(
         src"""BVBuildNoTree(16, $shift)""" +

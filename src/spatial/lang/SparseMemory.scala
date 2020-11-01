@@ -110,7 +110,12 @@ object SparseParSRAMSwizzle {
 
 object SparseDRAM {
   @api def apply[A:Bits](par:scala.Int)(length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
-    stage(SparseDRAMNew[A,SparseSRAM1](Seq(length), par, autoBar)).conflictable.mustmerge
+    stage(SparseDRAMNew[A,SparseSRAM1](Seq(length), par, autoBar, false)).conflictable.mustmerge
+}
+
+object SparseDRAMSeq {
+  @api def apply[A:Bits](par:scala.Int)(length: I32, autoBar:Boolean = true): SparseSRAM1[A] = 
+    stage(SparseDRAMNew[A,SparseSRAM1](Seq(length), par, autoBar, true)).conflictable.mustmerge
 }
 
 /** A 1-dimensional SparseSRAM with elements of type A. */

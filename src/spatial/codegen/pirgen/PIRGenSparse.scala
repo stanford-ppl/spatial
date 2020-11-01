@@ -15,8 +15,8 @@ trait PIRGenSparse extends PIRCodegen {
     case op@SparseParSRAMNew(dims, par, autoBar, swizzle)       => 
       stateMem(lhs, src"""SparseMem(stackTop[Ctrl].get.asInstanceOf[ControlTree], "ParSRAM", $par).autoBar($autoBar).swizzle($swizzle)""")
 
-    case op@SparseDRAMNew(dims, par, autoBar)       => 
-      stateMem(lhs, src"""SparseMem(stackTop[Ctrl].get.asInstanceOf[ControlTree], "ParDRAM", $par).alias.update(${lhs.alias}).autoBar($autoBar)""")
+    case op@SparseDRAMNew(dims, par, autoBar, seqLoad)       => 
+      stateMem(lhs, src"""SparseMem(stackTop[Ctrl].get.asInstanceOf[ControlTree], "ParDRAM", $par).alias.update(${lhs.alias}).autoBar($autoBar).seqLoad($seqLoad)""")
 
     case op@SparseSRAMBankedRead(sram,bank,ofs,barriers,ens)       => 
       stateAccess(lhs, sram, ens) {

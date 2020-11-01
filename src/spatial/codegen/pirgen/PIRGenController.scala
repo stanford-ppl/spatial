@@ -51,12 +51,12 @@ trait PIRGenController extends PIRCodegen {
       }
       valids.transpose.zipWithIndex.foreach { case (valids_x, j) =>
         valids_x.zipWithIndex.foreach { case (valid, i) =>
-          state(valid)(src"CounterValid(${quoteIdx(valids_x.head)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${valids_x.head.tp})")
+          state(valid)(src"CounterValid(${quoteIdx(valids_x.head)}).counter($lhs.cchain.T(0)).resetParent($lhs).tp(${valids_x.head.tp})")
         }
       }
       resets.transpose.zipWithIndex.foreach { case (resets_x, j) =>
         resets_x.zipWithIndex.foreach { case (reset, i) =>
-          state(reset)(src"CounterReset(${quoteIdx(resets_x.head)}).counter($lhs.cchain.T($i)).resetParent($lhs).tp(${resets_x.head.tp})")
+          state(reset)(src"CounterReset(${quoteIdx(resets_x.head)}).counter($lhs.cchain.T(0)).resetParent($lhs).tp(${resets_x.head.tp})")
         }
       }
     } else {

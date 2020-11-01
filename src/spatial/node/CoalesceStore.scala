@@ -81,7 +81,7 @@ object CoalesceStore {
     // val p = pars.toSeq.maxBy(_._1)._2
     // TODO: fixthis
     // val p = 1
-    val bytesPerWord = A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)
+    val bytesPerWord = (A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)).to[I64]
 
     assert(spatialConfig.enablePIR)
     val len = params._1
@@ -96,7 +96,7 @@ object CoalesceStore {
       val setupBus = StreamOut[Tup2[I64,I32]](CoalesceCmdBus[A]())
       val cmdBus = StreamOut[Tup2[A,Bit]](CoalesceSetupBus[A]())
       val ackBus = StreamIn[Bit](CoalesceAckBus)
-      val base64 = base.unbox.to[I64]
+      val base64 = base.unbox.to[I64]*bytesPerWord
 
       setupBus := (pack(base64 + dram.address, len.unbox), dram.isAlloc)
       Foreach(len.unbox par p){i =>

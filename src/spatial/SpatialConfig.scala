@@ -47,6 +47,7 @@ class SpatialConfig extends Config {
   var allowInsanity: Boolean = false
   var codeWindow: Int = 50
   var hypermapper_doeSamples: Int = 10000
+  var hypermapper_evalsPerIter: Int = 1
   var hypermapper_iters: Int = 5
 
   var enableArchDSE: Boolean = false

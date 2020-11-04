@@ -56,7 +56,8 @@ import spatial.lang._
     dram:      DRAM[A,C],
     setupStream: StreamOut[Tup2[I64,I32]],
     dataStream: StreamIn[I32],
-    par: scala.Int)
+    par: scala.Int,
+    comp: scala.Boolean)
   extends FringeNode[A,Void] {
   override def effects: Effects = Effects.Writes(dataStream, dram)
 }
@@ -144,8 +145,9 @@ object Fringe {
     dram:      DRAM[A,C],
     setupStream: StreamOut[Tup2[I64,I32]],
     dataStream: StreamIn[I32],
-    par: scala.Int
-  ): Void = stage(FringeStreamLoad[A,C](dram,setupStream,dataStream,par))
+    par: scala.Int,
+    comp: scala.Boolean
+  ): Void = stage(FringeStreamLoad[A,C](dram,setupStream,dataStream,par,comp))
 
   @rig def bvBuildNoTree(
     shift: Int,

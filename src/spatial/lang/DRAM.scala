@@ -135,7 +135,13 @@ object DRAM {
     // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
     //   Hacking this for now by catching it in a Unique node
     val params = stage(CoalesceStoreParams(base, len))
-    stage(StreamLoad(this, params, out, 16))
+    stage(StreamLoad(this, params, out, 16, false))
+  }
+  @api def stream_load_vec_comp[Local[T]<:LocalMem1[T,Local]](base: I32, len: I32, out: Local[I32])(implicit tp: Type[Local[A]]): Void = {
+    // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
+    //   Hacking this for now by catching it in a Unique node
+    val params = stage(CoalesceStoreParams(base, len))
+    stage(StreamLoad(this, params, out, 16, true))
   }
 }
 

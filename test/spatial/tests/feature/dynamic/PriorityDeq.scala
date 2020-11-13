@@ -198,3 +198,73 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
 
   }
 }
+
+@spatial class PriorityDeq2In1 extends SpatialTest {
+  override def runtimeArgs: Args = "1"
+
+  def main(args: Array[String]): Unit = {
+    val N = ArgIn[Int]
+    setArg(N, args(0).to[Int])
+
+    val R = ArgOut[Int]
+
+    Accel {
+      val worklist0 = FIFO[Int](16)
+      val worklist1 = FIFO[Int](16)
+      val tokens0 = FIFO[Int](16)
+      val tokens1 = FIFO[Int](16)
+      val workQueue = FIFO[Int](16)
+      // Initialize to 1 so we can get the thing moving during the first iter
+      val tokenCtr0 = Reg[Int](1)
+      val tokenCtr1 = Reg[Int](1)
+
+      // Count how many things we processed (should be 2 * N)
+      val processed_count = Reg[Int](0)
+
+      // Stuff N items into the b fifos
+      Sequential.Foreach(N by 1) { i =>
+        worklist0.enq(0)
+        retimeGate() // Force these to happen in different cycles
+        worklist1.enq(1)
+      }
+
+      Stream {
+   // Give a ton of tokens in a fifos
+        Foreach(4 by 1) { i =>
+          tokens0.enq(0)
+          tokens0.enq(1)
+        }
+
+        // Should have a ton of tokens but only
+        Foreach(*) { i =>
+          val token = priorityDeq(tokens1, tokens0)
+          val next = priorityDeq[Int](List(worklist0, worklist1), List(tokenCtr0.value > 0, tokenCtr1.value > 0))
+          if (token == 0) tokenCtr0 :+= mux(token == 0, 1, 0) - mux(next == 0, 1, 0)
+          if (token == 1) tokenCtr1 :+= mux(token == 1, 1, 0) - mux(next == 1, 1, 0)
+          workQueue.enq(next)
+        }
+
+        Foreach(*) { i =>
+          val got = workQueue.deq()
+          // acknowledge
+          processed_count :+= 1
+          // Give token back
+          tokens1.enq(got)
+          // Break out if we processed all that were expected and workQueue is empty
+          val done = workQueue.numel == 0 && processed_count >= N * 2 - 1 //fudge
+          if (done) {
+            R := processed_count.value
+            exit()
+          }
+        }
+      }
+
+    }
+
+    val got = getArg(R)
+    println(r"Got $got, wanted ${N*2}")
+    assert(got == N*2, "Just want the app to not hang")
+
+  }
+}
+

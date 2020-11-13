@@ -39,7 +39,11 @@ trait ChiselGenStruct extends ChiselGenCommon {
     case FieldApply(struct, field) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))
       val (start, end) = getField(struct.tp, field)
-      emit(src"$lhs.r := $struct($start, $end)")
+      lhs.tp match {
+        case v: Vec[_] => emit(src"$lhs.toSeq.zipWithIndex.foreach{case (fa, i) => fa := $struct($start, $end + (${v.size - 1} - i) * ${bitWidth(v.typeArgs.head)})}")
+        case _ => emit(src"$lhs.r := $struct($start, $end)")
+      }
+
 
     case _ => super.gen(lhs,rhs)
   }

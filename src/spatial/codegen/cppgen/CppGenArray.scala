@@ -195,12 +195,13 @@ trait CppGenArray extends CppGenCommon {
       val fields = st.zipWithIndex.map{case (f,i) => src"${f._2}"}
       emit(src"${struct} $lhs = ${struct}(${fields.mkString(",")});")
 
-    case FieldApply(struct, field) => 
-      if (isArrayType(lhs.tp)) emit(src"""${lhs.tp}* $lhs = ${struct}.$field;""")
-      else emit(src"""${lhs.tp} $lhs = ${struct}.$field;""")
-
-
-
+    case FieldApply(struct, field) =>
+      lhs.tp match {
+        case _: Vec[_] => assert(inAccel, "Cannot codegen vec field apply ")
+        case _ =>
+      }
+      if (isArrayType(lhs.tp)) emit(src"""${lhs.tp}* $lhs = $struct.$field;""")
+      else emit(src"""${lhs.tp} $lhs = $struct.$field;""")
     case VecAlloc(elems)     => emit(src"${lhs.tp} $lhs{$elems};")
     case VecApply(vector, i) => emit(src"${lhs.tp} $lhs = $vector[$i];")
     case VecSlice(vector, start, end) => emit(src"${lhs.tp} $lhs;")

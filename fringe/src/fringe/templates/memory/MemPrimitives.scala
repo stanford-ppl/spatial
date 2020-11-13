@@ -553,7 +553,6 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
            WMapping: List[Access], RMapping: List[Access],
            inits: Option[List[Double]], syncMem: Boolean, fracBits: Int, isBuf: Boolean, numActives: Int, myName: String) = this(MemParams(ShiftRegFileInterfaceType, logicalDims,bitWidth,banks,blocks,neighborhood,WMapping,RMapping,BankedMemory,inits,syncMem,fracBits, isBuf, numActives, myName))
 
-  chisel3.core.dontTouch(io)
   // Create list of (mem: Mem1D, coords: List[Int] <coordinates of bank>)
   val m = (0 until p.volume).map{ i =>
     val coords = p.Ds.zipWithIndex.map{ case (b,j) =>
@@ -561,7 +560,6 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     }
     val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W) else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
-  chisel3.core.dontTouch(mem)
     io.asInstanceOf[ShiftRegFileInterface].dump_out(i) := mem
     (mem,coords,initval, i)
   }

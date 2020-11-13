@@ -255,9 +255,11 @@ trait ChiselGenCommon extends ChiselCodegen {
       case bbox@Op(_:CtrlBlackboxUse[_,_]) if getUsedFields(bbox, sym).nonEmpty => src"$bbox.getForwardPressures(${getUsedFields(bbox, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
       case b if b.isBound && b.isInstanceOf[StreamStruct[_]] && getUsedFields(b, sym).nonEmpty => src"$b.getForwardPressures(${getUsedFields(b, sym).map{x => s""""$x""""}}).D(${sym.s.get.II}-1)"
     }) else "true.B"
-    val priorityInterfaces = if (getReadPriorityStreams(sym).nonEmpty && (sym.hasStreamAncestor || sym.isInBlackboxImpl)) or(getReadPriorityStreams(sym).collect{
-      case fifo@Op(FIFONew(_)) => src"(~$fifo.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"
-    }) else "true.B"
+    val priorityInterfaces = if (getReadPriorityStreams(sym).nonEmpty && (sym.hasStreamAncestor || sym.isInBlackboxImpl)) {
+      and(getReadPriorityStreams(sym).map { deqgrp =>
+        "(" + or(deqgrp.collect{case fifo@Op(FIFONew(_)) => src"(~$fifo.empty.D(${sym.s.get.II}-1) | ~(${FIFOForwardActive(sym, fifo)}))"}) + ")"
+      })
+    } else "true.B"
     s"($regularInterfaces) && ($priorityInterfaces)"
   }
   def getBackPressure(sym: Ctrl): String = {

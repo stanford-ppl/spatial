@@ -81,7 +81,6 @@ package object access {
       case _:StreamOutBankedWrite[_] => true
       case _ => false
     }
-
   }
 
   implicit class UsageOps(s: Sym[_]) {
@@ -120,6 +119,8 @@ package object access {
   }
 
   implicit class AccessOps(a: Sym[_]) {
+    def prDeqGrp: Option[Int] = metadata[PriorityDeqGroup](a).map(_.grp)
+    def prDeqGrp_=(grp: Int): Unit = metadata.add(a, PriorityDeqGroup(grp))
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
     def isVectorAccess: Boolean = a.op.exists(_.isVectorAccess)

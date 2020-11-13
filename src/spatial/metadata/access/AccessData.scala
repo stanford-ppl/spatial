@@ -30,3 +30,12 @@ case class Users(users: Set[User]) extends Data[Users](SetBy.Analysis.Consumer)
   * Default: empty set
   */
 case class ReadUses(reads: Set[Sym[_]]) extends Data[ReadUses](SetBy.Flow.Consumer)
+
+
+/** Set a tag so we can figure out which PriorityDeqs are grouped together
+  *
+  * Getter:  sym.prDeqGrp
+  * Setter:  sym.prDeqGrp
+  * Default: none
+  */
+case class PriorityDeqGroup(grp: Int) extends Data[PriorityDeqGroup](SetBy.Analysis.Self)

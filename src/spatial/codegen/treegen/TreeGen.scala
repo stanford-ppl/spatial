@@ -133,12 +133,20 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   }
 
   def print_stream_info(sym: Sym[_]): Unit = {
-    val listens = getReadStreams(sym.toCtrl).map{case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a,sym.toCtrl).mkString(",")}]"; case a => s"$a" }
+    val listens = getReadStreams(sym.toCtrl).map { case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a, sym.toCtrl).mkString(",")}]"; case a => s"$a" }
+    val priority_listens = getReadPriorityStreams(sym.toCtrl).map { case rdgrp =>
+      rdgrp.map {
+        case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a, sym.toCtrl).mkString(",")}]";
+        case a => s"$a"
+      }.mkString("prDeq[",",","]")
+    }
+    val all_listens = listens ++ priority_listens
+
     val pushes  = getWriteStreams(sym.toCtrl).map{case a if a.isCtrlBlackbox => s"$a[${getUsedFields(a,sym.toCtrl).mkString(",")}]"; case a => s"$a" }
-    if (listens.nonEmpty || pushes.nonEmpty) {
+    if (all_listens.nonEmpty || pushes.nonEmpty) {
       emit(s"""${"  "*ident}<div style="border:1px solid black"><font size = "2">Stream Info</font><br><font size = "1"> """)
-      if (listens.nonEmpty) emit(s"""<p align="left">----->$listens""")
-      if (listens.nonEmpty && pushes.nonEmpty) emit(s"<br>")
+      if (all_listens.nonEmpty) emit(s"""<p align="left">----->${all_listens}""")
+      if (all_listens.nonEmpty && pushes.nonEmpty) emit(s"<br>")
       if (pushes.nonEmpty) emit(s"""<p align="right">$pushes----->""")
       emit(s"""${"  "*ident}</font></div>""")
     }

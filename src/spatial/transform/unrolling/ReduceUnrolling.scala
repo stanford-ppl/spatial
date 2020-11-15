@@ -106,9 +106,19 @@ trait ReduceUnrolling extends UnrollingBase {
     val inds2 = mapLanes.indices
     val vs = mapLanes.indexValids
     val rs = mapLanes.resets
+    // Use counter-generated resets whenever using PIR
+    val isScan= spatialConfig.enablePIR
+    //val isScan= cchain.counters.exists(c => c match {
+      //case _:ScannerNew => true
+      //case _:DataScannerNew => true
+      //case _ => false
+    //})
     dbgs(s"Unroller indices: ${(inds2)}")
     dbgs(s"Unroller valids: ${(vs)}")
     dbgs(s"Unroller resets: ${(rs)}")
+    dbgs(s"Counters: ${cchain.counters}")
+    dbgs(s"Counter types: ${cchain.counters.map(_.getClass)}")
+    dbgs(s"Scan loop: ${isScan}")
     val start = cchain.counters.map(_.start.asInstanceOf[I32])
     // val reset = cchain.counters.map(_.reset.asInstanceOf[Bit])
 
@@ -121,12 +131,12 @@ trait ReduceUnrolling extends UnrollingBase {
       if (lhs.isOuterControl) {
         dbgs("Unrolling unit pipe reduce")
         stage(UnitPipe(enables, stageBlock{
-          unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, resets(), isInner = false)
+          unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, resets(), isInner = false, isSparse = isScan)
         }, stopWhen))
       }
       else {
         dbgs("Unrolling inner reduce")
-        unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, resets(), isInner = true)
+        unrollReduceAccumulate[A,Reg](accum, values, valids(), ident, fold, reduce, load, store, inds2.map(_.head), start, resets(), isInner = true, isSparse = isScan)
       }
     }
 
@@ -190,7 +200,8 @@ trait ReduceUnrolling extends UnrollingBase {
     iters:  Seq[I32],             // Iterators for entire reduction (used to determine when to reset)
     start:  Seq[I32],             // Start for each iterator
     resets: Seq[Bit],             // Counter force-reset bits
-    isInner: Boolean
+    isInner: Boolean,
+    isSparse: Boolean
   )(implicit ctx: SrcCtx): Void = {
     val redLanes = UnitUnroller(s"${accum}_accum", isInnerLoop = true)
 
@@ -212,7 +223,11 @@ trait ReduceUnrolling extends UnrollingBase {
         val result: A = inReduce(redType, isInner) {
           dbgs(s"Inlining load function in reduce")
           val accValue = load.reapply(accum)
-          val isFirst = resets.zip(iters.zip(start)).map { case (r, (i, st)) => r || (i === st) }.andTree
+          val isFirst = if (isSparse) {
+            resets.zip(iters.zip(start)).map { case (r, (i, st)) => r }.andTree
+          } else {
+            resets.zip(iters.zip(start)).map { case (r, (i, st)) => r || (i === st) }.andTree
+          }
           fold match {
             // FOLD: On first iteration, use init value rather than zero
             case Some(init) =>

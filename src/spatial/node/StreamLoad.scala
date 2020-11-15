@@ -28,6 +28,7 @@ import spatial.util.modeling.target
     out:      Local[I32],
     p:        scala.Int,
     comp:     scala.Boolean,
+    pad:     scala.Int,
     ens:      Set[Bit] = Set.empty,
   )(implicit
     val A:     Bits[A],
@@ -38,7 +39,7 @@ import spatial.util.modeling.target
   extends EarlyBlackBox[Void] {
 
   override def effects: Effects = Effects.Writes(dram) 
-  @rig def lower(old:Sym[Void]): Void = StreamLoad.transfer(old, dram,params,out,p,comp,ens)
+  @rig def lower(old:Sym[Void]): Void = StreamLoad.transfer(old, dram,params,out,p,comp,pad,ens)
   // @rig def pars: Seq[I32] = {
     // Seq(dram.addrs[_32]().sparsePars().values.head)
   // }
@@ -58,6 +59,7 @@ object StreamLoad {
     out:     Local[I32],
     p:       scala.Int,
     comp:    scala.Boolean,
+    pad:     scala.Int,
     ens:     Set[Bit],
   )(implicit
     A:     Bits[A],
@@ -104,12 +106,14 @@ object StreamLoad {
         //}
       //}
       // Fringe
-      val store = Fringe.streamLoad(dram, setupBus, dataBus, p, comp)
+      val store = Fringe.streamLoad(dram, setupBus, dataBus, p, comp, pad)
       transferSyncMeta(old, store)
       // Receive
-      Foreach(p par p){i =>
-        val data = dataBus.value()
-        out.__write(data, Seq(i), Set())
+      Foreach (*) { _ =>
+        Foreach(p par p){i =>
+          val data = dataBus.value()
+          out.__write(data, Seq(i), Set())
+        }
       }
     }
     // top.loweredTransfer = if (isLoad) SparseLoad else SparseStore // TODO: Work around @virtualize to set this metadata

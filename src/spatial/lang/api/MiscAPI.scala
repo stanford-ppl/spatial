@@ -36,13 +36,17 @@ trait MiscAPI {
       val params = stage(CoalesceStoreParams(len, len))
       stage(BitVecGeneratorTreeLen(shift, indices, gen_len, params))
     }
+  @api def scan_sum[Local[T]<:LocalMem1[T,Local]](len: I32, in: Local[I32], out: Local[I32])  : Unit = {
+      val params = stage(CoalesceStoreParams(len, len))
+      stage(ScanSum(in, out, params))
+    }
 
   @api def ScanRed(par: scala.Int, count: I32, mode: String, bv: U32): List[Counter[I32]] = {
-    List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0, true)), stage(ScannerNew(count, bv, par, 0, mode, par, 0, true)))
+    List(stage(ScannerNew(count, bv, par, 1, mode, par, 0, true)), stage(ScannerNew(count, bv, 1, 0, mode, par, 0, true)))
   }
   @api def ScanRed(par: scala.Int, count: I32, mode: String, bvA: U32, bvB: U32): List[Counter[I32]] = {
-    List(stage(ScannerNew(count, bvA, 1, 1, mode, par, 0, true)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, true)),
-         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1, true)), stage(ScannerNew(count, bvB, par, 0, mode, par, 1, true)))
+    List(stage(ScannerNew(count, bvA, par, 1, mode, par, 0, true)), stage(ScannerNew(count, bvA, 1, 0, mode, par, 0, true)),
+         stage(ScannerNew(count, bvB, 1, 2, mode, par, 1, true)), stage(ScannerNew(count, bvB, 1, 0, mode, par, 1, true)))
   }  // TODO: fix*/
   @api def Scan(par: scala.Int, count: I32, mode: String, bv: U32): List[Counter[I32]] = {
     // List(stage(ScannerNew(count, bv, 1, 1, mode, par, 0, false)), stage(ScannerNew(count, bv, par, 0, mode, par, 0, false)))

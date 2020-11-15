@@ -9,8 +9,8 @@ import emul.FixedPoint
 trait PIRGenFixPt extends PIRCodegen {
 
   override protected def quoteOrRemap(arg: Any): String = arg match {
-    case arg:BOOL[_] => s"Const(${arg.v})"
-    case arg:INT[_] => s"Const(${arg.v})"
+    case arg:BOOL[_] => s"Const(${arg.v}L)"
+    case arg:INT[_] => s"Const(${arg.v}L)"
     case FixFmt(s, i, f) => src"$s, $i, $f"
     case arg => super.quoteOrRemap(arg)
   }

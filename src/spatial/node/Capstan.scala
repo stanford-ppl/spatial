@@ -18,6 +18,55 @@ import spatial.util.modeling.target
     // override def effects = Effects.Writes(bv, last) andAlso Effects.Reads(len) andAlso Effects.Reads(indices) andAlso Effects.Sticky
 
   //}
+@op case class ScanSum[Local[T]<:LocalMem[T,Local]](
+    in: Local[I32],
+    out:      Local[I32],
+    params:  Tup2[I32,I32], // len and len
+    ens:     Set[Bit] = Set.empty,
+    )
+  extends EarlyBlackBox[Void] {
+
+  override def effects: Effects = Effects.Writes(out) 
+  @rig def lower(old:Sym[Void]): Void = ScanSum.transfer(old, in, out, params, ens)
+}
+
+object ScanSum {
+
+  @virtualize
+  @rig def transfer[Local[T]<:LocalMem[T,Local]](
+    old:     Sym[Void],
+    in: Local[I32],
+    out:      Local[I32],
+    params:  Tup2[I32,I32], // max and len
+    ens:     Set[Bit],
+    ) : Void = {
+
+    assert(spatialConfig.enablePIR)
+    val max = params._1
+    val len = params._2
+
+    val top = Stream {
+      val inFIFO = in.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
+      val outFIFO    = out.asInstanceOf[Sym[_]]      match {case Op(_:FIFONew[_]) => true; case _ => false}
+
+      val setupBus = StreamOut[Tup2[I32,I32]](BlackBoxBus[Tup2[I32,I32]]("setupBus"))
+      val inBus = StreamOut[I32](BlackBoxBus[I32]("idxBus"))
+      val retBus = StreamIn[I32](BlackBoxBus[I32]("retBus"))
+
+      setupBus := pack(len.unbox, len.unbox)
+      Foreach(len.unbox par 16){i =>
+        val inVal= in.__read(Seq(i), Set.empty)
+        inBus :=inVal
+      }
+      // Fringe
+      val op = Fringe.scanSum(setupBus, inBus, retBus)
+      Foreach(len.unbox par 16){i =>
+        val ret = retBus.value()
+        out.__write(ret, Seq(i), Set.empty)
+      }
+    }
+  }
+}
 @op case class BitVecGeneratorNoTree[Local[T]<:LocalMem[T,Local]](
     shift:   Int,
     indices: Local[I32],

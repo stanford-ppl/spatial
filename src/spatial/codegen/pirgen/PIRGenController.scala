@@ -51,12 +51,21 @@ trait PIRGenController extends PIRCodegen {
       }
       valids.transpose.zipWithIndex.foreach { case (valids_x, j) =>
         valids_x.zipWithIndex.foreach { case (valid, i) =>
-          state(valid)(src"CounterValid(${quoteIdx(valids_x.head)}).counter($lhs.cchain.T(0)).resetParent($lhs).tp(${valids_x.head.tp})")
+          if (i == 0) {
+            state(valid)(src"CounterValid(${quoteIdx(valids_x.head)}).counter($lhs.cchain.T(0)).resetParent($lhs /* $i, $j */).tp(${valids_x.head.tp})")
+          } else {
+            // state(valid)(src"/* $i, $j */ ${valids_x.head}")
+            state(valid)(src"Const(true).tp(Bool)")
+          }
         }
       }
       resets.transpose.zipWithIndex.foreach { case (resets_x, j) =>
         resets_x.zipWithIndex.foreach { case (reset, i) =>
-          state(reset)(src"CounterReset(${quoteIdx(resets_x.head)}).counter($lhs.cchain.T(0)).resetParent($lhs).tp(${resets_x.head.tp})")
+          if (i == 0) {
+            state(reset)(src"CounterReset(${quoteIdx(resets_x.head)}).counter($lhs.cchain.T(0)).resetParent($lhs).tp(${resets_x.head.tp})")
+          } else {
+            state(reset)(src"Const(true).tp(Bool)")
+          }
         }
       }
     } else {

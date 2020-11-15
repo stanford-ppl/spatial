@@ -57,7 +57,8 @@ import spatial.lang._
     setupStream: StreamOut[Tup2[I64,I32]],
     dataStream: StreamIn[I32],
     par: scala.Int,
-    comp: scala.Boolean)
+    comp: scala.Boolean,
+    pad: scala.Int)
   extends FringeNode[A,Void] {
   override def effects: Effects = Effects.Writes(dataStream, dram)
 }
@@ -67,6 +68,14 @@ import spatial.lang._
     setupStream: StreamOut[Tup2[I32,I32]],
     cmdStream: StreamOut[I32],
     retStream: StreamIn[U32])
+  extends FringeNode[I32,Void] {
+  override def effects: Effects = Effects.Writes(retStream)
+}
+
+@op case class FringeScanSum(
+    setupStream: StreamOut[Tup2[I32,I32]],
+    cmdStream: StreamOut[I32],
+    retStream: StreamIn[I32])
   extends FringeNode[I32,Void] {
   override def effects: Effects = Effects.Writes(retStream)
 }
@@ -146,8 +155,9 @@ object Fringe {
     setupStream: StreamOut[Tup2[I64,I32]],
     dataStream: StreamIn[I32],
     par: scala.Int,
-    comp: scala.Boolean
-  ): Void = stage(FringeStreamLoad[A,C](dram,setupStream,dataStream,par,comp))
+    comp: scala.Boolean,
+    pad: scala.Int
+  ): Void = stage(FringeStreamLoad[A,C](dram,setupStream,dataStream,par,comp,pad))
 
   @rig def bvBuildNoTree(
     shift: Int,
@@ -155,6 +165,12 @@ object Fringe {
     cmdStream: StreamOut[I32],
     retStream: StreamIn[U32]
   ): Void = stage(BVBuildNoTree(shift,setupStream,cmdStream,retStream))
+
+  @rig def scanSum(
+    setupStream: StreamOut[Tup2[I32,I32]],
+    cmdStream: StreamOut[I32],
+    retStream: StreamIn[I32]
+  ): Void = stage(FringeScanSum(setupStream,cmdStream,retStream))
 
   @rig def bvBuildTree(
     shift: Int,

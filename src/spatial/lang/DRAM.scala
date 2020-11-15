@@ -131,17 +131,17 @@ object DRAM {
     val params = stage(CoalesceStoreParams(base, base))
     stage(DynamicStore(this, data, last, params, num_stored, 16))
   }
-  @api def stream_load_vec[Local[T]<:LocalMem1[T,Local]](base: I32, len: I32, out: Local[I32])(implicit tp: Type[Local[A]]): Void = {
+  @api def stream_load_vec[Local[T]<:LocalMem1[T,Local]](base: I32, len: I32, out: Local[I32], pad:Int=(-1000))(implicit tp: Type[Local[A]]): Void = {
     // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
     //   Hacking this for now by catching it in a Unique node
     val params = stage(CoalesceStoreParams(base, len))
-    stage(StreamLoad(this, params, out, 16, false))
+    stage(StreamLoad(this, params, out, 16, false, pad))
   }
-  @api def stream_load_vec_comp[Local[T]<:LocalMem1[T,Local]](base: I32, len: I32, out: Local[I32])(implicit tp: Type[Local[A]]): Void = {
+  @api def stream_load_vec_comp[Local[T]<:LocalMem1[T,Local]](base: I32, len: I32, out: Local[I32], pad:Int=(-1000))(implicit tp: Type[Local[A]]): Void = {
     // Since the only use of len and base are the Coalesce node itself, this lowering rule kills that node and DCE kills len and base.
     //   Hacking this for now by catching it in a Unique node
     val params = stage(CoalesceStoreParams(base, len))
-    stage(StreamLoad(this, params, out, 16, true))
+    stage(StreamLoad(this, params, out, 16, true, pad))
   }
 }
 

@@ -131,6 +131,7 @@ abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChainI
     sm.io.maskIn.zip(sigsOut.smMaskIn).foreach{case (sm, i) => sm := i}
     cchain.zip(sigsOut.cchainEnable).foreach{case (c,e) => c.input.enable := e}
     sm.io.backpressure := backpressure
+    sm.io.forwardpressure := forwardpressure
     sm.io.rst := resetMe
     done := sm.io.done
     sigsIn.break := sm.io.break

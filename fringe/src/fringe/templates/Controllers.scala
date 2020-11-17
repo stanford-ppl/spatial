@@ -18,6 +18,7 @@ class ControlInterface(val p: ControlParams) extends Bundle {
   val ctrRst = Output(Bool())
   val parentAck = Input(Bool())
   val backpressure = Input(Bool())
+  val forwardpressure = Input(Bool())
   val break = Input(Bool())
 
   // Signals from children
@@ -276,11 +277,11 @@ class InnerControl(p: ControlParams) extends GeneralControl(p) {
   if (!p.isFSM) {
     // Set outputs
     if (p.isPassthrough) { // pass through signals
-      io.datapathEn := io.enable  & io.backpressure// & ~io.done & ~io.parentAck
+      io.datapathEn := io.enable  & io.backpressure & io.forwardpressure // & ~io.done & ~io.parentAck
       io.ctrInc := io.enable & io.backpressure
     }
     else {
-      io.datapathEn := active.io.output & ~done.io.output & io.enable & io.backpressure
+      io.datapathEn := active.io.output & ~done.io.output & io.enable & io.backpressure & io.forwardpressure
       io.ctrInc := active.io.output & io.enable & io.backpressure
     }
 

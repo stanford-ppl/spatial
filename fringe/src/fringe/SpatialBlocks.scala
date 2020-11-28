@@ -72,7 +72,7 @@ class OutputKernelSignals(val depth: Int, val ctrcopies: Int) extends Bundle{ //
 }
 
 /**
-  * Kernel class is a container for a state machine (SM) module, a concrete kernel ifaceSigsIn and ifaceSigsOut IO ports (not the Module itself),
+  * Kernel class is a container for a state machine (SM) module, a concrete kernel signalsFromParent and signalsToParent IO ports (not the Module itself),
   * and optional counter chains (cchain).  If there are 0 cchains, this is a Unit Pipe.  If there are as many cchains as children (>=2),
   * this is a Stream controller with counter duplication for each child.  Otherwise, there is just a single cchain for the majority of cases.
   *
@@ -94,18 +94,18 @@ class OutputKernelSignals(val depth: Int, val ctrcopies: Int) extends Bundle{ //
   * @param ctrWidths
   */
 abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChainInterface], val childId: Int, val nMyChildren: Int, ctrcopies: Int, ctrPars: List[Int], ctrWidths: List[Int]) {
-  val sigsIn = Wire(new InputKernelSignals(nMyChildren, ctrcopies, ctrPars, ctrWidths)); sigsIn := DontCare
-  val sigsOut = Wire(new OutputKernelSignals(nMyChildren, ctrcopies)); sigsOut := DontCare
-  def done = sigsIn.done
-  def smEnableOuts = sigsIn.smEnableOuts
-  def smEnableOut(i: Int) = sigsIn.smEnableOuts(i)
-  def mask = sigsIn.mask
-  def baseEn = sigsIn.baseEn
-  def iiDone = sigsIn.iiDone
-  def iiIssue = sigsIn.iiIssue
-  def backpressure = sigsIn.backpressure
-  def forwardpressure = sigsIn.forwardpressure
-  def datapathEn = sigsIn.datapathEn
+  val sigsIn = Wire(new InputKernelSignals(nMyChildren, ctrcopies, ctrPars, ctrWidths)); val mySignalsIn = sigsIn; mySignalsIn := DontCare
+  val sigsOut = Wire(new OutputKernelSignals(nMyChildren, ctrcopies)); val mySignalsOut = sigsOut; mySignalsOut := DontCare
+  def done = mySignalsIn.done
+  def smEnableOuts = mySignalsIn.smEnableOuts
+  def smEnableOut(i: Int) = mySignalsIn.smEnableOuts(i)
+  def mask = mySignalsIn.mask
+  def baseEn = mySignalsIn.baseEn
+  def iiDone = mySignalsIn.iiDone
+  def iiIssue = mySignalsIn.iiIssue
+  def backpressure = mySignalsIn.backpressure
+  def forwardpressure = mySignalsIn.forwardpressure
+  def datapathEn = mySignalsIn.datapathEn
   val resetChildren = Wire(Bool()); resetChildren := DontCare
   val en = Wire(Bool()); en := DontCare
   val resetMe = Wire(Bool()); resetMe := DontCare
@@ -113,35 +113,34 @@ abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChainI
   val sm: GeneralControl
   val iiCtr: IICounter
 
-  // Configure relative to parent Kernel (parent = ifaceSigsIn/Out, me = io.sigsIn/Out)
-  def configure(n: String, ifaceSigsIn: Option[InputKernelSignals], ifaceSigsOut: Option[OutputKernelSignals], isSwitchCase: Boolean = false): Unit = {
+  // Configure relative to parent Kernel (parent = signalsFromParent/Out, me = io.mySignalsIn/Out)
+  def configure(n: String, signalsFromParent: Option[InputKernelSignals], signalsToParent: Option[OutputKernelSignals], isSwitchCase: Boolean = false): Unit = {
     // Feed my counter values to my kernel
-    cchain.zip(sigsIn.cchainOutputs).foreach{case (cc, sc) => sc := cc.output}
+    cchain.zip(mySignalsIn.cchainOutputs).foreach{case (cc, sc) => sc := cc.output}
     // Feed my one-hot select vector to my kernel (for Switch controllers)
-    sigsIn.smSelectsOut.zip(sm.io.selectsOut).foreach{case (si, sm) => si := sm}
+    mySignalsIn.smSelectsOut.zip(sm.io.selectsOut).foreach{case (si, sm) => si := sm}
 
-    sigsIn.ctrDone := sm.io.ctrDone
-    sigsIn.smState := sm.io.state
-    sm.io.nextState := sigsOut.smNextState
-    sm.io.initState := sigsOut.smInitState
-    sm.io.doneCondition := sigsOut.smDoneCondition
-    sigsIn.smEnableOuts.zip(sm.io.enableOut).foreach{case (l,r) => l := r}
-    sigsIn.smChildAcks.zip(sm.io.childAck).foreach{case (l,r) => l := r}
-    sm.io.doneIn.zip(sigsOut.smDoneIn).foreach{case (sm, i) => sm := i}
-    sm.io.maskIn.zip(sigsOut.smMaskIn).foreach{case (sm, i) => sm := i}
-    cchain.zip(sigsOut.cchainEnable).foreach{case (c,e) => c.input.enable := e}
+    mySignalsIn.ctrDone := sm.io.ctrDone
+    mySignalsIn.smState := sm.io.state
+    sm.io.nextState := mySignalsOut.smNextState
+    sm.io.initState := mySignalsOut.smInitState
+    sm.io.doneCondition := mySignalsOut.smDoneCondition
+    mySignalsIn.smEnableOuts.zip(sm.io.enableOut).foreach{case (l,r) => l := r}
+    mySignalsIn.smChildAcks.zip(sm.io.childAck).foreach{case (l,r) => l := r}
+    sm.io.doneIn.zip(mySignalsOut.smDoneIn).foreach{case (sm, i) => sm := i}
+    sm.io.maskIn.zip(mySignalsOut.smMaskIn).foreach{case (sm, i) => sm := i}
     sm.io.backpressure := backpressure
     sm.io.rst := resetMe
     done := sm.io.done
-    sigsIn.break := sm.io.break
+    mySignalsIn.break := sm.io.break
     en := baseEn & forwardpressure
-    if (!isSwitchCase) ifaceSigsIn.foreach{si => baseEn := si.smEnableOuts(childId).D(1) && ~done.D(1)}
-    parentAck := {if (ifaceSigsIn.isDefined) ifaceSigsIn.get.smChildAcks(childId) else false.B}
+    if (!isSwitchCase) signalsFromParent.foreach{si => baseEn := si.smEnableOuts(childId).D(1) && ~done.D(1)}
+    parentAck := {if (signalsFromParent.isDefined) signalsFromParent.get.smChildAcks(childId) else false.B}
     sm.io.enable := en
     resetChildren := sm.io.ctrRst
     sm.io.parentAck := parentAck
-    sigsIn.suggestName(n + "_sigsIn")
-    sigsOut.suggestName(n + "_sigsOut")
+    mySignalsIn.suggestName(n + "_mySignalsIn")
+    mySignalsOut.suggestName(n + "_mySignalsOut")
     en.suggestName(n + "_en")
     done.suggestName(n + "_done")
     baseEn.suggestName(n + "_baseEn")
@@ -153,18 +152,21 @@ abstract class Kernel(val parent: Option[Kernel], val cchain: List[CounterChainI
     resetMe.suggestName(n + "_resetMe")
     resetChildren.suggestName(n + "_resetChildren")
     datapathEn.suggestName(n + "_datapathEn")
-    ifaceSigsOut.foreach{so => so.smDoneIn(childId) := done; so.smMaskIn(childId) := mask}
+    signalsToParent.foreach{so => so.smDoneIn(childId) := done; so.smMaskIn(childId) := mask}
     datapathEn := sm.io.datapathEn & mask & {if (cchain.isEmpty) true.B else ~sm.io.ctrDone} 
     iiCtr.io.input.enable := datapathEn; iiCtr.io.input.reset := sm.io.rst | sm.io.parentAck; iiDone := iiCtr.io.output.done | ~mask; iiIssue := iiCtr.io.output.issue | ~mask
     cchain.foreach { c => c.input.enable := sm.io.ctrInc & iiDone & forwardpressure; c.input.reset := resetChildren }
-    if (sm.p.sched == Streaming) {
-      sm.io.ctrCopyDone.zip(sigsOut.smCtrCopyDone).foreach{case (mySM, parentSM) => mySM := parentSM}
+    if (sm.p.sched == Streaming && sm.isInstanceOf[fringe.templates.OuterControl]) {
+      // If we are a streaming outer controller, do the following sleight of hand
+      sm.io.ctrCopyDone.zip(mySignalsOut.smCtrCopyDone).foreach{case (mySM, parentSM) => mySM := parentSM}
       if (cchain.nonEmpty) {
-        sigsOut.smCtrCopyDone.zip(cchain).foreach{case (ccd, cc) => ccd := cc.output.done}
-        cchain.zip(sigsOut.cchainEnable).foreach{case (cc, ce) => cc.input.enable := ce }
+        mySignalsOut.smCtrCopyDone.zip(cchain).foreach{case (ccd, cc) => ccd := cc.output.done}
+        cchain.zip(mySignalsOut.cchainEnable).foreach{case (cc, ce) => cc.input.enable := ce }
       }
     }
-    if (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) {ifaceSigsOut.foreach{so => so.cchainEnable(childId) := done}}
-    else if (parent.isDefined && parent.get.sm.p.sched == Streaming) {{ifaceSigsOut.foreach{so => so.smCtrCopyDone(childId) := done}}}
+    // Enable parent cchain when I am all done
+    if      (parent.isDefined && parent.get.sm.p.sched == Streaming && parent.get.cchain.nonEmpty) {signalsToParent.foreach{toParent => toParent.cchainEnable(childId) := done}}
+    // Otherwise inform parent I am totally done when I am done
+    else if (parent.isDefined && parent.get.sm.p.sched == Streaming) {{signalsToParent.foreach{toParent => toParent.smCtrCopyDone(childId) := done }}}
   }
 }

@@ -1328,12 +1328,14 @@ package object control {
       .filter{mem => mem.isStreamIn || mem.isFIFO || mem.isMergeBuffer || mem.isFIFOReg || mem.isCtrlBlackbox || mem.isInstanceOf[StreamStruct[_]]}
   }
 
-    @stateful def getReadPriorityStreams(ctrl: Ctrl): Set[Sym[_]] = {
-      LocalMemories.all.filter { mem =>
+   // Return inbound streams that are consumed by priority deq, grouped together by the priority deq they are part of
+    @stateful def getReadPriorityStreams(ctrl: Ctrl): Set[Set[Sym[_]]] = {
+      val inboundFifos = LocalMemories.all.filter { mem =>
         mem.readers.exists { x =>
           x.parent.s == ctrl.s && { x match { case Op(_:FIFOBankedPriorityDeq[_]) => true; case _ => false } }
         }
       }
+      inboundFifos.groupBy { f => f.readers.collectFirst { case x@Op(_: FIFOBankedPriorityDeq[_]) => x.prDeqGrp.get } }.values.toSet
     }
 
   @stateful def getWriteStreams(ctrl: Ctrl): Set[Sym[_]] = {

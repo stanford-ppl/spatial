@@ -300,6 +300,9 @@ trait MemoryUnrolling extends UnrollingBase {
           s.addGroupId(Nil,gids)
           s.segmentMapping = Map(0 -> segment)
           s.originalSym = lhs
+          if (lhs.prDeqGrp.isDefined)
+            s.prDeqGrp = lhs.prDeqGrp.get
+
           transferSyncMeta(lhs, s)
           mem2.substHotSwap(lhs, s)
           if (inHw) s.progorder = lhs.progorder.get

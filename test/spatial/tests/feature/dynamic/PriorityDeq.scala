@@ -268,3 +268,48 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
   }
 }
 
+
+@spatial class DeqDependencyCtrl extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+
+    val R = ArgOut[Int]
+
+    Accel {
+      val info = FIFO[Int](16)
+      val payload = FIFO[Int](16);
+      val killfifo = FIFO[Int](16)
+      val kill = Reg[Bit](false)
+      Sequential(breakWhen = kill).Foreach(99999 by 1) { _ =>
+        Stream.Foreach(*) { i =>
+          info.enq(i)
+
+          // Should have a ton of tokens but only
+          Pipe {
+            val data = info.deq()
+            if (data < 100) {} // nothing
+            else if (data % 100 == 0) {
+              R := payload.deq()
+              killfifo.enq(1)
+            }
+          }
+
+          if (i == 100)
+            payload.enq(5)
+
+          Pipe {
+            val got = killfifo.deq()
+            kill := got == 1
+          }
+
+        }
+      }
+    }
+
+    val got = getArg(R)
+    println(r"Got $got, wanted ${5}")
+    assert(got == 5, "Want to make sure we enq before we deq")
+
+  }
+}
+

@@ -61,7 +61,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}.map(appendSuffix(lhs.parent.s.get, _))
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    emit(src"""$lhs.r := $mem.connectRPort(${lhs.hashCode}, List[UInt](), List[UInt](), $backpressure, ${lhs}_en.map(_ && $lhs.ready && $invisibleEnable && ${and(commonEns.map(appendSuffix(lhs.parent.s.get, _)))}), ${!mem.broadcastsAnyRead}).head""")
+    emit(src"""$lhs.r := $mem.connectRPort(${lhs.hashCode}, List[UInt](), List[UInt](), $backpressure, ${lhs}_en.map(_ && $forwardpressure && $lhs.ready && $invisibleEnable && ${and(commonEns.map(appendSuffix(lhs.parent.s.get, _)))}), ${!mem.broadcastsAnyRead}).head""")
     emit(src"$lhs.valid := ~$mem.empty")
     emit(src"$mem.connectAccessActivesIn(${activesMap(lhs)}, ${lhs}.activeIn /*(${or(ens.head.map(appendSuffix(lhs.parent.s.get, _)))})*/)")
     emit(src"$lhs.activeOut := $mem.active(${activesMap(lhs)}).out")
@@ -81,7 +81,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    emit(src"""$lhs.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
+    emit(src"""$lhs.toSeq.zip($mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && $forwardpressure && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})).foreach{case (a,b) => a := b}""")
   }
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {

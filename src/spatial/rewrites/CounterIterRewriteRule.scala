@@ -44,6 +44,7 @@ object PreunrollIter {
     case sym if sym.isBound => sym.getCounter.flatMap { 
       case IndexCounterInfo(Def(CounterNew(start,end,step,spar@Expect(par))), lanes) =>
         if (lanes.size == par) Some((start,end,step,spar)) else None
+      case _ => None
     }
     case _ => None
   }

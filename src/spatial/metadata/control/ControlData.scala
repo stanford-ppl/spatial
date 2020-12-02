@@ -211,6 +211,24 @@ case class TransientReadMems(mems: Set[Sym[_]]) extends Data[TransientReadMems](
   */
 case class ShouldNotBind(f: Boolean) extends Data[ShouldNotBind](SetBy.Analysis.Self)
 
+/** Flag marking whether to include forward pressure as part of getRetimed / DS stall signal.
+  * We always halt if the controller is stalled (output fifo is full).  Whether an empty inbound fifo should also stall the controller
+  * or not turns out to be really hard to decide.  For example, if you are moving 2 elements from a fifo to dram at burst granularity, we don't
+  * want the controller to stall when the 2 elements are drained but the DMA is waiting for 14 more elements.  However, if we want to deq
+  * from a fifo based on some condition that is mostly false and strobes true for one cycle, and the fifo happens to be empty during that cycle, and
+  * this condition is retimed by some amount >= 1, we definitely don't want the controller to attempt to deq garbage so we must halt.
+  * Yes, it's confusing.  Stream control needs a huge re-design or a new compiler to make it more user friendly and manageable.
+  * I THINK the rule is that if you have a controller that reads from a fifo based on some condition that is expected to be false
+  * for a while, flip true for a cycle, then go back to false, you want this haltIfStarved flag = true.
+  * See unit test "DeqDependencyCtrl" for an example usage.
+  *
+  * Getter: sym.haltIfStarved
+  * Setter: sym.haltIfStarved = Boolean
+  * Default: false
+  */
+case class HaltIfStarved(f: Boolean) extends Data[HaltIfStarved](SetBy.Analysis.Self)
+
+
 /** Marks top-level streaming controller as one derived from DRAM transfer during blackbox lowering.
   * Used for runtime performance modeling post-blackbox lowering
   *

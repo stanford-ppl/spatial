@@ -255,6 +255,7 @@ trait ChiselGenCommon extends ChiselCodegen {
     } else "true.B"
     s"($regularInterfaces) && ($priorityInterfaces)"
   }
+
   def getBackPressure(sym: Ctrl): String = {
     if (sym.hasStreamAncestor || sym.isInBlackboxImpl) and(getWriteStreams(sym).collect{
       case fifo@Op(StreamOutNew(bus)) => src"$fifo.ready"
@@ -279,8 +280,9 @@ trait ChiselGenCommon extends ChiselCodegen {
 
   def DL[T](name: String, latency: T, isBit: Boolean = false): String = {
     val bpressure = if (controllerStack.nonEmpty) src"$backpressure" else "true.B"
-    if (isBit) src"($name).DS($latency.toInt, rr, $bpressure)"
-    else src"getRetimed($name, $latency.toInt, $bpressure)"
+    val fpressure = if (controllerStack.nonEmpty && controllerStack.head.haltIfStarved) src"$forwardpressure" else "true.B"
+    if (isBit) src"($name).DS($latency.toInt, rr, $bpressure & $fpressure)"
+    else src"getRetimed($name, $latency.toInt, $bpressure & $fpressure)"
   }
 
   // DL for when we are visiting children but emiting DL on signals that belong to parent

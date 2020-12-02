@@ -6,7 +6,7 @@ import forge.tags._
 import spatial.node._
 
 protected class AccelClass(name: Option[String]) {
-  lazy val options = CtrlOpt(name, None, None, mop = false, pom = false)
+  lazy val options = CtrlOpt(name, None, None, mop = false, pom = false, haltIfStarved = false)
 
   @api def apply(wild: Wildcard)(scope: => Any): Void = {
     Accel {

@@ -593,14 +593,16 @@ package object control {
     }
 
     def shouldNotBind: Boolean = s.flatMap{sym => metadata[ShouldNotBind](sym).map(_.f) }.getOrElse(false)
-      def shouldNotBind_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, ShouldNotBind(f))}
+    def shouldNotBind_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, ShouldNotBind(f))}
+    def haltIfStarved: Boolean = s.flatMap{sym => metadata[HaltIfStarved](sym).map(_.f) }.getOrElse(false)
+    def haltIfStarved_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, HaltIfStarved(f))}
 
-      def getLoweredTransfer: Option[TransferType] = {
-        s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ) }
-      }
-      def loweredTransfer: TransferType = {
-        s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ) }.head
-      }
+    def getLoweredTransfer: Option[TransferType] = {
+      s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ) }
+    }
+    def loweredTransfer: TransferType = {
+      s.flatMap{sym => metadata[LoweredTransfer](sym).map(_.typ) }.head
+    }
     def loweredTransfer_=(typ: TransferType): Unit = {
       s.foreach{sym => metadata.add(sym, LoweredTransfer(typ)) }
     }

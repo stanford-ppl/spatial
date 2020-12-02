@@ -13,6 +13,7 @@ case class CtrlOpt(
   mop: Boolean = false,
   pom: Boolean = false,
   nobind: Boolean = false,
+  haltIfStarved: Boolean = false
 ) {
   def set[A](x: Sym[A]): Unit = {
     name.foreach{n => x.name = Some(n) }
@@ -21,5 +22,6 @@ case class CtrlOpt(
     if (mop) x.unrollAsMOP
     if (pom) x.unrollAsPOM
     if (nobind) x.shouldNotBind = true
+    if (haltIfStarved) x.haltIfStarved = true
   }
 }

@@ -111,7 +111,7 @@ def getDoc(title):
 		try: 
 			sh = gc.open_by_key("1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM")
 		except:
-			print("ERROR: Couldn't get sheet")
+			print("ERROR: Couldn't get sheet VCS")
 			exit()
 	elif (title == "scalasim"):
 		try: 

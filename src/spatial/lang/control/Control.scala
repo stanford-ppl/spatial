@@ -45,6 +45,7 @@ class Stream(name: Option[String], stopWhen: Option[Reg[Bit]], haltIfStarved: Bo
       behavior if you are not careful about how you use it.
     */
   @api def apply(breakWhen: Reg[Bit]): Stream = new Stream(name, Some(breakWhen), haltIfStarved)
+  def haltIfStarved = new Stream(name, stopWhen, true)
 }
 class Sequential(name: Option[String], stopWhen: Option[Reg[Bit]], haltIfStarved: Boolean) extends Directives(CtrlOpt(name,Some(Sequenced),None,stopWhen,haltIfStarved)) {
   /** "Sequential" unit controller */

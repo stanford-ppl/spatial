@@ -308,8 +308,53 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
 
     val got = getArg(R)
     println(r"Got $got, wanted ${5}")
-//    assert(got == 5, "Want to make sure we enq before we deq")
+    assert(got == 5, "Want to make sure we enq before we deq")
 
   }
 }
 
+
+@spatial class PriorityDeqDependencyCtrl extends SpatialTest {
+
+  def main(args: Array[String]): Unit = {
+
+    val R = ArgOut[Int]
+
+    Accel {
+      val info = FIFO[Int](16)
+      val payload = FIFO[Int](16);
+      val killfifo = FIFO[Int](16)
+      val kill = Reg[Bit](false)
+      Sequential(breakWhen = kill).Foreach(99999 by 1) { _ =>
+        Stream.Foreach(*) { i =>
+          info.enq(i)
+
+          // Should have a ton of tokens
+          Pipe.haltIfStarved {
+            val data = info.deq()
+            val rtdata = retime(10, data)
+            // With control bug, this deq happens before the enq to payload finished.  There is timing mismatch between payload being empty and payload activeIn toggling
+            if (rtdata == 100) R := payload.deq()
+            retimeGate()
+            if (rtdata == 100) killfifo.enq(1)
+          }
+
+          Pipe {
+            payload.enq(5, i % 100 == 0 && i > 0)
+          }
+
+          Pipe {
+            val got = killfifo.deq()
+            kill := got == 1
+          }
+
+        }
+      }
+    }
+
+    val got = getArg(R)
+    println(r"Got $got, wanted ${5}")
+    assert(got == 5, "Want to make sure we enq before we deq")
+
+  }
+}

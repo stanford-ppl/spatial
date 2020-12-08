@@ -44,7 +44,10 @@ trait ChiselGenMem extends ChiselGenCommon {
 
   private def implicitEnableWrite(lhs: Sym[_]): String = {
     val flowEnable = src"~$break && $backpressure"
-    src"""~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)} & $flowEnable"""
+    if (controllerStack.head.haltIfStarved)
+      src"""~$break && $forwardpressure && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)} & $flowEnable"""
+    else
+      src"""~$break && ${DL(src"$datapathEn & $iiIssue", lhs.fullDelay, true)} & $flowEnable"""
   }
   private def emitReset(lhs: Sym[_], mem: Sym[_], en: Set[Bit]): Unit = {
       if (memsWithReset.contains(mem)) throw new Exception(s"Currently only one resetter per Mem is supported ($mem ${mem.name} has more than 1)")

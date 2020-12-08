@@ -111,7 +111,7 @@ def getDoc(title):
 		try: 
 			sh = gc.open_by_key("1_bbJHrt6fvMvfCLyuSyy6-pQbJLiNY4kOSoKN3voSoM")
 		except:
-			print("ERROR: Couldn't get sheet")
+			print("ERROR: Couldn't get sheet VCS")
 			exit()
 	elif (title == "scalasim"):
 		try: 
@@ -430,6 +430,7 @@ def prepare_sheet(hash, apphash, timestamp, backend):
 		numsheets = len(sh.worksheets())
 		for x in range(0,numsheets):
 			# worksheet = sh.get_worksheet(x)
+			time.sleep(2)
 			worksheet = sh.worksheet('index', x)
 			if (worksheet.title != "STATUS" and worksheet.title != "Properties" and worksheet.title != "Probe"):
 				if (worksheet.title == "Runtime" and isPerf): worksheet.insert_rows(row = 2, values = [link, alink, t, freq + ' MHz (' + numthreads + " threads)" , os.uname()[1], count_success, count_fail, count_crash ])

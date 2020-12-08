@@ -50,7 +50,7 @@ class FringeContextVCS : public FringeContextBase<void> {
   const uint32_t burstSizeBytes = 64;
   const uint32_t commandReg = 0;
   const uint32_t statusReg = 1;
-  uint64_t maxCycles = 10000000000;
+  uint64_t maxCycles = MAX_CYCLES;
   uint64_t stepCount = 0;
 
   // Debug flags

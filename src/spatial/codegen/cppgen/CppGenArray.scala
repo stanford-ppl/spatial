@@ -150,7 +150,7 @@ trait CppGenArray extends CppGenCommon {
     }
     case SimpleStruct(st) => 
       // val struct = st.map{case (name, data) => src"${name}${data.tp}".replaceAll("[<|>]","")}.mkString("")
-      val struct = src"${lhs.tp}".replaceAll("[<|>]","")
+      val struct = src"${lhs.tp}".replaceAll("[<|>]","").replaceAll("[\\[\\],]", "_")
       // Add to struct header if not there already
       if (!struct_list.contains(struct)) {
         struct_list = struct_list :+ struct

@@ -98,14 +98,16 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
     val make: String,
     val run:  String,
     val model: String,
-    val shouldRunModels: Boolean = false
+    val shouldRunModels: Boolean = false,
   ){ backend =>
     val makeTimeout: Long = 3000 // Timeout for compiling, in seconds
     val runTimeout: Long  = 3000 // Timeout for running, in seconds
     val modelTimeout: Long  = 180 // Timeout for running, in seconds
     var prev: String = ""
 
-    def shouldRun: Boolean
+    def deleteAfter: Boolean = checkFlag("test.deleteAfter")
+
+    def shouldRun: Boolean = checkFlag(f"test.$name")
     override def toString: String = name
     def makeArgs: Seq[String] = make.split(" ").map(_.trim).filter(_.nonEmpty)
     def runArgs: Seq[String] = run.split(" ").map(_.trim).filter(_.nonEmpty)
@@ -232,6 +234,8 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       }
     }
 
+    def deleteDir(path: String): Result = command("cleanup", Seq("rm", "-rf", path), 30, x => Unknown, x => Unknown)
+
     /** Run everything for this backend, including DSL compile, backend make, and backend run. */
     def runBackend(): Unit = {
       s"${test.name}" should s"compile, run, and verify for backend $name" in {
@@ -246,6 +250,11 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
           }
         }
         result.resolve()
+
+        if (deleteAfter) {
+          // Delete generated stuff after. This triggers only on success.
+          deleteDir(genDir(test.name))
+        }
       }
     }
   }

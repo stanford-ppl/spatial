@@ -16,7 +16,7 @@ trait ChiselGenVec extends ChiselGenCommon {
     case VecConcat(list) => 
       emit(createWire(quote(lhs),remap(lhs.tp)))
       val raws = list.map{x => src"$x"}.mkString(" ++ ")
-      emit(src"${lhs}.zip($raws).foreach{case (a,b) => a := b}")
+      emit(src"${lhs}.zip($raws).foreach{case (a,b) => a.r := b.r}")
 
     case VecApply(vec, id) =>
       emit(createWire(quote(lhs),remap(lhs.tp)))

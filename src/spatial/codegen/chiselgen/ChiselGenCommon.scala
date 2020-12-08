@@ -47,14 +47,14 @@ trait ChiselGenCommon extends ChiselCodegen {
   protected var activesMap = HashMap[Sym[_], Int]()
 
   protected def instrumentCounterIndex(s: Sym[_]): Int = {
-    if (spatialConfig.enableInstrumentation) {
+    if (spatialConfig.enableInstrumentation && instrumentCounters.nonEmpty) {
       instrumentCounters.takeWhile(_._1 != s).map{x => 
         2 + {if (hasBackPressure(x._1.toCtrl) || hasForwardPressure(x._1.toCtrl)) 2 else 0}
       }.sum
     } else 0
   }
   protected def instrumentCounterArgs(): Int = {
-    if (spatialConfig.enableInstrumentation) {
+    if (spatialConfig.enableInstrumentation && instrumentCounters.nonEmpty) {
       val last = instrumentCounters.last._1
       instrumentCounterIndex(last) + 2 + {if (hasBackPressure(last.toCtrl) || hasForwardPressure(last.toCtrl)) 2 else 0}
     } else 0
@@ -162,6 +162,13 @@ trait ChiselGenCommon extends ChiselCodegen {
           fields.map{ f =>
             val x = src"(${quoteAsScala(f._2)} * ${scala.math.pow(2, shift)})"
             shift = shift + bitWidth(f._2.tp)
+            x
+          }.mkString(" + ")
+        case Op(alloc@VecAlloc(elems)) =>
+          var shift = 0
+          elems.map{ f =>
+            val x = src"(${quoteAsScala(f.asInstanceOf[Sym[_]])} * ${scala.math.pow(2, shift)})"
+            shift = shift + bitWidth(alloc.tV.A)
             x
           }.mkString(" + ")
         case _ => throw new Exception(s"Cannot quote $x as a Scala type!") 

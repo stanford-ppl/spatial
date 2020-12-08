@@ -34,7 +34,11 @@ sw:
 
 hw:
 	echo "$$(date +%s)" > start.log
-	if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
+	sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv
+	if [[ -n "${VCD_ON}" ]]; then sed -i "s/vcdon = .*;/vcdon = 1;/g" vcs.hw-resources/Top-harness.sv; fi
+	if [[ -n "${VCD_OFF}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
+	#if [[ ! -z "${REGRESSION_ENV}" ]]; then sed -i "s/vcdon = .*;/vcdon = 0;/g" vcs.hw-resources/Top-harness.sv; fi
+	#sed -i 's/vcdon = .*;/vcdon = 1;/g' *\.hw-resources/Top-harness.sv
 ifeq ($(FRINGELESS),1)
 	sbt "runMain spatialIP.Instantiator --verilog --testArgs fringeless";
 	mv verilog-fringeless verilog-vcs

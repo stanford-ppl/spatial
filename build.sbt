@@ -45,6 +45,7 @@ val base = Seq(
   scalacOptions += "-language:implicitConversions", // Globally enable implicit conversions
   scalacOptions += "-language:experimental.macros", // Globally enable macros
   scalacOptions += "-language:existentials",        // Globally enable existentials
+  scalacOptions += "-language:postfixOps",          // Globally enable postfix ops
   scalacOptions += "-Yno-generic-signatures",       // Suppress generation of generic signatures in bytecode
   scalacOptions += "-Xfuture",                      // Enable "future language features"
 

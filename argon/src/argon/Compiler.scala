@@ -145,6 +145,7 @@ trait Compiler extends DSLRunnable { self =>
     cli.opt[String]('l',"log").action{(d,_) => config.logDir = d }.text("Set log directory [./logs/<name>]")
     cli.opt[String]('r',"report").action{(d,_) => config.repDir = d }.text("Set report directory [./reports/<name>]")
     cli.opt[Unit]("nonaming").action{(_,_) => config.naming = false }.text("Disable verbose naming")
+    cli.opt[Long](name="max_cycles").action{(cyc, _) => config.max_cycles = cyc}.text("Set maximum cycles for execution")
 
     cli.opt[Unit]("test").action{(_,_) => config.test = true }.text("Testbench Mode: Throw exception on failure.").hidden()
     cli.opt[Int]("stop").action{(i,_) =>

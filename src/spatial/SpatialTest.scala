@@ -49,13 +49,32 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
   object VCS extends ChiselBackend(
     name = "VCS",
     args = "--synth --insanity --instrument --runtime --fpga VCS",
-    make = "make",
+    make = {
+      val vcd = checkFlag("VCD")
+      println(s"Run VCD: ${vcd}")
+      if (vcd) {
+        "make -e VCD_ON=1"
+      } else {
+        "make -e VCD_OFF=1"
+      }
+    },
     run  = "bash scripts/regression_run.sh vcs",
     model  = "bash scripts/model_run.sh vcs",
     shouldRunModels = true
   ) {
     override def shouldRun: Boolean = checkFlag("test.VCS")
-    override val makeTimeout: Long = 3600
+    override val makeTimeout: Long = 130000
+  }
+
+  object VCSTest extends ChiselBackend(
+    name = "VCSTest",
+    args = "--synth --instrument --runtime --fpga VCS",
+    make = "make",
+    run  = "",
+    model  = ""
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.VCSTest")
+    override val makeTimeout: Long = 130000
   }
 
   object Zynq extends ChiselBackend(
@@ -77,7 +96,18 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     model = "noninteractive"
   ) {
     override def shouldRun: Boolean = checkFlag("test.ZCU")
-    override val makeTimeout: Long = 13000
+    override val makeTimeout: Long = 130000
+  }
+
+  object ZCUSynth extends ChiselBackend(
+    name = "ZCUS",
+    args = ZCU.args,
+    make = ZCU.make,
+    run = "bash scripts/scrape.sh ZCUS",
+    model = ZCU.model
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.ZCUS")
+    override val makeTimeout: Long = ZCU.makeTimeout
   }
 
   object AWS extends ChiselBackend(
@@ -107,6 +137,6 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP) ++ super.backends
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP, ZCUSynth, VCSTest) ++ super.backends
 
 }

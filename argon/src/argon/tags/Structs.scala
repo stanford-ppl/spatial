@@ -29,7 +29,6 @@ object StagedStructsMacro {
   def impl(c: blackbox.Context)(annottees: c.Tree*): c.Tree = {
     val typeclasses: Seq[TypeclassMacro[c.type]] = Seq(
       new Bits[c.type](c),
-      new Arith[c.type](c)
     )
 
     val utils = new MacroUtils[c.type](c)
@@ -43,31 +42,42 @@ object StagedStructsMacro {
     }
 
     val fields = cls.constructorArgs.head
+
+    if (cls.constructorArgs.size > 2) {
+      error(s"@struct case class class had more than 2 parameter lists. What are you doing? ${
+        cls.constructorArgs.map { paramList => paramList map {param => showCode(param)} mkString(", ") } mkString("; ")
+      }")
+    }
+
+    val implicits = cls.constructorArgs match {
+      case _ :: goodStuff :: _ => goodStuff
+      case _ => Seq.empty
+    }
+
+
     val methods = cls.nonConstructorMethods.filterNot{_.mods.hasFlag(Flag.CASEACCESSOR) }
     val parents: Seq[String] = cls.parents.collect{case Ident(TypeName(name)) => name }
 
     // TODO[5]: What to do if class has parents? Error?
 
     if (fields.isEmpty) abort("Classes need at least one field in order to be transformed into a @struct.")
-    if (methods.nonEmpty) {
-      error(s"@struct class had ${methods.length} disallowed methods:\n" + methods.map{method =>
-        "  " + showCode(method.modifyBody(_ => EmptyTree))
-      }.mkString("\n"))
-      abort("@struct classes with methods are not yet supported")
-    }
-    if (cls.tparams.nonEmpty) abort("@struct classes with type parameters are not yet supported")
     if (cls.fields.exists(_.isVar)) abort("@struct classes with var fields are not yet supported")
 
     val fieldTypes  = fields.map{field => q"${field.nameLiteral} -> argon.Type[${field.tpTree}]" }
     val fieldNames  = fields.map{field => q"${field.nameLiteral} -> ${field.name}"}
-    val fieldOpts   = fields.map{field => field.withRHS(q"null") }
+    val fieldOpts   = fields.map{field => field.withRHS(q"null.asInstanceOf[${field.tpTree}]") }
     val fieldOrElse = fields.map{field => q"Option(${field.name}).getOrElse{this.${field.name}(ctx,state)}" }
     val fieldCases = fields.zip(fieldOrElse).map{case (f,foe) =>
       val pat = pq"${f.name}"
       cq"$pat => $foe;"
     }
 
-    var cls2 = q"class ${cls.name}[..${cls.tparams}]() extends spatial.lang.Struct[${cls.fullName}]".asClass
+    val implicitNames = implicits map {
+      impli =>
+        impli.name
+    }
+
+    var cls2 = q"class ${cls.name}[..${cls.tparams}](implicit ..${implicits}) extends spatial.lang.Struct[${cls.fullName}]".asClass
     var obj2 = obj
     fields.foreach{field =>
       cls2 = cls2.injectMethod(
@@ -84,21 +94,26 @@ object StagedStructsMacro {
       cls2.injectField(q"lazy val fields = Seq(..$fieldTypes)".asVal)
           .mixIn(tq"argon.Ref[Any,${cls.fullName}]")
           .injectMethod(
-            q"""def copy(..$fieldOpts)(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
-                  ${obj2.name}.apply(..$fieldOrElse)(ctx, state)
+            q"""def copy(..$fieldOpts)(implicit ctx: forge.SrcCtx, state: argon.State, ..$implicits): ${cls.fullName} = {
+                  ${obj2.name}.apply(..$fieldOrElse)(ctx, state, ..${implicitNames})
                 }""".asDef)
           .injectField(q"""override val box = implicitly[${cls.fullName} <:< (
                              spatial.lang.Struct[${cls.fullName}]
                         with argon.lang.types.Bits[${cls.fullName}]
-                        with argon.lang.types.Arith[${cls.fullName}]) ]""".asVal)
+                        ) ]""".asVal)
     }
 
     obj2 = {
       obj2.injectMethod(
-        q"""def apply[..${cls.tparams}](..$fields)(implicit ctx: forge.SrcCtx, state: argon.State): ${cls.fullName} = {
+        q"""def apply[..${cls.tparams}](..$fields)(implicit ctx: forge.SrcCtx, state: argon.State, ..${implicits}): ${cls.fullName} = {
               spatial.lang.Struct[${cls.fullName}]( ..$fieldNames )(spatial.lang.Struct.tp[${cls.fullName}], ctx, state)
             }
          """.asDef)
+    }
+
+    methods foreach {
+      method =>
+        cls2 = cls2.injectMethod(method)
     }
 
     val (cls3,obj3) = typeclasses.foldRight((cls2,obj2)){case (tc, (c,o)) =>
@@ -106,10 +121,14 @@ object StagedStructsMacro {
     }
 
     val (cls4, obj4) = forge.tags.ref.implement(c)(cls3, obj3)
-    val out = q"$cls4; $obj4"
+    val out =
+      q"""
+        $cls4
+        $obj4
+        """
 
-    //info(showRaw(out))
-    //info(showCode(out))
+//    info(showRaw(out))
+//    info(showCode(out))
 
     out
   }

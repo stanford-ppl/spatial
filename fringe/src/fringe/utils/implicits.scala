@@ -35,10 +35,10 @@ object implicits {
     def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.FP(s, d, f)
   }
 
-  implicit class VecOps[T](b: Vec[FixedPoint]) {
-    def raw: UInt = Cat(b.map{_.raw})
-    def r: UInt = raw
-    def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.FP(s, d, f)
+  implicit class VecOps[T <: Data](b: Vec[T]) {
+    def raw = new VecUInt(b)
+    def r = raw
+    def FP(s: Boolean, d: Int, f: Int): FixedPoint = raw.raw.FP(s, d, f)
   }
 
   implicit class BoolOps(b: Bool) {
@@ -198,4 +198,11 @@ object implicits {
     def FlP(m: Int, e: Int): FloatingPoint = FloatingPoint(m, e, v)
   }
 
+  implicit def UIntLikeToUInt(UIntLike: UIntLike): UInt = UIntLike.asUInt
+
+  def ConvAndCat(elements: {def raw: UInt}*): UInt = {
+    chisel3.util.Cat(elements map {
+      _.raw
+    })
+  }
 }

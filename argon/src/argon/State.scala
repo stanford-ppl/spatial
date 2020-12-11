@@ -14,9 +14,14 @@ object BundleHandle {
 class ScopeBundle (var scope: Vector[Sym[_]],     // Statements in the current scope
                    var impure: Vector[Impure],    // Effectful statements in the current scope
                    var cache: Map[Op[_],Sym[_]],  // Definition cache used for CSE
-                   val handle: BundleHandle)
+                   val handle: BundleHandle) {
+  def copy(): ScopeBundle = {
+    new ScopeBundle(scope, impure, cache, handle)
+  }
+}
 
 private[argon] class ScopeBundleRegistry() {
+  // TODO(stanfurd): Replace these with weakreferences so that we don't cause a memory leak.
   private val bundles = scala.collection.mutable.Map[BundleHandle, ScopeBundle]()
   private var nextHandle = -1
 
@@ -25,7 +30,7 @@ private[argon] class ScopeBundleRegistry() {
     BundleHandle(nextHandle)
   }
 
-  def CreateNewBundle(impure: Vector[Impure] = Vector.empty, scope: Vector[Sym[_]] = Vector.empty, cache: Map[Op[_], Sym[_]] = Map.empty): ScopeBundle = {
+  def CreateNewBundle(impure: Vector[Impure], scope: Vector[Sym[_]], cache: Map[Op[_], Sym[_]]): ScopeBundle = {
     val newHandle = GetNewHandle()
     val newBundle = new ScopeBundle(scope, impure, cache, newHandle)
     bundles(newHandle) = newBundle
@@ -35,6 +40,15 @@ private[argon] class ScopeBundleRegistry() {
   def GetBundle(bundleHandle: BundleHandle): Option[ScopeBundle] = {
     assert(bundleHandle != BundleHandle.InvalidHandle, "Attempting to get invalid handle!")
     bundles.get(bundleHandle)
+  }
+
+  def copyTo(target: ScopeBundleRegistry): Unit = {
+    target.nextHandle = nextHandle
+    target.bundles.clear()
+    bundles foreach {
+      case (handle, value) =>
+        target.bundles(handle) = value.copy()
+    }
   }
 }
 
@@ -72,6 +86,18 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
 
   var scopeBundleRegistry = new ScopeBundleRegistry
 
+  def saveBundle(): Unit = {
+    assert(currentBundle != null, "Attempting to save null bundle!")
+
+    // clean out current bundle
+    currentBundle = null
+  }
+
+  def setBundle(bundle: ScopeBundle): Unit = {
+    assert(currentBundle == null,  "Attempting to set bundle on top of existing bundle! Save it first.")
+    currentBundle = bundle
+  }
+
   def scope: Vector[Sym[_]] = currentBundle.scope
   def scope_=(update: Vector[Sym[_]]): Unit = currentBundle.scope = update
 
@@ -82,7 +108,7 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
   def cache_=(update: Map[Op[_], Sym[_]]): Unit = currentBundle.cache = update
 
   def GetBundle = scopeBundleRegistry.GetBundle _
-  def GetCurrentHandle() = currentBundle.handle
+  def GetCurrentHandle(): BundleHandle = currentBundle.handle
 
   /** Sets the current scope to the one described by bundle, and executes block in that context. Pops the scope
     * afterwards.
@@ -95,12 +121,15 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
 
     // saves existing bundle
     val savedBundle = currentBundle
+    saveBundle()
 
     // uses passed bundle as context for evaluating block
-    currentBundle = scopeBundleRegistry.GetBundle(handle).get
+    setBundle(scopeBundleRegistry.GetBundle(handle).get)
     val result = block
+    saveBundle()
 
-    currentBundle = savedBundle
+    setBundle(savedBundle)
+    assert(savedBundle == scopeBundleRegistry.GetBundle(savedBundle.handle).get)
     result
   }
 
@@ -109,12 +138,16 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
       // Empty the CSE cache in case code motion is disabled
       if (motion) currentBundle.cache else Map.empty
     )
-//    info(s"Created new bundle: ${newBundle.handle}, motion: $motion")
     (WithScope(newBundle.handle) {block}, newBundle.handle)
   }
 
+  private def resetBundles() = {
+    currentBundle = null
+    scopeBundleRegistry = new ScopeBundleRegistry
+  }
+
   def init(): Unit = {
-    currentBundle = scopeBundleRegistry.CreateNewBundle(Vector.empty, Vector.empty, Map.empty)
+    setBundle(scopeBundleRegistry.CreateNewBundle(Vector.empty, Vector.empty, Map.empty))
   }
 
   /** Graph Metadata */
@@ -180,8 +213,7 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
   def reset(): Unit = {
     config.reset()
     id = -1
-    scopeBundleRegistry = new ScopeBundleRegistry
-    currentBundle = null
+    resetBundles()
     globals.reset()
     pass = 1
     logTab = 0
@@ -199,11 +231,8 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
   def copyTo(target: State): Unit = {
     this.config.copyTo(target.config)
     target.id = this.id
-
-//    target.scope = this.scope
-//    target.impure = this.impure
-//    target.cache = this.cache
-    assert(false)
+    scopeBundleRegistry.copyTo(target.scopeBundleRegistry)
+    target.currentBundle = scopeBundleRegistry.GetBundle(currentBundle.handle).get
     globals.copyTo(target.globals)
     target.pass = this.pass
     target.logTab = this.logTab

@@ -10,7 +10,7 @@ protected class AccelClass(name: Option[String]) {
 
   @api def apply(wild: Wildcard)(scope: => Any): Void = {
     Accel {
-      Stream(*){ scope }
+      Stream.Foreach(*){  _ => scope }
     }
   }
 

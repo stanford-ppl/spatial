@@ -60,7 +60,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     },
     run  = "bash scripts/regression_run.sh vcs",
     model  = "bash scripts/model_run.sh vcs",
-    shouldRunModels = true
+    shouldRunModels = checkFlag("test.RunModels")
   ) {
     override def shouldRun: Boolean = checkFlag("test.VCS")
     override val makeTimeout: Long = 130000

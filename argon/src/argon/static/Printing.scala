@@ -216,6 +216,7 @@ trait Printing {
     }
     dbgs(s" - Type: ${lhs.tp}")
     dbgs(s" - SrcCtx: ${lhs.ctx}")
-    metadata.all(lhs).foreach{case (k,m) => dbgss(s" - $k: $m") }
+    val meta = metadata.all(lhs).toList.sortBy {case (k, _) => s"$k"}
+    meta.foreach{case (k,m) => dbgss(s" - $k: $m") }
   }
 }

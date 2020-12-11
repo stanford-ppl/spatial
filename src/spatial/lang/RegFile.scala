@@ -83,6 +83,11 @@ object RegFile {
       error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
     stage(RegFileNew[A, RegFile1](Seq(length), Some(inits)))
   }
+  @api def apply[A:Bits](length: I32, inits: Option[Seq[Bits[A]]]): RegFile1[A] = {
+    if (!length.isParam && !length.isConst)
+      error(ctx, s"Only compile-time constants and DSE parameters can be used to declare on-chip memories!")
+    stage(RegFileNew[A, RegFile1](Seq(length), inits))
+  }
 
   /** Allocates a [[RegFile2]] with size `rows` x `cols` and elements of type A. */
   @api def apply[A:Bits](rows: I32, cols: I32): RegFile2[A] = {

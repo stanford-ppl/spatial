@@ -35,20 +35,16 @@ trait PriorityDeqAPI {  this: Implicits =>
     val gid = ctx.line // TODO: this is probably an unsafe way to compute a group id
 
     assert(fifo.size == cond.size)
-    // dequeue from fifo if prior fifos are either empty or have empty conditions.
 
-    val shouldDequeue = scala.collection.mutable.ListBuffer[Bit]()
-    // For the first fifo we only check the condition, since isEmpty is checked via codegen hack
-    shouldDequeue.append(cond(0))
-    // for subsequent fifos we check if the previous one is enabled and not empty, and if not, check our cond.
-    (fifo.dropRight(1) zip cond.drop(1)) foreach {
-      case (prevFifo, cnd) =>
-        val previousEnabled = shouldDequeue.last && (!prevFifo.isEmpty)
-        val currentEnabled = !previousEnabled && cnd
-        shouldDequeue.append(currentEnabled)
-    }
+    // In a vacuum should a fifo have been enabled?
+    val deqEnabled = (fifo zip cond).dropRight(1) map {case (a, b) => (!a.isEmpty) && b}
 
-    assert(shouldDequeue.size == fifo.size)
+    // Have any prior fifos been enabled?
+    val cumulativeEnabled = deqEnabled.scanLeft(Bit(false)) { _ || _ }
+
+    assert(cumulativeEnabled.size == fifo.size)
+
+    val shouldDequeue = (cumulativeEnabled zip cond) map { case (a, b) => !a && b }
 
     val datas: Seq[T] = (fifo zip shouldDequeue).map{case (f,c) =>
       // The enable should also have a !f.isEmpty but this messes up II analysis so it is added at codegen as a hack for this deq node

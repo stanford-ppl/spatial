@@ -371,6 +371,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case Op(_:RegFileShiftIn[_,_])  => Nil
     case Op(_:RegFileRead[_,_])     => Nil
     case Op(_:RegFileWrite[_,_])    => Nil
+//    case Op(_:LUTRead[_, _])        => Nil
     case Op(_:LineBufferEnq[_])     => addr.map{laneAddr => laneAddr.head}
     case Op(_:LineBufferRead[_])  => addr.map{laneAddr =>
       inst.bankOffset(mem, Seq(0.to[I32]) ++ laneAddr.drop(1))
@@ -523,7 +524,7 @@ trait MemoryUnrolling extends UnrollingBase {
     case _:FIFODeqInterface[_]       => USymReadSym(stage(FIFODeqInterface(mem.asInstanceOf[FIFO[A]], enss.head)))
     case _:FIFOVecDeq[_]       => UVecReadVec(stage(FIFOBankedDeq(mem.asInstanceOf[FIFO[A]], ArrayBuffer.fill(ofs.size)(enss.head))))
     case _:LIFOPop[_]       => UVecReadSym(stage(LIFOBankedPop(mem.asInstanceOf[LIFO[A]], enss)))
-    case _:LUTRead[_,_]     => UVecReadSym(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs, enss)))
+    case _:LUTRead[_,_]     => UVecReadSym(stage(LUTBankedRead(mem.asInstanceOf[LUTx[A]], bank, ofs map { x => x.zero }, enss)))
     case _:RegFileRead[_,_] => UVecReadSym(stage(RegFileVectorRead(mem.asInstanceOf[RegFilex[A]], bank, enss)))
     case _:SRAMRead[_,_]    => UVecReadSym(stage(SRAMBankedRead(mem.asInstanceOf[SRAMx[A]], bank, ofs, enss)))
     case _:StreamInRead[_]  => UVecReadSym(stage(StreamInBankedRead(mem.asInstanceOf[StreamIn[A]], enss)))

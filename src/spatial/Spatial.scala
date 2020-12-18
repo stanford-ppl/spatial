@@ -110,6 +110,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val retiming              = RetimingTransformer(state)
     lazy val accumTransformer      = AccumTransformer(state)
     lazy val regReadCSE            = RegReadCSE(state)
+    lazy val counterBitwidth       = CounterBitwidthTransformer(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -157,6 +158,8 @@ trait Spatial extends Compiler with ParamLoader {
         /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
+        // Counter bitwidth improvement
+        counterBitwidth     ==> printer ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==> 
         /** Memory analysis */

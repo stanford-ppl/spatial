@@ -4,6 +4,7 @@ import argon._
 import models._
 import forge.tags._
 import spatial.metadata.control._
+import spatial.metadata.retiming._
 import spatial.util.spatialConfig
 
 class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](target) {
@@ -14,7 +15,8 @@ class LatencyModel(target: HardwareTarget) extends SpatialModel[LatencyFields](t
   final implicit def MODEL_FIELDS: LatencyFields[NodeModel] = target.LMODEL_FIELDS
 
   @stateful def latencyOf(s: Sym[_], inReduce: Boolean): Double = {
-    if (inReduce) latencyInReduce(s) else latencyOfNode(s)
+    if (s.hasForcedLatency) s.forcedLatency
+    else if (inReduce) latencyInReduce(s) else latencyOfNode(s)
   }
 
   @stateful def latencyInReduce(s: Sym[_]): Double = model(s, "LatencyInReduce")

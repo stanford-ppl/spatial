@@ -325,7 +325,7 @@ trait ChiselCodegen extends NamedCodegen with FileDependencies with AccelTravers
     // case FixPtType(s,d,f) => s"new FixedPoint($s, $d, $f)"
     case FltPtType(m,e) => s"new FloatingPoint($m, $e)"
     case BitType() => "Bool()"
-    case tp: Vec[_] => src"Vec(${tp.width}, ${tp.typeArgs.head})"
+    case tp: Vec[_] => src"Vec(${tp.width}, ${remap(tp.typeArgs.head)})"
     // case tp: StructType[_] => src"UInt(${bitWidth(tp)}.W)"
     case _ => super.remap(tp)
   }

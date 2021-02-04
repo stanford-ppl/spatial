@@ -6,7 +6,6 @@ trait UIntLike {
   def asUInt: UInt
   def raw = asUInt
   def r = asUInt
-  implicit def conv: UInt = asUInt
   def :=(other: UIntLike): Unit
   def :=(other: UInt): Unit = {
     val that = other
@@ -17,7 +16,6 @@ trait UIntLike {
       override def :=(other: UIntLike): Unit = Unit
     }
   }
-
 }
 
 class VecUInt[T <: Data](vec: Vec[T]) extends UIntLike {

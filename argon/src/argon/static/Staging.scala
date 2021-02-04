@@ -23,7 +23,7 @@ trait Staging { this: Printing =>
   @stateful def err[A:Type](msg: String): A = Type[A]._new(Def.Error[A](state.nextId(),msg), ctx)
   @stateful def err_[A](tp: Type[A], msg: String): A = tp._new(Def.Error[A](state.nextId(),msg), ctx)
 
-  @stateful def boundVar[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
+  @api def boundVar[A:Type]: A = Type[A]._new(Def.Bound[A](state.nextId()), ctx)
 
   @rig private def symbol[A](tp: Type[A], op: Op[A]): A = {
     if (state eq null) throw new Exception(s"Staging in null state scope")

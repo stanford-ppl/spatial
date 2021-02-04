@@ -13,7 +13,11 @@ package object retiming {
     def reduceCycle_=(cycle: Cycle): Unit = metadata.add(s, cycle)
 
     def delayDefined: Boolean = metadata[FullDelay](s).map(_.latency).isDefined
-    def fullDelay: Double = metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
+//    def fullDelay: Double = metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
+    def fullDelay: Double = {
+      // If we have a forcedLatency, use that one instead
+      if (hasForcedLatency) forcedLatency else metadata[FullDelay](s).map(_.latency).getOrElse(0.0)
+    }
     def fullDelay_=(d: Double): Unit = metadata.add(s, FullDelay(d))
 
     def isRetimeGate: Boolean = s match { case Op(RetimeGate()) => true; case _ => false }
@@ -25,6 +29,10 @@ package object retiming {
 
     def userInjectedDelay: Boolean = metadata[UserInjectedDelay](s).map(_.flag).getOrElse(false)
     def userInjectedDelay_=(flag: Boolean): Unit = metadata.add(s, UserInjectedDelay(flag))
+
+    def forcedLatency: Double = metadata[ForcedLatency](s).get.latency
+    def forcedLatency_=(latency: Double): Unit = metadata.add(s, ForcedLatency(latency))
+    def hasForcedLatency: Boolean = metadata[ForcedLatency](s).isDefined
 
     def traceToInt: Int = s.trace match {
       case Const(c: FixedPoint) => c.toInt

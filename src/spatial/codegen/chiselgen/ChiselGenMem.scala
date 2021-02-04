@@ -74,7 +74,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
     
     lhs.tp match {
-      case _: Vec[_] => emit(createWire(src"$lhs",src"Vec(${ens.length}, ${mem.tp.typeArgs.head})"))
+      case _: Vec[_] => emit(createWire(src"$lhs",src"Vec(${ens.length}, ${remap(mem.tp.typeArgs.head)})"))
       case _ => emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
     }
 
@@ -288,7 +288,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"$reg.connectWPort($index, $data1.r, $data2.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, $first)")
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := $reg.output")
-    case RegReset(reg, en)    => emitReset(lhs, reg, en)
+    case (reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
     case op@RegFileNew(_, inits) => emitMem(lhs, inits)

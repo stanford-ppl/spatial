@@ -148,6 +148,8 @@ trait ExternalAliases extends InternalAliases {
 
   type StreamStruct[A] = spatial.lang.StreamStruct[A]
   lazy val StreamStruct = spatial.lang.StreamStruct
+
+  lazy val ForcedLatency = spatial.lang.ForcedLatency
 }
 
 /** Remaining aliases that shadow original Scala types. */

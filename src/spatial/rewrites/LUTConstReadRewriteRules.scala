@@ -25,7 +25,7 @@ trait LUTConstReadRewriteRules extends RewriteRules {
             flattenND(addrs.asInstanceOf[Seq[Int]], dims.asInstanceOf[Seq[Int]])
           }
           val values = faddr.map { a => elems(a) match { case Const(c) => c; case c => throw new Exception(s"Non contant content in LUT $c") } }
-          val b = boundVar[a](op.A.asInstanceOf[Bits[a]], state)
+          val b = boundVar[a](op.A.asInstanceOf[Bits[a]], implicitly[SrcCtx], state)
           b.asInstanceOf[Sym[a]].vecConst = values.toList
           Some(stage(VecAlloc[a](Seq(b))(op.A.asInstanceOf[Bits[a]], op.vT.asInstanceOf[Vec[a]])))
         case bank => 

@@ -201,6 +201,7 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
 
 @spatial class PriorityDeq2In1 extends SpatialTest {
   override def runtimeArgs: Args = "1"
+  override def compileArgs = "--max_cycles=2000"
 
   def main(args: Array[String]): Unit = {
     val N = ArgIn[Int]
@@ -231,8 +232,9 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
       Stream {
    // Give a ton of tokens in a fifos
         Foreach(4 by 1) { i =>
-          tokens0.enq(0)
-          tokens0.enq(1)
+          Foreach(2 by 1) {
+            t => tokens0.enq(t)
+          }
         }
 
         // Should have a ton of tokens but only
@@ -245,17 +247,16 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
         }
 
         Foreach(*) { i =>
-          val got = workQueue.deq()
+          val got = workQueue.deq
           // acknowledge
+          val exitSignal = processed_count + 1
           processed_count :+= 1
           // Give token back
           tokens1.enq(got)
           // Break out if we processed all that were expected and workQueue is empty
-          val done = workQueue.numel == 0 && processed_count >= N * 2 - 1 //fudge
-          if (done) {
-            R := processed_count.value
-            exit()
-          }
+          val done = exitSignal == N * 2
+          R.write(exitSignal, done)
+          exitIf(Set(done))
         }
       }
 
@@ -263,8 +264,8 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
 
     val got = getArg(R)
     println(r"Got $got, wanted ${N*2}")
-    assert(got == N*2, "Just want the app to not hang")
-
+    assert(got == N*2, r"Just want the app to not hang, and expected ${got} == ${N*2}")
+    assert(Bit(true))
   }
 }
 
@@ -356,5 +357,49 @@ class MultiPriorityDeqDynamic extends MultiPriorityDeq(true)
     println(r"Got $got, wanted ${5}")
     assert(got == 5, "Want to make sure we enq before we deq")
 
+  }
+}
+
+@spatial class RoundRobinDeq extends SpatialTest {
+  def main(args: Array[String]): Unit = {
+    val result = ArgOut[I32]
+    val leakValue = ArgOut[I32]
+    val numFifos = 8
+    val fifoDepth = 8
+    Accel {
+      val fifos = Range(0, numFifos) map {_ => FIFO[I32](fifoDepth)}
+      // fill up fifos first
+      Foreach(0 until fifoDepth by 1) {
+        i =>
+          fifos.zipWithIndex foreach {
+            case(fifo, ind) => fifo.enq(i * numFifos + ind)
+          }
+      }
+
+      result := -1
+
+      Stream {
+        // Dequeue from fifos
+        Foreach(0 until fifoDepth) {
+          group =>
+            Foreach (0 until numFifos) {
+              fnum =>
+                val v = roundRobinDeq(fifos.toList, (fifos map {_ => Bit(true) }).toList, group * numFifos + fnum)
+                // v should be in the same "group"
+                val inGroup = (v >= group * numFifos) && (v <= (group + 1) * numFifos)
+                if (!inGroup) {
+                  result := group
+                  leakValue := fnum
+                  exit()
+                }
+            }
+
+        }
+      }
+    }
+
+    val failed = getArg(result)
+    val lv = getArg(leakValue)
+    assert(failed === -1, r"We failed!, on iter $failed, fifo $lv")
   }
 }

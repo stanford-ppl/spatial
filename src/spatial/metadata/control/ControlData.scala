@@ -161,6 +161,14 @@ case class InitiationInterval(interval: Double) extends Data[InitiationInterval]
   */
 case class UserII(interval: Double) extends Data[UserII](SetBy.User)
 
+/**Compiler-definied initiation interval of a given controller.
+  *
+  * Option: sym.compilerII
+  * Setter: sym.compilerII = Double
+  * Default: None
+  */
+
+case class CompilerII(interval: Double) extends Data[CompilerII](SetBy.Analysis.Self)
 
 /** DRAMs which are written in a given controller.
   *

@@ -229,7 +229,7 @@ trait ChiselGenMath extends ChiselGenCommon {
 
     case PriorityMux(sels, opts) => 
       emit(createWire(quote(lhs),remap(lhs.tp)))
-      emit(src"$lhs.r := PriorityMux(List($sels), List(${opts.map{x => src"$x.r"}}))")
+      emit(src"$lhs.r := PriorityMux(List($sels), List(${opts.map{x => src"ForceUInt($x)"}}))")
 
     case Mux(sel, a, b) => 
       emit(createWire(quote(lhs),remap(lhs.tp)))

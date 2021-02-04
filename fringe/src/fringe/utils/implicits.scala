@@ -199,6 +199,13 @@ object implicits {
   }
 
   implicit def UIntLikeToUInt(UIntLike: UIntLike): UInt = UIntLike.asUInt
+  implicit def ForceUInt[T](v: T): UInt = {
+    v match {
+      case u: UInt => u
+      case ul: UIntLike => ul.asUInt
+      case fallthrough: Data => fallthrough.asUInt()
+    }
+  }
 
   def ConvAndCat(elements: {def raw: UInt}*): UInt = {
     chisel3.util.Cat(elements map {

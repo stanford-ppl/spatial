@@ -17,6 +17,7 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
     val interval = (1.0 +: lhs.children.map{child => child.sym.II }).max
     dbgs(s" - Interval: $interval")
     lhs.II = lhs.userII.getOrElse(interval)
+    lhs.compilerII = interval
   }
 
   private def visitInnerControl(lhs: Sym[_], rhs: Op[_]): Unit = {
@@ -36,6 +37,7 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
     val compilerII = if (forceII1) 1.0 else if (minIterDiff.isEmpty) interval else if (minIterDiff.get == 1) interval else scala.math.ceil(interval/minIterDiff.get)
     lhs.II = if (lhs.getUserSchedule.isDefined && lhs.userSchedule == Sequenced) latency
              else                                                                lhs.userII.getOrElse(scala.math.min(compilerII,latency))
+    lhs.compilerII = compilerII
   }
 
   private def visitControl(lhs: Sym[_], rhs: Op[_]): Unit = {

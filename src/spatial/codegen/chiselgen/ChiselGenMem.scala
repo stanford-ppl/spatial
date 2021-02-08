@@ -288,7 +288,7 @@ trait ChiselGenMem extends ChiselGenCommon {
       emit(src"$reg.connectWPort($index, $data1.r, $data2.r, ${and(ens)} && $invisibleEnable, ${DL(src"$ctrDone", lhs.fullDelay, true)}, $first)")
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := $reg.output")
-    case (reg, en)    => emitReset(lhs, reg, en)
+    case RegReset(reg, en)    => emitReset(lhs, reg, en)
 
     // RegFiles
     case op@RegFileNew(_, inits) => emitMem(lhs, inits)

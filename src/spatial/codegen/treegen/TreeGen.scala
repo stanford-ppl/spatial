@@ -113,7 +113,9 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
       val ii = scrubNoise(lhs.II).toInt
       val lat = scrubNoise(lhs.bodyLatency.sum).toInt
       val attentionII = if (ii > 1) src"<b>II=$ii</b>" else src"II=$ii"
-      if (lhs.isInnerControl) emit(s"""${"  "*ident}<p><mark style="border:1px; border-style:solid; border-color:black; padding: 1px; background: #ccc"><font size = "2">Latency=${lat},  ${attentionII}</font></mark></p>""")
+      val mismatchedII = lhs.compilerII != lhs.II
+      val attentionMismatch = if (mismatchedII) src", <b>CompilerII=${lhs.compilerII}</b>" else src""
+      if (lhs.isInnerControl) emit(s"""${"  "*ident}<p><mark style="border:1px; border-style:solid; border-color:black; padding: 1px; background: #ccc"><font size = "2">Latency=${lat},  ${attentionII}$attentionMismatch</font></mark></p>""")
       if (swappers.contains(lhs)) {
         inTitledCollapsible(true){
           emit(src"<font size=1>NBuf Connections</font>")

@@ -1,11 +1,11 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import math, sys
 from subprocess import Popen, PIPE
 import json, time
 import base64
 import hashlib
 
-do_synth = False
+do_synth = True
 
 def get_input_header(config):
     with open(config) as f:
@@ -58,7 +58,7 @@ def wait_for_all_done(procs, testnames):
                 print(' - ' + testnames[i])
 
 def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_path, app_cli):
-    cmd = ["python", "/home/mattfel/hypermapper/scripts/hypermapper.py", json_path] # todo: env var
+    cmd = ["python3", "/home/mattfel/hypermapper/scripts/hypermapper.py", json_path] # todo: env var
     print(' '.join(cmd)) # Command to launch HyperMapper
     p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8") # Create a subprocess and launch HyperMapper
     time.sleep(1)
@@ -99,7 +99,7 @@ def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_pat
 
             # Kick off synth build
             if do_synth:
-                runtime_cmd = 'bin/spatial ' + testname + ' --out=' + testname + 'ZCU --synth --fpga=ZCU'
+                synth_cmd = 'bin/spatial ' + testname + ' --out=' + testname + 'ZCU --synth --fpga=ZCU'
                 synth_proc = Popen(synth_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8", shell=True)
                 synth_procs.append(synth_proc)
 

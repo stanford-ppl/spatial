@@ -173,7 +173,7 @@ def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_pat
             else:
                 runtime = 0
             feasible = 'true' if runtime > 0 and all([x > 0 for x in utilization]) else 'false'
-            str_to_hypermapper = ','.join(config_values) + ',' + ','.join([str(u) for u in utilization]) + ',' + runtime + ',' + feasible
+            str_to_hypermapper = ','.join(config_values[i]) + ',' + ','.join([str(u) for u in utilization]) + ',' + runtime + ',' + feasible
             print(str_to_hypermapper)
             p.stdin.write(str_to_hypermapper); p.stdin.flush() # Reply to HyperMapper with all the evaluations
         i += 1

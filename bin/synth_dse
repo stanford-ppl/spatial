@@ -1,0 +1,192 @@
+#!/usr/bin/python
+import math, sys
+from subprocess import Popen, PIPE
+import json, time
+import base64
+import hashlib
+
+do_synth = False
+
+def get_input_header(config):
+    with open(config) as f:
+        data = json.load(f)
+    fields = []
+    for input_param in data['input_parameters']:
+        fields.append(input_param)
+    return fields
+
+def get_response_header(config):
+    with open(config) as f:
+        data = json.load(f)
+    fields = get_input_header(config)
+    for param in data['optimization_objectives']:
+        fields.append(param)
+    fields.append('Valid')
+    return fields
+
+def get_app_name(config):
+    with open(config) as f:
+        data = json.load(f)
+    return data['application_name']
+
+def write_spatial_app_params(parameters_values, input_fields, appname, configs_path, apps_path):
+    parameters_values = [x.strip() for x in parameters_values.split(',')]
+    filename = appname + "_" 
+    paramlist = []
+    for i in range(0, len(parameters_values)):
+        paramlist.append(input_fields[i] + '-' + parameters_values[i])
+    filename = appname + "_" + "_".join(paramlist)
+
+    apphash = str(int(hashlib.sha256(filename.encode('utf-8')).hexdigest(), 16) % 10**8)
+
+    with open(configs_path + filename + ".csv", 'w') as f:
+        f.write(','.join(parameters_values) + ',' + apphash)
+
+    with open(apps_path + filename + ".scala", 'w') as f:
+        f.write('import spatial.tests.feature.dense.' + appname + '\n')
+        f.write('class ' + appname + apphash + ' extends ' + appname + '("' + configs_path + filename + '.csv' + '")')
+
+    print(appname + apphash)# + ": " + apps_path + filename + ".scala" + " - " + configs_path + filename + ".csv")
+    return appname + apphash
+
+def wait_for_all_done(procs, testnames):
+    while (any([rp.poll() is None for rp in procs])):
+        time.sleep(5)
+        print("Waiting for the following to compile...")
+        for i in range(0, len(procs)):
+            if (procs[i].poll() is None):
+                print(' - ' + testnames[i])
+
+def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_path, app_cli):
+    cmd = ["python", "/home/mattfel/hypermapper/scripts/hypermapper.py", json_path] # todo: env var
+    print(' '.join(cmd)) # Command to launch HyperMapper
+    p = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8") # Create a subprocess and launch HyperMapper
+    time.sleep(1)
+    i = 0
+    input_fields = get_input_header(json_path)
+    response_fields = get_response_header(json_path)
+    appname = get_app_name(json_path)
+
+    while p.poll() is None: # Check if the process is still running
+        request = p.stdout.readline(); p.stdout.flush() # The first line is the request in the form: Request #_of_evaluation_requests
+        if "End of HyperMapper" in request: # This means that HyperMapper ended
+            print(request)
+            break
+        print("Iteration %d" %i)
+        sys.stdout.write(request)
+        str_to_hypermapper = ' '.join(response_fields) + "\n"
+        num_of_eval_requests = int(request.split(' ')[1]) # Get the #_of_evaluation_requests
+        headers = p.stdout.readline(); p.stdin.flush() # The second line contains the header in the form: x1,x2
+        sys.stdout.write(headers)
+
+        config_values = []
+        runtime_procs = []
+        synth_procs = []
+        testnames = []
+        # Launch synths for each request
+        for row in range(num_of_eval_requests):
+            parameters_values = p.stdout.readline()
+            config_values.append(parameters_values)
+            sys.stdout.write(parameters_values)
+            # Write params to file and create new Spatial app that extends the abstract class and provides this file
+            testname = write_spatial_app_params(parameters_values, input_fields, appname, configs_path, apps_path)
+            testnames.append(testname)
+
+            # Kick off runtime build
+            runtime_cmd = 'bin/spatial ' + testname + ' --out=' + testname + 'VCS --synth --fpga=VCS'
+            runtime_proc = Popen(runtime_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8", shell=True)
+            runtime_procs.append(runtime_proc)
+
+            # Kick off synth build
+            if do_synth:
+                runtime_cmd = 'bin/spatial ' + testname + ' --out=' + testname + 'ZCU --synth --fpga=ZCU'
+                synth_proc = Popen(synth_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8", shell=True)
+                synth_procs.append(synth_proc)
+
+        # Wait for runtime builds to finish
+        print("Compiling vcs tests...")
+        wait_for_all_done(runtime_procs, testnames)
+        print("Compiling synth tests...")
+        wait_for_all_done(synth_procs, testnames)
+
+
+        # for x in runtime_procs:
+        #     print(runtime_proc.stdout.read())
+
+        # Kick off runtime simulations
+        print("Compiling and running vcs and synth tests...")
+        runtime_procs = []
+        synth_procs = []
+        for i in range(len(testnames)):
+            runtime_cmd = 'cd ' + testname + 'VCS && make && bash run.sh ' + app_cli
+            runtime_proc = Popen(runtime_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8", shell=True)
+            runtime_procs.append(runtime_proc)
+            if do_synth:
+                synth_cmd = 'cd ' + testname + 'ZCU && make'
+                synth_proc = Popen(synth_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8", shell=True)
+                synth_procs.append(synth_proc)
+
+        # Wait for runtime simulations to build] and finish
+        wait_for_all_done(runtime_procs, testnames)
+
+        # Collect runtime results
+        runtimes = []
+        for i in range(len(runtime_procs)):
+            # Scrape for runtime
+            runtime = 0
+            for line in iter(runtime_procs[i].stdout.readline,""):
+                if ('Design ran for ' in line):
+                    runtime = line.replace('Design ran for ','').replace(' cycles','').strip()
+            runtimes.append(runtime)
+
+        # Wait for runtime simulations to finish
+        wait_for_all_done(synth_procs, testnames)
+
+        # Collect utilization results
+        utilizations = []
+        for i in range(len(synth_procs)):
+            # Scrape for runtime
+            utilization = [0, 0, 0]
+            scrape_cmd = 'cd ' + testname + 'ZCU && bash scripts/quickscrape.sh ZCU'
+            scrape_proc = Popen(runtime_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, encoding="utf-8", shell=True)
+            while (scrape_proc.poll() is None):
+                # wait.. This shouldn't take long
+                time.sleep(0.5)
+
+            for line in iter(scrape_proc.stdout.readline,""):
+                if ('LUT: ' in line):
+                    data = line.split(' ')
+                    lut = int(data[data.index('LUT:') + 1])
+                    bram = int(data[data.index('BRAM:') + 1])
+                    dsp = int(data[data.index('DSP:') + 1])
+                    utilization = [lut, bram, dsp]
+            utilizations.append(utilization)
+
+        # Reply to hypermapper
+        for i in range(num_of_eval_requests): 
+            if (len(utilizations) > i):
+                utilization = utilizations[i]
+            else: 
+                utilization = [0, 0, 0]
+            if (len(runtimes) > i):
+                runtime = runtimes[i]
+            else:
+                runtime = 0
+            feasible = 'true' if runtime > 0 and all([x > 0 for x in utilization]) else 'false'
+            str_to_hypermapper = ','.join(config_values) + ',' + ','.join([str(u) for u in utilization]) + ',' + runtime + ',' + feasible
+            print(str_to_hypermapper)
+            p.stdin.write(str_to_hypermapper); p.stdin.flush() # Reply to HyperMapper with all the evaluations
+        i += 1
+
+def main():
+    print("Usage: bin/synth_dse <path to hm json> <dir to dump spatial app configs> <dir to dump spatial app scala code>")
+    json_path = sys.argv[1]
+    configs_path = sys.argv[2]
+    apps_path = sys.argv[3]
+    app_cli = sys.argv[4]
+    communication_protocol_spatial_hypermapper(json_path, configs_path, apps_path, app_cli)
+    print("End of Spatial DSE run.")
+
+if __name__ == "__main__":
+    main()
+

@@ -210,3 +210,71 @@ import spatial.dsl._
     assert(cksum)
   }
 }
+
+import utils.io.files._
+//class DotProductSynthDSE_test extends DotProductSynthDSE("/home/mattfel/sp_fixes/spatial/test_cfg.csv")
+@spatial abstract class DotProductSynthDSE(params_file: java.lang.String) extends SpatialTest {
+  override def runtimeArgs: Args = "640"
+  type X = FixPt[TRUE,_32,_0]
+
+  def main(args: Array[String]): Unit = {
+    val size = args(0).to[Int]
+    val aData = Array.fill(size){ random[X](4) }
+    val bData = Array.fill(size){ random[X](4) }
+
+    val config = loadCSVNow[java.lang.String](params_file, ","){x => x}
+
+    val P2 = config(0).toInt
+    val P1 = config(1).toInt
+    val B = config(2).toInt
+    val P3 = config(3).toInt
+    val schedule = config(4).toBoolean
+
+    //saveParams(s"$SPATIAL_HOME/saved.param") // Store used params to file
+
+    val N = ArgIn[Int]
+    setArg(N, size)
+
+    val a = DRAM[X](N)
+    val b = DRAM[X](N)
+    val out0 = ArgOut[X]
+    setMem(a, aData)
+    setMem(b, bData)
+
+    Accel {
+      val accO = Reg[X](0.to[X])
+      val sum = if (schedule == true) {
+        Reduce(accO)(N by B par P1){i =>
+          //ts := min(B, N-i)
+          val aBlk = SRAM[X](B)
+          val bBlk = SRAM[X](B)
+          aBlk load a(i::i+B par P3)
+          bBlk load b(i::i+B par P3)
+          val accI = Reg[X](0.to[X])
+          Reduce(accI)(B par P2){ii => aBlk(ii) * bBlk(ii) }{_+_}
+        }{_+_}
+      } else {
+        Sequential.Reduce(accO)(N by B par P1){i =>
+          //ts := min(B, N-i)
+          val aBlk = SRAM[X](B)
+          val bBlk = SRAM[X](B)
+          aBlk load a(i::i+B par P3)
+          bBlk load b(i::i+B par P3)
+          val accI = Reg[X](0.to[X])
+          Reduce(accI)(B par P2){ii => aBlk(ii) * bBlk(ii) }{_+_}
+        }{_+_}
+      }
+      out0 := sum
+    }
+
+    val result0 = getArg(out0)
+    val gold = aData.zip(bData){_*_}.reduce{_+_}
+
+    println("expected: " + gold)
+    println("result0: " + result0)
+
+    val cksum = gold == result0
+    println("PASS: " + cksum + " (DotProduct)")
+    assert(cksum)
+  }
+}

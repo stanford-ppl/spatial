@@ -56,6 +56,8 @@ def wait_for_all_done(procs, testnames):
         for i in range(0, len(procs)):
             if (procs[i].poll() is None):
                 print(' - ' + testnames[i])
+                #print(procs[i].stdout.read())
+
 
 def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_path, app_cli):
     cmd = ["python3", "/home/mattfel/hypermapper/scripts/hypermapper.py", json_path] # todo: env var
@@ -110,8 +112,8 @@ def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_pat
         wait_for_all_done(synth_procs, testnames)
 
 
-        # for x in runtime_procs:
-        #     print(runtime_proc.stdout.read())
+        #for x in runtime_procs:
+        #    print(runtime_proc.stdout.read())
 
         # Kick off runtime simulations
         print("Compiling and running vcs and synth tests...")
@@ -173,7 +175,7 @@ def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_pat
             else:
                 runtime = 0
             feasible = 'true' if runtime > 0 and all([x > 0 for x in utilization]) else 'false'
-            str_to_hypermapper = ','.join(config_values[i]) + ',' + ','.join([str(u) for u in utilization]) + ',' + runtime + ',' + feasible
+            str_to_hypermapper = ','.join(config_values[i]) + ',' + ','.join([str(u) for u in utilization]) + ',' + str(runtime) + ',' + feasible
             print(str_to_hypermapper)
             p.stdin.write(str_to_hypermapper); p.stdin.flush() # Reply to HyperMapper with all the evaluations
         i += 1

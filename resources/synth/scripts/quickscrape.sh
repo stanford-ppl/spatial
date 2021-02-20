@@ -65,8 +65,8 @@ if [[ -f ${par_util} ]]; then
 		uramraw=`cat $par_util | grep -m 1 "URAM" | awk -v f=$f1 -F'|' '{print $f}' | sed "s/ //g"`
 		urampcnt=`cat $par_util | grep -m 1 "URAM" | awk -v f=$f2 -F'|' '{print $f}' | sed "s/ //g"`
 	else
-		uramraw="NA"
-		urampcnt="NA"
+		uramraw="0"
+		urampcnt="0"
 	fi
 	dspraw=`cat $par_util | grep -m 1 "DSPs" | awk -v f=$f1 -F'|' '{print $f}' | sed "s/ //g"`
 	dsppcnt=`cat $par_util | grep -m 1 "DSPs" | awk -v f=$f2 -F'|' '{print $f}' | sed "s/ //g"`
@@ -75,27 +75,27 @@ if [[ -f ${par_util} ]]; then
 	lamraw=`cat $par_util | grep -m 1 "LUT as Memory" | awk -v f=$f1 -F'|' '{print $f}' | sed "s/ //g"`
 	lampcnt=`cat $par_util | grep -m 1 "LUT as Memory" | awk -v f=$f2 -F'|' '{print $f}' | sed "s/ //g"`
 else
-	lutraw="NA"
-	lutpcnt="NA"
-	regraw="NA"
-	regpcnt="NA"
-	ramraw="NA"
-	rampcnt="NA"
-	uramraw="NA"
-	urampcnt="NA"
-	dspraw="NA"
-	dsppcnt="NA"
-	lalraw="NA"
-	lalpcnt="NA"
-	lamraw="NA"
-	lampcnt="NA"
+	lutraw="0"
+	lutpcnt="0"
+	regraw="0"
+	regpcnt="0"
+	ramraw="0"
+	rampcnt="0"
+	uramraw="0"
+	urampcnt="0"
+	dspraw="0"
+	dsppcnt="0"
+	lalraw="0"
+	lalpcnt="0"
+	lamraw="0"
+	lampcnt="0"
 fi
 
 if [[ -f ${par_tmg} ]]; then
 	viocnt=`cat $par_tmg | grep -i violated | grep -v synth | wc -l`
 	if [[ $viocnt != "0" ]]; then tmg="0"; else tmg="1"; fi
 else
-	tmg="NA"
+	tmg="0"
 fi
 
 

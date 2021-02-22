@@ -59,13 +59,11 @@ def wait_for_all_done(procs, testnames):
         for i in range(0, len(procs)):
             if (procs[i].poll() is None):
                 print(' - ' + testnames[i])
-                #print(procs[i].stdout.read())
                 if (active_time > timeout):
                     print('   - Killing due to timeout!')
                     procs[i].kill()
         active_time = active_time + sec_per_update
 
->>>>>>> 543edcee042a4bc046e47504eb3e4c5deab90efb
 
 def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_path, app_cli):
     cmd = ["python3", "/home/mattfel/hypermapper/scripts/hypermapper.py", json_path] # todo: env var

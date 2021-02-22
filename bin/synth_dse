@@ -180,6 +180,10 @@ def communication_protocol_spatial_hypermapper(json_path, configs_path, apps_pat
                 runtime = runtimes[i]
             else:
                 runtime = 0
+            print("runtime:")
+            print(runtime)
+            print("utilz:")
+            print(all([x > 0 for x in utilization]))
             feasible = 'true' if int(runtime) > 0 and all([x > 0 for x in utilization]) else 'false'
             str_to_hypermapper = ','.join(config_values[i]) + ',' + ','.join([str(u) for u in utilization]) + ',' + str(runtime) + ',' + feasible
             print(str_to_hypermapper)

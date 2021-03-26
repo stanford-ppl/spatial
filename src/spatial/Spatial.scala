@@ -201,7 +201,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** Code generation */
         treeCodegen         ==>
         irCodegen           ==>
-        //(spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableFlatDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
@@ -255,6 +255,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("dot").action( (_,_) =>
       spatialConfig.enableDot = true
     ).text("Enable dot graph generation [false]")
+
+    cli.opt[Unit](name="fdot").action( (_, _) =>
+      spatialConfig.enableFlatDot = true
+    ).text("Enable flat dot graph generation [false]")
 
     cli.opt[Unit]("reporter").action( (_,_) =>
       spatialConfig.enableResourceReporter = true

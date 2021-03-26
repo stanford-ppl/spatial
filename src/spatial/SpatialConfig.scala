@@ -24,6 +24,7 @@ class SpatialConfig extends Config {
   var enableResourceReporter: Boolean = false
   var enableTree: Boolean = true
   var enableDot: Boolean = false
+  var enableFlatDot: Boolean = false
 
   var enableInstrumentation: Boolean = false
   var enableModular: Boolean = true

@@ -175,7 +175,8 @@ class CompactingIncDincCtr(inc: Int, dinc: Int, widest_inc: Int, widest_dinc: In
 
   io.output.overread := cnt < 0.S((width+1).W)
   io.output.overwrite := cnt > stop.S((width+1).W)
-  io.output.empty := cnt === 0.S((width+1).W)
+//  io.output.empty := cnt === 0.S((width+1).W)
+  io.output.empty := cnt < widest_dinc.S((width+1).W)
   io.output.almostEmpty := cnt - widest_dinc.S((width+1).W) === 0.S((width+1).W)
   io.output.full := cnt > (stop-widest_inc).S((width+1).W)
   io.output.almostFull := cnt + widest_inc.S((width+1).W) === stop.S((width+1).W)

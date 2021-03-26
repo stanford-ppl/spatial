@@ -558,7 +558,7 @@ class ShiftRegFile(p: MemParams) extends MemPrimitive(p) {
     val coords = p.Ds.zipWithIndex.map{ case (b,j) =>
       i % p.Ds.drop(j).product / p.Ds.drop(j+1).product
     }
-    val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.U(p.bitWidth.W) else 0.U(p.bitWidth.W)
+    val initval = if (p.inits.isDefined) (p.inits.get.apply(i)*scala.math.pow(2,p.fracBits)).toLong.S(p.bitWidth.W).asUInt() else 0.U(p.bitWidth.W)
     val mem = RegInit(initval)
     io.asInstanceOf[ShiftRegFileInterface].dump_out(i) := mem
     (mem,coords,initval, i)

@@ -305,7 +305,12 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
       val stms = block.nestedStms
       val hasAssert = stms.exists{case Op(_: AssertIf) => true; case _ => false }
       if (!hasAssert) throw Unknown
-      checkIR(block)
+      checkIR(block) match {
+        case Fail =>
+          error("CheckIR Failed")
+          throw CompilerErrors("CheckIR", 1)
+        case _ =>
+      }
     }
   }
 

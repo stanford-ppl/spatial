@@ -112,6 +112,13 @@ trait Printing {
     dbgblk(x)
   } else x
 
+  @stateful def indent[T](x: => T): T = if (config.enDbg) {
+    state.logTab += 1
+    val r = x
+    state.logTab -= 1
+    r
+  } else x
+
   @stateful def log(x: => Any): Unit = if (config.enLog) state.log.println(x)
   @stateful def logs(x: => Any): Unit = if (config.enLog) state.log.println("  "*state.logTab + x)
 

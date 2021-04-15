@@ -116,6 +116,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   */
 sealed trait Exp[+C,+A] extends Equals { self =>
   type L = C@uV
+  type R = A@uV
 
   private[argon] var _tp: ExpType[C@uV,A@uV] = _
   private[argon] var _rhs: Def[C@uV,A@uV] = _

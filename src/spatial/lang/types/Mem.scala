@@ -11,6 +11,8 @@ trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   implicit val A: Bits[A]
 
   override protected val __neverMutable: Boolean = false
+
+  def __makeCopy(implicit state: argon.State): C[_] = null.asInstanceOf[C[_]]
 }
 
 trait TensorMem[A] {
@@ -44,6 +46,8 @@ trait LocalMem[A,C[_]] extends Mem[A,C] {
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void
   @rig def __reset(ens: Set[Bit]): Void
+
+  @rig def __makeFIFO(size: I32): FIFO[A] = spatial.lang.FIFO.alloc[A](size)
 }
 trait LocalMem0[A,C[T]<:LocalMem0[T,C]] extends LocalMem[A,C]
 trait LocalMem1[A,C[T]<:LocalMem1[T,C]] extends LocalMem[A,C] {

@@ -77,6 +77,7 @@ timeout=`if [[ $(cat log | grep -a TIMEOUT | wc -l) -gt 0 ]]; then echo 1; else 
 pass=`if [[ $(cat log | grep -a "Assertion" | wc -l) -gt 0 ]]; then echo 1; else echo 0; fi`
 
 if [[ $pass = 0 && $timeout = 0 ]]; then
+  bash scripts/instrument.sh
 	exit 0
 else
 	exit 1

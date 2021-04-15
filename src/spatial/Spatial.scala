@@ -160,13 +160,9 @@ trait Spatial extends Compiler with ParamLoader {
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
         /** Metapipelines to Streams */
-        (spatialConfig.enableSynth ? unitPipeToForeach) ==> printer ==>
-        (spatialConfig.enableSynth ? metapipeToStream) ==> printer ==>
-        /** Dead code elimination */
-        useAnalyzer         ==>
-        transientCleanup    ==> printer ==> transformerChecks ==>
+        spatialConfig.streamify ? Seq(unitPipeToForeach, initiationAnalyzer, metapipeToStream, useAnalyzer, transientCleanup, printer, transformerChecks) ==>
         /** Stream controller rewrites */
-        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==> 
+        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>
@@ -314,6 +310,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("noModifyStream").action{ (_,_) => 
       spatialConfig.distributeStreamCtr = false
     }.text("Disable transformer that converts Stream.Foreach controllers into Stream Unit Pipes with the counter tacked on to children counters (default: do modify stream [i.e. run transformer])")
+
+    cli.opt[Unit]("streamify").action {(_, _) =>
+      spatialConfig.streamify = true
+    }.text("Enable automatically transforming controllers into streams.")
 
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false

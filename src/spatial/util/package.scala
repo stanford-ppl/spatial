@@ -46,4 +46,12 @@ package object util {
     dlys
   }
 
+  def crossJoin[T](list: Iterable[Iterable[T]]): Iterable[Iterable[T]] =
+    list match {
+      case xs :: Nil => xs map (Iterable(_))
+      case x :: xs => for {
+        i <- x
+        j <- crossJoin(xs)
+      } yield Iterable(i) ++ j
+    }
 }

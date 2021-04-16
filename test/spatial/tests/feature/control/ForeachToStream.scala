@@ -71,5 +71,11 @@ class ForeachToStream1_streamed extends ForeachToStream1 with Streamified
 class ForeachToStream2_streamed extends ForeachToStream2 with Streamified
 class ForeachToStream10_streamed extends ForeachToStream10 with Streamified
 
-class ForeachToStream1p2 extends ForeachToStream(1, 1, 2)
-class ForeachToStream1p2_streamed extends ForeachToStream1p2 with Streamified
+class ForeachToStream1op2 extends ForeachToStream(1, 1, 2)
+class ForeachToStream1op2_streamed extends ForeachToStream1op2 with Streamified
+
+class ForeachToStream1ip2 extends ForeachToStream(1, 2, 1)
+class ForeachToStream1ip2_streamed extends ForeachToStream1ip2 with Streamified
+
+class ForeachToStream1ip4 extends ForeachToStream(1, 4, 1)
+class ForeachToStream1ip4_streamed extends ForeachToStream1ip4 with Streamified

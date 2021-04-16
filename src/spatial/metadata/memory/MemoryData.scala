@@ -93,3 +93,10 @@ case class InterfaceStream(stream: Sym[_]) extends Data[InterfaceStream](SetBy.A
   * Default: None
   */
 case class ExplicitName(name: String) extends Data[ExplicitName](SetBy.User)
+
+/**
+  * Memory Synchronization Strategy
+  *
+  */
+
+case class SynchronizationStrategy() extends Data[SynchronizationStrategy](SetBy.User)

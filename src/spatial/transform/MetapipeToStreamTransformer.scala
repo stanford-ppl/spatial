@@ -13,6 +13,7 @@ import spatial.metadata.memory._
 import spatial.metadata.blackbox._
 import spatial.metadata.access._
 import spatial.metadata.control._
+import spatial.metadata.types._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -32,6 +33,9 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
     rhs match {
       case foreach: OpForeach =>
+        if (foreach.cchain.counters.exists {
+          ctr => ctr.ctrParOr1 != 1
+        }) { return false }
         foreach.block.stms.forall {
           sym =>
             if (!sym.isMem) {
@@ -50,6 +54,14 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     case r:Reg[_] => true
     case _ => false
   }
+
+  private def computeShifts(parFactors: Iterable[Int]) = {
+    dbgs(s"Par Factors: $parFactors")
+    (spatial.util.crossJoin((parFactors map {f => Range(0, f).toList}).toList) map {
+      _.toList
+    }).toList
+  }
+
 
 
   private def transformForeach[A: Type](lhs: Sym[A], foreach: OpForeach): Sym[Void] = {
@@ -89,7 +101,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                   case Some(writer) =>
                     // Memory was previously written, now need a new fifo.
                     val writerLatency = math.ceil(writer.latencySum).toInt
-                    val latencyEpsilon = 5
+                    val latencyEpsilon = 4
+
                     mem match {
                       case r: Reg[_] =>
                         lazy implicit val bits: Bits[r.L] = r.A.asInstanceOf[Bits[r.L]]
@@ -113,7 +126,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
           case s if canTransformMem(s) =>
             dbgs(s"Skipping re-staging $s since it can be transformed")
 
-          case stmt if stmt.isControl =>
+          case stmt if stmt.isControl && !stmt.isStreamControl =>
             val stmtReads = getReadMems(stmt)
             val stmtWrites = getWrittenMems(stmt)
             // for each stmtRead, we need to create a register of the same type inside.
@@ -132,18 +145,25 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
             isolateSubst() {
               stmt.op match {
                 case Some(OpForeach(ens, cchain, block, iters, stopWhen)) =>
+                  // Unroll early here.
+                  // start, stop, step, par ->
+                  // start, stop, step * par, 1
+                  val shape = ArrayBuffer[Int]()
                   val newctrs = (foreach.cchain.counters ++ cchain.counters).map {
                     case Op(CounterNew(start, stop, step, par)) =>
-                      stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32], par))
+                      shape.append(par.toInt)
+                      stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32] * par, I32(1)))
                     case Op(ForeverNew()) =>
+                      shape.append(1)
                       stage(ForeverNew())
                   }
                   val ccnew = stage(CounterChainNew(newctrs))
                   register(foreach.cchain -> ccnew)
 
-                  val newiters = (foreach.iters ++ iters).zip(newctrs).map { case (i, ctr) =>
+                  val alliters = foreach.iters ++ iters
+
+                  val newiters = alliters.zip(newctrs).map { case (i, ctr) =>
                     val n = boundVar[I32]
-                    subst += (i -> n)
                     n.name = i.name
                     n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
                     n
@@ -152,7 +172,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                   f(stage(OpForeach(ens, ccnew, stageBlock {
                     val isFirstIter = newiters.takeRight(iters.size)
                     val en = isFirstIter.map {
-                      _ === I32(0)
+                      i => i === i.counter.ctr.start
                     }.toSet
 
                     stmtReads foreach {
@@ -179,11 +199,34 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                           stage(RegWrite(tmp, deq, en))
                         }
                     }
-                    // Within this scope, we rename this register.
-                    block.stms foreach {
-                      x =>
-                        visit(f(x))
+
+                    val shifts = computeShifts(shape)
+                    dbgs(s"Unrolling with shifts: $shifts")
+
+                    shifts foreach {
+                      shift =>
+                        isolateSubst() {
+                          dbgs(s"Processing shift: $shift")
+                          (alliters zip newiters) zip shift foreach {
+                            case ((oldIter, newIter), s) =>
+                              val shifted = newIter + s
+                              subst += (oldIter -> shifted)
+                          }
+
+                          block.stms foreach {
+                            x =>
+                              x.op match {
+                                case Some(op) =>
+                                  val mirrored = op.mirror(f)
+                                  val copied = stage(mirrored)
+                                  dbgs(s"Staging: $copied = $mirrored ($x = $op)")
+                                  subst += (x -> copied.asInstanceOf[Sym[_]])
+                              }
+                          }
+                        }
                     }
+                    // Within this scope, we rename this register.
+
 
                     stmtWrites foreach {
                       case wr: Reg[_] =>

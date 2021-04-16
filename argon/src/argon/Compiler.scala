@@ -199,12 +199,23 @@ trait Compiler extends DSLRunnable { self =>
     compileProgram(args)
   }
 
+  protected case class PassCollection(en: Boolean, passes: Seq[Pass])
+
   protected implicit class BlockOps[R](block: Block[R]) {
     def ==>(pass: Pass): Block[R] = runPass(pass, block)
-    def ==>(pass: (Boolean,Pass)): Block[R] = if (pass._1) runPass(pass._2,block) else block
+    def ==>(passSeq: PassCollection): Block[R] = if (passSeq.en) {
+      var blk = block
+      passSeq.passes foreach {
+        pass =>
+          blk = runPass(pass, blk)
+      }
+      blk
+    } else block
   }
+
   protected implicit class ConditionalPass(cond: Boolean) {
-    def ?(pass: Pass): (Boolean, Pass) = (cond, pass)
+    def ?(passSeq: Seq[Pass]): PassCollection = PassCollection(cond, passSeq)
+    def ?(pass: Pass): PassCollection = PassCollection(cond, Seq(pass))
   }
 
   final protected def handleException(t: Throwable): Option[Throwable] = t match {

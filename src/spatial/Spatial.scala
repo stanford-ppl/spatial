@@ -128,6 +128,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val dotFlatGen    = DotFlatGenSpatial(state)
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
+    // Utilities
+    lazy val DCE = Seq(useAnalyzer, transientCleanup, printer, transformerChecks)
+
     val result = {
 
         block ==> printer     ==>
@@ -157,10 +160,11 @@ trait Spatial extends Compiler with ParamLoader {
         /** CSE on regs */
         regReadCSE          ==>
         /** Dead code elimination */
-        useAnalyzer         ==>
-        transientCleanup    ==> printer ==> transformerChecks ==>
+        DCE ==>
+//        useAnalyzer         ==>
+//        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Metapipelines to Streams */
-        spatialConfig.streamify ? Seq(unitPipeToForeach, initiationAnalyzer, metapipeToStream, useAnalyzer, transientCleanup, printer, transformerChecks) ==>
+        spatialConfig.streamify ? (Seq(unitPipeToForeach, retimingAnalyzer, metapipeToStream) ++ DCE) ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */

@@ -26,6 +26,7 @@ object ForeachToStream {
       'Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val k = ForeachToStream.doLotsOfCompute(2)(i, i+1)
+//          val k = i + 1
           Range(0, numConsumers) foreach {
             n =>
               'Inner.Foreach(innerIters by 1 par ip) {
@@ -33,6 +34,7 @@ object ForeachToStream {
                   // A Few iterations of a deeeeep pipeline
                   val tmp = k + j
                   mems(n)(i, j) = ForeachToStream.doLotsOfCompute(2)(tmp, i+1) + n
+//                  mems(n)(i, j) = tmp + n
               }
           }
 
@@ -50,7 +52,9 @@ object ForeachToStream {
         val recv = getMatrix(memOuts(n))
         Foreach(iters by 1, innerIters by 1) {
           (i, j) =>
+            printMatrix(recv, header = s"Recv: $n")
             assert(goldArray(i, j) + n == recv(i, j), r"Gold($i, $j) = ${goldArray(i, j) + n}, Recv($i, $j) = ${recv(i, j)}")
+//            assert(recv(i, j) == i + j + n + 1, r"Recv-$n($i, $j) = ${recv(i, j)}, expected ${i + j + n + 1}")
         }
     }
 
@@ -60,7 +64,7 @@ object ForeachToStream {
 
 trait Streamified {
   this: SpatialTest =>
-  override def compileArgs: Args = "--streamify --max_cycles=10000"
+  override def compileArgs: Args = "--streamify --max_cycles=10000 --fdot"
 }
 
 class ForeachToStream1 extends ForeachToStream(1)
@@ -79,3 +83,6 @@ class ForeachToStream1ip2_streamed extends ForeachToStream1ip2 with Streamified
 
 class ForeachToStream1ip4 extends ForeachToStream(1, 4, 1)
 class ForeachToStream1ip4_streamed extends ForeachToStream1ip4 with Streamified
+
+class ForeachToStreamExp extends ForeachToStream(2, 2, 2)
+class ForeachToStreamExp_streamed extends ForeachToStreamExp with Streamified

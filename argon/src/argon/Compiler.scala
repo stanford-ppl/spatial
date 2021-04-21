@@ -211,6 +211,10 @@ trait Compiler extends DSLRunnable { self =>
       }
       blk
     } else block
+
+    def ==>(passSeq: Seq[Pass]): Block[R] = {
+      block ==> (true ? passSeq)
+    }
   }
 
   protected implicit class ConditionalPass(cond: Boolean) {

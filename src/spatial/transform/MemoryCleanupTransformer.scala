@@ -15,7 +15,7 @@ case class MemoryCleanupTransformer(IR: State) extends MutateTransformer with Bl
     case _:SpatialBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
     case _:SpatialCtrlBlackboxImpl[_,_] => inBox{ super.transform(lhs,rhs) }
 
-    case _: MemAlloc[_,_] if !lhs.isDRAM && !lhs.keepUnused && inHw && lhs.readers.size == 0 && lhs.writers.size == 0 =>
+    case _: MemAlloc[_,_] if !lhs.isDRAM && !lhs.keepUnused && inHw && lhs.readers.isEmpty && lhs.writers.isEmpty =>
       Invalid.asInstanceOf[Sym[A]] // Drop
 
     case _ =>

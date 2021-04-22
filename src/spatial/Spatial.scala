@@ -112,6 +112,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val regReadCSE            = RegReadCSE(state)
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
     lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
+    lazy val regElim               = RegWriteReadElimination(state)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -164,7 +165,7 @@ trait Spatial extends Compiler with ParamLoader {
 //        useAnalyzer         ==>
 //        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Metapipelines to Streams */
-        spatialConfig.streamify ? (Seq(unitPipeToForeach, retimingAnalyzer, metapipeToStream) ++ DCE) ==>
+        spatialConfig.streamify ? (Seq(unitPipeToForeach, retimingAnalyzer, metapipeToStream, printer, regElim, printer) ++ DCE) ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */

@@ -27,7 +27,7 @@ import spatial.metadata.memory._
 
   /** Indicate that the memory should be buffered and ignore
     * ignore potential situation where result from running sequentially
-    * does not match with resurt from running pipelined
+    * does not match with result from running pipelined
     */
   def buffer: Reg[A] = { this.isWriteBuffer = true; me }
   /** Do not buffer memory */

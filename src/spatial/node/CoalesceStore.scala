@@ -117,3 +117,91 @@ object CoalesceStore {
   }
 
 }
+
+@op case class StreamStore[A,Dram[T]<:DRAM[T,Dram],Local[T]<:LocalMem[T,Local]](
+    dram:     Dram[A],
+    data:     Local[A],
+    params:   Tup2[I32,I32],
+    p:        scala.Int,
+    ens:      Set[Bit] = Set.empty,
+  )(implicit
+    val A:     Bits[A],
+    val Local: Type[Local[A]],
+    val Dram:  Type[Dram[A]])
+    // val bA:   Bits[A],
+    // val tL:   Type[Local[A]])
+  extends EarlyBlackBox[Void] {
+
+  override def effects: Effects = Effects.Writes(dram) 
+  @rig def lower(old:Sym[Void]): Void = StreamStore.transfer(old, dram,data,params,p,ens)
+  // @rig def pars: Seq[I32] = {
+    // Seq(dram.addrs[_32]().sparsePars().values.head)
+  // }
+  @rig def pars: Seq[I32] = {
+    val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+    (dram.sparsePars().map(_._2) ++ {if (!normalCounting) Seq(I32(1)) else Nil }).toSeq
+  }
+}
+
+object StreamStore {
+
+  @virtualize
+  @rig def transfer[A,Dram[T]<:DRAM[T,Dram],Local[T]<:LocalMem[T,Local]](
+    old:     Sym[Void],
+    dram:    Dram[A],
+    local:   Local[A],
+    params:  Tup2[I32,I32],
+    p:       scala.Int,
+    ens:     Set[Bit],
+  )(implicit
+    A:     Bits[A],
+    Local: Type[Local[A]],
+    Dram:  Type[Dram[A]]
+    // A:     Bits[A],
+    // Local: Type[Local[A]]
+  ): Void = {
+    // val addrs = dram.addrs[_32]()
+    // val origin = dram.sparseOrigins[_32]().values.head
+    // val p = addrs.sparsePars().values.head
+    // val requestLength = dram.sparseLens().values.head
+
+    // val rawRank: Int = dram.rawRank.length
+    // val normalCounting: Boolean = dram.rawRank.last == dram.sparseRank.last
+    // val pars: Map[Int,I32] = dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
+    // val p = pars.toSeq.maxBy(_._1)._2
+    // TODO: fixthis
+    // val p = 1
+    val bytesPerWord = (A.nbits / 8 + (if (A.nbits % 8 != 0) 1 else 0)).to[I64]
+
+    assert(spatialConfig.enablePIR)
+    val len = params._1
+    val base = params._2
+    // val iters = requestLength
+
+    val top = Stream {
+      val localFIFO = local.asInstanceOf[Sym[_]] match {case Op(_:FIFONew[_]) => true; case _ => false}
+
+      // Stream
+      val setupBus = StreamOut[Tup2[I64,I32]](CoalesceCmdBus[A]())
+      val cmdBus = StreamOut[A](StreamCmdBus[A]())
+      val ackBus = StreamIn[Bit](CoalesceAckBus)
+      val base64 = base.unbox.to[I64]*bytesPerWord
+
+      setupBus := (pack(base64 + dram.address, len.unbox), dram.isAlloc)
+      Foreach(len.unbox par p){i =>
+        // val addr: I64  = if (i == 0) { base.to[I64] + dram.address } else { -1.to[I64] }
+        val data       = local.__read(Seq(i), Set.empty)
+        cmdBus := (data, dram.isAlloc)
+      }
+      // Fringe
+      val store = Fringe.streamStore(dram, setupBus, cmdBus, ackBus, p)
+      transferSyncMeta(old, store)
+      // Receive
+      Foreach(1 by 1 par 1){i =>
+        val ack = ackBus.value()
+      }
+    }
+    // top.loweredTransfer = if (isLoad) SparseLoad else SparseStore // TODO: Work around @virtualize to set this metadata
+  }
+
+}

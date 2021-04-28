@@ -235,7 +235,7 @@ trait PlasticineTest extends DSLTest { test =>
       scommand(s"maketst", s"$timer make ideal -j16 ${if (fast) "DEBUG=1" else "DEBUG=0"}".split(" "), timeout=6000, parseMake, MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runp2p", timeout=1000000) >>
       (if (runhybrid)
-      scommand(s"runproute", s"$timer make proute".split(" "), timeout=10800 * 2, parseProute()(_), MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
+      scommand(s"runproute", s"$timer unbuffer make proute".split(" "), timeout=10800 * 2, parseProute()(_), MakeError.apply, wd=IR.config.genDir+"/tungsten") >>
       runtst("runhybrid", timeout=1000000)
       else Pass
       )

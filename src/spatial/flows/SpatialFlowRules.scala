@@ -260,6 +260,7 @@ case class SpatialFlowRules(IR: State) extends FlowRules {
     case _: SwitchCase[_]          => s.rawSchedule = Sequenced
     case _: DenseTransfer[_,_,_]   => s.rawSchedule = Pipelined
     case _: CoalesceStore[_,_,_]   => s.rawSchedule = Pipelined
+    case _: StreamStore[_,_,_]   => s.rawSchedule = Pipelined
     case _: SparseTransfer[_,_]    => s.rawSchedule = Pipelined
     case ctrl: Control[_] =>
       logs(s"Determining schedule of $s = $op")

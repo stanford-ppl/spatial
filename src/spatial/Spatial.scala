@@ -198,7 +198,7 @@ trait Spatial extends Compiler with ParamLoader {
         treeCodegen         ==>
         irCodegen           ==>
         //(spatialConfig.enableDot ? dotFlatGen)      ==>
-        (spatialConfig.enableDot ? dotHierGen)      ==>
+        // (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
         (spatialConfig.enableSynth ? chiselCodegen) ==>
         (spatialConfig.enableSynth ? cppCodegen) ==>

@@ -41,6 +41,16 @@ import spatial.lang._
   extends FringeNode[A,Void] {
   override def effects: Effects = Effects.Writes(ackStream, dram)
 }
+@op case class FringeStreamStore[A:Bits,C[T]](
+    dram:      DRAM[A,C],
+    setupStream: StreamOut[Tup2[I64,I32]],
+    cmdStream: StreamOut[A],
+    ackStream: StreamIn[Bit],
+    par: scala.Int)
+  extends FringeNode[A,Void] {
+  override def effects: Effects = Effects.Writes(ackStream, dram)
+}
+
 
 @op case class FringeDynStore[A:Bits,C[T]](
     dram:      DRAM[A,C],
@@ -141,6 +151,14 @@ object Fringe {
     ackStream: StreamIn[Bit],
     par: scala.Int
   ): Void = stage(FringeCoalStore[A,C](dram,setupStream,cmdStream,ackStream, par))
+
+  @rig def streamStore[A:Bits,C[T]](
+    dram:      DRAM[A,C],
+    setupStream: StreamOut[Tup2[I64,I32]],
+    cmdStream: StreamOut[A],
+    ackStream: StreamIn[Bit],
+    par: scala.Int
+  ): Void = stage(FringeStreamStore[A,C](dram,setupStream,cmdStream,ackStream, par))
 
   @rig def dynStore[A:Bits,C[T]](
     dram:      DRAM[A,C],

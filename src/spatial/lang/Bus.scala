@@ -64,6 +64,7 @@ case object ScatterAckBus extends DRAMBus[Bit]
 
 case class CoalesceSetupBus[A:Bits]() extends DRAMBus[Tup2[I64, I32]]
 case class CoalesceCmdBus[A:Bits]() extends DRAMBus[Tup2[A, Bit]]
+case class StreamCmdBus[A:Bits]() extends DRAMBus[A]
 case object CoalesceAckBus extends DRAMBus[Bit]
 
 case class DynStoreSetupBus[A:Bits]() extends DRAMBus[I64]

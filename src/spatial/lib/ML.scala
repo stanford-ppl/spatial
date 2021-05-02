@@ -72,6 +72,7 @@ object ML extends HostML {
         totalSum.value
     }
   }
+  
 
   /*                                                       
    * Forward MLP with parameterized layers and dimensions
@@ -255,6 +256,7 @@ object ML extends HostML {
     val O = dims(1)
     val din = SRAM[T](batch, I)
 	
+    
     Foreach(0 until batch par opb) { b =>
       Foreach(0 until I par opi) { i =>
         val dot = sum_tiled(O, tso, mpo, ipo) { o =>

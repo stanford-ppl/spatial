@@ -170,46 +170,6 @@ object ML extends HostML {
         None
     }
   }
-  
-  
-  @api def sparselayer[T:Num](
-  // wrapper, o', off-chip for w and b, on-chip w' and b', list of active IDs, slided load into FIFO into SRAM compressed, capstan feature
-    w:Sym[_] with TensorMem[T] with ReadMem2[T], 
-    b:Sym[_] with TensorMem[T] with ReadMem1[T], 
-    activation: T => T,
-    in:I32 => T,
-    nlout:(I32, T) => scala.Unit,
-    lout:(I32, T) => scala.Unit = { (i:I32,d:T) => () },
-  )(
-    ip:scala.Int=16,
-    mp:scala.Int=1,
-    op:scala.Int=1, 
-  ):Option[T] = {
-    val dims = w.constDims
-    val I = dims(0) // 8
-    val O = dims(1) // 4
-
-    def InnerNN(o:Int) = {
-      val dot = dp_tiled(N=I,ts=ip,op=mp,ip=ip) { i => 
-        (in(i), w(i,o))
-      }
-      val lo = dot + b(o)
-      lout(o,lo)
-      val nlo = activation(lo)
-      nlout(o,nlo)
-      nlo
-    }
-	
-    O match {
-      case 1 => Some(InnerNN(0))
-      case _ =>
-        Foreach(O par op) { o =>
-          InnerNN(o)
-        }
-        None
-    }
-  }
-  
 
   /*                                                       
    *   b                            o

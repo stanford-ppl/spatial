@@ -133,6 +133,7 @@ object ML extends HostML {
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
   @api def denselayer[T:Num](
+  // wrapper, o', off-chip for w and b, on-chip w' and b', list of active IDs, slided load into FIFO into SRAM compressed, capstan feature
     w:Sym[_] with TensorMem[T] with ReadMem2[T], 
     b:Sym[_] with TensorMem[T] with ReadMem1[T], 
     activation: T => T,
@@ -145,8 +146,8 @@ object ML extends HostML {
     op:scala.Int=1, 
   ):Option[T] = {
     val dims = w.constDims
-    val I = dims(0)
-    val O = dims(1)
+    val I = dims(0) // 8
+    val O = dims(1) // 4
 
     def InnerNN(o:Int) = {
       val dot = dp_tiled(N=I,ts=ip,op=mp,ip=ip) { i => 
@@ -158,6 +159,7 @@ object ML extends HostML {
       nlout(o,nlo)
       nlo
     }
+	
     O match {
       case 1 => Some(InnerNN(0))
       case _ =>
@@ -167,6 +169,46 @@ object ML extends HostML {
         None
     }
   }
+  
+  
+  @api def sparselayer[T:Num](
+  // wrapper, o', off-chip for w and b, on-chip w' and b', list of active IDs, slided load into FIFO into SRAM compressed, capstan feature
+    w:Sym[_] with TensorMem[T] with ReadMem2[T], 
+    b:Sym[_] with TensorMem[T] with ReadMem1[T], 
+    activation: T => T,
+    in:I32 => T,
+    nlout:(I32, T) => scala.Unit,
+    lout:(I32, T) => scala.Unit = { (i:I32,d:T) => () },
+  )(
+    ip:scala.Int=16,
+    mp:scala.Int=1,
+    op:scala.Int=1, 
+  ):Option[T] = {
+    val dims = w.constDims
+    val I = dims(0) // 8
+    val O = dims(1) // 4
+
+    def InnerNN(o:Int) = {
+      val dot = dp_tiled(N=I,ts=ip,op=mp,ip=ip) { i => 
+        (in(i), w(i,o))
+      }
+      val lo = dot + b(o)
+      lout(o,lo)
+      val nlo = activation(lo)
+      nlout(o,nlo)
+      nlo
+    }
+	
+    O match {
+      case 1 => Some(InnerNN(0))
+      case _ =>
+        Foreach(O par op) { o =>
+          InnerNN(o)
+        }
+        None
+    }
+  }
+  
 
   /*                                                       
    *   b                            o
@@ -192,11 +234,11 @@ object ML extends HostML {
     b:SRAM1[T], 
     batch:scala.Int,
     learnRate:scala.Float,
-    dactivation: (T,T) => T,
+    dactivation: (T,T) => T, // relu, identity
     in:(I32, I32) => T,
-    nlout:(I32, I32) => T,
-    lout:(I32, I32) => T,
-    dnlout:(I32, I32) => T,
+    nlout:(I32, I32) => T, // not used
+    lout:(I32, I32) => T, // not used
+    dnlout:(I32, I32) => T, // error
   )(
     opb:scala.Int = 1,
     tsb:scala.Int = 16,
@@ -212,35 +254,40 @@ object ML extends HostML {
     val I = dims(0)
     val O = dims(1)
     val din = SRAM[T](batch, I)
+	
     Foreach(0 until batch par opb) { b =>
       Foreach(0 until I par opi) { i =>
         val dot = sum_tiled(O, tso, mpo, ipo) { o =>
           w(i,o) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
         }
-        din(b,i) = dot
+        din(b,i) = dot // error of previous layer = w * error of this layer
       }
     }
-    Foreach(0 until I par opi) { i =>
+    
+	Foreach(0 until I par opi) { i =>
       Foreach(0 until O par opo) { o =>
         val wdot = sum_tiled(batch, tsb, mpb, ipb) { b => 
           in(b,i) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
         }
-        w(i, o) = w(i, o) - wdot / batch * learnRate.to[T]
+        w(i, o) = w(i, o) - wdot / batch * learnRate.to[T] // delta w = input of this layer * error of this layer
       }
     }
-    Foreach(0 until O par opo) { o =>
+    
+	Foreach(0 until O par opo) { o =>
       val sum = sum_tiled(batch, tsb, mpb, ipb) { b =>
         dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
       }
-      b(o) = b(o) - sum / batch * learnRate.to[T]
+      b(o) = b(o) - sum / batch * learnRate.to[T] // delta b = error of this layer
     }
-    din
+    
+	din
   }
 
   @api def loss_squre_backward[T:Num](yhat:T, y:T):T = yhat - y
 
   // Activation Functions
   @api def identity[T:Num]: T => T = { x => x}
+  // @api def identity[T:Num](x:T) = x
   @api def identity_backward[T:Num]: (T,T) => T = { (x,y) => 1.to[T]}
   @api def relu[T:Num](x:T) = max(x,0.to[T])
   @api def relu_backward[T:Num](x:T,y:T) = mux(x > 0.to[T], 1.to[T], 0.to[T])

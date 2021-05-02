@@ -36,7 +36,7 @@ install:
 ## Update pir libs.                    ##
 ###-----------------------------------###
 pir: models utils
-	git submodule update --init
+	# git submodule update --init
 	bin/update_resources.sh
 	cd pir && make
 

@@ -1,30 +1,29 @@
-package spatial.transform
+package spatial.transform.stream
 
-import scala.collection.mutable
+import argon.transform.MutateTransformer
 import argon._
 import argon.node._
-import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.util.shouldMotionFromConditional
 import spatial.traversal.AccelTraversal
-import spatial.metadata.control._
 import spatial.metadata.memory._
-import spatial.metadata.blackbox._
-import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.types._
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /** Converts Metapipelined controllers into streamed controllers.
   */
-case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal {
+case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal with MetaPipeToStreamBase {
 
   private val allowableSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
+
   private def canTransform[A: Type](lhs: Sym[A], rhs: Op[A]): Boolean = {
     // No point in converting inner controllers
-    if (lhs.isInnerControl) { return false }
+    if (lhs.isInnerControl) {
+      return false
+    }
 
     // Can't currently handle the semantics of Stream control, ends up being too strict for Parallel
     if (!(allowableSchedules contains lhs.schedule)) {
@@ -48,18 +47,66 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
   type MemType = LocalMem[_, C forSome {type C[_]}]
 
   private def canTransformMem(s: Sym[_]): Boolean = s match {
-    case r:Reg[_] => true
+    case r: Reg[_] => true
+    case _ if s.isSRAM => true
     case _ => false
   }
 
-  private def computeShifts(parFactors: Iterable[Int]) = {
-    dbgs(s"Par Factors: $parFactors")
-    (spatial.util.crossJoin((parFactors map {f => Range(0, f).toList}).toList) map {
-      _.toList
-    }).toList
+  private def shouldBuffer(s: Sym[_]): Boolean = s match {
+    case _: SRAM[_, _] => true
+    case _ => false
   }
 
+  private def shouldDuplicate(s: Sym[_]): Boolean = s match {
+    case _: Reg[_] => true
+    case _ => false
+  }
 
+  private def isUnconditionalWrite(s: Sym[_]): Boolean = s match {
+    case Writer((_, _, _, ens)) => ens forall {
+      case Const(c) => c.value
+      case _ => false
+    }
+  }
+
+  class MemoryBufferNotification {
+
+    // src -> dst -> FIFO
+    val notifiers = mutable.Map[Sym[_], mutable.Map[Sym[_], FIFO[Bit]]]()
+
+    def register(src: Sym[_], dst: Sym[_], depth: I32, initialTokens: Int = 0) = {
+      val srcMap = notifiers.getOrElseUpdate(src, mutable.Map.empty)
+      if (!(srcMap contains dst)) {
+        dbgs(s"Registering Notif: $src, $dst")
+        val fifo = FIFO[Bit](depth)
+        fifo.conflictable
+        srcMap(dst) = fifo
+
+        if (initialTokens > 0) {
+          Pipe {
+            fifo.enqVec(Vec.fromSeq(Range(0, initialTokens) map {_ => Bit(true)}))
+          }
+        }
+      }
+    }
+
+    def getSendFIFOs(src: Sym[_]): List[FIFO[Bit]] = {
+      notifiers.getOrElse(src, mutable.Map.empty).values.toList
+    }
+
+    def getRecvFIFOs(dst:Sym[_]): List[FIFO[Bit]] = {
+      (notifiers.values flatMap {_.get(dst)}).toList
+    }
+  }
+
+  /**
+    * For a sequence of statments, compute the following:
+    * For each memory, for each writer, compute the set of readers which read its value.
+    * This is slightly different from reaching definitions as each write KILLS the previous writes even if it is
+    * conditional. Additionally, this only considers one level of the hierarchy.
+    *
+    * @param stmts
+    */
 
   private def transformForeach[A: Type](lhs: Sym[A], foreach: OpForeach): Sym[Void] = {
 
@@ -68,17 +115,20 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     // Transforms the foreach into a streampipe of foreaches
     val replacement = stageWithFlow(UnitPipe(
       foreach.ens, stageBlock {
-
         // for each parent shift, we restage the entire thing.
 
         val internalMems = (foreach.block.stms filter canTransformMem).toSet
 
-        def getReadMems(s: Sym[_]) = {
-          (s.readMems union s.writtenMems) intersect internalMems
+        val internalRegs = internalMems filter {
+          _.isReg
         }
 
-        def getWrittenMems(s: Sym[_]) = {
-          s.writtenMems intersect internalMems
+        def getReadRegs(s: Sym[_]) = {
+          (s.readMems union s.writtenMems) intersect internalRegs
+        }
+
+        def getWrittenRegs(s: Sym[_]) = {
+          s.writtenMems intersect internalRegs
         }
 
         // for each block which reads this mem, convert it into a FIFO.
@@ -87,43 +137,58 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         parentShifts foreach {
           parentShift =>
 
-            // Memory -> Last Writer
-            val lastWrite = scala.collection.mutable.Map[Sym[_], Sym[_]]()
 
+            // For Duplicated Memories
             // Reader -> Memory -> FIFO
-            val readFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
+            val duplicationReadFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
 
             // Writer -> Memory -> FIFOs
-            val writeFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], mutable.ArrayBuffer[Sym[_]]]]()
+            val duplicationWriteFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], mutable.ArrayBuffer[Sym[_]]]]()
 
-            foreach.block.stms foreach {
-              stmt =>
-                getReadMems(stmt) foreach {
-                  mem =>
-                    lastWrite.get(mem) match {
-                      case None =>
-                      // Memory was never written before.
-                      case Some(writer) =>
-                        // Memory was previously written, now need a new fifo.
-                        val writerLatency = math.ceil(writer.latencySum).toInt
-                        val latencyEpsilon = 4
+            val memoryBufferNotifs = new MemoryBufferNotification
 
-                        mem match {
-                          case r: Reg[_] =>
-                            lazy implicit val bits: Bits[r.L] = r.A.asInstanceOf[Bits[r.L]]
-                            val newFIFO = stage(FIFONew[r.L](I32(writerLatency + latencyEpsilon)))
-                            newFIFO.explicitName = r.explicitName.getOrElse(s"$r")
-                            dbgs(s"WriteFIFOs: $writeFIFOs, writer: $writer")
-                            writeFIFOs(writer).getOrElseUpdate(mem, mutable.ArrayBuffer.empty).append(newFIFO.asSym)
-                            readFIFOs.getOrElseUpdate(stmt, mutable.Map.empty)(mem) = newFIFO.asSym
-                        }
+            val linearizedUses = computeLinearizedUses(foreach.block.stms)
+            dbgs(s"Linearised Uses: ${linearizedUses}")
+
+            linearizedUses.dataMap foreach {
+              case (mem: Mem[_, _], wrData) if shouldDuplicate(mem) =>
+                wrData foreach {
+                  case MemoryWriteData(wr, rds) =>
+                    // handle the FIFO-ization logic
+
+                    // Memory was previously written, now need a new fifo.
+                    val writerLatency = math.ceil(wr.latencySum).toInt
+                    val latencyEpsilon = 4
+
+                    lazy implicit val bits: Bits[mem.L] = mem.A.asInstanceOf[Bits[mem.L]]
+                    val fifoDepth = I32(writerLatency + latencyEpsilon)
+
+                    rds foreach {
+                      rd =>
+                        val newFIFO = stage(FIFONew[mem.L](fifoDepth))
+                        newFIFO.explicitName = s"${mem.explicitName.getOrElse(s"$mem")}_${wr}_$rd"
+                        duplicationWriteFIFOs.getOrElseUpdate(wr, mutable.Map.empty).getOrElseUpdate(mem, mutable.ArrayBuffer.empty).append(newFIFO.asSym)
+                        duplicationReadFIFOs.getOrElseUpdate(rd, mutable.Map.empty)(mem) = newFIFO.asSym
                     }
                 }
 
-                getWrittenMems(stmt) foreach {
-                  case r: Reg[_] =>
-                    lastWrite(r) = stmt
-                    writeFIFOs.getOrElseUpdate(stmt, mutable.Map.empty)(r) = new ArrayBuffer[Sym[_]]()
+              case (mem: Mem[_, _], wrData) if shouldBuffer(mem) =>
+                // for each memory, synchronize accesses with FIFOs.
+                wrData foreach {
+                  case mwd@MemoryWriteData(writer, readers) =>
+                  // TODO: Calculate bufferdepth
+
+                    dbgs(s"Memory: $mem, data: $mwd")
+
+                    // writer sends a signal to each reader signaling that it's ready
+                    val bufferDepth = 10
+                    // Creates a cyclic loop of FIFOs
+                    (Seq(writer) ++ readers) zip readers foreach {
+                      case (s, d) => memoryBufferNotifs.register(s, d, I32(bufferDepth))
+                    }
+
+                    // Add a backedge from the last reader back to the writer
+                    memoryBufferNotifs.register(readers.last, writer, I32(bufferDepth), 1)
                 }
             }
 
@@ -132,13 +197,13 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 subst += (stmt -> Invalid)
                 dbgs(s"Eliding counter operations: ${stmt}")
 
-              case s if canTransformMem(s) =>
+              case s if canTransformMem(s) && shouldDuplicate(s) =>
                 dbgs(s"Skipping re-staging $s since it can be transformed")
                 subst += (s -> Invalid)
 
               case stmt if stmt.isControl && !stmt.isStreamControl =>
-                val stmtReads = getReadMems(stmt)
-                val stmtWrites = getWrittenMems(stmt)
+                val stmtReads = getReadRegs(stmt)
+                val stmtWrites = getWrittenRegs(stmt)
                 // for each stmtRead, we need to create a register of the same type inside.
 
                 // map from sym to mems
@@ -158,7 +223,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                       // Unroll early here.
                       // start, stop, step, par ->
                       // start, stop, step * par, 1
-                      val shape = ArrayBuffer[Int]()
 
                       val newParentCtrs = (foreach.cchain.counters zip parentShift) map {
                         case (ctr, pshift) =>
@@ -176,6 +240,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               stage(ForeverNew())
                           }
                       }
+                      val shape = ArrayBuffer[Int]()
 
                       val newChildCtrs = cchain.counters map {
                         case Op(CounterNew(start, stop, step, par)) =>
@@ -204,20 +269,35 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                           i => i === i.counter.ctr.start
                         }.toSet
 
+                        val isLastEn = isFirstIter.map {
+                          i =>
+                            (i.unbox + i.counter.ctr.step.asInstanceOf[I32]) >= i.counter.ctr.end.asInstanceOf[I32]
+                        }.toSet
+
+                        // Hook up notifications
+                        dbgs(s"Setting up notifications for $stmt")
+                        dbgs(s"Recv FIFOs: ${memoryBufferNotifs.getRecvFIFOs(stmt)}")
+                        dbgs(s"Send FIFOs: ${memoryBufferNotifs.getSendFIFOs(stmt)}")
+
+                        memoryBufferNotifs.getRecvFIFOs(stmt) foreach {
+                          fifo =>
+                            stage(FIFODeq(fifo, en))
+                        }
+
                         stmtReads foreach {
                           case read: Reg[_] =>
                             type T = read.RT
                             lazy implicit val bT: Bits[T] = read.A.asInstanceOf[Bits[T]]
-                            val tmp = read.__makeCopy.asInstanceOf[Reg[T]]
+                            val tmp = mirrorSym(read)
                             cloned(read) = tmp
 
                             // All of the original register reads/writes are now delegated to a proxy register.
                             register(read -> tmp)
 
                             tmp.explicitName = read.explicitName.getOrElse(s"InsertedReg_$read")
-                            if (readFIFOs.getOrElse(stmt, mutable.Map.empty) contains read) {
-                              val deq = stage(FIFODeq(readFIFOs(stmt)(read).asInstanceOf[FIFO[T]], en))
-                              stage(RegWrite(tmp, deq, en))
+                            if (duplicationReadFIFOs.getOrElse(stmt, mutable.Map.empty) contains read) {
+                              val deq = stage(FIFODeq(duplicationReadFIFOs(stmt)(read).asInstanceOf[FIFO[T]], en))
+                              stage(RegWrite(tmp.unbox, deq, en))
                             }
                         }
 
@@ -231,7 +311,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               dbgs(s"Processing shift: $shift")
                               (alliters zip newiters) zip shift foreach {
                                 case ((oldIter, newIter), s) =>
-                                  val shifted = newIter + s
+                                  val shifted = newIter + I32(s)
                                   subst += (oldIter -> shifted)
                               }
 
@@ -248,28 +328,26 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             // Write the write register to the FIFO.
                             implicit lazy val ev: Bits[wr.RT] = wr.A.asInstanceOf[Bits[wr.RT]]
                             val read = cloned(wr).asInstanceOf[Reg[wr.RT]].value
-                            writeFIFOs(stmt)(wr.asSym) foreach {
+                            duplicationWriteFIFOs(stmt)(wr.asSym) foreach {
                               s =>
                                 val of = s.asInstanceOf[FIFO[wr.RT]]
                                 stage(FIFOEnq(of, read.asInstanceOf[Bits[wr.RT]], en))
                             }
                         }
 
-                        void
+                        retimeGate()
+                        memoryBufferNotifs.getSendFIFOs(stmt) foreach {
+                          fifo =>
+                            stage(FIFOEnq(fifo, Bit(true), isLastEn))
+                        }
                       }, newiters, stopWhen))
                   }
                 }
               case stmt if !stmt.isControl =>
                 dbgs(s"Didn't know how to convert: $stmt of type ${stmt.op}")
-                stmt.op match {
-                  case Some(rhs) =>
-                    implicit val ev: Type[stmt.R] = rhs.R.asInstanceOf[Type[stmt.R]]
-                    transform[stmt.R](stmt.asInstanceOf[Sym[stmt.R]], rhs.asInstanceOf[Op[stmt.R]])
-                  case None =>
-                }
+                subst += (stmt -> mirrorSym(stmt))
             }
         }
-
       }, foreach.stopWhen
     )) {
       lhs2 =>
@@ -281,8 +359,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     replacement
   }
 
-  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
-    dbgs(s"Transforming: $lhs = $rhs")
+  override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+//    dbgs(s"Transforming: $lhs = $rhs")
     indent {
       (rhs match {
         case AccelScope(_) => inAccel {
@@ -294,10 +372,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
             transformForeach(lhs, foreach)
           }
 
-        case _ => dbgs(s"Passing Through $lhs = $rhs"); super.transform(lhs, rhs)
+        case _ => super.transform(lhs, rhs)
       }).asInstanceOf[Sym[A]]
     }
   }
 }
-
-

@@ -13,7 +13,6 @@ import spatial.codegen.pirgen._
 import spatial.codegen.tsthgen._
 import spatial.codegen.dotgen._
 import spatial.codegen.resourcegen._
-
 import spatial.lang.{Tensor1, Text, Void}
 import spatial.node.InputArguments
 import spatial.metadata.access._
@@ -25,6 +24,7 @@ import spatial.model.RuntimeModelGenerator
 import spatial.report._
 import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
+import spatial.transform.stream.MetapipeToStreamTransformer
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -114,6 +114,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
     lazy val regElim               = RegWriteReadElimination(state)
 
+    lazy val streamify = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer, regElim, printer) ++ DCE
+
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
     lazy val resourceReporter = ResourceReporter(state, mlModel)
@@ -162,10 +164,8 @@ trait Spatial extends Compiler with ParamLoader {
         regReadCSE          ==>
         /** Dead code elimination */
         DCE ==>
-//        useAnalyzer         ==>
-//        transientCleanup    ==> printer ==> transformerChecks ==>
         /** Metapipelines to Streams */
-        spatialConfig.streamify ? (Seq(unitPipeToForeach, retimingAnalyzer, metapipeToStream, printer, regElim, printer) ++ DCE) ==>
+        spatialConfig.streamify ? streamify  ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */
@@ -179,8 +179,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** CSE on regs */
         regReadCSE          ==>
         /** Dead code elimination */
-        useAnalyzer         ==>
-        transientCleanup    ==> printer ==> transformerChecks ==>
+        DCE ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>

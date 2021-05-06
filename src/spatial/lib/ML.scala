@@ -129,18 +129,15 @@ object ML extends HostML {
    * @param b bias
    * @param activation activation function
    * @param in input layer access function
-   * @param lout linear output layer update function
    * @param nlout non-linear output layer update function
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
   @api def denselayer[T:Num](
-  // wrapper, o', off-chip for w and b, on-chip w' and b', list of active IDs, slided load into FIFO into SRAM compressed, capstan feature
     w:Sym[_] with TensorMem[T] with ReadMem2[T], 
     b:Sym[_] with TensorMem[T] with ReadMem1[T], 
     activation: T => T,
     in:I32 => T,
     nlout:(I32, T) => scala.Unit,
-    lout:(I32, T) => scala.Unit = { (i:I32,d:T) => () },
   )(
     ip:scala.Int=16,
     mp:scala.Int=1,
@@ -155,7 +152,6 @@ object ML extends HostML {
         (in(i), w(i,o))
       }
       val lo = dot + b(o)
-      lout(o,lo)
       val nlo = activation(lo)
       nlout(o,nlo)
       nlo
@@ -170,6 +166,7 @@ object ML extends HostML {
         None
     }
   }
+  
 
   /*                                                       
    *   b                            o
@@ -186,7 +183,6 @@ object ML extends HostML {
    * function as inputs.
    * @param in input layer access function
    * @param nlout non-linear output layer access function
-   * @param lout linear output layer access function
    * @param dnlout derivative of non-linear output
    * to an externally allocated SRAM
    * */
@@ -195,10 +191,9 @@ object ML extends HostML {
     b:SRAM1[T], 
     batch:scala.Int,
     learnRate:scala.Float,
-    dactivation: (T,T) => T, // relu, identity
+    dactivation: T => T, // relu, identity
     in:(I32, I32) => T,
     nlout:(I32, I32) => T, // not used
-    lout:(I32, I32) => T, // not used
     dnlout:(I32, I32) => T, // error
   )(
     opb:scala.Int = 1,
@@ -220,7 +215,7 @@ object ML extends HostML {
     Foreach(0 until batch par opb) { b =>
       Foreach(0 until I par opi) { i =>
         val dot = sum_tiled(O, tso, mpo, ipo) { o =>
-          w(i,o) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+          w(i,o) * dactivation(nlout(b,o)) * dnlout(b,o)
         }
         din(b,i) = dot // error of previous layer = w * error of this layer
       }
@@ -229,7 +224,7 @@ object ML extends HostML {
 	Foreach(0 until I par opi) { i =>
       Foreach(0 until O par opo) { o =>
         val wdot = sum_tiled(batch, tsb, mpb, ipb) { b => 
-          in(b,i) * dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+          in(b,i) * dactivation(nlout(b,o)) * dnlout(b,o)
         }
         w(i, o) = w(i, o) - wdot / batch * learnRate.to[T] // delta w = input of this layer * error of this layer
       }
@@ -237,7 +232,7 @@ object ML extends HostML {
     
 	Foreach(0 until O par opo) { o =>
       val sum = sum_tiled(batch, tsb, mpb, ipb) { b =>
-        dactivation(lout(b,o),nlout(b,o)) * dnlout(b,o)
+        dactivation(nlout(b,o)) * dnlout(b,o)
       }
       b(o) = b(o) - sum / batch * learnRate.to[T] // delta b = error of this layer
     }
@@ -249,10 +244,9 @@ object ML extends HostML {
 
   // Activation Functions
   @api def identity[T:Num]: T => T = { x => x}
-  // @api def identity[T:Num](x:T) = x
-  @api def identity_backward[T:Num]: (T,T) => T = { (x,y) => 1.to[T]}
+  @api def identity_backward[T:Num]: T => T = { x => 1.to[T]}
   @api def relu[T:Num](x:T) = max(x,0.to[T])
-  @api def relu_backward[T:Num](x:T,y:T) = mux(x > 0.to[T], 1.to[T], 0.to[T])
+  @api def relu_backward[T:Num](x:T) = mux(x > 0.to[T], 1.to[T], 0.to[T])
 
    /*
     * SVM regression inference

@@ -95,8 +95,17 @@ case class InterfaceStream(stream: Sym[_]) extends Data[InterfaceStream](SetBy.A
 case class ExplicitName(name: String) extends Data[ExplicitName](SetBy.User)
 
 /**
-  * Memory Synchronization Strategy
+  * Memory Buffering Amount
   *
+  * Getter: sym.bufferAmount
+  * setter: sym.bufferAmount = Some(Int)
+  * Default: Some(1)
   */
 
-case class SynchronizationStrategy() extends Data[SynchronizationStrategy](SetBy.User)
+case class StreamBufferAmount(buffering: Int) extends Data[StreamBufferAmount](SetBy.User)
+
+/**
+  * Memory Buffering Index
+  */
+
+case class StreamBufferIndex(bufferIndex: Sym[_]) extends Data[StreamBufferIndex](SetBy.Analysis.Self)

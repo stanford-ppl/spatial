@@ -412,6 +412,12 @@ package object memory {
       case _ => false
     }
 
+    def bufferAmount: Option[Int] = metadata[StreamBufferAmount](mem).map(_.buffering)
+    def bufferAmountOr1: Int = bufferAmount.getOrElse(1)
+    def bufferAmount_=(amount: Int): Unit = metadata.add(mem, StreamBufferAmount(amount))
+
+    def bufferIndex: Option[Sym[_]] = metadata[StreamBufferIndex](mem).map(_.bufferIndex)
+    def bufferIndex_=(index: Sym[_]): Unit = metadata.add(mem, StreamBufferIndex(index))
   }
 
 

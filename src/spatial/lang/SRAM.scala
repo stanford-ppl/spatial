@@ -258,6 +258,30 @@ object SRAM {
 
 }
 
+/** An N-dimensional SRAM */
+@ref class SRAMN[A:Bits] extends SRAM[A, SRAMN] with LocalMem[A, SRAMN] with MemN[A, SRAMN] with Ref[Array[Any], SRAMN[A]] {
+  var r: Int = -1
+
+  def rank: Int = {
+    assert(r >= 0, s"SRAM cannot have negative rank!")
+    r
+  }
+
+  @api def apply(index: Seq[I32], ens: Set[Bit] = Set.empty): A = {
+    assert(index.size == rank, s"Index $index is not compatible with SRAM of rank $rank")
+    stage(SRAMRead(this, index, ens))
+  }
+  @api def update(index: Seq[I32], data: A): Void = {
+    assert(index.size == rank, s"Index $index is not compatible with SRAM of rank $rank")
+    stage(SRAMWrite(this, data, index, Set.empty))
+  }
+  @api def update(index: Seq[I32], ens: Set[Bit], data: A): Void = {
+    assert(index.size == rank, s"Index $index is not compatible with SRAM of rank $rank")
+    stage(SRAMWrite(this, data, index, ens))
+  }
+
+  override protected def MN: Type[SRAMN[A]] = this.selfType
+}
 
 
 

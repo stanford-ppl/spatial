@@ -24,7 +24,7 @@ import spatial.model.RuntimeModelGenerator
 import spatial.report._
 import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
-import spatial.transform.stream.MetapipeToStreamTransformer
+import spatial.transform.stream.{MetapipeToStreamTransformer, StreamBufferExpansion}
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -113,8 +113,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
     lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
     lazy val regElim               = RegWriteReadElimination(state)
+    lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
-    lazy val streamify = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer, regElim, printer) ++ DCE
+    lazy val streamify = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer, streamBufferExpansion, regElim, printer) ++ DCE
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

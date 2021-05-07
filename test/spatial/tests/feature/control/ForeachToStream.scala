@@ -72,6 +72,7 @@ object ForeachToStream {
       'Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val sram = SRAM[I32](innerIters)
+          sram.bufferAmount = 2
 
           'Producer.Foreach(innerIters by 1 par ip) {
             j =>

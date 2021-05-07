@@ -299,6 +299,11 @@ trait Mem5[A,M1[T],M2[T],M3[T],M4[T],M5[T]] extends Mem[A,M5] {
   @api def apply(x: Rng, q: Rng, p: Rng, r: Rng, c: Rng): M5[A] = stage(MemDenseAlias[A,M5,M5](me, Seq(x, q, p, r, c)))
 }
 
+trait MemN[A, MN[T]] extends Mem[A, MN] {
+  protected def MN: Type[MN[A]]
+  implicit def MNType: Type[MN[A]] = this.selfType
+}
+
 trait ReadMem1[A] {
   @api def apply(pos: I32): A
   @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 

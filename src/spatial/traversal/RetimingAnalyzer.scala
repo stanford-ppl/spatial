@@ -28,9 +28,9 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
     val result = (scope.flatMap{case Op(d) => d.blocks; case _ => Nil} :+ block).flatMap(exps(_)).toSortedSeq
 
     dbgs(s"Retiming block $block:")
-    //scope.foreach{e => dbgs(s"  ${stm(e)}") }
-    //dbgs(s"Result: ")
-    //result.foreach{e => dbgs(s"  ${stm(e)}") }
+    scope.foreach{e => dbgs(s"  ${stm(e)}") }
+    dbgs(s"Result: ")
+    result.foreach{e => dbgs(s"  ${stm(e)}") }
     // The position AFTER the given node
     val (newLatencies, newCycles) = pipeLatencies(result, scope)
     val adjustedLatencies = newLatencies.map{case (k,v) => (k , v + lastLatency)}

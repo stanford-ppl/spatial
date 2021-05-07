@@ -38,7 +38,7 @@ case class AccumAnalyzer(IR: State) extends AccelTraversal {
   def markBlock(block: Block[_]): Unit = {
     // Find standard write-after-read accumulation candidates
     // TODO: May want to keep timing metadata from a different common traversal
-    val (_, cycles) = latenciesAndCycles(block)
+    val (_, cycles) = latenciesAndCycles(block, true)
     val warCycles = cycles.collect{case cycle:WARCycle => cycle }.zipWithIndex
 
     def accumControl(first: Bit, writer: Sym[_]): Option[Ctrl] = {

@@ -173,6 +173,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 //          firstInstances += current.activeAccess
 //          current.activeAccess
 //        }:_*)
+
 //      }
 //    }
 
@@ -346,6 +347,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
   protected def findBanking(regroupedGrps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_], firstSearch: Boolean): Option[PartialBankingChoices] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
+    // If user requested fully banked for this dim, give a fully banked scheme for this dim and don't even check it
+    if (mem.fullyBankDim.isDefined && axes.head == mem.fullyBankDim.get) {
+        return Some(Seq(ModBanking(mem.stagedDims(filteredStagedDims.head().toInt).toInt, 1,Seq(1),axes,Seq(mem.stagedDims(filteredStagedDims.head().toInt).toInt))))
+    }
     val Nmin_base_r: Int = regroupedGrps.filter(_.size > 0).filter(_.head.isReader).map(_.size).maxOrElse(1)
     val Nmin_base_w: Int = regroupedGrps.filter(_.size > 0).filter(!_.head.isReader).map(_.size).maxOrElse(1)
     val dualPortHalve = mem.isDualPortedRead && firstSearch

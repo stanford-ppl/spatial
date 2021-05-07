@@ -71,6 +71,8 @@ package object memory {
 
     def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])] = metadata[ExplicitBanking](s).map(_.scheme)
     def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def fullyBankDim: Option[Int] = metadata[FullyBankDim](s).map(_.dim)
+    def fullyBankDim_=(dim: Int): Unit = metadata.add(s, FullyBankDim(dim))
     def explicitNs: Seq[Int] = explicitBanking.get._1
     def explicitBs: Seq[Int] = explicitBanking.get._2
     def explicitAlphas: Seq[Int] = explicitBanking.get._3

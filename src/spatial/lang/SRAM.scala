@@ -118,6 +118,8 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = (N, B, alpha, P); me }
   /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will NOT crash. It will also assume only one duplicate */
   def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = (N, B, alpha, P); this.forceExplicitBanking = true; me }
+  /** Indicate if a dimension should be fully banked **/
+  def fullybankdim(dim: Int): C[A] = { this.fullyBankDim = dim; hierarchical; me }
 
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 

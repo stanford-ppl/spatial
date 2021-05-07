@@ -173,6 +173,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 //          firstInstances += current.activeAccess
 //          current.activeAccess
 //        }:_*)
+
 //      }
 //    }
 
@@ -202,7 +203,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
         if (myWrites.exists(_.size > 1) && !mem.shouldIgnoreConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i})))))
       }
-      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && mem.explicitBanking.isEmpty) Map(attemptDirectives.head -> Map((myReads.map{ x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){ i => i})))))
+      else if (myGrps.forall(_.lengthLessThan(2)) && !mem.isLineBuffer && mem.explicitBanking.isEmpty && mem.fullyBankDim.isEmpty) Map(attemptDirectives.head -> Map((myReads.map{ x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){ i => i})))))
       else if (myGrps.forall(_.lengthLessThan(2)) && mem.isLineBuffer && mem.explicitBanking.isEmpty) {
         val autoFullBank: FullBanking = Seq(ModBanking.Simple(mem.stagedDims(0).toInt + (depth-1)*mem.stride, Seq(0), mem.stride))
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(autoFullBank ++ Seq(ModBanking.Simple(1, Seq(1), 1)))))
@@ -248,7 +249,7 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
               val axisBankingScheme: Option[PartialBankingChoices] = {
                 if (solutionCache.contains((regroupedAccs, nStricts, aStricts, axes))) dbgs(s"Cache hit on ${regroupedAccs.flatten.size} accesses, $nStricts, $aStricts, axes $axes!  Good job! (scheme ${solutionCache.get((regroupedAccs, nStricts, aStricts, axes))})")
                 solutionCache.getOrElseUpdate((regroupedAccs, nStricts, aStricts, axes), {
-                  if (regroupedAccs.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical]) Some(Seq(ModBanking.Unit(1, axes)))
+                  if (regroupedAccs.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Hierarchical] && mem.fullyBankDim.isEmpty) Some(Seq(ModBanking.Unit(1, axes)))
                   else if (regroupedAccs.forall(_.toSeq.lengthLessThan(2)) && view.isInstanceOf[Flat]) Some(Seq(ModBanking.Unit(rank, axes)))
                   else {
                     val x = findBanking(regroupedAccs, nStricts, aStricts, axes, mem.stagedDims.map(_.toInt), mem, firstSearch)
@@ -346,6 +347,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
 
   protected def findBanking(regroupedGrps: Set[Set[SparseMatrix[Idx]]], nStricts: NStrictness, aStricts: AlphaStrictness, axes: Seq[Int], stagedDims: Seq[Int], mem: Sym[_], firstSearch: Boolean): Option[PartialBankingChoices] = {
     val filteredStagedDims = axes.map(mem.stagedDims.map(_.toInt))
+    // If user requested fully banked for this dim, give a fully banked scheme for this dim and don't even check it
+    if (mem.fullyBankDim.isDefined && axes.head == mem.fullyBankDim.get) {
+        return Some(Seq(ModBanking(filteredStagedDims.head().toInt, 1,Seq(1),axes,Seq(filteredStagedDims.head().toInt))))
+    }
     val Nmin_base_r: Int = regroupedGrps.filter(_.size > 0).filter(_.head.isReader).map(_.size).maxOrElse(1)
     val Nmin_base_w: Int = regroupedGrps.filter(_.size > 0).filter(!_.head.isReader).map(_.size).maxOrElse(1)
     val dualPortHalve = mem.isDualPortedRead && firstSearch

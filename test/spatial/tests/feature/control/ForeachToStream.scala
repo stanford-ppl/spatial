@@ -72,7 +72,7 @@ object ForeachToStream {
       'Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val sram = SRAM[I32](innerIters)
-          sram.bufferAmount = 2
+          sram.bufferAmount = 4
 
           'Producer.Foreach(innerIters by 1 par ip) {
             j =>
@@ -94,13 +94,17 @@ object ForeachToStream {
       }
     }
 
-    val goldArray = Array(ForeachToStream.gold:_*).reshape(iters, innerIters)
     Range(0, numConsumers) foreach {
       n =>
         val recv = getMatrix(memOuts(n))
         printMatrix(recv, header = s"Recv: $n")
+        Foreach(iters by 1, innerIters by 1) {
+          (i, j) =>
+            val fetched = recv(i, j)
+            val gold = i + 3*j + 7*n
+            assert(fetched == gold, r"Fetched: $fetched, Gold: $gold")
+        }
     }
-
     assert(Bit(true))
   }
 }

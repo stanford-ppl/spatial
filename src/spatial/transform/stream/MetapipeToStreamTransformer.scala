@@ -284,8 +284,11 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         memTokens = (memoryBufferNotifs.getRecvFIFOs(stmt) map {
                           case(mem, fifo) =>
                             val token = stage(FIFODeq(fifo, en))
-                            dbgs(s"Staging token: $mem, $fifo, $token")
-                            (f(mem) -> token)
+                            val tokenReg = Reg[I32]
+                            tokenReg.explicitName = s"TokenReg_${mem}_${fifo}"
+                            tokenReg.write(token, en.toSeq:_*)
+                            dbgs(s"Staging token: $mem, $fifo, $tokenReg")
+                            (f(mem) -> tokenReg.value)
                         }).toMap
 
                         dbgs(s"MemTokens: ${memTokens}")

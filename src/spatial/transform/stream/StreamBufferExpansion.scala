@@ -25,6 +25,7 @@ case class StreamBufferExpansion(IR: State) extends MutateTransformer with Accel
       lazy implicit val bitsEV: Bits[A] = srn.A
       val newMem = stage(SRAMNew[A, SRAMN](newDims))
       newMem.r = dims.size + 1
+      newMem.fullybankdim(0)
       register(mem -> newMem)
       newMem
   }

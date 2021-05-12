@@ -20,7 +20,8 @@ case class StreamBufferExpansion(IR: State) extends MutateTransformer with Accel
   def expandMem(mem: Sym[_]) = mem.op match {
     case Some(srn@SRAMNew(dims)) =>
       dbgs(s"Expanding SRAM: $mem")
-      val newDims = Seq(I32(mem.bufferAmountOr1)) ++ dims
+      val bufferAmount = mem.bufferAmountOr1
+      val newDims = Seq(I32(bufferAmount)) ++ dims
       type A = srn.A.R
       lazy implicit val bitsEV: Bits[A] = srn.A
       val newMem = stage(SRAMNew[A, SRAMN](newDims))
@@ -68,7 +69,7 @@ case class StreamBufferExpansion(IR: State) extends MutateTransformer with Accel
       case wr: Writer[_] if shouldExpand(wr.mem) => expandWriter(lhs, wr)
       case rd: Reader[_, _] if shouldExpand(rd.mem) => expandReader(lhs, rd)
 
-      case _ => dbgs(s"Skipping: ${lhs} = ${rhs}"); super.transform(lhs, rhs)
+      case _ => super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }
 }

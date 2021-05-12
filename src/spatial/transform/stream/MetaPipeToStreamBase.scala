@@ -67,4 +67,8 @@ trait MetaPipeToStreamBase {
 
     new LinearizedUseData(states)
   }
+
+//  def computeBufferDepths(useData: LinearizedUseData) = {
+//    val earliestStart = mutable.Map[Sym[_], Int]()
+//  }
 }

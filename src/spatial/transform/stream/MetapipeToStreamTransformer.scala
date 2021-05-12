@@ -99,6 +99,45 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     }
   }
 
+  def computeBufferDepth(writeData: Seq[MemoryWriteData]): (Map[Sym[_], Int], Int) = {
+    val accesses = writeData.flatMap {
+      case MemoryWriteData(wr, rds) =>
+        Seq(wr) ++ rds
+    } ++ Seq(writeData.head.writer)
+    val result = ((accesses zip accesses.tail) map {
+      case (source, destination) =>
+        // the buffer depth necessary is from when the destination dequeues to when the src can create a new element.
+        // if src cycles < dest II then the result is 3. The source can catch up even if it ends up clearing its
+        // pipeline each time.
+        val sourceIterations = source.approxIters
+        val destIterations = destination.approxIters
+
+        val srcII = source.II * sourceIterations
+        val destII = destination.II * destIterations
+        val srcCycles = source.II * (sourceIterations - 1) + source.latencySum
+        dbgs(s"$source -> $destination ($srcII, $destII, $srcCycles, ${source.latencySum})")
+
+        // if src cycles > dest II, but src II <= dest II, then the result should be src cycles - src II = srcLatency
+        // Can't tolerate clearing pipeline, so we have to buffer by latency.
+        // Otherwise, the source can't keep up, so use 3.
+
+        val requiredBufferDepth = if (srcCycles <= destII) {
+          // In this case, we can start the next iteration after the destination dequeues, so it's fine.
+          3
+        } else if (srcCycles > destII && srcII <= destII) {
+          // In this case, the producer can keep up, but needs some extra time.
+          scala.math.max(scala.math.ceil((source.latencySum - destII)).toInt, 3)
+        } else {
+          // In this case, srcCycles >= destII, and srcII > destII, so we can't keep up anyways. Default to 3.
+          3
+        }
+        destination -> requiredBufferDepth
+    }).toMap
+    dbgs(s"Computing Buffer Depths: ${result}")
+    val maxVal = spatial.util.roundUpToPow2(result.values.max)
+    ((result.keys map {k => (k -> maxVal*2)}).toMap, maxVal)
+  }
+
   /**
     * For a sequence of statments, compute the following:
     * For each memory, for each writer, compute the set of readers which read its value.
@@ -174,6 +213,17 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
               case (mem: Mem[_, _], wrData) if shouldBuffer(mem) =>
                 // for each memory, synchronize accesses with FIFOs.
+                val (bufferAmounts, duplicates) = mem.bufferAmount match {
+                  case Some(bam) =>
+                    val bdepths = Map[Sym[_], Int]().withDefaultValue(2*bam)
+                    (bdepths, bam)
+                  case None =>
+                    val t = computeBufferDepth(wrData)
+                    mem.bufferAmount = t._2
+                    t
+                }
+                dbgs(s"Mem: $mem, buffering: $bufferAmounts, duplications: $duplicates")
+
                 wrData foreach {
                   case mwd@MemoryWriteData(writer, readers) =>
                   // TODO: Calculate bufferdepth
@@ -181,15 +231,18 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                     dbgs(s"Memory: $mem, data: $mwd")
 
                     // writer sends a signal to each reader signaling that it's ready
-                    val bufferDepth = 10
                     // Creates a cyclic loop of FIFOs
                     (Seq(writer) ++ readers) zip readers foreach {
-                      case (s, d) => memoryBufferNotifs.register(s, d, mem, I32(bufferDepth))
+                      case (s, d) =>
+                        val bufferDepth = 128 // bufferAmounts(d)
+                        memoryBufferNotifs.register(s, d, mem, I32(bufferDepth))
                     }
-
-                    // Add a backedge from the last reader back to the writer
-                    memoryBufferNotifs.register(readers.last, writer, mem, I32(bufferDepth), mem.bufferAmountOr1)
                 }
+                // Add a backedge from the last reader back to the writer
+                val lastReader = wrData.last.readers.last
+                val firstWriter = wrData.head.writer
+
+                memoryBufferNotifs.register(lastReader, firstWriter, mem, scala.math.max(duplicates, bufferAmounts(firstWriter)), duplicates)
             }
 
             foreach.block.stms foreach {

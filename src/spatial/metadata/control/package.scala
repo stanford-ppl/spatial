@@ -709,6 +709,8 @@ package object control {
       case Some(op: Control[_]) => op.cchains.map(_._1).distinct
       case _ => Nil
     }
+
+    @stateful def approxIters: Int = (cchains map {_.approxIters}).product
   }
 
   abstract class ScopeHierarchyOps(s: Option[Sym[_]]) extends CtrlHierarchyOps(s) {
@@ -978,6 +980,14 @@ package object control {
     @stateful def willUnroll: Boolean = parsOr1.exists(_ > 1)
     @stateful def isUnit: Boolean = counters.forall(_.isUnit)
     @stateful def isStatic: Boolean = counters.forall(_.isStatic)
+    @stateful def approxIters: Int = (counters map {
+      _.nIters match {
+        case Some(bound) =>
+          bound.toInt
+        case None =>
+          1
+      }
+    }).product
   }
 
 

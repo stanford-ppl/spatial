@@ -265,7 +265,7 @@ case class RuntimeModelGenerator(IR: State, version: String) extends FileDepende
       emit(src"val $lhs = new ControllerModel(${lhs.hashCode}, ${lhs.level.toString}, Left(${lhs.rawSchedule.toString}), CChainModel(Seq()), ${lat.toInt}, ${ii.toInt}, $ctx)")
       visitBlock(block)
       lhs.children.filter(_.s.get != lhs).foreach{x => emit(src"$lhs.registerChild(${x.s.get})")}
-      emit(src"${lhs}")
+      emit(src"return ${lhs}")
 
     case OpForeach(_,cchain, _,_,_) if lhs.getLoweredTransfer.isDefined =>
       // TODO: Include last level counter?

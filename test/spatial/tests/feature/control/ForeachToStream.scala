@@ -59,7 +59,7 @@ object ForeachToStream {
   }
 }
 
-@spatial class ForeachToStreamSRAM(numConsumers: scala.Int, ip: scala.Int = 1, op: scala.Int = 1) extends SpatialTest {
+@spatial class ForeachToStreamSRAM(numConsumers: scala.Int, ip: scala.Int = 1, op: scala.Int = 1, bufferDepth: Option[scala.Int] = Some(1)) extends SpatialTest {
 
   val iters = 16
   val innerIters = 4
@@ -72,7 +72,10 @@ object ForeachToStream {
       'Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val sram = SRAM[I32](innerIters)
-          sram.bufferAmount = 4
+          bufferDepth match {
+            case Some(v) => sram.bufferAmount = v
+            case None =>
+          }
 
           'Producer.Foreach(innerIters by 1 par ip) {
             j =>
@@ -102,7 +105,7 @@ object ForeachToStream {
           (i, j) =>
             val fetched = recv(i, j)
             val gold = i + 3*j + 7*n
-            assert(fetched == gold, r"Fetched: $fetched, Gold: $gold")
+            assert(fetched == gold, r"($n, $i, $j), Fetched: $fetched, Gold: $gold")
         }
     }
     assert(Bit(true))
@@ -147,5 +150,16 @@ class ForeachToStreamSRAM1ip2_streamed extends ForeachToStreamSRAM1ip2 with Stre
 class ForeachToStreamSRAM1ip4 extends ForeachToStreamSRAM(1, 4, 1)
 class ForeachToStreamSRAM1ip4_streamed extends ForeachToStreamSRAM1ip4 with Streamified
 
-class ForeachToStreamSRAMExp extends ForeachToStreamSRAM(2, 2, 2)
-class ForeachToStreamSRAMExp_streamed extends ForeachToStreamSRAMExp with Streamified
+class ForeachToStreamSRAMBuffered(bufferDepth: scala.Int) extends ForeachToStreamSRAM(2, 2, 2, Some(bufferDepth))
+class ForeachToStreamSRAMBuffered1 extends ForeachToStreamSRAMBuffered(1)
+class ForeachToStreamSRAMBuffered2 extends ForeachToStreamSRAMBuffered(2)
+class ForeachToStreamSRAMBuffered4 extends ForeachToStreamSRAMBuffered(4)
+class ForeachToStreamSRAMBuffered8 extends ForeachToStreamSRAMBuffered(8)
+
+class ForeachToStreamSRAMBufferedStreamed(bufferDepth: scala.Int) extends ForeachToStreamSRAM(2, 2, 2, Some(bufferDepth)) with Streamified
+class ForeachToStreamSRAMBufferedStreamed1 extends ForeachToStreamSRAMBufferedStreamed(1)
+class ForeachToStreamSRAMBufferedStreamed2 extends ForeachToStreamSRAMBufferedStreamed(2)
+class ForeachToStreamSRAMBufferedStreamed4 extends ForeachToStreamSRAMBufferedStreamed(4)
+class ForeachToStreamSRAMBufferedStreamed8 extends ForeachToStreamSRAMBufferedStreamed(8)
+
+class ForeachToStreamSRAMBufferedStreamedAuto extends ForeachToStreamSRAM(2, 2, 2, None) with Streamified

@@ -54,4 +54,12 @@ package object util {
         j <- crossJoin(xs)
       } yield Iterable(i) ++ j
     }
+
+  def roundUpToPow2(target: Int): Int = {
+    var candidate: Int = 1
+    while (candidate < target) {
+      candidate <<= 1
+    }
+    candidate
+  }
 }

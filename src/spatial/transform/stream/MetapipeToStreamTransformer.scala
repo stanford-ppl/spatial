@@ -226,15 +226,13 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                 wrData foreach {
                   case mwd@MemoryWriteData(writer, readers) =>
-                  // TODO: Calculate bufferdepth
-
                     dbgs(s"Memory: $mem, data: $mwd")
 
                     // writer sends a signal to each reader signaling that it's ready
                     // Creates a cyclic loop of FIFOs
                     (Seq(writer) ++ readers) zip readers foreach {
                       case (s, d) =>
-                        val bufferDepth = 128 // bufferAmounts(d)
+                        val bufferDepth = bufferAmounts(d)
                         memoryBufferNotifs.register(s, d, mem, I32(bufferDepth))
                     }
                 }
@@ -242,7 +240,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 val lastReader = wrData.last.readers.last
                 val firstWriter = wrData.head.writer
 
-                memoryBufferNotifs.register(lastReader, firstWriter, mem, scala.math.max(duplicates, bufferAmounts(firstWriter)), duplicates)
+                memoryBufferNotifs.register(lastReader, firstWriter, mem, bufferAmounts(firstWriter), duplicates)
             }
 
             foreach.block.stms foreach {

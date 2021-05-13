@@ -162,4 +162,6 @@ class ForeachToStreamSRAMBufferedStreamed2 extends ForeachToStreamSRAMBufferedSt
 class ForeachToStreamSRAMBufferedStreamed4 extends ForeachToStreamSRAMBufferedStreamed(4)
 class ForeachToStreamSRAMBufferedStreamed8 extends ForeachToStreamSRAMBufferedStreamed(8)
 
+class ForeachToStreamSRAMBufferedStreamed3 extends ForeachToStreamSRAMBufferedStreamed(3)
+
 class ForeachToStreamSRAMBufferedStreamedAuto extends ForeachToStreamSRAM(2, 2, 2, None) with Streamified

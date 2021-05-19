@@ -27,7 +27,9 @@ case class StreamBufferExpansion(IR: State) extends MutateTransformer with Accel
       val newMem = stage(SRAMNew[A, SRAMN](newDims))
       newMem.r = dims.size + 1
       newMem.fullybankdim(0)
-      newMem.nofission
+      mem.explicitName match {
+        case Some(name) => newMem.explicitName = name
+      }
       register(mem -> newMem)
       newMem
   }

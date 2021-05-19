@@ -3,6 +3,7 @@ package spatial.transform
 import argon.node.Enabled
 import argon._
 import argon.transform.MutateTransformer
+import spatial.dsl.retimeGate
 import spatial.node.UnitPipe
 import spatial.traversal.AccelTraversal
 

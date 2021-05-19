@@ -2,6 +2,7 @@ package spatial.tests.feature.control
 
 import spatial.dsl._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 
 object ForeachToStream {
 
@@ -23,7 +24,7 @@ object ForeachToStream {
     Accel {
       val mems = Range(0, numConsumers) map {_ => SRAM[I32](iters, innerIters)}
       // construct a long unitpipe followed by another controller
-      'Outer.Pipe.Foreach(iters by 1 par op) {
+      ('Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val k = ForeachToStream.doLotsOfCompute(2)(i, i+1)
           Range(0, numConsumers) foreach {
@@ -36,7 +37,7 @@ object ForeachToStream {
               }
           }
 
-      }
+      }).asSym.shouldConvertToStreamed = true
       Parallel {
         memOuts zip mems foreach {
           case (d, s) => d store s
@@ -69,7 +70,7 @@ object ForeachToStream {
     Accel {
       val mems = Range(0, numConsumers) map {_ => SRAM[I32](iters, innerIters)}
       // construct a long unitpipe followed by another controller
-      'Outer.Pipe.Foreach(iters by 1 par op) {
+      ('Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val sram = SRAM[I32](innerIters)
           bufferDepth match {
@@ -89,7 +90,7 @@ object ForeachToStream {
                   mems(n)(i, j) = sram(j) + 2*j + 7*n
               }
           }
-      }
+      }).asSym.shouldConvertToStreamed = true
       Parallel {
         memOuts zip mems foreach {
           case (d, s) => d store s

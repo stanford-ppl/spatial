@@ -25,6 +25,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
       return false
     }
 
+    return lhs.shouldConvertToStreamed
+
     // Can't currently handle the semantics of Stream control, ends up being too strict for Parallel
     if (!(allowableSchedules contains lhs.schedule)) {
       return false
@@ -79,6 +81,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
     def register(src: Sym[_], dst: Sym[_], mem: Sym[_], depth: I32, initialTokens: Int = 0) = {
       val fifo = FIFO[I32](depth)
+      fifo.explicitName = s"CommFIFO_${src}_${dst}"
       notifiers.append(Internal(src, dst, mem, fifo))
       if (initialTokens > 0) {
         fifo.conflictable
@@ -152,22 +155,23 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     val parentPars = foreach.cchain.counters map { ctr => ctr.ctrParOr1 }
     val parentShifts = computeShifts(parentPars)
     // Transforms the foreach into a streampipe of foreaches
+    dbgs(s"Transforming Foreach: $lhs = $foreach")
     val replacement = stageWithFlow(UnitPipe(
       foreach.ens, stageBlock {
         // for each parent shift, we restage the entire thing.
 
-        val internalMems = (foreach.block.stms filter canTransformMem).toSet
+        val internalMems = foreach.block.internalMems.toSet
 
         val internalRegs = internalMems filter {
           _.isReg
         }
 
         def getReadRegs(s: Sym[_]) = {
-          (s.readMems union s.writtenMems) intersect internalRegs
+          (s.effects.reads union s.effects.writes) intersect internalRegs
         }
 
         def getWrittenRegs(s: Sym[_]) = {
-          s.writtenMems intersect internalRegs
+          s.effects.reads intersect internalRegs
         }
 
         // for each block which reads this mem, convert it into a FIFO.
@@ -175,8 +179,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
         parentShifts foreach {
           parentShift =>
-
-
             // For Duplicated Memories
             // Reader -> Memory -> FIFO
             val duplicationReadFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
@@ -187,7 +189,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
             val memoryBufferNotifs = new MemoryBufferNotification
 
             val linearizedUses = computeLinearizedUses(foreach.block.stms)
-            dbgs(s"Linearised Uses: ${linearizedUses}")
+            dbgs(s"Linearised Uses: ${linearizedUses.dataMap}")
 
             linearizedUses.dataMap foreach {
               case (mem: Mem[_, _], wrData) if shouldDuplicate(mem) =>
@@ -243,6 +245,20 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 memoryBufferNotifs.register(lastReader, firstWriter, mem, bufferAmounts(firstWriter), duplicates)
             }
 
+            dbgs(s"Duplication FIFOs: $duplicationReadFIFOs -> $duplicationWriteFIFOs")
+
+            val nonLocalUses = computeNonlocalUses(lhs.effects.reads, lhs.effects.writes, foreach.block.stms)
+            dbgs(s"NonLocal Uses: $nonLocalUses")
+            nonLocalUses foreach {
+              case (mem, users) =>
+                users.sliding(2) foreach {
+                  case a::b::_ =>
+                    // what should the buffer depth be?
+                    memoryBufferNotifs.register(a, b, mem, 128)
+                }
+                memoryBufferNotifs.register(users.last, users.head, mem, 128, 1)
+            }
+
             foreach.block.stms foreach {
               case stmt if stmt.isCounter || stmt.isCounterChain =>
                 subst += (stmt -> Invalid)
@@ -252,9 +268,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 dbgs(s"Skipping re-staging $s since it can be transformed")
                 subst += (s -> Invalid)
 
-              case stmt if stmt.isControl && !stmt.isStreamControl =>
+              case stmt if stmt.isControl =>
                 val stmtReads = getReadRegs(stmt)
                 val stmtWrites = getWrittenRegs(stmt)
+                dbgs(s"Stmt: $stmt, effects: ${stmt.effects} reads: $stmtReads, writes: $stmtWrites")
                 // for each stmtRead, we need to create a register of the same type inside.
 
                 // map from sym to mems
@@ -411,7 +428,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               blk.nestedStms foreach {
                                 stmt =>
                                   val mems = stmt.readMem ++ stmt.writtenMem
-                                  dbgs(s"$stmt -> $mems")
                                   mems foreach {
                                     mem => memTokens.get(mem) match {
                                       case Some(ind) => stmt.bufferIndex = ind
@@ -423,12 +439,15 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                       }
                   }
                 }
-              case stmt if shouldDuplicate(stmt) =>
+              case stmt if shouldDuplicate(stmt) || shouldBuffer(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")
                 subst += (stmt -> mirrorSym(stmt))
               case stmt if !stmt.isControl =>
                 dbgs(s"Didn't know how to convert: $stmt of type ${stmt.op}")
                 subst += (stmt -> mirrorSym(stmt))
+              case stmt if stmt.isControl =>
+                bug(s"Could not convert controller: $stmt of type ${stmt.op}")
+                throw new Exception()
             }
         }
       }, foreach.stopWhen
@@ -443,7 +462,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
   }
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
-//    dbgs(s"Transforming: $lhs = $rhs")
     (rhs match {
       case AccelScope(_) => inAccel {
         super.transform(lhs, rhs)

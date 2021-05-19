@@ -1,6 +1,6 @@
 package spatial.transform.stream
 
-import argon.{Sym, bug, dbgs}
+import argon.{Block, Sym, bug, dbgs}
 import spatial.metadata.memory._
 import spatial.metadata.control._
 
@@ -9,7 +9,6 @@ import scala.collection.mutable
 trait MetaPipeToStreamBase {
 
   implicit def IR: argon.State
-
 
   def computeShifts(parFactors: Iterable[Int]) = {
     dbgs(s"Par Factors: $parFactors")
@@ -47,7 +46,7 @@ trait MetaPipeToStreamBase {
       case mem if mem.isMem =>
         localMems.add(mem)
       case stmt =>
-        stmt.readMems intersect localMems foreach {
+        (stmt.effects.reads diff stmt.effects.writes) intersect localMems foreach {
           mem =>
             lastWrite.get(mem) match {
               case Some(wr) =>
@@ -58,17 +57,42 @@ trait MetaPipeToStreamBase {
             }
         }
 
-        stmt.writtenMems intersect localMems foreach {
+        stmt.effects.writes intersect localMems foreach {
           mem =>
             lastWrite(mem) = stmt
             states.getOrElseUpdate(mem, mutable.LinkedHashMap.empty)(stmt) = mutable.Set.empty
         }
     }
 
+    dbgs(s"Local Mems: $localMems")
+
     new LinearizedUseData(states)
   }
 
-//  def computeBufferDepths(useData: LinearizedUseData) = {
-//    val earliestStart = mutable.Map[Sym[_], Int]()
-//  }
+  def computeNonlocalUses(readMems: Set[Sym[_]], writtenMems: Set[Sym[_]], stmts: Seq[Sym[_]]) = {
+    // If a memory is only read/written by a single child, then it's fine.
+    // If a memory is read/written by multiple children, then we need to pass tokens around.
+    val memUseCounts = ((readMems union writtenMems) map {
+      mem =>
+        mem -> (stmts count { stmt => (stmt.readMems union stmt.writtenMems) contains mem })
+    }).toMap
+
+    val singleUseMemories = (memUseCounts filter {case (_, v) => v == 1}).keySet
+    val multiUseMemories = (memUseCounts filter {case (_, v) => v > 1}).keySet
+
+    dbgs(s"Single Use Memories: $singleUseMemories")
+    dbgs(s"Multi Use Memories: $multiUseMemories")
+
+    // For single use memories, we leave them alone.
+    // For Multi use memories, we create a cycle of readers and writers to that memory.
+    val multiUses = mutable.Map[Sym[_], mutable.ArrayBuffer[Sym[_]]]()
+    stmts foreach {
+      stmt =>
+        val modifiedMultiUse = (stmt.readMems union stmt.writtenMems) intersect multiUseMemories
+        modifiedMultiUse foreach {
+          mem => multiUses.getOrElseUpdate(mem, mutable.ArrayBuffer.empty).append(stmt)
+        }
+    }
+    (multiUses map {case (k, v) => k -> v.toList}).toMap
+  }
 }

@@ -507,5 +507,8 @@ package object memory {
     to
   }
 
+  implicit class BlockMemoryOps[R](block: Block[R]) {
+    def internalMems = block.stms.filter {_.isMem}
+  }
 
 }

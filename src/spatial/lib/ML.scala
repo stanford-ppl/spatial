@@ -16,7 +16,7 @@ object ML extends HostML {
    * @param x lambda that takes in an index and return an element in the first vector
    * @param y lambda that takes in an index and return an element in the second vector
    * */
-  @api def dp_flat[T:Num](
+  @stateful def dp_flat[T:Num](
     N:scala.Int,
     ip:scala.Int,
   )(input:I32 => (T,T)):T = {
@@ -32,7 +32,7 @@ object ML extends HostML {
    * @param x lambda that takes in an index and return an element in the first vector
    * @param y lambda that takes in an index and return an element in the second vector
    * */
-  @api def dp_tiled[T:Num](
+  @stateful def dp_tiled[T:Num](
     N:scala.Int,
     ts:scala.Int,
     op:scala.Int,
@@ -41,7 +41,7 @@ object ML extends HostML {
     sum_tiled[T](N, ts, op, ip) { i => val (a,b) = input(i); a * b }
   }
 
-  @api def sum_flat[T:Num](
+  @stateful def sum_flat[T:Num](
     N:scala.Int,
     ip:scala.Int,
   )(input:I32 => T):T = {
@@ -50,12 +50,12 @@ object ML extends HostML {
         input(0.to[I32])
       case _ =>
         val sum = Reg[T]
-        Reduce(sum)(N par Math.min(ip,N)) { i => input(i) } { _ + _ }
+        'DP_Tiled.Reduce(sum)(N par Math.min(ip,N)) { i => input(i) } { _ + _ }
         sum.value
     }
   }
 
-  @api def sum_tiled[T:Num](
+  @stateful def sum_tiled[T:Num](
     N:scala.Int,
     ts:scala.Int,
     op:scala.Int,
@@ -66,7 +66,7 @@ object ML extends HostML {
       case N if N <= ts => inner(N, 0)
       case _ => 
         val totalSum = Reg[T]
-        Reduce(totalSum)(N by ts par Math.min(N/ts,op)) { io =>
+        'Sum_Tiled.Reduce(totalSum)(N by ts par Math.min(N/ts,op)) { io =>
           inner(ts, io)
         } { _ + _ }
         totalSum.value
@@ -84,7 +84,7 @@ object ML extends HostML {
    * @param mps a list of outer loop unrolling factor on input dimension of each layer
    * @param ops a list of outer loop unrolling factor on output dimension of each layer
    * */
-  @api def mlp_forward[T:Num](
+  @stateful def mlp_forward[T:Num](
     weights:Seq[Sym[_] with TensorMem[T] with ReadMem2[T]], 
     biases:Seq[Sym[_] with TensorMem[T] with ReadMem1[T]], 
     activation: T => T,
@@ -99,6 +99,9 @@ object ML extends HostML {
     val layers = List.tabulate(dims.size) { i => i }
     val hiddenDims = dims.slice(1,layers.size-1)
     val hiddens = hiddenDims.map { h => SRAM[T](h) }
+    hiddens.zipWithIndex foreach {case (sram, ind) =>
+      sram.explicitName = s"Hidden_$ind"
+    }
     layers.sliding(2,1).foreach { case List(prev,next) =>
       val in = IfElse[I32 => T](prev==0) { input } { hiddens(prev-1)(_) }
       val out = IfElse[(I32, T) => scala.Unit](next==layers.last) { output } { hiddens(next-1).update }
@@ -132,7 +135,7 @@ object ML extends HostML {
    * @param nlout non-linear output layer update function
    * @return if output dimension is 1, then return a Some(of the element), otherwise None
    * */
-  @api def denselayer[T:Num](
+  @stateful def denselayer[T:Num](
     w:Sym[_] with TensorMem[T] with ReadMem2[T], 
     b:Sym[_] with TensorMem[T] with ReadMem1[T], 
     activation: T => T,
@@ -161,7 +164,7 @@ object ML extends HostML {
     O match {
       case 1 => Some(InnerNN(0))
       case _ =>
-        Foreach(O par op) { o =>
+        'Denselayer.Foreach(O par op) { o =>
           InnerNN(o)
         }
         None
@@ -187,7 +190,7 @@ object ML extends HostML {
    * @param dnlout derivative of non-linear output
    * to an externally allocated SRAM
    * */
-  @api def denselayer_backward[T:Num](
+  @stateful def denselayer_backward[T:Num](
     w:SRAM2[T], 
     b:SRAM1[T], 
     batch:scala.Int,
@@ -237,18 +240,18 @@ object ML extends HostML {
     din
   }
 
-  @api def loss_squre_backward[T:Num](yhat:T, y:T):T = yhat - y
+  @stateful def loss_squre_backward[T:Num](yhat:T, y:T):T = yhat - y
 
   // Activation Functions
-  @api def identity[T:Num]: T => T = { x => x}
-  @api def identity_backward[T:Num]: (T,T) => T = { (x,y) => 1.to[T]}
-  @api def relu[T:Num](x:T) = max(x,0.to[T])
-  @api def relu_backward[T:Num](x:T,y:T) = mux(x > 0.to[T], 1.to[T], 0.to[T])
+  @stateful def identity[T:Num]: T => T = { x => x}
+  @stateful def identity_backward[T:Num]: (T,T) => T = { (x,y) => 1.to[T]}
+  @stateful def relu[T:Num](x:T) = max(x,0.to[T])
+  @stateful def relu_backward[T:Num](x:T,y:T) = mux(x > 0.to[T], 1.to[T], 0.to[T])
 
    /*
     * SVM regression inference
     * */
-  @api def SVMR_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):T = {
+  @stateful def SVMR_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):T = {
     val sum = Reg[T]
     Reduce(sum)(V by 1 par opv) { v =>
       val ins = inputs(v)
@@ -263,7 +266,7 @@ object ML extends HostML {
    /*
     * SVM classification inference
     * */
-  @api def SVMC_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):Bit = {
+  @stateful def SVMC_infer[T:Num](V:scala.Int, opv:scala.Int, b:T)(inputs:I32 => (T,T,T)):Bit = {
     SVMR_infer[T](V,opv,b)(inputs) > 0.to[T]
   }
 
@@ -271,7 +274,7 @@ object ML extends HostML {
    * SVM inner product kernel
    * (<x,y> + c)^d
    * */
-  @api def inner_kernel[T:Num](N:scala.Int,ip:scala.Int)(vecs:I32 => (T,T)) = {
+  @stateful def inner_kernel[T:Num](N:scala.Int,ip:scala.Int)(vecs:I32 => (T,T)) = {
     dp_flat[T](N, ip)(vecs)
   }
 
@@ -279,7 +282,7 @@ object ML extends HostML {
    * SVM polynomial kernel
    * (<x,y> + c)^d
    * */
-  @api def polynomial_kernel[T:Num](c:T,d:T,N:scala.Int,ip:scala.Int)(vecs:I32 => (T,T)) = {
+  @stateful def polynomial_kernel[T:Num](c:T,d:T,N:scala.Int,ip:scala.Int)(vecs:I32 => (T,T)) = {
     pow(dp_flat[T](N, ip)(vecs) + c, d)
   }
 

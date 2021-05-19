@@ -6,7 +6,7 @@ import forge.tags._
 import spatial.metadata.control._
 import spatial.node._
 
-abstract class Directives(options: CtrlOpt) {
+abstract class Directives(val options: CtrlOpt) {
   lazy val Foreach   = new ForeachClass(options)
   lazy val Reduce    = new ReduceClass(options)
   lazy val Fold      = new FoldClass(options)

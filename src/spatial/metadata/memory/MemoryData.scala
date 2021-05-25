@@ -102,7 +102,7 @@ case class ExplicitName(name: String) extends Data[ExplicitName](SetBy.User)
   * Default: Some(1)
   */
 
-case class StreamBufferAmount(buffering: Int) extends Data[StreamBufferAmount](SetBy.User)
+case class StreamBufferAmount(buffering: Int, min: Int = 0, max: Int = Int.MaxValue) extends Data[StreamBufferAmount](SetBy.User)
 
 /**
   * Memory Buffering Index

@@ -101,6 +101,7 @@ object ML extends HostML {
     val hiddens = hiddenDims.map { h => SRAM[T](h) }
     hiddens.zipWithIndex foreach {case (sram, ind) =>
       sram.explicitName = s"Hidden_$ind"
+//      sram.bufferAmount = 8
     }
     layers.sliding(2,1).foreach { case List(prev,next) =>
       val in = IfElse[I32 => T](prev==0) { input } { hiddens(prev-1)(_) }
@@ -116,7 +117,18 @@ object ML extends HostML {
       scala.Predef.assert(op <= O, s"op=$op, O=$O")
       val w = weights(prev)
       val b = biases(prev)
-      denselayer[T](w, b, activation, in=in, nlout=out)(ip=ip, mp=mp, op=op)
+
+      val inWithPrint = (x: I32) => {
+        val res = in(x)
+        println(r"Read: $prev($x) = $res")
+        res
+      }
+
+      val outWithPrint = (x: I32, v: T) => {
+        println(r"Write: $next($x) = $v")
+        out(x, v)
+      }
+      denselayer[T](w, b, activation, in=inWithPrint, nlout=outWithPrint)(ip=ip, mp=mp, op=op)
     }
   }
 

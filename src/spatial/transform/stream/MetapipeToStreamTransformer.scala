@@ -26,24 +26,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     }
 
     return lhs.shouldConvertToStreamed
-
-    // Can't currently handle the semantics of Stream control, ends up being too strict for Parallel
-    if (!(allowableSchedules contains lhs.schedule)) {
-      return false
-    }
-
-    rhs match {
-      case foreach: OpForeach =>
-        foreach.block.stms.forall {
-          sym =>
-            if (!sym.isMem) {
-              true
-            } else {
-              canTransformMem(sym)
-            }
-        }
-      case _ => false
-    }
   }
 
   type MemType = LocalMem[_, C forSome {type C[_]}]
@@ -71,6 +53,19 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     }
   }
 
+  private def requiredBuffers(s: Sym[_]): Int = {
+    s match {
+      case _ if s.isSeqControl => 1  // Only 1 stage is active at a time
+      case _ if s.isInnerPipeLoop =>
+        scala.math.ceil(s.children.length / s.II).toInt
+      case _ if s.isOuterPipeControl =>
+        s.children.length
+      case _ if s.isStreamControl || s.isParallel => 1  // These manage synchronization on the buffer manually.
+      case _ =>
+        throw new Exception(s"Cannot determine buffer depth for a non-control symbol ${s}")
+    }
+  }
+
   class MemoryBufferNotification {
 
     // src -> dst -> mem -> FIFO
@@ -85,8 +80,13 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
       notifiers.append(Internal(src, dst, mem, fifo))
       if (initialTokens > 0) {
         fifo.conflictable
-        Pipe {
-          fifo.enqVec(Vec.fromSeq(Range(0, initialTokens) map {i => I32(i)}))
+
+        val enableReg = Reg[Bit](true)
+        enableReg.explicitName = s"CommFIFO_Initial_${src}_${dst}"
+        enableReg.dontTouch
+        'TokenInitializer.Pipe {
+          fifo.enqVec(Vec.fromSeq(Range(0, initialTokens) map {i => I32(i)}), enableReg.value)
+          enableReg := false
         }
       }
     }
@@ -102,7 +102,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     }
   }
 
-  def computeBufferDepth(writeData: Seq[MemoryWriteData]): (Map[Sym[_], Int], Int) = {
+  def computeBufferDepth(mem: Sym[_], writeData: Seq[MemoryWriteData]): (Map[Sym[_], Int], Int) = {
     val accesses = writeData.flatMap {
       case MemoryWriteData(wr, rds) =>
         Seq(wr) ++ rds
@@ -118,11 +118,18 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         val srcII = source.II * sourceIterations
         val destII = destination.II * destIterations
         val srcCycles = source.II * (sourceIterations - 1) + source.latencySum
-        dbgs(s"$source -> $destination ($srcII, $destII, $srcCycles, ${source.latencySum})")
+        dbgs(s"$source -> $destination ($srcII, $destII, $sourceIterations, $destIterations)")
 
         // if src cycles > dest II, but src II <= dest II, then the result should be src cycles - src II = srcLatency
         // Can't tolerate clearing pipeline, so we have to buffer by latency.
         // Otherwise, the source can't keep up, so use 3.
+
+        val minBufferDepth = {
+          // Also, need to make sure that the destination can terminate while still having elements left in the fifo
+          // to prevent deadlock. This means that there need to be enough credits in the system
+          // such that the consumer can actually dequeue a token.
+          requiredBuffers(destination)
+        }
 
         val requiredBufferDepth = if (srcCycles <= destII) {
           // In this case, we can start the next iteration after the destination dequeues, so it's fine.
@@ -134,11 +141,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
           // In this case, srcCycles >= destII, and srcII > destII, so we can't keep up anyways. Default to 3.
           3
         }
-        destination -> requiredBufferDepth
+        destination -> scala.math.max(requiredBufferDepth, minBufferDepth)
     }).toMap
     dbgs(s"Computing Buffer Depths: ${result}")
-    val maxVal = spatial.util.roundUpToPow2(result.values.max)
-    ((result.keys map {k => (k -> maxVal*2)}).toMap, maxVal)
+    // For maximum throughput, buffer depth = sum(buffer depths) + 1
+    // For minimum throughput, buffer depth = max(buffer depths) + 1
+    val minBufferDepth = spatial.util.roundUpToPow2(result.values.max + 1)
+    val maxBufferDepth = spatial.util.roundUpToPow2(result.values.sum + 1)
+    mem.bufferAmount = StreamBufferAmount(maxBufferDepth, minBufferDepth, maxBufferDepth)
+
+    ((result.keys map {k => (k -> (maxBufferDepth * 2))}).toMap, maxBufferDepth)
   }
 
   /**
@@ -220,9 +232,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                     val bdepths = Map[Sym[_], Int]().withDefaultValue(2*bam)
                     (bdepths, bam)
                   case None =>
-                    val t = computeBufferDepth(wrData)
-                    mem.bufferAmount = t._2
-                    t
+                    computeBufferDepth(mem, wrData)
                 }
                 dbgs(s"Mem: $mem, buffering: $bufferAmounts, duplications: $duplicates")
 
@@ -332,7 +342,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                       }
 
                       var memTokens: Map[Sym[_], I32] = null
-                      stageWithFlow(OpForeach(ens, ccnew, stageBlock {
+                      stage(OpForeach(ens, ccnew, stageBlock {
                         val isFirstIter = newiters.takeRight(iters.size)
                         val en = isFirstIter.map {
                           i => i === i.counter.ctr.start
@@ -348,15 +358,26 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         dbgs(s"Recv FIFOs: ${memoryBufferNotifs.getRecvFIFOs(stmt)}")
                         dbgs(s"Send FIFOs: ${memoryBufferNotifs.getSendFIFOs(stmt)}")
 
+                        val tmpRegs = (memoryBufferNotifs.getRecvFIFOs(stmt) map {
+                          case(mem, fifo) =>
+                            val tokenRegBuf = Reg[I32]
+                            tokenRegBuf.explicitName = s"TokenReg_${mem}_${fifo}_buf"
+                            ((mem, fifo) -> tokenRegBuf)
+                        }).toMap
 
                         memTokens = (memoryBufferNotifs.getRecvFIFOs(stmt) map {
                           case(mem, fifo) =>
                             val token = stage(FIFODeq(fifo, en))
                             val tokenReg = Reg[I32]
+                            val tokenRegBuf = tmpRegs((mem, fifo))
+
                             tokenReg.explicitName = s"TokenReg_${mem}_${fifo}"
+                            tokenReg.nonbuffer
                             tokenReg.write(token, en.toSeq:_*)
-                            dbgs(s"Staging token: $mem, $fifo, $tokenReg")
-                            (f(mem) -> tokenReg.value)
+                            tokenRegBuf := tokenReg
+
+                            dbgs(s"Staging token: $mem, $fifo, $tokenReg, $tokenRegBuf")
+                            (f(mem) -> tokenRegBuf.value)
                         }).toMap
 
                         dbgs(s"MemTokens: ${memTokens}")
@@ -375,6 +396,21 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             if (duplicationReadFIFOs.getOrElse(stmt, mutable.Map.empty) contains read) {
                               val deq = stage(FIFODeq(duplicationReadFIFOs(stmt)(read).asInstanceOf[FIFO[T]], en))
                               stage(RegWrite(tmp.unbox, deq, en))
+                            }
+                        }
+
+                        dbgs(s"Blk: ${block.nestedStms}")
+                        block.nestedStms foreach {
+                          stmt =>
+                            val mems = stmt.readMem ++ stmt.writtenMem
+                            mems foreach {
+                              mem =>
+                                memTokens.get(f(mem)) match {
+                                  case Some(ind) =>
+                                    dbgs(s"Adding Buffering Info to: $stmt")
+                                    stmt.bufferIndex = ind
+                                  case None =>
+                                }
                             }
                         }
 
@@ -412,31 +448,12 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             }
                         }
 
-                        retimeGate()
                         memoryBufferNotifs.getSendFIFOs(stmt) foreach {
                           case(mem, fifo) =>
                             dbgs(s"Sending fifo: $mem, $fifo")
                             stage(FIFOEnq(fifo, memTokens(f(mem)), isLastEn))
                         }
-                      }, newiters, stopWhen)) {
-                        lhs2 =>
-                          dbgs(s"Filling in buffering information: $memTokens")
-                          dbgs(s"Blocks: ${lhs2.blocks}")
-                          lhs2.blocks.foreach {
-                            blk =>
-                              dbgs(s"Blk: ${blk.nestedStms}")
-                              blk.nestedStms foreach {
-                                stmt =>
-                                  val mems = stmt.readMem ++ stmt.writtenMem
-                                  mems foreach {
-                                    mem => memTokens.get(mem) match {
-                                      case Some(ind) => stmt.bufferIndex = ind
-                                      case None =>
-                                    }
-                                  }
-                              }
-                          }
-                      }
+                      }, newiters, stopWhen))
                   }
                 }
               case stmt if shouldDuplicate(stmt) || shouldBuffer(stmt) =>

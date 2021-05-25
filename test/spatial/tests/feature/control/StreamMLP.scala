@@ -6,10 +6,10 @@ import utils.io.files._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 
-class MLP_Variant extends MLP_Variants(N=1,batch=2,dims=List(2,2,2),ips=List(1,1),mps=List(1,1),ops=List(1,1))
+class MLP_Variant extends MLP_Variants(N=1024,batch=512,dims=List(2,2,2),ips=List(1,1),mps=List(1,1),ops=List(1,1))
 
 class MLP_Variant_Streamed extends MLP_Variant {
-  override def compileArgs = "--streamify --max_cycles=10000"
+  override def compileArgs = "--streamify --noBindParallels --max_cycles=200000"
 }
 
 @spatial abstract class MLP_Variants(

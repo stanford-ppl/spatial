@@ -194,14 +194,14 @@ trait DebuggingAPI_Shadowing extends DebuggingAPI_Internal
   @api def checkGold[T:Bits](dram:DRAM2[T], gold:Tensor2[T])(implicit ev:Cast[Text,T]):Bit =
     checkGold(dram, gold, 0)
   @api def checkGold[T:Bits](dram:DRAM2[T], gold:Tensor2[T], margin:scala.Double)(implicit ev:Cast[Text,T]):Bit = {
-    val result = getMem(dram)
+    val result = getMatrix(dram)
     println(s"${dram.name.getOrElse(s"$dram")} Result: ")
-    printArray(result)
+    printMatrix(result)
 
     println(s"${dram.name.getOrElse(s"$dram")} Gold: ")
     printMatrix(gold)
 
-    approxEql[T](result, gold.flatten, margin)
+    approxEql[T](result, gold, margin)
   }
 
   @api def checkGold[T:Bits](reg:Reg[T], gold:T)(implicit ev:Cast[T,Text]):Bit = checkGold(reg, gold, 0)

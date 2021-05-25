@@ -210,7 +210,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                     // handle the FIFO-ization logic
 
                     // Memory was previously written, now need a new fifo.
-                    val writerLatency = math.ceil(wr.latencySum).toInt
+                    val writerLatency = wr.children.length
                     val latencyEpsilon = 4
 
                     lazy implicit val bits: Bits[mem.L] = mem.A.asInstanceOf[Bits[mem.L]]

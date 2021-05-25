@@ -37,17 +37,17 @@ case class StreamBufferExpansion(IR: State) extends MutateTransformer with Accel
 //      newMem.alphaConstraints = Seq(UserDefinedAlpha(Seq(1, 1)))
       dbgs(s"newMem rank: ${newMem.constDims}")
       dbgs(s"Duplicates: ${mem.duplicates}")
-      mem.getInstance match {
-        case Some(memory) =>
-          val Ns = Seq(bufferAmount) ++ memory.nBanks
-          val Bs = Seq(1) ++ memory.Bs
-          val alphas = Seq(1) ++ memory.alphas
-          val Ps = Seq(1) ++ memory.Ps
-          dbgs(s"Inferring banking: $Ns, $Bs, $alphas, $Ps")
-          newMem.bank(Ns, Bs, alphas, Some(Ps))
-        case None =>
-          dbgs(s"Could not infer memory banking for $newMem from $mem")
-      }
+//      mem.getInstance match {
+//        case Some(memory) =>
+//          val Ns = Seq(bufferAmount) ++ memory.nBanks
+//          val Bs = Seq(1) ++ memory.Bs
+//          val alphas = Seq(1) ++ memory.alphas
+//          val Ps = Seq(1) ++ memory.Ps
+//          dbgs(s"Inferring banking: $Ns, $Bs, $alphas, $Ps")
+//          newMem.bank(Ns, Bs, alphas, Some(Ps))
+//        case None =>
+//          dbgs(s"Could not infer memory banking for $newMem from $mem")
+//      }
       register(mem -> newMem)
       newMem
   }

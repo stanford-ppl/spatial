@@ -108,7 +108,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
 
     val isFSM = lhs match {case Op(_: StateMachine[_]) => " FSM"; case _ => ""}
     inCell(src"$lhs", !isLeaf){
-      emit(s"""${"  "*ident}<font size = "6">${link(s"$lhs")}$isBox: ${lhs.schedule} $isFSM<font size = "4"> (${lhs.level})</font>""")
+      emit(s"""${"  "*ident}<font size = "6">${link(s"$lhs")}$isBox: ${lhs.schedule} ${lhs.op.map(_.name).getOrElse("")} $isFSM<font size = "4"> (${lhs.level})</font>""")
       emit(s"""${"  "*ident}<br><font size = "2">${lhs.ctx} <font color="grey">- $line</font></font>""")
       val ii = scrubNoise(lhs.II).toInt
       val lat = scrubNoise(lhs.bodyLatency.sum).toInt

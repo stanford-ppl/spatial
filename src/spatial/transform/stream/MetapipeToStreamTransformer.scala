@@ -179,11 +179,11 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         }
 
         def getReadRegs(s: Sym[_]) = {
-          (s.effects.reads union s.effects.writes) intersect internalRegs
+          (s.readMems union s.writtenMems) intersect internalRegs
         }
 
         def getWrittenRegs(s: Sym[_]) = {
-          s.effects.reads intersect internalRegs
+          s.readMems intersect internalRegs
         }
 
         // for each block which reads this mem, convert it into a FIFO.
@@ -257,7 +257,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
             dbgs(s"Duplication FIFOs: $duplicationReadFIFOs -> $duplicationWriteFIFOs")
 
-            val nonLocalUses = computeNonlocalUses(lhs.effects.reads, lhs.effects.writes, foreach.block.stms)
+            val nonLocalUses = computeNonlocalUses(lhs.readMems, lhs.writtenMems, foreach.block.stms)
             dbgs(s"NonLocal Uses: $nonLocalUses")
             nonLocalUses foreach {
               case (mem, users) =>

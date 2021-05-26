@@ -63,6 +63,7 @@ trait Spatial extends Compiler with ParamLoader {
     // --- Debug
     lazy val printer = IRPrinter(state, enable = config.enDbg)
     lazy val finalIRPrinter = IRPrinter(state, enable = true)
+    lazy val textCleanup = TextCleanup(state)
 
     // --- Checking
     lazy val userSanityChecks  = UserSanityChecks(state, enable = !spatialConfig.allowInsanity)
@@ -151,6 +152,7 @@ trait Spatial extends Compiler with ParamLoader {
         (blackboxLowering1)   ==> printer ==> transformerChecks ==>
         /** More black box lowering */
         (blackboxLowering2)   ==> printer ==> transformerChecks ==>
+        (spatialConfig.enableSynth && !spatialConfig.enableSim) ? textCleanup ==>
         /** DSE */
         ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
         /** Optional scala model generator */

@@ -101,7 +101,6 @@ object ML extends HostML {
     val hiddens = hiddenDims.map { h => SRAM[T](h) }
     hiddens.zipWithIndex foreach {case (sram, ind) =>
       sram.explicitName = s"Hidden_$ind"
-//      sram.bufferAmount = 8
     }
     layers.sliding(2,1).foreach { case List(prev,next) =>
       val in = IfElse[I32 => T](prev==0) { input } { hiddens(prev-1)(_) }

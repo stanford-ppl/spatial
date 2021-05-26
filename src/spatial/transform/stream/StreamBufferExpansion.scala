@@ -34,7 +34,6 @@ case class StreamBufferExpansion(IR: State) extends MutateTransformer with Accel
       }
       transferData(mem, newMem)
       newMem.fullybankdim(0)
-//      newMem.alphaConstraints = Seq(UserDefinedAlpha(Seq(1, 1)))
       dbgs(s"newMem rank: ${newMem.constDims}")
       dbgs(s"Duplicates: ${mem.duplicates}")
 //      mem.getInstance match {

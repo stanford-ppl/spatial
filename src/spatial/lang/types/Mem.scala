@@ -11,8 +11,6 @@ trait Mem[A,C[_]] extends Top[C[A]] with Ref[Any,C[A]] {
   implicit val A: Bits[A]
 
   override protected val __neverMutable: Boolean = false
-
-  def __makeCopy(implicit state: argon.State): C[_] = null.asInstanceOf[C[_]]
 }
 
 trait TensorMem[A] {

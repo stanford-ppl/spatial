@@ -116,6 +116,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val regElim               = RegWriteReadElimination(state)
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
     lazy val unitpipeDestruction   = UnitpipeDestruction(state)
+    lazy val loopPerfecter         = LoopPerfecter(state)
+    lazy val loopCompaction        = LoopCompaction(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer)
@@ -171,6 +173,7 @@ trait Spatial extends Compiler with ParamLoader {
         regReadCSE          ==>
         /** Dead code elimination */
         DCE ==>
+        loopPerfecter ==> printer ==> loopCompaction ==> regReadCSE ==> DCE ==>
         /** Metapipelines to Streams */
         spatialConfig.streamify ? streamify  ==>
         /** Stream controller rewrites */

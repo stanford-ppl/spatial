@@ -1,41 +1,143 @@
 package spatial.transform
 
 import argon._
+import argon.node.Enabled
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.metadata.memory._
 import spatial.traversal.AccelTraversal
 
-/** Converts inner pipes that contain switches into innerpipes with enabled accesses.
-  * Also squashes outer unit pipes that contain only one child
+/** Performs loop perfection as mentioned by Pu. et al in the Halide on FPGA paper.
+  * Loop perfection takes a sequence of instructions, where there is at most one controller. All others must be
+  * unitpipes.
   */
 case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversal {
 
-  // private def transformCtrl[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+  val enStack = scala.collection.mutable.Stack[scala.collection.Set[Bit]]()
 
-  //   private var fusePipe = false
-  //   case ctrl: Control[_] if (ctrl.isOuterControl && ctrl.children.forall(_.s.get.isInnerControl)) => 
-  //     ctrl.bodies.foreach{body => 
-  //       body.blocks.foreach{case (_,block) => 
-  //           val block2 = f(block)
-  //           register(block -> block2)
-  //         }
-  //       }
+  private def shouldTransform(sequence: Seq[Sym[_]]): Boolean = {
+    // should transform IFF sequence is promote-able to a single looped controller.
+    // This means that there is exactly 1 loop controller, and an arbitrary number of unitpipes.
+    if (sequence.count(_.isLoopControl) != 1) {
+      return false
+    }
+    val looped = sequence.find(_.isLoopControl).get.asInstanceOf[Sym[Void]]
+    if (looped.hasStreamAncestor) {
+      return false
+    }
+    looped match {
+      case Op(_:OpForeach) => true
+      case _ => false
+    }
+  }
 
+  override def mirrorNode[A](rhs: Op[A]): Op[A] = {
+    rhs match {
+      case en: Enabled[A] =>
+        en.mirrorEn(f, enStack.flatten.toSet)
+      case _ =>
+        super.mirrorNode(rhs)
+    }
+  }
 
-  //   case _ => super.transform(lhs,rhs)
-  // }
+  private def withEns[T](ens: Set[Bit])(v: => T) = {
+    enStack.push(ens)
+    val r = v
+    enStack.pop()
+    r
+  }
+
+  private def mirrorSeq(seq: Seq[Sym[_]]) = {
+    seq map {x =>
+      val result = mirrorSym(x)
+      register(x -> result)
+      result
+    }
+  }
+
+  private def destructBlocks(seq: Seq[Sym[_]]) = {
+    seq flatMap {
+      sym =>
+        if (sym.isTransient || sym.isMem) { Seq(sym) } else sym.blocks flatMap {_.stms}
+    }
+  }
+
+  private def transformSequence(preTarget: Seq[Sym[_]], targetLoop: Sym[_], postTarget: Seq[Sym[_]]) = {
+
+    targetLoop match {
+      case Op(OpForeach(ens, cchain, block, iters, stopWhen)) if ens.isEmpty =>
+        // Mirror the cchain
+        val newCChain = f(cchain)
+        val newiters = newCChain.counters.map { ctr =>
+          val n = boundVar[I32]
+          n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
+          n
+        }
+
+        (iters zip newiters) foreach {
+          case (i, n) => register(i -> n)
+        }
+        stageWithFlow(OpForeach(ens, newCChain, stageBlock {
+          val isFirstIteration = (newCChain.counters zip newiters) map {
+            case (ctr, iter) =>
+              iter === ctr.start
+          }
+
+          withEns(isFirstIteration.toSet) {
+            mirrorSeq(preTarget)
+          }
+
+          mirrorSeq(block.stms)
+
+          val isLastIteration = (newCChain.counters zip newiters) map {
+            case (ctr, iter) =>
+              type ctrType = ctr.CT
+              implicit def ctEV: Num[ctrType] = ctr.CTeV.asInstanceOf[Num[ctrType]]
+              val castIter = numericCast[I32, ctrType].apply(iter)
+              val nextIter = castIter + ctr.step.asInstanceOf[ctrType]
+              nextIter >= ctr.end.asInstanceOf[ctrType]
+          }
+          withEns(isLastIteration.toSet) {
+            mirrorSeq(postTarget)
+          }
+          spatial.lang.void
+        }, newiters, f(stopWhen))) {
+          lhs2 => transferData(targetLoop, lhs2)
+        }
+    }
+  }
+
+  private def transformForeach(foreach: OpForeach): Sym[_] = {
+    val sequence = foreach.block.stms.toIndexedSeq
+    val targetIndex = sequence.indexWhere(_.isLoopControl)
+    val targetLoop = sequence(targetIndex)
+    val preTarget = sequence.take(targetIndex)
+    val postTarget = sequence.drop(targetIndex + 1)
+    dbgs(s"Pre: $preTarget, target: $targetLoop, post: $postTarget")
+    // Extract all counter-related things
+    val (chains, actual) = preTarget.partition {x => x.isCounter || x.isCounterChain}
+    val preDestructed = destructBlocks(actual)
+    stage(OpForeach(
+      foreach.ens, foreach.cchain, stageBlock {
+        mirrorSeq(chains)
+        dbgs(s"Chains: $chains -> ${f(chains)}")
+        transformSequence(preDestructed, targetLoop, destructBlocks(postTarget))
+      }, foreach.iters, foreach.stopWhen
+    ))
+  }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    // case _: AccelScope => inAccel{ transformCtrl(lhs,rhs)}
+     case _: AccelScope => inAccel{ super.transform(lhs, rhs) }
 
-    // case ctrl: Control[_] if fusePipe && lhs.isInnerControl =>
-    //   super.transform(lhs,rhs)
-    // case ctrl: Control[_] if lhs.isUnitPipe && lhs.isInnerControl => 
-    //   super.transform(lhs,rhs)
+     case foreach:OpForeach if lhs.isOuterControl && shouldTransform(foreach.block.stms) =>
+       dbgs(s"Transforming: $lhs = $rhs")
+       transformForeach(foreach).asInstanceOf[Sym[A]]
 
-    case _ => super.transform(lhs,rhs)
+    case _ =>
+      dbgs(s"Skipping: $lhs = $rhs")
+      super.transform(lhs,rhs)
   }
 
 }

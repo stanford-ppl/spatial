@@ -7,22 +7,9 @@ import spatial.node._
 
 /** Types */
 @ref class Counter[A:Num] extends Top[Counter[A]] with Ref[FixedPointRange,Counter[A]] {
+  type CT = A
+  val CTeV = implicitly[Num[A]]
   override protected val __neverMutable: Boolean = false
-
-  @api def __makeCopy: Counter[A] = {
-    if (this.op.isEmpty) {
-      error(ctx, s"No op definition for $this")
-      err_[Counter[A]](this.tp, "Invalid declaration in global namespace")
-    } else {
-      this.op.get match {
-        case Op(CounterNew(start, end, stride, par)) =>
-          stage(CounterNew[A](start.asInstanceOf[A], end.asInstanceOf[A], stride.asInstanceOf[A], par))
-        case Op(ForeverNew()) =>
-          // This will only happen if A = I32
-          stage(ForeverNew()).asInstanceOf[Counter[A]]
-      }
-    }
-  }
 }
 object Counter {
   @api def apply[A:Num](

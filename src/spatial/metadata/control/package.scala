@@ -711,6 +711,11 @@ package object control {
     }
 
     @stateful def approxIters: Int = (cchains map {_.approxIters}).product
+
+    @stateful def isForeach: Boolean = op match {
+      case Some(_: OpForeach) => true
+      case _ => false
+    }
   }
 
   abstract class ScopeHierarchyOps(s: Option[Sym[_]]) extends CtrlHierarchyOps(s) {

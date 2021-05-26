@@ -12,12 +12,6 @@ import spatial.metadata.memory._
   private implicit val evA: A <:< Bits[A] = Bits[A].box
   override val evMem: Reg[A] <:< LocalMem[A,Reg] = implicitly[Reg[A] <:< LocalMem[A,Reg]]
 
-  override def __makeCopy(implicit state: argon.State) = {
-    val r = Reg.alloc[A](this.rhs.getOp match {case Some(RegNew(reset)) => reset.unbox; case None => zero[A]})
-    r.ctx = this.ctx
-    r
-  }
-
   // --- Infix Methods
   @api def :=(data: A): Void = Reg.write(this, data)
   @rig def write(data: A, ens: Bit*): Void = Reg.write(this, data, ens.toSet)

@@ -8,7 +8,7 @@ import spatial.node._
 /** Types */
 @ref class Counter[A:Num] extends Top[Counter[A]] with Ref[FixedPointRange,Counter[A]] {
   type CT = A
-  val CTeV = implicitly[Num[A]]
+  lazy val CTeV:Num[A] = implicitly[Num[A]]
   override protected val __neverMutable: Boolean = false
 }
 object Counter {

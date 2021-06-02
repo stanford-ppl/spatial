@@ -32,30 +32,26 @@ case class RegWriteReadElimination(IR: State) extends MutateTransformer {
           val regCache = mutable.Map[Sym[_], Bits[_]]()
           val copied = stageBlock({
             block.stms foreach {
-              stmt =>
-                stmt.op match {
-                  case Some(RegNew(init)) if !stmt.keepUnused && isEliminatable(stmt) =>
-                    dbgs(s"Registering $stmt <- $init")
-                    regCache(stmt) = init
-                  case Some(RegWrite(mem, data, ens)) if regCache contains mem =>
-                    implicit lazy val bEV: Bits[data.R] = data
-                    if (ens.isEmpty) {
-                      regCache(mem) = data
-                    } else {
-                      regCache(mem) = stage(Mux(ens.reduce {
-                        _ && _
-                      }, data, regCache(mem).asInstanceOf[Bits[data.R]]))
-                    }
-                    dbgs(s"Updating $mem <- ${regCache(mem)}, ens: $ens")
-                  case Some(RegRead(mem)) if regCache contains mem =>
-                    dbgs(s"Reading: $mem")
-                    subst += (stmt -> regCache(mem).asSym)
+                case stmt@Op(RegNew(init)) if !stmt.keepUnused && isEliminatable(stmt) =>
+                  dbgs(s"Registering $stmt <- $init")
+                  regCache(stmt) = init
+                case Op(RegWrite(mem, data, ens)) if regCache contains mem =>
+                  implicit lazy val bEV: Bits[data.R] = data
+                  if (ens.isEmpty) {
+                    regCache(mem) = data
+                  } else {
+                    regCache(mem) = stage(Mux(ens.reduce {
+                      _ && _
+                    }, data, regCache(mem).asInstanceOf[Bits[data.R]]))
+                  }
+                  dbgs(s"Updating $mem <- ${regCache(mem)}, ens: $ens")
+                case stmt@Op(RegRead(mem)) if regCache contains mem =>
+                  dbgs(s"Reading: $mem")
+                  subst += (stmt -> regCache(mem).asSym)
 
-                  case Some(op) =>
-                    val updated = update(stmt.asInstanceOf[Sym[stmt.R]], op.asInstanceOf[Op[stmt.R]])
-                    subst += (stmt -> updated)
-                  case None =>
-                }
+                case stmt@Op(op) =>
+                  val updated = update(stmt.asInstanceOf[Sym[stmt.R]], op.asInstanceOf[Op[stmt.R]])
+                  subst += (stmt -> updated)
             }
           }, block.options)
           register(block -> copied)

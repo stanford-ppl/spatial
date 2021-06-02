@@ -115,11 +115,11 @@ import argon.Block
 
 @spatial class PerfectionForeach extends SpatialTest {
 
-  val R = 4
-  val C = 4
+  val R = 1024
+  val C = 1024
 
-  val RP = 2
-  val CP = 1
+  val RP = 4
+  val CP = 4
 
   def main(args: Array[String]): Unit = {
     val img = DRAM[Int](R, C)
@@ -140,7 +140,7 @@ import argon.Block
       (i, j) => (i + 1) * j
     }
     val result = checkGold(img, gold)
-    assert(Bit(true))
+    assert(result)
   }
 
   override def checkIR(block: Block[_]): Result = {

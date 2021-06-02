@@ -65,7 +65,6 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
   }
 
   private def transformSequence(preTarget: Seq[Sym[_]], targetLoop: Sym[_], postTarget: Seq[Sym[_]]) = {
-
     targetLoop match {
       case Op(OpForeach(ens, cchain, block, iters, stopWhen)) if ens.isEmpty =>
         // Mirror the cchain
@@ -76,10 +75,10 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
           n
         }
 
-        (iters zip newiters) foreach {
-          case (i, n) => register(i -> n)
-        }
-        stageWithFlow(OpForeach(ens, newCChain, stageBlock {
+        val ctrPars = cchain.counters map {_.ctrParOr1}
+        val replicas = spatial.util.computeShifts(ctrPars)
+
+        stage(OpForeach(ens, newCChain, stageBlock {
           val isFirst = spatial.util.TransformUtils.isFirstIter(newiters, newCChain)
 
           withEns(isFirst.toSet) {
@@ -87,9 +86,21 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
           }
 
           // Need to unroll this to maintain correctness
-          isolateSubst() {
-
-            mirrorSeq(block.stms)
+          replicas foreach {
+            replica =>
+              isolateSubst() {
+                val shifts = (cchain.counters zip replica) map {
+                  case (ctr, shift) =>
+                    implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+                    implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
+                    ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
+                }
+                (iters zip newiters zip shifts) foreach {
+                  case ((olditer, newiter), shift) =>
+                    register(olditer -> (newiter + shift))
+                }
+                mirrorSeq(block.stms)
+              }
           }
 
           val isLastIteration = spatial.util.TransformUtils.isLastIter(newiters, newCChain)
@@ -97,9 +108,7 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
             mirrorSeq(postTarget)
           }
           spatial.lang.void
-        }, newiters, f(stopWhen))) {
-          lhs2 => transferData(targetLoop, lhs2)
-        }
+        }, newiters, f(stopWhen)))
     }
   }
 
@@ -127,7 +136,8 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
 
      case foreach:OpForeach if lhs.isOuterControl && shouldTransform(foreach.block.stms) =>
        dbgs(s"Transforming: $lhs = $rhs")
-       transformForeach(foreach).asInstanceOf[Sym[A]]
+       val transformed = transformForeach(foreach).asInstanceOf[Sym[A]]
+       super.transform(transformed, transformed.op.get)
 
     case _ =>
       dbgs(s"Skipping: $lhs = $rhs")

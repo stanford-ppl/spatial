@@ -6,11 +6,14 @@ import utils.io.files._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 
-class MLP_Variant extends MLP_Variants(N=4096,batch=1024,dims=List(4,4,4),ips=List(1,1),mps=List(1,1),ops=List(1,1))
+class MLP_Variant extends MLP_Variants(N=64, batch=32,dims=List(2,2,2),ips=List(1,1),mps=List(1,1),ops=List(1,1))
 
 class MLP_Variant_Streamed extends MLP_Variant {
-  override def compileArgs = "--streamify --noBindParallels"
+  override def compileArgs = "--streamify --noBindParallels --vv"
 }
+
+class MLP_Variant_Streamed_passing extends MLP_Variant_Streamed
+class MLP_Variant_Streamed_2 extends MLP_Variant_Streamed
 
 @spatial abstract class MLP_Variants(
                                       val N:scala.Int = 1024,

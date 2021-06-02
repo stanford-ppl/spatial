@@ -69,6 +69,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val userSanityChecks  = UserSanityChecks(state, enable = !spatialConfig.allowInsanity)
     lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog && !spatialConfig.allowInsanity)
     lazy val finalSanityChecks = CompilerSanityChecks(state, enable = !spatialConfig.allowInsanity)
+    lazy val streamChecks = CompilerSanityChecks(state, enable = true)
 
     // --- Analysis
     lazy val cliNaming          = CLINaming(state)
@@ -118,13 +119,17 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeDestruction   = UnitpipeDestruction(state)
     lazy val loopPerfecter         = LoopPerfecter(state)
     lazy val loopCompaction        = LoopCompaction(state)
+    lazy val allocMotion           = AllocMotion(state)
+
+    def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
     lazy val loopPerfection = Seq(loopPerfecter, printer, loopCompaction, printer) ++ DCE
+    lazy val unitpipeReform = createDump("preDestruction") ++ Seq(unitpipeDestruction, printer) ++ Seq(regElim, printer, pipeInserter, printer) ++ bankingAnalysis ++ createDump("postReform")
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer)
-    lazy val streamifyExpansion = Seq(streamBufferExpansion, printer, pipeInserter, printer) ++ DCE
-    lazy val streamify = streamifyAnalysis ++ bankingAnalysis ++ streamifyExpansion
+    lazy val streamifyExpansion = Seq(streamBufferExpansion, printer, allocMotion, printer, pipeInserter, printer) ++ DCE
+    lazy val streamify = streamifyAnalysis ++ bankingAnalysis ++ streamifyExpansion ++ unitpipeReform ++ Seq(streamChecks)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -177,7 +182,7 @@ trait Spatial extends Compiler with ParamLoader {
         DCE ==>
         (!spatialConfig.imperfect ? loopPerfection) ==>
         /** Metapipelines to Streams */
-        spatialConfig.streamify ? streamify  ==>
+        spatialConfig.streamify ? streamify ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */

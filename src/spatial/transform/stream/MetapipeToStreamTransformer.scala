@@ -356,11 +356,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                           i => i === i.counter.ctr.start
                         }.toSet
 
-                        val isLastEn = isFirstIter.map {
-                          i =>
-                            (i.unbox + i.counter.ctr.step.asInstanceOf[I32]) >= i.counter.ctr.end.asInstanceOf[I32]
-                        }.toSet
-
                         // Hook up notifications
                         dbgs(s"Setting up notifications for $stmt")
                         dbgs(s"Recv FIFOs: ${memoryBufferNotifs.getRecvFIFOs(stmt)}")
@@ -463,6 +458,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             }
                         }
 
+                        val isLastEn = isFirstIter.map {
+                          i =>
+                            (i.unbox + i.counter.ctr.step.asInstanceOf[I32]) >= i.counter.ctr.end.asInstanceOf[I32]
+                        }.toSet
                         memoryBufferNotifs.getSendFIFOs(stmt) foreach {
                           case(mem, fifo) =>
                             dbgs(s"Sending fifo: $mem, $fifo")

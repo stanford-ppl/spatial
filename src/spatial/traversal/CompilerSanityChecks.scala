@@ -6,6 +6,7 @@ import spatial.node._
 import spatial.util.spatialConfig
 import spatial.metadata.control._
 import spatial.metadata.bounds._
+import spatial.metadata.retiming._
 import spatial.issues.ControlPrimitiveMix
 
 /** Used to automatically detect invalid changes that occurred during transformations. */
@@ -91,6 +92,11 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
       case SpatialCtrlBlackboxImpl(block) =>
         if (lhs.parent match { case Ctrl.Host => false; case _ => true }) error(ctx, s"Please declare Blackbox implementation outside of Accel!")
         inBox { check(lhs,rhs); super.visit(lhs, rhs) }
+      case FIFODeq(_, _) | FIFOBankedDeq(_, _) =>
+        dbgs(s"Found dequeue $lhs with delay ${lhs.fullDelay}")
+        if (lhs.fullDelay >= 1) {
+          error(lhs.ctx, s"Found a banked dequeue ${lhs} with delay ${lhs.fullDelay}")
+        }
       case _ =>
         check(lhs, rhs)
         super.visit(lhs, rhs)

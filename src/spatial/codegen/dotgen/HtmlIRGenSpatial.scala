@@ -5,10 +5,11 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.bounds._
 import spatial.util.spatialConfig
+import utils.io.files
 
-case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
+case class HtmlIRGenSpatial(IR: State, filename: String = "IR") extends HtmlIRCodegen {
 
-  override def entryFile: String = s"IR.$ext"
+  override def entryFile: String = s"$filename.$ext"
 
   override protected def quoteConst(tp: Type[_], c: Any): String = s"$c"
 
@@ -16,7 +17,7 @@ case class HtmlIRGenSpatial(val IR: State) extends HtmlIRCodegen {
     case rhs if s.vecConst.nonEmpty => s"[${s.vecConst.get.mkString(",")}]"
     case (_:Def.Node[_] | _:Def.Bound[_]) => 
       val q = super.quote(s)
-      elem("a", q, "href"->s"IR.html#$q")
+      elem("a", q, "href"->s"$filename.html#$q")
     case _ => super.quote(s)
   }
 

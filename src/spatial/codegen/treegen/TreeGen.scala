@@ -12,15 +12,17 @@ import spatial.util.spatialConfig
 
 import scala.collection.mutable.HashMap
 import spatial.metadata.blackbox._
+import utils.io.files
+import utils.io.files.sep
 
-case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen {
+case class TreeGen(IR: State, filename: String = "controller_tree", IRFile: String = "IR") extends AccelTraversal with argon.codegen.Codegen {
   override val ext: String = "html"
   backend = "tree"
   private var ident = 0
 
   private val swappers = HashMap[Sym[_],Set[Sym[_]]]() // Map from controller to nbufs that it swaps
   override val lang: String = "info"
-  override val entryFile: String = "controller_tree.html"
+  override val entryFile: String = s"$filename.$ext"
 
   val memColors = Seq("cce6ff", "ccb6ff", "99ddff", "99ff99", "e6b3cc", "ccffcc", "e0e0d1", "ffcccc",
                       "d1e0e0", "e699ff", "fff7e6", "f2ffcc", "d9b3ff", "cce0ff", "f2e6ff", "ecc6d9",
@@ -28,6 +30,10 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
                       "50d246", "e0b77a", "14fb82", "efc11b", "aed919") // List of colors I think looks nice
   private val colorMap = HashMap[Sym[_], String]()
   private val nonBufMems = scala.collection.mutable.Set[Sym[_]]()
+
+  override def clearGen(): Unit = {
+    files.deleteFiles(s"$out${sep}$entryFile")
+  }
 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {
     case AccelScope(func)     => inAccel{ printControl(lhs,rhs) }
@@ -77,7 +83,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   }
   override def quoteConst(tp: Type[_], c: Any): String = c.toString
 
-  protected def link(s: String): String = s"""<a href=IR.html#$s target=_blank>$s</a>"""
+  protected def link(s: String): String = s"""<a href=$IRFile.html#$s target=_blank>$s</a>"""
   protected def printMem(mem: Sym[_], payload: String*): Unit = {
     val name = mem.name.getOrElse("")
     emit(s"""${"  "*ident}<p><div style="padding: 10px; border: 1px;display:inline-block;background-color: #${colorMap(mem)}"><font size = "1">${link(s"$mem")} (${mem.memName} "$name")""")
@@ -88,7 +94,7 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
   override protected def emitEntry(block: Block[_]): Unit = gen(block)
 
   def logMem(lhs: Sym[_], rhs: Op[_]): Unit = {
-    if (lhs.instance.depth > 1) {
+    if (lhs.getInstance.isDefined && lhs.getPorts.isDefined && lhs.instance.depth > 1) {
       assignColor(lhs)
       lhs.swappers.foreach{ s => 
         swappers += (s -> (swappers.getOrElse(s, Set()) ++ Set(lhs)))
@@ -212,27 +218,32 @@ case class TreeGen(IR: State) extends AccelTraversal with argon.codegen.Codegen 
         printMem(mem, s"lca = ${link(s"$lca")}", s"nBufs = $depth", s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth)", s"nBufs*volume = $bufVolume", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
       }
     }
-    inCell("Single-Buffered Mems", true) {
-      emit("Single-Buffered Mems")
-    } {
-      nonBufMems.toList.map{x => (x, x.constDims.product)}.sortBy(_._2).reverse.map(_._1).foreach{mem => 
-        val dims = mem.constDims
-        val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
-        val volume = singleVolume(mem)
-        val bitwidth = bitWidth(mem.tp.typeArgs.head)
-        val banks = mem.instance.nBanks
-        val B = mem.instance.Bs
-        val alphas = mem.instance.alphas
-        val Ps = mem.instance.Ps
-        val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
-        val histR: Map[Int, Int] = mem.readers.toList.flatMap{x => x.residualGenerators}.zip(mem.readers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
-        val histW: Map[Int, Int] = mem.writers.toList.flatMap{x => x.residualGenerators}.zip(mem.writers.toList.flatMap{x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0)}).collect{case (rg,b) if b == 0 => rg}.groupBy{lane => lane.zipWithIndex.map{case (r,j) => r.expand(nBanks(j)).size}.product}.map{case(k,v) => k -> v.size}
-        val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
-        val hist = 
-          if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map{b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b,0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b,0)}</div>"""} ++ Seq("</div>")).mkString(" ")
-          else ""
-        printMem(mem, s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth)", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
+    try {
+      inCell("Single-Buffered Mems", true) {
+        emit("Single-Buffered Mems")
+      } {
+        nonBufMems.toList.map { x => (x, x.constDims.product) }.sortBy(_._2).reverse.map(_._1).foreach { mem =>
+          val dims = mem.constDims
+          val pads = mem.getPadding.getOrElse(Seq.fill(dims.length)(0))
+          val volume = singleVolume(mem)
+          val bitwidth = bitWidth(mem.tp.typeArgs.head)
+          val banks = mem.instance.nBanks
+          val B = mem.instance.Bs
+          val alphas = mem.instance.alphas
+          val Ps = mem.instance.Ps
+          val nBanks = if (mem.isLUT | mem.isRegFile) dims else mem.instance.nBanks
+          val histR: Map[Int, Int] = mem.readers.toList.flatMap { x => x.residualGenerators }.zip(mem.readers.toList.flatMap { x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0) }).collect { case (rg, b) if b == 0 => rg }.groupBy { lane => lane.zipWithIndex.map { case (r, j) => r.expand(nBanks(j)).size }.product }.map { case (k, v) => k -> v.size }
+          val histW: Map[Int, Int] = mem.writers.toList.flatMap { x => x.residualGenerators }.zip(mem.writers.toList.flatMap { x => if (x.getPorts.isDefined) x.port.broadcast else List.fill(x.residualGenerators.size)(0) }).collect { case (rg, b) if b == 0 => rg }.groupBy { lane => lane.zipWithIndex.map { case (r, j) => r.expand(nBanks(j)).size }.product }.map { case (k, v) => k -> v.size }
+          val allBins = (histR.map(_._1) ++ histW.map(_._1)).toList.sorted.distinct
+          val hist =
+            if (volume > 1) (Seq("""<div style="display:grid;grid-template-columns: max-content max-content max-content"><div style="border: 1px solid;padding: 5px"><b>muxwidth</b></div> <div style="border: 1px solid;padding: 5px"><b># R lanes</b></div><div style="border: 1px solid;padding: 5px"><b># W Lanes</b></div>""") ++ allBins.map { b => s"""<div style="border: 1px solid;padding: 5px">$b</div> <div style="border: 1px solid;padding: 5px">${histR.getOrElse(b, 0)}</div><div style="border: 1px solid;padding: 5px">${histW.getOrElse(b, 0)}</div>""" } ++ Seq("</div>")).mkString(" ")
+            else ""
+          printMem(mem, s"volume = $volume (dims $dims + pads $pads, bw = $bitwidth)", s"nBanks = $banks, B = $B, a = $alphas, p = $Ps", hist)
+        }
       }
+    }
+    catch {
+      case err: Exception => dbgs(s"${err} occured while trying to generate Single Buffered Mem Data, probably not computed yet.")
     }
     emit("</body>")
     emit("</html>")

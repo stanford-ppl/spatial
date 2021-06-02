@@ -29,6 +29,7 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
     }
     looped match {
       case Op(_:OpForeach) => true
+//      case Op(_:OpReduce[_]) => true
       case _ => false
     }
   }
@@ -129,6 +130,11 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
         transformSequence(preDestructed, targetLoop, destructBlocks(postTarget))
       }, foreach.iters, foreach.stopWhen
     ))
+  }
+
+  private def transformReduce[T](reduce: OpReduce[T]): Sym[_] = {
+    // A reduce can be separated into two blocks: the Map and the Reduce.
+
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {

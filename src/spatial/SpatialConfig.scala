@@ -79,6 +79,8 @@ class SpatialConfig extends Config {
   // Internal flag used to mark whether unit pipe transformer has been run or not
   var allowPrimitivesInOuterControl = true
 
+  // Internal flag used to mark whether fifo deqs with delay > 1 is allowed.
+  var allowLargeDelayFIFODeq = true
 
   var ignoreParEdgeCases: Boolean = false
   var vecInnerLoop: Boolean = false

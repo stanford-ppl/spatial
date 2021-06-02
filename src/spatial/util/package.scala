@@ -62,4 +62,10 @@ package object util {
     }
     candidate
   }
+
+  def computeShifts(parFactors: Iterable[Int]) = {
+    (spatial.util.crossJoin((parFactors map { f => Range(0, f).toList }).toList) map {
+      _.toList
+    }).toList
+  }
 }

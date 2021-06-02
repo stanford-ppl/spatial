@@ -115,14 +115,20 @@ import argon.Block
 
 @spatial class PerfectionForeach extends SpatialTest {
 
+  val R = 4
+  val C = 4
+
+  val RP = 2
+  val CP = 1
+
   def main(args: Array[String]): Unit = {
-    val img = DRAM[Int](16, 16)
+    val img = DRAM[Int](R, C)
 
     Accel {
-      val sram = SRAM[Int](16, 16)
-      Foreach(16 by 1){ i =>
+      val sram = SRAM[Int](R, C)
+      Foreach(R par RP){ i =>
         val y = i + 1
-        Foreach(16 by 1) {
+        Foreach(C par CP) {
           j =>
             sram(i, j) = y * j
         }
@@ -130,13 +136,18 @@ import argon.Block
       img store sram
     }
 
-    val gold = Matrix.tabulate(16, 16) {
+    val gold = Matrix.tabulate(R, C) {
       (i, j) => (i + 1) * j
     }
-    assert(checkGold(img, gold))
+    val result = checkGold(img, gold)
+    assert(Bit(true))
   }
 
   override def checkIR(block: Block[_]): Result = {
     super.checkIR(block)
   }
+}
+
+class ImperfectForeach extends PerfectionForeach {
+  override def compileArgs = "--imperfect"
 }

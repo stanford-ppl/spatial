@@ -165,7 +165,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
   private def transformForeach[A: Type](lhs: Sym[A], foreach: OpForeach): Sym[Void] = {
 
     val parentPars = foreach.cchain.counters map { ctr => ctr.ctrParOr1 }
-    val parentShifts = computeShifts(parentPars)
+    val parentShifts = spatial.util.computeShifts(parentPars)
     // Transforms the foreach into a streampipe of foreaches
     dbgs(s"Transforming Foreach: $lhs = $foreach")
     val replacement = stageWithFlow(UnitPipe(
@@ -190,7 +190,15 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         dbgs(s"InternalMems: ${internalMems.mkString(", ")}")
 
         parentShifts foreach {
-          parentShift =>
+          pShift =>
+
+            val parentShift = (foreach.cchain.counters zip pShift) map {
+              case (ctr, shift) =>
+                implicit def NumEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+                implicit def cast: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
+                ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
+            }
+
             // For Duplicated Memories
             // Reader -> Memory -> FIFO
             val duplicationReadFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
@@ -309,7 +317,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               // we're handling the parent par at a high level.
                               stage(CounterNew(
                                 start.asInstanceOf[I32],
-                                stop.asInstanceOf[I32] - I32(pshift),
+                                stop.asInstanceOf[I32] - pshift,
                                 step.asInstanceOf[I32] * par, I32(1)
                               ))
 
@@ -414,17 +422,24 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             }
                         }
 
-                        val childShifts = computeShifts(shape)
+                        val childShifts = spatial.util.computeShifts(shape)
                         dbgs(s"Unrolling with shifts: $childShifts")
 
                         childShifts foreach {
-                          childShift =>
+                          cShift =>
                             isolateSubst() {
+                              val childShift = (cchain.counters zip cShift) map {
+                                case (ctr, shift) =>
+                                  implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+                                  implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
+                                  ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
+                              }
+
                               val shift = parentShift ++ childShift
                               dbgs(s"Processing shift: $shift")
                               (alliters zip newiters) zip shift foreach {
                                 case ((oldIter, newIter), s) =>
-                                  val shifted = newIter + I32(s)
+                                  val shifted = newIter + s
                                   subst += (oldIter -> shifted)
                               }
 

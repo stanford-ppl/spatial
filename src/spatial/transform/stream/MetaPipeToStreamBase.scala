@@ -10,13 +10,6 @@ trait MetaPipeToStreamBase {
 
   implicit def IR: argon.State
 
-  def computeShifts(parFactors: Iterable[Int]) = {
-    dbgs(s"Par Factors: $parFactors")
-    (spatial.util.crossJoin((parFactors map { f => Range(0, f).toList }).toList) map {
-      _.toList
-    }).toList
-  }
-
   case class MemoryWriteData(writer: Sym[_], readers: Set[Sym[_]])
 
   class LinearizedUseData(val data: mutable.Map[Sym[_], mutable.LinkedHashMap[Sym[_], mutable.Set[Sym[_]]]]) {

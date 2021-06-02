@@ -69,9 +69,9 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
     targetLoop match {
       case Op(OpForeach(ens, cchain, block, iters, stopWhen)) if ens.isEmpty =>
         // Mirror the cchain
-        val newCChain = f(cchain)
+        val newCChain = spatial.util.TransformUtils.expandCounterPars(cchain)
         val newiters = newCChain.counters.map { ctr =>
-          val n = boundVar[I32]
+          val n  = boundVar[I32]
           n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
           n
         }
@@ -80,25 +80,19 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
           case (i, n) => register(i -> n)
         }
         stageWithFlow(OpForeach(ens, newCChain, stageBlock {
-          val isFirstIteration = (newCChain.counters zip newiters) map {
-            case (ctr, iter) =>
-              iter === ctr.start
-          }
+          val isFirst = spatial.util.TransformUtils.isFirstIter(newiters, newCChain)
 
-          withEns(isFirstIteration.toSet) {
+          withEns(isFirst.toSet) {
             mirrorSeq(preTarget)
           }
 
-          mirrorSeq(block.stms)
+          // Need to unroll this to maintain correctness
+          isolateSubst() {
 
-          val isLastIteration = (newCChain.counters zip newiters) map {
-            case (ctr, iter) =>
-              type ctrType = ctr.CT
-              implicit def ctEV: Num[ctrType] = ctr.CTeV.asInstanceOf[Num[ctrType]]
-              val castIter = numericCast[I32, ctrType].apply(iter)
-              val nextIter = castIter + ctr.step.asInstanceOf[ctrType]
-              nextIter >= ctr.end.asInstanceOf[ctrType]
+            mirrorSeq(block.stms)
           }
+
+          val isLastIteration = spatial.util.TransformUtils.isLastIter(newiters, newCChain)
           withEns(isLastIteration.toSet) {
             mirrorSeq(postTarget)
           }

@@ -119,6 +119,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val loopPerfecter         = LoopPerfecter(state)
     lazy val loopCompaction        = LoopCompaction(state)
 
+    lazy val loopPerfection = Seq(loopPerfecter, printer, loopCompaction, printer) ++ DCE
+
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer)
     lazy val streamifyExpansion = Seq(streamBufferExpansion, printer, pipeInserter, printer) ++ DCE
@@ -173,7 +175,7 @@ trait Spatial extends Compiler with ParamLoader {
         regReadCSE          ==>
         /** Dead code elimination */
         DCE ==>
-        loopPerfecter ==> printer ==> loopCompaction ==> regReadCSE ==> DCE ==>
+        (!spatialConfig.imperfect ? loopPerfection) ==>
         /** Metapipelines to Streams */
         spatialConfig.streamify ? streamify  ==>
         /** Stream controller rewrites */
@@ -505,6 +507,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("noOptimizeReduce").action { (_,_) => 
       spatialConfig.enableOptimizedReduce = false
     }.text("Do not squeeze II of reductions to 1 where possible, and instantiate specialized reduce node")
+
+    cli.opt[Unit]("imperfect").action { (_, _) =>
+      spatialConfig.imperfect = true
+    }.text("Do not attempt to perfect loops")
 
     cli.opt[Unit]("runtime").action{ (_,_) =>
       spatialConfig.enableRuntimeModel = true

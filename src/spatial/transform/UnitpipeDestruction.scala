@@ -18,15 +18,17 @@ case class UnitpipeDestruction(IR: argon.State) extends MutateTransformer with A
   }
 
   private def restageUnitpipe(unitpipe: UnitPipe) = {
-    unitpipe.block.stms foreach {
-      case s@Op(op: Enabled[_]) =>
-        implicit val tA: Type[s.R] = op.R.asInstanceOf[Type[s.R]]
-        implicit val ctx: SrcCtx = s.ctx
-        val copy = stageWithFlow( op.mirrorEn(f, unitpipe.ens) ){lhs2 => transferDataIfNew(s, lhs2) }
-        register(s -> copy)
-      case s@Op(op) =>
-        dbgs(s"Mirroring Inside Unitpipe: $s = $op")
-        register(s -> mirrorSym(s))
+    isolateSubst() {
+      unitpipe.block.stms foreach {
+        case s@Op(op: Enabled[_]) =>
+          implicit val tA: Type[s.R] = op.R.asInstanceOf[Type[s.R]]
+          implicit val ctx: SrcCtx = s.ctx
+          val copy = stageWithFlow(op.mirrorEn(f, unitpipe.ens)) { lhs2 => transferDataIfNew(s, lhs2) }
+          register(s -> copy)
+        case s@Op(op) =>
+          dbgs(s"Mirroring Inside Unitpipe: $s = $op")
+          register(s -> mirrorSym(s))
+      }
     }
   }
 

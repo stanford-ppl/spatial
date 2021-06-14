@@ -18,9 +18,9 @@ case class RegWriteReadElimination(IR: State) extends MutateTransformer with Acc
 
     case AccelScope(_) => inAccel { dbgs("In Accel"); super.transform(lhs, rhs) }
 
-    case ctrl: Control[_] if inAccel && (lhs.isUnitPipe || lhs.isForeach) && lhs.isInnerControl =>
+    case ctrl: Control[_] if inAccel && (lhs.isUnitPipe || lhs.isForeach) =>
       dbgs(s"Processing: $lhs = $rhs")
-//      routeThroughRegs(ctrl)
+      routeThroughRegs(ctrl)
       val mirrored = mirrorSym(lhs)
       register(lhs -> mirrored)
       mirrored
@@ -35,27 +35,37 @@ case class RegWriteReadElimination(IR: State) extends MutateTransformer with Acc
     } foreach {
       case (_, block) =>
         // Reg -> current value
-        val regCache = mutable.Map[Sym[_], Bits[_]]()
+        val regCache = mutable.Map[Sym[_], Bits[_]]().withDefault({case Op(RegNew(init)) => init})
+
+        val eliminationCache = (block.stms flatMap {
+          case Op(RegWrite(mem, _, _)) => Some(mem.asSym)
+          case Op(RegRead(mem)) => Some(mem.asSym)
+          case Op(_) => None
+        }).toSet.map({
+          mem: Sym[_] => mem -> isEliminatable(mem)
+        }).toMap[Sym[_], Boolean].withDefaultValue(false)
+
+        dbgs(s"$eliminationCache")
+
         val copied = stageBlock({
           block.stms foreach {
-              case stmt@Op(RegNew(init)) if !stmt.keepUnused && isEliminatable(stmt) =>
-                dbgs(s"Registering $stmt <- $init")
-                regCache(stmt) = init
-              case stmt@Op(RegWrite(mem, data, ens)) if regCache contains mem =>
+              case stmt@Op(RegWrite(mem, data, ens)) if eliminationCache(mem) =>
                 implicit lazy val bEV: Bits[data.R] = data
                 if (ens.isEmpty) {
-                  regCache(mem) = data
+                  regCache(mem) = f(data)
                 } else {
                   regCache(mem) = stage(Mux(ens.reduce {
                     _ && _
-                  }, data, regCache(mem).asInstanceOf[Bits[data.R]]))
+                  }, f(data), regCache(mem).asInstanceOf[Bits[data.R]]))
                 }
                 dbgs(s"Updating $mem <- ${regCache(mem)}, ens: $ens, eliminated $stmt")
                 subst += (stmt -> Invalid)
-              case stmt@Op(RegRead(mem)) if regCache contains mem =>
+              case stmt@Op(RegRead(mem)) if eliminationCache(mem) =>
                 dbgs(s"Reading: $mem, eliminated $stmt")
                 subst += (stmt -> regCache(mem).asSym)
 
+              case stmt if eliminationCache(stmt) =>
+                dbgs(s"Eliminating: ${stmt}")
               case stmt@Op(op) =>
                 dbgs(s"Updating: $stmt = $op")
                 subst += (stmt -> mirrorSym(stmt))
@@ -68,12 +78,27 @@ case class RegWriteReadElimination(IR: State) extends MutateTransformer with Acc
   private def isEliminatable(s: Sym[_]): Boolean = {
     // A register is eliminatable if:
     // all readers happen after a guaranteed write
+    // All users of the register are in the same controller
     if (s.resetters.nonEmpty) return false
-    s.writers forall {
+    if (s.isNonBuffer) return false
+    val guaranteedWrite = s.writers forall {
         case Writer((_, _, _, ens)) => ens.isEmpty || ens.forall {
           case Const(c) => c.value
           case _ => false
         }
     }
+    dbgs(s"$s : ${s.accesses}")
+    dbgs(s"${metadata.all(s).toList}")
+    val ancestors = (s.accesses map {
+      sym => sym.parent
+    })
+    val hasSingleAncestor = ancestors.size == 1
+
+    dbgs(s"isEliminatable($s) = $guaranteedWrite && $hasSingleAncestor")
+    indent {
+      dbgs(s"Accesses: ${s.accesses}, Ancestors: $ancestors")
+    }
+
+    guaranteedWrite && hasSingleAncestor
   }
 }

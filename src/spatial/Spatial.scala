@@ -124,12 +124,12 @@ trait Spatial extends Compiler with ParamLoader {
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
     lazy val loopPerfection = Seq(loopPerfecter, printer, loopCompaction, printer) ++ DCE
-    lazy val unitpipeReform = createDump("preDestruction") ++ Seq(unitpipeDestruction, printer) ++ Seq(regElim, printer, pipeInserter, printer) ++ bankingAnalysis ++ createDump("postReform")
+    lazy val unitpipeReform = Seq(regElim, printer, allocMotion, pipeInserter, printer)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer)
-    lazy val streamifyExpansion = Seq(streamBufferExpansion, printer, allocMotion, printer, pipeInserter, printer) ++ DCE
-    lazy val streamify = streamifyAnalysis ++ bankingAnalysis ++ streamifyExpansion ++ unitpipeReform ++ Seq(streamChecks)
+    lazy val streamifyExpansion = Seq(streamBufferExpansion, printer)
+    lazy val streamify = streamifyAnalysis ++ bankingAnalysis ++ streamifyExpansion ++ Seq(allocMotion, pipeInserter, printer)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -196,7 +196,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** CSE on regs */
         regReadCSE          ==>
         /** Dead code elimination */
-        DCE ==>
+        DCE ==> Seq(retimingAnalyzer, printer, streamChecks) ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>

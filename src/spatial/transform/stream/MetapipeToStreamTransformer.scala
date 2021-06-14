@@ -499,9 +499,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
       }
 
       case foreach@OpForeach(ens, cchain, block, iters, stopWhen) if inHw && canTransform(lhs, rhs) =>
-        indent {
-          transformForeach(lhs, foreach)
-        }
+        transformForeach(lhs, foreach)
 
       case _ => super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]

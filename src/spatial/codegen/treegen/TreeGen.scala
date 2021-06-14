@@ -94,15 +94,20 @@ case class TreeGen(IR: State, filename: String = "controller_tree", IRFile: Stri
   override protected def emitEntry(block: Block[_]): Unit = gen(block)
 
   def logMem(lhs: Sym[_], rhs: Op[_]): Unit = {
-    if (lhs.getInstance.isDefined && lhs.getPorts.isDefined && lhs.instance.depth > 1) {
-      assignColor(lhs)
-      lhs.swappers.foreach{ s => 
-        swappers += (s -> (swappers.getOrElse(s, Set()) ++ Set(lhs)))
+    try {
+      if (lhs.instance.depth > 1) {
+        assignColor(lhs)
+        lhs.swappers.foreach { s =>
+          swappers += (s -> (swappers.getOrElse(s, Set()) ++ Set(lhs)))
+        }
       }
-    }
-    else {
-      assignColor(lhs, Some(0))
-      nonBufMems += lhs
+      else {
+        assignColor(lhs, Some(0))
+        nonBufMems += lhs
+      }
+    } catch {
+      case err: Exception =>
+        dbgs(s"${err} occured while trying to log memory $lhs = $rhs.")
     }
   }
 

@@ -9,12 +9,9 @@ import spatial.metadata.memory._
 class MLP_Variant extends MLP_Variants(N=1024, batch=32,dims=List(2,2,2),ips=List(1,1),mps=List(1,1),ops=List(1,1))
 
 class MLP_Variant_Streamed extends MLP_Variant {
-  override def compileArgs = "--streamify --noBindParallels --vv"
+  override def compileArgs = "--streamify --vv"
 }
 
-class MLP_Variant_Streamed_passing extends MLP_Variant_Streamed
-class MLP_Variant_Streamed_2 extends MLP_Variant_Streamed
-class MLP_Variant_Streamed_noallocmotion extends MLP_Variant_Streamed
 
 @spatial abstract class MLP_Variants(
                                       val N:scala.Int = 1024,
@@ -31,7 +28,7 @@ class MLP_Variant_Streamed_noallocmotion extends MLP_Variant_Streamed
 
   def main(args: Array[String]): Unit = {
     val state = implicitly[argon.State]
-    state.config.setV(3)
+//    state.config.setV(3)
     val Ws = dims.sliding(2,1).map { case List(prev, next) => Seq.tabulate(prev, next) { (i,j) => (i*next +j) } }.toList
     val Bs = dims.sliding(2,1).map { case List(prev, next) => Seq.tabulate(next) { i => i } }.toList
     val input = Seq.tabulate(N, dims.head) { case (i,j) => i*dims.head + j }

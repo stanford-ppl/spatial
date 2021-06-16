@@ -115,7 +115,6 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
     lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
     lazy val regElim               = RegWriteReadElimination(state)
-    lazy val streamBufferExpansion = StreamBufferExpansion(state)
     lazy val unitpipeDestruction   = UnitpipeDestruction(state)
     lazy val loopPerfecter         = LoopPerfecter(state)
     lazy val loopCompaction        = LoopCompaction(state)
@@ -127,9 +126,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeReform = Seq(regElim, printer, allocMotion, pipeInserter, printer)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
-    lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer, printer, metapipeToStream, printer)
-    lazy val streamifyExpansion = Seq(streamBufferExpansion, printer)
-    lazy val streamify = streamifyAnalysis ++ bankingAnalysis ++ streamifyExpansion ++ Seq(allocMotion, pipeInserter, printer)
+    lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer) ++ bankingAnalysis ++ createDump("PreMetapipe") ++ Seq(metapipeToStream, printer) ++ createDump("PostMetapipe")
+    lazy val streamify = streamifyAnalysis ++ Seq(pipeInserter, printer)
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

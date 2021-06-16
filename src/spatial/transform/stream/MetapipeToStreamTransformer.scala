@@ -1,21 +1,20 @@
 package spatial.transform.stream
 
-import argon.transform.MutateTransformer
 import argon._
+import argon.transform.MutateTransformer
 import spatial.lang._
-import spatial.node._
-import spatial.traversal.AccelTraversal
-import spatial.metadata.memory._
-import spatial.metadata.control._
-import spatial.metadata.types._
 import spatial.metadata.access._
+import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.node._
+import spatial.transform.{AllocMotion, PipeInserter}
+import spatial.traversal.AccelTraversal
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 /** Converts Metapipelined controllers into streamed controllers.
   */
-case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal with MetaPipeToStreamBase {
+case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal with MetaPipeToStreamBase with StreamBufferExpansion {
 
   private val allowableSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
 
@@ -153,14 +152,29 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     ((result.keys map {k => (k -> (maxBufferDepth * 2))}).toMap, maxBufferDepth)
   }
 
-  /**
-    * For a sequence of statments, compute the following:
-    * For each memory, for each writer, compute the set of readers which read its value.
-    * This is slightly different from reaching definitions as each write KILLS the previous writes even if it is
-    * conditional. Additionally, this only considers one level of the hierarchy.
-    *
-    * @param stmts
-    */
+  private def getMemTokens(stmt: Sym[_], en: Set[Bit], memoryBufferNotifs: MemoryBufferNotification) = {
+    val tmpRegs = (memoryBufferNotifs.getRecvFIFOs(stmt) map {
+      case(mem, fifo) =>
+        val tokenRegBuf = Reg[I32]
+        tokenRegBuf.explicitName = s"TokenReg_${mem}_${fifo}_buf"
+        ((mem, fifo) -> tokenRegBuf)
+    }).toMap
+
+    (memoryBufferNotifs.getRecvFIFOs(stmt) map {
+      case(mem, fifo) =>
+        val token = stage(FIFODeq(fifo, en))
+        val tokenReg = Reg[I32]
+        val tokenRegBuf = tmpRegs((mem, fifo))
+
+        tokenReg.explicitName = s"TokenReg_${mem}_${fifo}"
+        tokenReg.nonbuffer
+        tokenReg.write(token, en.toSeq:_*)
+        tokenRegBuf := tokenReg
+
+        dbgs(s"Staging token: $mem, $fifo, $tokenReg, $tokenRegBuf")
+        (f(mem) -> tokenRegBuf.value)
+    }).toMap
+  }
 
   private def transformForeach[A: Type](lhs: Sym[A], foreach: OpForeach): Sym[Void] = {
 
@@ -304,8 +318,12 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 // two on enqueue.
 
                 isolateSubst() {
-                  stmt.op match {
-                    case Some(OpForeach(ens, cchain, block, iters, stopWhen)) =>
+                  stmt match {
+//                    case Op(OpReduce(ens, cchain, accum, map, load, reduce, store, ident, fold, iters, stopWhen)) =>
+//                      // Unroll early here as well.
+
+
+                    case Op(OpForeach(ens, cchain, block, iters, stopWhen)) =>
                       // Unroll early here.
                       // start, stop, step, par ->
                       // start, stop, step * par, 1
@@ -326,14 +344,12 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               stage(ForeverNew())
                           }
                       }
-                      val shape = ArrayBuffer[Int]()
+                      val shape = cchain.counters map {_.ctrParOr1}
 
                       val newChildCtrs = cchain.counters map {
                         case Op(CounterNew(start, stop, step, par)) =>
-                          shape.append(par.toInt)
                           stage(CounterNew[I32](start.asInstanceOf[I32], stop.asInstanceOf[I32], step.asInstanceOf[I32] * par, I32(1)))
                         case Op(ForeverNew()) =>
-                          shape.append(1)
                           stage(ForeverNew())
                       }
 
@@ -349,7 +365,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         n
                       }
 
-                      var memTokens: Map[Sym[_], I32] = null
                       stage(OpForeach(ens, ccnew, stageBlock {
                         val isFirstIter = newiters.takeRight(iters.size)
                         val en = isFirstIter.map {
@@ -361,27 +376,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         dbgs(s"Recv FIFOs: ${memoryBufferNotifs.getRecvFIFOs(stmt)}")
                         dbgs(s"Send FIFOs: ${memoryBufferNotifs.getSendFIFOs(stmt)}")
 
-                        val tmpRegs = (memoryBufferNotifs.getRecvFIFOs(stmt) map {
-                          case(mem, fifo) =>
-                            val tokenRegBuf = Reg[I32]
-                            tokenRegBuf.explicitName = s"TokenReg_${mem}_${fifo}_buf"
-                            ((mem, fifo) -> tokenRegBuf)
-                        }).toMap
-
-                        memTokens = (memoryBufferNotifs.getRecvFIFOs(stmt) map {
-                          case(mem, fifo) =>
-                            val token = stage(FIFODeq(fifo, en))
-                            val tokenReg = Reg[I32]
-                            val tokenRegBuf = tmpRegs((mem, fifo))
-
-                            tokenReg.explicitName = s"TokenReg_${mem}_${fifo}"
-                            tokenReg.nonbuffer
-                            tokenReg.write(token, en.toSeq:_*)
-                            tokenRegBuf := tokenReg
-
-                            dbgs(s"Staging token: $mem, $fifo, $tokenReg, $tokenRegBuf")
-                            (f(mem) -> tokenRegBuf.value)
-                        }).toMap
+                        val memTokens = getMemTokens(stmt, en, memoryBufferNotifs)
 
                         dbgs(s"MemTokens: ${memTokens}")
 
@@ -389,7 +384,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                           case read: Reg[_] =>
                             type T = read.RT
                             lazy implicit val bT: Bits[T] = read.A
-                            val tmp = mirrorSym(read)
+                            visit(read)
+                            val tmp = f(read)
                             cloned(read) = tmp
 
                             // All of the original register reads/writes are now delegated to a proxy register.
@@ -411,7 +407,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                 memTokens.get(f(mem)) match {
                                   case Some(ind) =>
                                     dbgs(s"Adding Buffering Info to: $stmt")
-                                    stmt.bufferIndex = ind
+                                    f(stmt).bufferIndex = ind
                                   case None =>
                                 }
                             }
@@ -440,8 +436,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                               block.stms foreach {
                                 x =>
-                                  val copy = mirrorSym(x)
-                                  subst += (x -> copy)
+                                  visit(x)
                               }
                             }
                         }
@@ -470,14 +465,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                       }, newiters, stopWhen))
                   }
                 }
-              case stmt if shouldDuplicate(stmt) || shouldBuffer(stmt) =>
+              case stmt if shouldDuplicate(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")
                 subst += (stmt -> mirrorSym(stmt))
+              case stmt if shouldBuffer(stmt) =>
+                subst += (stmt -> expandMem(stmt))
               case stmt if !stmt.isControl =>
                 dbgs(s"Didn't know how to convert: $stmt of type ${stmt.op}")
                 subst += (stmt -> mirrorSym(stmt))
               case stmt if stmt.isControl =>
-                bug(s"Could not convert controller: $stmt of type ${stmt.op}")
+                error(s"Could not convert controller: $stmt of type ${stmt.op}")
                 throw new Exception()
             }
         }
@@ -498,9 +495,11 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         super.transform(lhs, rhs)
       }
 
-      case foreach@OpForeach(ens, cchain, block, iters, stopWhen) if inHw && canTransform(lhs, rhs) =>
+      case foreach:OpForeach if inHw && canTransform(lhs, rhs) =>
         transformForeach(lhs, foreach)
 
+      case writer: Writer[_] if shouldExpand(writer.mem) => expandWriter(lhs, writer)
+      case reader: Reader[_, _] if shouldExpand(reader.mem) => expandReader(lhs, reader)
       case _ => super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }

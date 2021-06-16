@@ -108,4 +108,4 @@ case class StreamBufferAmount(buffering: Int, min: Int = 0, max: Int = Int.MaxVa
   * Memory Buffering Index
   */
 
-case class StreamBufferIndex(bufferIndex: Sym[_]) extends Data[StreamBufferIndex](SetBy.Analysis.Self)
+case class StreamBufferIndex(bufferIndex: Sym[_]) extends Data[StreamBufferIndex](Transfer.Mirror)

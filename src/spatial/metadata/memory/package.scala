@@ -430,21 +430,11 @@ package object memory {
 
   implicit class MemoryAccessOps(s: Sym[_]) {
     def readers: Set[Sym[_]] = {
-      s.rhs.getID match {
-        case Some(231) => println(s"readers($s) = ${metadata[Readers](s)}")
-        case _ =>
-      }
-
       metadata[Readers](s).map(_.readers).getOrElse(Set.empty)
     }
     def readers_=(rds: Set[Sym[_]]): Unit = metadata.add(s, Readers(rds))
 
     def writers: Set[Sym[_]] = {
-      s.rhs.getID match {
-        case Some(231) => println(s"writers($s) = ${metadata[Writers](s)}")
-        case _ =>
-      }
-
       metadata[Writers](s).map(_.writers).getOrElse(Set.empty)
     }
     def writers_=(wrs: Set[Sym[_]]): Unit = metadata.add(s, Writers(wrs))

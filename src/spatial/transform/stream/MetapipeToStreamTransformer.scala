@@ -1,6 +1,7 @@
 package spatial.transform.stream
 
 import argon._
+import argon.passes.RepeatableTraversal
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.metadata.access._
@@ -14,7 +15,12 @@ import scala.collection.mutable
 
 /** Converts Metapipelined controllers into streamed controllers.
   */
-case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal with MetaPipeToStreamBase with StreamBufferExpansion {
+case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal with MetaPipeToStreamBase with StreamBufferExpansion with RepeatableTraversal {
+
+  lazy val allocMotion = AllocMotion(IR)
+  lazy val pipeInserter = PipeInserter(IR)
+
+  lazy val subPasses = Seq(allocMotion, pipeInserter)
 
   private val allowableSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
 
@@ -407,7 +413,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                 memTokens.get(f(mem)) match {
                                   case Some(ind) =>
                                     dbgs(s"Adding Buffering Info to: $stmt")
-                                    f(stmt).bufferIndex = ind
+                                    stmt.bufferIndex = ind
                                   case None =>
                                 }
                             }
@@ -496,10 +502,13 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
       }
 
       case foreach:OpForeach if inHw && canTransform(lhs, rhs) =>
-        transformForeach(lhs, foreach)
+        isolateSubst(lhs) {
+          converged = false
+          transformForeach(lhs, foreach)
+        }
 
-      case writer: Writer[_] if shouldExpand(writer.mem) => expandWriter(lhs, writer)
-      case reader: Reader[_, _] if shouldExpand(reader.mem) => expandReader(lhs, reader)
+      case writer: Writer[_] if lhs.bufferIndex.isDefined => expandWriter(lhs, writer)
+      case reader: Reader[_, _] if lhs.bufferIndex.isDefined => expandReader(lhs, reader)
       case _ => super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }

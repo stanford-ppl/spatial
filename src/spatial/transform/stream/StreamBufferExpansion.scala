@@ -65,7 +65,7 @@ trait StreamBufferExpansion {
       case sr: SRAM[_, _] =>
         type A = sr.A.R
         lazy implicit val bitsEV: Bits[A] = sr.A
-        val result = stage(SRAMRead(f(reader.mem).asInstanceOf[SRAM[A, SRAMN]], Seq(insertedDim) ++ f(reader.addr), f(reader.ens)))
+        val result = stage(SRAMRead(f(reader.mem).asInstanceOf[SRAM[A, SRAMN]], Seq(insertedDim) ++ f(reader.addr), reader.ens))
         result
     }
   }

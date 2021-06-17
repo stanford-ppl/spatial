@@ -1,7 +1,7 @@
 package spatial
 
 import argon._
-import argon.passes.IRPrinter
+import argon.passes.{IRPrinter, RepeatedTraversal}
 import poly.{ConstraintMatrix, ISL}
 import models.AreaEstimator
 import spatial.codegen.chiselgen._
@@ -126,8 +126,10 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeReform = Seq(regElim, printer, allocMotion, pipeInserter, printer)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
-    lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer) ++ bankingAnalysis ++ createDump("PreMetapipe") ++ Seq(metapipeToStream, printer) ++ createDump("PostMetapipe")
-    lazy val streamify = streamifyAnalysis ++ Seq(pipeInserter, printer)
+    lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer, iterationDiffAnalyzer) ++ bankingAnalysis ++ Seq(metapipeToStream, printer)
+//    lazy val streamify = streamifyAnalysis ++ Seq(pipeInserter, printer)
+
+    lazy val streamify = RepeatedTraversal(state, streamifyAnalysis ++ Seq(pipeInserter, printer))
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

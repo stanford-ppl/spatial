@@ -2,9 +2,8 @@ package spatial.transform
 
 import argon._
 import argon.transform.MutateTransformer
-import spatial.node.{AccelScope, Control}
+import spatial.node.{AccelScope, Control, OpForeach}
 import spatial.traversal.AccelTraversal
-
 import spatial.lang._
 import spatial.metadata.control._
 import spatial.metadata.memory._
@@ -14,7 +13,7 @@ case class AllocMotion(IR: State) extends MutateTransformer with AccelTraversal 
 
     case AccelScope(_) => inAccel { dbgs("In Accel"); super.transform(lhs, rhs) }
 
-    case ctrl: Control[_] if inAccel =>
+    case ctrl: OpForeach if inAccel =>
       dbgs(s"Processing: $lhs = $rhs")
       ctrl.blocks foreach {
         blk =>
@@ -29,17 +28,18 @@ case class AllocMotion(IR: State) extends MutateTransformer with AccelTraversal 
   // Moves allocs to the beginning of the block.
   def motionAllocs(block: Block[_]): Block[_] = {
     stageBlock({
-      block.stms.filter(_.isMem).foreach {
+      block.internalMems.foreach {
         mem =>
+          dbgs(s"Mirroring Memory: $mem = ${mem.op}")
           register(mem -> mirrorSym(mem))
       }
 
       block.stms.filterNot(_.isMem).foreach {
-        notMem =>
-          register(notMem -> mirrorSym(notMem))
+        case sym@Op(op) =>
+          implicit def tpEV: Type[sym.R] = op.R.asInstanceOf[Type[sym.R]]
+          register(sym -> transform(sym.asInstanceOf[Sym[sym.R]], op.asInstanceOf[Op[sym.R]]))
       }
-
-      spatial.lang.void.asSym
+      f(block.stms.last)
     })
   }
 }

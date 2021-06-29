@@ -1,5 +1,5 @@
 package argon.passes
-import argon.Block
+import argon.{Block, dbgs, metadata}
 
 
 trait RepeatableTraversal extends Traversal {
@@ -10,6 +10,7 @@ case class RepeatedTraversal(IR: argon.State, passes: Seq[Traversal]) extends Pa
   private def hasConverged: Boolean = {
     passes forall {
       case rt: RepeatableTraversal =>
+        dbgs(s"Has Converged: $rt = ${rt.converged}")
         rt.converged
       case _: Traversal => true
     }
@@ -30,7 +31,9 @@ case class RepeatedTraversal(IR: argon.State, passes: Seq[Traversal]) extends Pa
       resetConvergence(true)
       passes foreach {
         pass =>
+          dbgs(s"Starting Pass: $pass")
           blk = pass.run(block)
+          dbgs(s"Ending Pass: $pass")
       }
     } while (!hasConverged)
     blk

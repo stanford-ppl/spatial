@@ -86,22 +86,38 @@ abstract class Data[T](val transfer: Transfer.Transfer) extends Serializable { s
 
 /** Shortcuts for metadata */
 object metadata {
+  var dbgPrint: Boolean = false
+  val dbgPrintClasses: Set[String] = Set()
+
   type MMap = mutable.Map[Class[_],Data[_]]
 
   private def keyOf[M<:Data[M]:Manifest]: Class[M] = manifest[M].runtimeClass.asInstanceOf[Class[M]]
 
-  def add(edge: Sym[_], key: Class[_], m: Data[_]): Unit = edge._data += (key -> m)
+  def add(edge: Sym[_], key: Class[_], m: Data[_]): Unit = {
+    if (dbgPrint && (dbgPrintClasses contains key.getSimpleName)) {
+      println(s"Adding: $edge[$key] = $m")
+    }
+    edge._data += (key -> m)
+  }
 
-  def add[M<:Data[M]:Manifest](edge: Sym[_], m: M): Unit = edge._data += (m.key -> m)
+  def add[M<:Data[M]:Manifest](edge: Sym[_], m: M): Unit = add(edge, m.key, m)
+
   def add[M<:Data[M]:Manifest](edge: Sym[_], m: Option[M]): Unit = m match {
-    case Some(data) => edge._data += (data.key -> data)
-    case None => edge._data.remove(keyOf[M])
+    case Some(data) =>
+      add(edge, data)
+    case None =>
+      remove(edge, keyOf[M])
   }
   def all(edge: Sym[_]): Iterator[(Class[_],Data[_])] = edge._data.iterator
 
-  def remove(edge: Sym[_], key: Class[_]): Unit = edge._data.remove(key)
+  def remove(edge: Sym[_], key: Class[_]): Unit = {
+    if (dbgPrint && (dbgPrintClasses contains key.getSimpleName)) {
+      println(s"Removing: $edge[$key]")
+    }
+    edge._data.remove(key)
+  }
 
-  def clear[M<:Data[M]:Manifest](edge: Sym[_]): Unit = edge._data.remove(keyOf[M])
+  def clear[M<:Data[M]:Manifest](edge: Sym[_]): Unit = remove(edge, keyOf[M])
 
   def apply[M<:Data[M]:Manifest](edge: Sym[_]): Option[M] = edge._data.get(keyOf[M]).map(_.asInstanceOf[M])
 }

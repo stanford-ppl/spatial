@@ -116,14 +116,20 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
       def computeStages(): Unit = {
         block.stms.foreach{
           case Transient(s) =>
-            val i = stages.lastIndexWhere{stage => (stage.nodes intersect s.inputs).nonEmpty }
+            val i = stages.lastIndexWhere{stage =>
+              // Nodes which produce this value, or nodes which write to a mem read by this sym.
+              // this second case is basically a special-case for RegReads, which are transient, but ordered.
+              val stageEffects = stage.nodes// ++ stage.nodes.flatMap(sym => sym.effects.writes)
+              (stageEffects intersect s.inputs).nonEmpty
+            }
             val stage = if (i >= 0) stages(i) else stages.head
             stage.nodes += s
+            dbgs(s"inline: $s = ${s.op}, inputs: ${s.inputs}")
 
-          case Alloc(s)      => nextOuterStage.nodes += s
-          case Primitive(s)  => nextInnerStage.nodes += s
-          case Control(s)    => nextOuterStage.nodes += s
-          case FringeNode(s) => nextOuterStage.nodes += s
+          case Alloc(s)      => nextOuterStage.nodes += s; dbgs(s"Alloc: $s = ${s.op}")
+          case Primitive(s)  => nextInnerStage.nodes += s; dbgs(s"Primitive: $s = ${s.op}")
+          case Control(s)    => nextOuterStage.nodes += s; dbgs(s"Control: $s = ${s.op}")
+          case FringeNode(s) => nextOuterStage.nodes += s; dbgs(s"Fringe: $s = ${s.op}")
         }
       }
       def bindStages(): Unit = {
@@ -193,6 +199,8 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
               dbgs(s"  => ${stm(rd)}")
               register(s, rd)
             }
+
+//            dbgs(s"Replacements: $subst")
 
           case (stg,i) if stg.outer =>
             stg.dump(id,i)

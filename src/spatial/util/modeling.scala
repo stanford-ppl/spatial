@@ -245,6 +245,7 @@ object modeling {
     }
 
     def fullDFS(cur: Sym[_]): Double = {
+      dbgs(s"Computing fullDFS: $cur")
       def precedingWrites: Seq[Sym[_]] = {
         cur.readMem.map{mem => 
           val parentScope = cur.parent.innerBlocks.flatMap(_._2.stms)

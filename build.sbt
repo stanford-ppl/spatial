@@ -179,3 +179,6 @@ lazy val pirTest = project
 /** Set number of threads for testing **/
 val threadsOrDefault: Int = Option(System.getProperty("maxthreads")).getOrElse("1").toInt
 Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
+
+val cleanAll = taskKey[Unit]("Clean all projects")
+cleanAll := clean.all(ScopeFilter(inAnyProject)).value

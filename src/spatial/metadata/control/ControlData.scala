@@ -278,4 +278,4 @@ case class UnrollBy(par: Int) extends Data[UnrollBy](SetBy.Analysis.Self)
   */
 case class ProgramOrder(id: Int) extends Data[ProgramOrder](SetBy.Analysis.Self)
 
-case class ConvertToStreamed(flag: Boolean) extends Data[ConvertToStreamed](SetBy.Analysis.Self)
+case class ConvertToStreamed(flag: Boolean) extends Data[ConvertToStreamed](Transfer.Mirror)

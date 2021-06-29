@@ -597,7 +597,7 @@ package object control {
     def haltIfStarved: Boolean = s.flatMap{sym => metadata[HaltIfStarved](sym).map(_.f) }.getOrElse(false)
     def haltIfStarved_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, HaltIfStarved(f))}
 
-    def shouldConvertToStreamed: Boolean = s.flatMap{sym => metadata[ConvertToStreamed](sym).map(_.flag)}.getOrElse(false)
+    def shouldConvertToStreamed: Option[Boolean] = s.flatMap{sym => metadata[ConvertToStreamed](sym).map(_.flag)}
     def shouldConvertToStreamed_=(f: Boolean): Unit = s.foreach{sym => metadata.add(sym, ConvertToStreamed(f))}
 
     def getLoweredTransfer: Option[TransferType] = {

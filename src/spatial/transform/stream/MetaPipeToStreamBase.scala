@@ -37,6 +37,7 @@ trait MetaPipeToStreamBase {
 
     stmts foreach {
       case mem if mem.isMem =>
+        dbgs(s"Adding mem: $mem")
         localMems.add(mem)
       case stmt =>
         (stmt.effects.reads diff stmt.effects.writes) intersect localMems foreach {
@@ -62,12 +63,17 @@ trait MetaPipeToStreamBase {
     new LinearizedUseData(states)
   }
 
-  def computeNonlocalUses(readMems: Set[Sym[_]], writtenMems: Set[Sym[_]], stmts: Seq[Sym[_]]) = {
+  def computeNonlocalUses(ctrl: Sym[_]) = {
     // If a memory is only read/written by a single child, then it's fine.
     // If a memory is read/written by multiple children, then we need to pass tokens around.
-    val memUseCounts = ((readMems union writtenMems) map {
+    val readMems = ctrl.effects.reads
+    val writtenMems = ctrl.effects.writes
+    val stmts = ctrl.blocks.flatMap(_.stms)
+    val externalMems = (readMems union writtenMems) diff stmts.toSet
+    dbgs(s"External Memories: $externalMems")
+    val memUseCounts = (externalMems map {
       mem =>
-        mem -> (stmts count { stmt => (stmt.readMems union stmt.writtenMems) contains mem })
+        mem -> (stmts count { stmt => (stmt.effects.reads union stmt.effects.writes) contains mem })
     }).toMap
 
     val singleUseMemories = (memUseCounts filter {case (_, v) => v == 1}).keySet
@@ -81,7 +87,7 @@ trait MetaPipeToStreamBase {
     val multiUses = mutable.Map[Sym[_], mutable.ArrayBuffer[Sym[_]]]()
     stmts foreach {
       stmt =>
-        val modifiedMultiUse = (stmt.readMems union stmt.writtenMems) intersect multiUseMemories
+        val modifiedMultiUse = (stmt.effects.reads union stmt.effects.writes) intersect multiUseMemories
         modifiedMultiUse foreach {
           mem => multiUses.getOrElseUpdate(mem, mutable.ArrayBuffer.empty).append(stmt)
         }

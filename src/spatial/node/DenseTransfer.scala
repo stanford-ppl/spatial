@@ -97,7 +97,7 @@ object DenseTransfer {
 
     val outerLoopCounters = counters.dropRight(1)
     if (outerLoopCounters.nonEmpty) {
-      val top = Stream.Foreach(outerLoopCounters.map{ctr => ctr()}){ is =>
+      val top = 'DenseTransfer.Stream.Foreach(outerLoopCounters.map{ctr => ctr()}){ is =>
         val indices = is :+ 0.to[I32]
 
         // Pad indices, strides with 0's against rawDramOffsets
@@ -114,7 +114,7 @@ object DenseTransfer {
       top.loweredTransferSize = (lens.last._2, pars.last._2, lastPar*A.nbits)
     }
     else {
-      val top = Stream {
+      val top = 'DenseTransfer.Stream {
         val dramAddr = () => flatIndex(rawDramOffsets, rawDims) / wordsPackedInByte
         val localAddr = {i: I32 => Seq(i) }
         if (isLoad) load(dramAddr, localAddr)
@@ -164,7 +164,7 @@ object DenseTransfer {
       val ackStream  = StreamIn[Bit](BurstAckBus)
 
       // Command generator
-      Sequential {
+      'DenseTransferCommands.Sequential {
         val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
         cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
@@ -183,7 +183,7 @@ object DenseTransfer {
 
       // Ack receiver
       // TODO[2]: Assumes one ack per command
-      Pipe {
+      'DenseTransferAck.Pipe {
         // val size = Reg[I32]
         // Pipe{size := issueQueue.deq()}
         val ack  = ackStream.value()

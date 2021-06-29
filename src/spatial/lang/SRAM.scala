@@ -265,7 +265,13 @@ object SRAM {
   var r: Int = -1
 
   def rank: Int = {
-    assert(r >= 0, s"SRAM cannot have negative rank!")
+    if (r < 0) {
+      (this.asSym) match {
+        case Op(SRAMNew(dims)) =>
+          r = dims.size
+      }
+    }
+    assert(r >= 0, s"${this.asSym} SRAM cannot have negative rank!")
     r
   }
 

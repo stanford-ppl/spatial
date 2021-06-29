@@ -25,6 +25,7 @@ trait StreamBufferExpansion {
       val newDims = Seq(I32(bufferAmount)) ++ dims
       type A = srn.A.R
       lazy implicit val bitsEV: Bits[A] = srn.A
+      implicit def ctx: SrcCtx = mem.ctx
       val newMem = stageWithFlow(SRAMNew[A, SRAMN](newDims)) { nm => transferData(mem, nm) }
       newMem.r = dims.size + 1
       transferData(mem, newMem)
@@ -53,6 +54,7 @@ trait StreamBufferExpansion {
         type A = sr.A.R
         lazy implicit val bitsEV: Bits[A] = sr.A
         val dataAsBits = f(writer.data).asInstanceOf[Bits[A]]
+        implicit def ctx: SrcCtx = sym.ctx
         val newWrite = stage(SRAMWrite(f(writer.mem).asInstanceOf[SRAM[A, SRAMN]], dataAsBits, Seq(insertedDim) ++ f(writer.addr), f(writer.ens)))
         newWrite
     }
@@ -65,6 +67,7 @@ trait StreamBufferExpansion {
       case sr: SRAM[_, _] =>
         type A = sr.A.R
         lazy implicit val bitsEV: Bits[A] = sr.A
+        implicit def ctx: SrcCtx = sym.ctx
         val result = stage(SRAMRead(f(reader.mem).asInstanceOf[SRAM[A, SRAMN]], Seq(insertedDim) ++ f(reader.addr), reader.ens))
         result
     }

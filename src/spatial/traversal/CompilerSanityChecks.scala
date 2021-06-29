@@ -97,6 +97,14 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         if (lhs.fullDelay >= 1) {
           error(lhs.ctx, s"Found a banked dequeue ${lhs} with delay ${lhs.fullDelay}")
         }
+      case SRAMRead(mem, addr, _) =>
+        if (mem.rank != addr.size) {
+          error(lhs.ctx, s"Found an SRAM Read $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
+        }
+      case SRAMWrite(mem, _, addr, _) =>
+        if (mem.rank != addr.size) {
+          error(lhs.ctx, s"Found an SRAM Write $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
+        }
       case _ =>
         check(lhs, rhs)
         super.visit(lhs, rhs)

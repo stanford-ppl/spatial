@@ -262,6 +262,14 @@ package object memory {
       case _ => throw new Exception(s"Could not get static size of $mem")
     }
 
+    def parAllowed: Int = metadata[ParAllowed](mem).map(_.parAllowed).getOrElse(1)
+    def parAllowed_=(p: Int): Unit = {
+      metadata.add(mem, ParAllowed(p)) 
+    }
+    def parAllowed(p: Int): Unit = {
+      metadata.add(mem, ParAllowed(p)) 
+    }
+
     def hotSwapPairings: Map[Sym[_], Set[Sym[_]]] = {
       metadata[HotSwapPairings](mem).map(_.pairings).getOrElse(Map.empty)
     }

@@ -13,7 +13,7 @@ trait PIRGenDRAM extends PIRCodegen with PIRGenController {
       val dimStr = lhs.getConstDims.fold("") { dims =>
         s".dims($dims)"
       }
-      state(lhs)(src"""DRAM("${lhs.name.getOrElse(src"$lhs")}")$dimStr.tp(${op.A})""")
+      state(lhs)(src"""DRAM("${lhs.name.getOrElse(src"$lhs")}")$dimStr.tp(${op.A}).parAllowed(${lhs.parAllowed})""")
 
     case DRAMAddress(dram) =>
       state(lhs, tp=Some("MemRead"))(src"""dramAddress($dram).name("${dram.toString}_addr").tp(${lhs.tp})""")

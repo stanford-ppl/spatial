@@ -76,6 +76,15 @@ case class DephasedAccess(accesses: Set[Sym[_]]) extends Data[DephasedAccess](Se
   */
 case class HotSwapPairings(pairings: Map[Sym[_], Set[Sym[_]]]) extends Data[HotSwapPairings](SetBy.Analysis.Self)
 
+/** Number of parallel access threads allowed to DRAM
+  *
+  * Getter:  sym.parAllowed
+  * Setter:  sym.parAllowed = <int>
+  * Default: None
+  */
+case class ParAllowed(parAllowed: Int) extends Data[ParAllowed](SetBy.User)
+
+
 /** Alias from Sparse DRAM to Dense DRAM
   *
   * Getter:  sym.alias

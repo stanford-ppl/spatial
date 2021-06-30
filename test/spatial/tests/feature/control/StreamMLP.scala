@@ -6,7 +6,7 @@ import utils.io.files._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 
-class MLP_Variant extends MLP_Variants(N=32, batch=1,dims=List(2,2,2),ips=List(1,1),mps=List(1,1),ops=List(1,1), ipls=1)
+class MLP_Variant extends MLP_Variants(N=32, batch=16,dims=List(2,2,2),ips=List(2,2),mps=List(1,1),ops=List(1,1))
 
 class MLP_Variant_Streamed extends MLP_Variant {
   override def compileArgs = "--streamify --vv"
@@ -56,9 +56,9 @@ class MLP_Variant_Streamed_exp extends MLP_Variant_Streamed_nobind
         val outsram = SRAM[T](batch, dims.last)
         outsram.explicitName = "OutSRAM"
         insram load indram(t::t+batch, dims.head par ipls)
-        ('Batch.Foreach(0 until batch par opb) { b =>
+        'Batch.Foreach(0 until batch par opb) { b =>
           mlp_forward[T](weights, biases, relu[T], insram(b,_), outsram.update(b, _, _))(ips, mps, ops)
-        }).asSym.shouldConvertToStreamed = true
+        }
         outdram(t::t+batch, dims.last par ipls) store outsram
       }
     }

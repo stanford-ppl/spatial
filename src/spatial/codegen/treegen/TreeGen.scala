@@ -33,6 +33,7 @@ case class TreeGen(IR: State, filename: String = "controller_tree", IRFile: Stri
 
   override def clearGen(): Unit = {
     files.deleteFiles(s"$out${sep}$entryFile")
+    files.deleteFiles(s"$out${sep}$filename.bak.$ext")
   }
 
   override def gen(lhs: Sym[_], rhs: Op[_]): Unit = rhs match {

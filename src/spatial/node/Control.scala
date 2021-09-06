@@ -2,6 +2,7 @@ package spatial.node
 
 import argon._
 import argon.node._
+import argon.tags.struct
 import forge.tags._
 import spatial.lang._
 

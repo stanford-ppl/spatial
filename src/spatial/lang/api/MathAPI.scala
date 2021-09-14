@@ -30,6 +30,11 @@ trait MathAPI { this: Implicits with MuxAPI =>
   @api def pow[A:Num](a: Literal, b: A): A = Num[A].pow(Num[A].from(a.value),b)
   @api def pow[A:Num](b: Lift[A], e: Lift[A]): A = Num[A].pow(b.unbox,e.unbox)
 
+  @api def mulh[A:Num](b: Sym[A], e: Sym[A]): A = Num[A].mulh(b.unbox,e.unbox)
+  @api def mulh[A:Num](a: A, b: Literal): A = Num[A].mulh(a,Num[A].from(b.value))
+  @api def mulh[A:Num](a: Literal, b: A): A = Num[A].mulh(Num[A].from(a.value),b)
+  @api def mulh[A:Num](b: Lift[A], e: Lift[A]): A = Num[A].mulh(b.unbox,e.unbox)
+
   @api def abs[A:Num](a: Sym[A]): A = Num[A].abs(a.unbox)
   @api def ceil[A:Num](a: Sym[A]): A = Num[A].ceil(a.unbox)
   @api def floor[A:Num](a: Sym[A]): A = Num[A].floor(a.unbox)

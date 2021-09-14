@@ -28,6 +28,7 @@ trait Num[A] extends Order[A] with Arith[A] with Bits[A] {
   @rig def zero: A = this.from(0)
 
   @rig def pow(b: A, e: A): A
+  @rig def mulh(b: A, e: A): A
   @rig def exp(a: A): A
   @rig def ln(a: A): A
   @rig def sqrt(a: A): A

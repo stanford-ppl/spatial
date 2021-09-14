@@ -56,6 +56,10 @@ object FltFmt {
 
   @rig def min(a: Flt[M,E], b: Flt[M,E]): Flt[M,E] = stage(FltMin(a,b))
   @rig def max(a: Flt[M,E], b: Flt[M,E]): Flt[M,E] = stage(FltMax(a,b))
+  @rig def mulh(a: Flt[M,E], b: Flt[M,E]): Flt[M,E] = {
+    assert(false)
+    stage(FltMul(a,b))
+  }
 
   @rig def random(max: Option[Flt[M,E]]): Flt[M,E] = stage(FltRandom(max))
 

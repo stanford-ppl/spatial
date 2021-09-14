@@ -117,6 +117,7 @@ case class ResourceReporter(IR: State) extends NamedCodegen with FileDependencie
     case FixSLA(x, y) => fixOp += 1
     case FixSRA(x, y) => fixOp += 1
     case FixSRU(x, y) => fixOp += 1
+    case FixMulH(x, y) => fixOp += 1
     case SatAdd(x, y) => fixOp += 1
     case SatSub(x, y) => fixOp += 1
     case SatMul(x, y) => fixOp += 1

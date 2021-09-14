@@ -70,6 +70,7 @@ object FixFmt {
 
   @rig def min(a: Fix[S,I,F], b: Fix[S,I,F]): Fix[S,I,F] = stage(FixMin(a,b))
   @rig def max(a: Fix[S,I,F], b: Fix[S,I,F]): Fix[S,I,F] = stage(FixMax(a,b))
+  @rig def mulh(a: Fix[S,I,F], b: Fix[S,I,F]): Fix[S,I,F] = stage(FixMulH(a,b))
 
 
   /**

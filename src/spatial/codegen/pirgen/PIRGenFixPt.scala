@@ -32,6 +32,7 @@ trait PIRGenFixPt extends PIRCodegen {
     case FixSLA(x,y)          => genOp(lhs)
     case FixSRA(x,y)          => genOp(lhs)
     case FixSRU(x,y)          => genOp(lhs)
+    case FixMulH(x,y)          => genOp(lhs)
     case SatAdd(x,y)          => genOp(lhs)
     case SatSub(x,y)          => genOp(lhs)
     case SatMul(x,y)          => genOp(lhs)

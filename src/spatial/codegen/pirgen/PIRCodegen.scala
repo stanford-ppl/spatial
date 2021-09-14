@@ -81,7 +81,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   }
 
   override def quote(s: Sym[_]): String = s match {
-    case VecConst(vs) => src"Const(${vs}).tp(${s.tp})"
+    case VecConst(vs) => src"Const(${vs}L).tp(${s.tp})"
     case s => super.quote(s)
   }
 
@@ -91,7 +91,7 @@ trait PIRCodegen extends Codegen with FileDependencies with AccelTraversal with 
   }
 
   override protected def quoteConst(tp: Type[_], c: Any): String = {
-    src"Const(${quoteString(c)}).tp(${tp})"
+    src"Const(${quoteString(c)}L).tp(${tp})"
   }
 
   override protected def quoteOrRemap(arg: Any): String = arg match {

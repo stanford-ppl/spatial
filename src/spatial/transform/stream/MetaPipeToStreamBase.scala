@@ -40,8 +40,10 @@ trait MetaPipeToStreamBase {
         dbgs(s"Adding mem: $mem")
         localMems.add(mem)
       case stmt =>
+        dbgs(s"stmt: $stmt = ${stmt.op}")
         (stmt.effects.reads diff stmt.effects.writes) intersect localMems foreach {
           mem =>
+            dbgs(s"Registering Reader: $stmt <- $mem")
             lastWrite.get(mem) match {
               case Some(wr) =>
                 states(mem)(wr).add(stmt)
@@ -53,6 +55,7 @@ trait MetaPipeToStreamBase {
 
         stmt.effects.writes intersect localMems foreach {
           mem =>
+            dbgs(s"Registering Writer: $stmt -> $mem")
             lastWrite(mem) = stmt
             states.getOrElseUpdate(mem, mutable.LinkedHashMap.empty)(stmt) = mutable.Set.empty
         }

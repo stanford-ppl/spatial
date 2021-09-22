@@ -115,7 +115,7 @@ object ForeachToStream {
 
 trait Streamified {
   this: SpatialTest =>
-  override def compileArgs: Args = "--streamify --max_cycles=10000 --fdot"
+  override def compileArgs: Args = "--streamify --max_cycles=10000 --fdot --vv"
 }
 
 class ForeachToStream1 extends ForeachToStream(1)

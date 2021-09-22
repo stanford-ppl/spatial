@@ -320,6 +320,9 @@ package object control {
       case _ => false
     }
 
+    def nDim: Int = op match {
+      case Some(op: CounterChainNew) => op.counters.length
+    }
 
     // --- Control hierarchy --- //
 

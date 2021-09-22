@@ -11,8 +11,7 @@ import spatial.traversal.AccelTraversal
 import scala.collection.mutable
 import spatial.metadata.memory._
 
-trait StreamBufferExpansion {
-  this: MutateTransformer =>
+case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer {
 
   def shouldExpand(sym: Sym[_]): Boolean = {
     sym.isSRAM && sym.bufferAmount.getOrElse(1) > 1
@@ -72,4 +71,10 @@ trait StreamBufferExpansion {
         result
     }
   }
+
+  override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (lhs match {
+    case writer: SRAMWrite[_, _] if lhs.bufferIndex.isDefined => expandWriter(lhs, writer)
+    case reader: SRAMRead[_, _] if lhs.bufferIndex.isDefined => expandReader(lhs, reader)
+    case _ => super.transform(lhs, rhs)
+  }).asInstanceOf[Sym[A]]
 }

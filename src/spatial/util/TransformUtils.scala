@@ -1,7 +1,8 @@
 package spatial.util
 
 import argon.lang.implicits.castType
-import argon.lang.{Arith, Bit, I32, Num}
+import argon.lang.types.Bits
+import argon.lang.{Arith, Bit, I32, Num, Vec}
 import argon.{Op, stage}
 import forge.tags.stateful
 import spatial.lang.{Counter, CounterChain}
@@ -53,23 +54,7 @@ object TransformUtils {
     ctr.end.unbox.asInstanceOf[Num[T]] >= nextIter
   }
 
-//  // Expands a Foreach with Par Factors into one without by performing unrolling here.
-//  @stateful def earlyExpandForeach(foreach: OpForeach): (Seq[Counter[_]], CounterChain, OpForeach) = {
-//    val parFactors = foreach.cchain.counters.map(_.ctrParOr1)
-//    val shifts = spatial.util.computeShifts(parFactors)
-//    val newCounters = foreach.cchain.counters.map {
-//      case ctr@Op(CounterNew(start, end, step, par)) =>
-//        // All these asInstanceOfs are to
-//        type CT = ctr.CT
-//        implicit def ev: Num[CT] = ctr.CTeV
-//        val stepCT = step.asInstanceOf[Num[CT]]
-//        val parCT = ctr.CTeV.from(par.toInt).asInstanceOf[CT]
-//        val newStep = stepCT * parCT
-//        stage(CounterNew(start.asInstanceOf[Num[CT]], end.asInstanceOf[Num[CT]], newStep.asInstanceOf[Num[CT]], I32(1)))
-//    }
-//
-//    OpForeach(foreach.ens, cchain, argon.stageBlock {
-//
-//    }, iters, stopWhen)
-//  }
+  @stateful def CreateVecEV[T: Bits](length: Int): Bits[Vec[T]] = {
+    Vec.fromSeq(Range(0, length) map {_ => implicitly[Bits[T]].zero})
+  }
 }

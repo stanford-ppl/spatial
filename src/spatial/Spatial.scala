@@ -24,7 +24,7 @@ import spatial.model.RuntimeModelGenerator
 import spatial.report._
 import spatial.flows.SpatialFlowRules
 import spatial.rewrites.SpatialRewriteRules
-import spatial.transform.stream.{MetapipeToStreamTransformer, StreamBufferExpansion}
+import spatial.transform.stream._
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -124,10 +124,11 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val loopPerfection = Seq(loopPerfecter, printer, loopCompaction, printer) ++ DCE
     lazy val unitpipeReform = Seq(regElim, printer, allocMotion, pipeInserter, printer)
+    lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer) ++
-      bankingAnalysis ++ Seq(metapipeToStream, allocMotion, printer, pipeInserter) ++ DCE ++ Seq(streamChecks)
+      bankingAnalysis ++ Seq(metapipeToStream, streamBufferExpansion, allocMotion, printer, pipeInserter) ++ DCE ++ Seq(streamChecks)
 
     lazy val streamify = RepeatedTraversal(state, streamifyAnalysis)
 

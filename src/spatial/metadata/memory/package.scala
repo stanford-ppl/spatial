@@ -422,6 +422,7 @@ package object memory {
 
     def bufferAmount_=(amount: Int): Unit = metadata.add(mem, StreamBufferAmount(amount))
     def bufferAmount_=(v: StreamBufferAmount) = metadata.add(mem, v)
+    def bufferAmount_=(v: Option[StreamBufferAmount]) = metadata.add(mem, v)
 
     def bufferIndex: Option[Sym[_]] = metadata[StreamBufferIndex](mem).map(_.bufferIndex)
     def bufferIndex_=(index: Sym[_]): Unit = metadata.add(mem, StreamBufferIndex(index))

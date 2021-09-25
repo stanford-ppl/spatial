@@ -128,7 +128,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer) ++
-      bankingAnalysis ++ Seq(metapipeToStream, streamBufferExpansion, allocMotion, printer, pipeInserter) ++ DCE ++ Seq(streamChecks)
+      bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, printer, pipeInserter) ++ DCE ++ Seq(streamChecks)
 
     lazy val streamify = RepeatedTraversal(state, streamifyAnalysis)
 

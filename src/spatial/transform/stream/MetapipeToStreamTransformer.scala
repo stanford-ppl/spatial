@@ -191,7 +191,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               mem =>
                                 memTokens.get(f(mem)) match {
                                   case Some(ind) =>
-                                    dbgs(s"Adding Buffering Info to: $stmt")
+                                    dbgs(s"Adding Buffering Info to: $stmt = $ind")
                                     stmt.bufferIndex = ind
                                   case None =>
                                 }

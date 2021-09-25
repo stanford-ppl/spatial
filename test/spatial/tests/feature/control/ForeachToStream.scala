@@ -68,11 +68,16 @@ object ForeachToStream {
   def main(args: Array[String]): Unit = {
     val memOuts = Range(0, numConsumers) map {_ => DRAM[I32](iters, innerIters)}
     Accel {
-      val mems = Range(0, numConsumers) map {_ => SRAM[I32](iters, innerIters)}
+      val mems = Range(0, numConsumers) map {i =>
+        val mem = SRAM[I32](iters, innerIters)
+        mem.explicitName = s"outer_sram_$i"
+        mem
+      }
       // construct a long unitpipe followed by another controller
       ('Outer.Pipe.Foreach(iters by 1 par op) {
         i =>
           val sram = SRAM[I32](innerIters)
+          sram.explicitName = "inner_SRAM"
           bufferDepth match {
             case Some(v) => sram.bufferAmount = v
             case None =>
@@ -158,11 +163,4 @@ class ForeachToStreamSRAMBuffered4 extends ForeachToStreamSRAMBuffered(4)
 class ForeachToStreamSRAMBuffered8 extends ForeachToStreamSRAMBuffered(8)
 
 class ForeachToStreamSRAMBufferedStreamed(bufferDepth: scala.Int) extends ForeachToStreamSRAM(2, 2, 2, Some(bufferDepth)) with Streamified
-class ForeachToStreamSRAMBufferedStreamed1 extends ForeachToStreamSRAMBufferedStreamed(1)
-class ForeachToStreamSRAMBufferedStreamed2 extends ForeachToStreamSRAMBufferedStreamed(2)
-class ForeachToStreamSRAMBufferedStreamed4 extends ForeachToStreamSRAMBufferedStreamed(4)
-class ForeachToStreamSRAMBufferedStreamed8 extends ForeachToStreamSRAMBufferedStreamed(8)
-
-class ForeachToStreamSRAMBufferedStreamed3 extends ForeachToStreamSRAMBufferedStreamed(3)
-
 class ForeachToStreamSRAMBufferedStreamedAuto extends ForeachToStreamSRAM(2, 2, 2, None) with Streamified

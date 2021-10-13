@@ -6,13 +6,13 @@ trait RepeatableTraversal extends Traversal {
   var converged: Boolean = true
 }
 
-case class RepeatedTraversal(IR: argon.State, passes: Seq[Traversal]) extends Pass {
+case class RepeatedTraversal(IR: argon.State, passes: Seq[Pass]) extends Pass {
   private def hasConverged: Boolean = {
     passes forall {
       case rt: RepeatableTraversal =>
-        dbgs(s"Has Converged: $rt = ${rt.converged}")
+        dbgs(s"Has Converged: ${rt.getClass} = ${rt.converged}")
         rt.converged
-      case _: Traversal => true
+      case _: Pass => true
     }
   }
 

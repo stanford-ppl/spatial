@@ -115,8 +115,8 @@ import argon.Block
 
 @spatial class PerfectionForeach extends SpatialTest {
 
-  val R = 1024
-  val C = 1024
+  val R = 16
+  val C = 16
 
   val RP = 4
   val CP = 4
@@ -150,4 +150,12 @@ import argon.Block
 
 class ImperfectForeach extends PerfectionForeach {
   override def compileArgs = "--imperfect"
+}
+
+class StreamifiedImperfectForeach extends PerfectionForeach {
+  override def compileArgs = "--streamify --imperfect"
+}
+
+class StreamifiedPerfectForeach extends PerfectionForeach {
+  override def compileArgs = "--streamify"
 }

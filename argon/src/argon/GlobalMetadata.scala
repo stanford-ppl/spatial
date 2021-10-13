@@ -25,8 +25,10 @@ class GlobalMetadata {
     remove.foreach{k => data.remove(k._1) }
   }
 
+  private def sortedData = data.toList.sortBy {_._1.toString}
+
   def copyTo(that: GlobalMetadata): Unit = data.foreach{case (k,v) => that.add(k,v) }
   def reset(): Unit = data.clear()
 
-  def foreach(func: (Class[_],Data[_]) => Unit): Unit = data.foreach{case (k,v) => func(k,v)}
+  def foreach(func: (Class[_],Data[_]) => Unit): Unit = sortedData.foreach{case (k,v) => func(k,v)}
 }

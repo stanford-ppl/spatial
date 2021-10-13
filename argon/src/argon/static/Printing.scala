@@ -218,7 +218,7 @@ trait Printing {
   @stateful def strMeta(lhs: Sym[_]): Unit = {
     lhs.name.foreach{name => dbgs(s" - Name: $name") }
     if (lhs.prevNames.nonEmpty) {
-      val aliases = lhs.prevNames.map{case (tx,alias) => s"$tx: $alias" }.mkString(", ")
+      val aliases = lhs.prevNames.sorted.map{case (tx,alias) => s"$tx: $alias" }.mkString(", ")
       dbgs(s" - Aliases: $aliases")
     }
     dbgs(s" - Type: ${lhs.tp}")

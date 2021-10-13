@@ -31,6 +31,11 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
     case _ => false
   }
 
+  def shouldIgnore(s: Sym[_]): Boolean = s match {
+    case _: FIFO[_] => true
+    case _ => false
+  }
+
   private def requiredBuffers(s: Sym[_]): Int = {
     s match {
       case _ if s.isSeqControl => 1  // Only 1 stage is active at a time
@@ -187,10 +192,11 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
 
     // For Duplicated Memories
     // Reader -> Memory -> FIFO
-    val duplicationReadFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
+//    val duplicationReadFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
 
     // Writer -> Memory -> FIFOs
-    val duplicationWriteFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], mutable.ArrayBuffer[Sym[_]]]]()
+    duplicationWriteFIFOs.clear()
+    duplicationReadFIFOs.clear()
 
     memoryBufferNotifs = new MemoryBufferNotification
 
@@ -249,6 +255,9 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
 
         memoryBufferNotifs.register(lastReader, firstWriter, mem, bufferAmounts(firstWriter), duplicates)
 
+      case (mem: Mem[_, _], _) if shouldIgnore(mem) =>
+        dbgs(s"Ignoring $mem")
+
       case (mem: Mem[_, _], wrData) =>
         dbgs(s"Skipping $mem, since it's neither buffered nor duplicated. Probably a FIFO. $wrData")
     }
@@ -260,6 +269,8 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
           case a::b::_ =>
             // what should the buffer depth be?
             memoryBufferNotifs.register(a, b, mem, 128)
+          case _ =>
+            error("Error computing notifications")
         }
         memoryBufferNotifs.register(users.last, users.head, mem, 128, 1)
     }

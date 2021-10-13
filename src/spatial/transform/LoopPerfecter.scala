@@ -8,14 +8,16 @@ import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.traversal.AccelTraversal
+import spatial.util.TransformUtils._
+import spatial.util.TransformerUtilMixin
 
 /** Performs loop perfection as mentioned by Pu. et al in the Halide on FPGA paper.
   * Loop perfection takes a sequence of instructions, where there is at most one controller. All others must be
   * unitpipes.
   */
-case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversal {
+case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversal with TransformerUtilMixin {
 
-  val enStack = scala.collection.mutable.Stack[scala.collection.Set[Bit]]()
+  private val enStack = scala.collection.mutable.Stack[scala.collection.Set[Bit]]()
 
   private def shouldTransform(sequence: Seq[Sym[_]]): Boolean = {
     // should transform IFF sequence is promote-able to a single looped controller.
@@ -29,7 +31,6 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
     }
     looped match {
       case Op(_:OpForeach) => true
-//      case Op(_:OpReduce[_]) => true
       case _ => false
     }
   }
@@ -37,7 +38,7 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
   override def mirrorNode[A](rhs: Op[A]): Op[A] = {
     rhs match {
       case en: Enabled[A] =>
-        en.mirrorEn(f, enStack.flatten.toSet)
+        en.mirrorEn(f, f(enStack.flatten.toSet))
       case _ =>
         super.mirrorNode(rhs)
     }
@@ -65,53 +66,54 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
     }
   }
 
-  private def transformSequence(preTarget: Seq[Sym[_]], targetLoop: Sym[_], postTarget: Seq[Sym[_]]) = {
-    targetLoop match {
-      case Op(OpForeach(ens, cchain, block, iters, stopWhen)) if ens.isEmpty =>
-        // Mirror the cchain
-        val newCChain = spatial.util.TransformUtils.expandCounterPars(cchain)
-        val newiters = newCChain.counters.map { ctr =>
-          val n  = boundVar[I32]
-          n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
-          n
-        }
-
-        val ctrPars = cchain.counters map {_.ctrParOr1}
-        val replicas = spatial.util.computeShifts(ctrPars)
-
-        stage(OpForeach(ens, newCChain, stageBlock {
-          val isFirst = spatial.util.TransformUtils.isFirstIter(newiters, newCChain)
-
-          withEns(isFirst.toSet) {
-            mirrorSeq(preTarget)
-          }
-
-          // Need to unroll this to maintain correctness
-          replicas foreach {
-            replica =>
-              isolateSubst() {
-                val shifts = (cchain.counters zip replica) map {
-                  case (ctr, shift) =>
-                    implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
-                    implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
-                    ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
-                }
-                (iters zip newiters zip shifts) foreach {
-                  case ((olditer, newiter), shift) =>
-                    register(olditer -> (newiter + shift))
-                }
-                mirrorSeq(block.stms)
-              }
-          }
-
-          val isLastIteration = spatial.util.TransformUtils.isLastIter(newiters, newCChain)
-          withEns(isLastIteration.toSet) {
-            mirrorSeq(postTarget)
-          }
-          spatial.lang.void
-        }, newiters, f(stopWhen)))
-    }
-  }
+//  private def transformSequence(parentChain: CounterChain, preTarget: Seq[Sym[_]], targetLoop: Sym[_], postTarget: Seq[Sym[_]]) = {
+//    // Mirror parent counters. These will be fused into the child.
+//    val newParentCounters = parentChain.counters.map { mirrorSym(_) }
+//    (newParentCounters zip parentChain.counters) foreach { case (newCtr, oldCtr) => register(oldCtr -> newCtr)}
+//    targetLoop match {
+//      case Op(OpForeach(ens, cchain, block, iters, stopWhen)) if ens.isEmpty =>
+//        // Mirror the cchain
+//        val newCChain = spatial.util.TransformUtils.expandCounterPars(cchain)
+//        val newiters = newCChain.counters.map { ctr =>
+//          val n  = boundVar[I32]
+//          n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
+//          n
+//        }
+//
+//        val ctrPars = cchain.counters map {_.ctrParOr1}
+//        val replicas = spatial.util.computeShifts(ctrPars)
+//
+//        stage(OpForeach(ens, newCChain, stageBlock {
+//          val isFirst = spatial.util.TransformUtils.isFirstIter(newiters, newCChain)
+//
+//          withEns(isFirst.toSet) {
+//            mirrorSeq(preTarget)
+//          }
+//
+//          // Need to unroll this to maintain correctness
+//          replicas foreach {
+//            replica =>
+//              val shifts = (cchain.counters zip replica) map {
+//                case (ctr, shift) =>
+//                  implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+//                  implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
+//                  ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
+//              }
+//              (iters zip newiters zip shifts) foreach {
+//                case ((olditer, newiter), shift) =>
+//                  register(olditer -> (newiter + shift))
+//              }
+//              mirrorSeq(block.stms)
+//          }
+//
+//          val isLastIteration = spatial.util.TransformUtils.isLastIter(newiters, newCChain)
+//          withEns(isLastIteration.toSet) {
+//            mirrorSeq(postTarget)
+//          }
+//          spatial.lang.void
+//        }, newiters, f(stopWhen)))
+//    }
+//  }
 
   private def transformForeach(foreach: OpForeach): Sym[_] = {
     val sequence = foreach.block.stms.toIndexedSeq
@@ -119,16 +121,65 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
     val targetLoop = sequence(targetIndex)
     val preTarget = sequence.take(targetIndex)
     val postTarget = sequence.drop(targetIndex + 1)
-    dbgs(s"Pre: $preTarget, target: $targetLoop, post: $postTarget")
     // Extract all counter-related things
     val (chains, actual) = preTarget.partition {x => x.isCounter || x.isCounterChain}
-    val preDestructed = destructBlocks(actual)
+    val targetChain = targetLoop.cchains.head
+
+    indent {
+      dbgs(s"Chains: $chains")
+      dbgs(s"PreTarget: $actual")
+      dbgs(s"Target: $targetLoop")
+      dbgs(s"PostTarget: $postTarget")
+    }
+
+
+    // New chain has regular parent chain and flattened child chain.
+    val innerIters = targetLoop.toScope.iters
+    val RemappedChainData(newChain, newParentIters, newChildIters) = parentAndFlattenedChildChain(foreach.cchain, targetChain, foreach.iters, innerIters)
+    val newChildCounters = newChain.counters.drop(foreach.cchain.nDim)
+
+    val ctrPars = targetChain.counters map {_.ctrParOr1}
+    val replicas = spatial.util.computeShifts(ctrPars)
+    register(foreach.iters, newParentIters)
+
     stage(OpForeach(
-      foreach.ens, foreach.cchain, stageBlock {
-        mirrorSeq(chains)
-        dbgs(s"Chains: $chains -> ${f(chains)}")
-        transformSequence(preDestructed, targetLoop, destructBlocks(postTarget))
-      }, foreach.iters, foreach.stopWhen
+      f(foreach.ens), newChain, stageBlock {
+        val isFirst = (newChildCounters zip newChildIters) map {
+          case (ctr, iter) =>
+            isFirstIter(iter.asInstanceOf[I32], ctr.asInstanceOf[Counter[I32]])
+        }
+
+        withEns(isFirst.toSet) {
+          mirrorSeq(preTarget)
+        }
+
+        // Need to unroll this to maintain correctness
+        replicas foreach {
+          replica =>
+            val shifts = (targetChain.counters zip replica) map {
+              case (ctr, repl) =>
+                implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+                implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
+                f(ctr.step).asInstanceOf[ctr.CT].to[I32] * I32(repl)
+            }
+            (innerIters zip newChildIters zip shifts) foreach {
+              case ((olditer, newiter), shift) =>
+                register(olditer -> (newiter + shift))
+            }
+            mirrorSeq(targetLoop.blocks.flatMap{_.stms})
+        }
+
+        val isLast = (newChildCounters zip newChildIters) map {
+          case (ctr, iter) =>
+            isLastIter(iter, ctr.asInstanceOf[Counter[I32]])
+        }
+
+        withEns(isLast.toSet) {
+          mirrorSeq(postTarget)
+        }
+
+        spatial.lang.void
+      }, newParentIters ++ newChildIters, f(foreach.stopWhen)
     ))
   }
 
@@ -137,18 +188,16 @@ case class LoopPerfecter(IR: State) extends MutateTransformer with AccelTraversa
 
   }
 
-  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
+  override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
      case _: AccelScope => inAccel{ super.transform(lhs, rhs) }
 
-     case foreach:OpForeach if lhs.isOuterControl && shouldTransform(foreach.block.stms) =>
+     case foreach:OpForeach if inHw && lhs.isOuterControl && shouldTransform(foreach.block.stms) =>
        dbgs(s"Transforming: $lhs = $rhs")
-       val transformed = transformForeach(foreach).asInstanceOf[Sym[A]]
-       super.transform(transformed, transformed.op.get)
+       transformForeach(foreach)
 
     case _ =>
-      dbgs(s"Skipping: $lhs = $rhs")
       super.transform(lhs,rhs)
-  }
+  }).asInstanceOf[Sym[A]]
 
 }
 

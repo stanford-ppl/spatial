@@ -16,6 +16,7 @@ abstract class SubstTransformer extends Transformer {
   /** Register a substitution rule orig -> sub. */
   def register[A,B](orig: A, sub: B): Unit = (orig, sub) match {
     case (s1: Sym[_], s2: Sym[_])       => subst += s1 -> s2
+    case (s1: Seq[_], s2: Seq[_])      => (s1 zip s2) foreach { case (a, b) => register(a, b) }
     case (b1: Block[_], b2: Block[_])   => blockSubst += b1 -> b2
     case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
   }

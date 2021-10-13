@@ -56,16 +56,14 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     }
     if (hasForbidden) { return false }
 
-//    return lhs.shouldConvertToStreamed.getOrElse(false)
-
     // can transform if all children are foreach loops
     lhs.blocks.flatMap(_.stms).forall {
       case stmt@Op(foreach:OpForeach) =>
         dbgs(s"True: ${stmt} = ${stmt.op}")
         true
-      case stmt@Op(red:OpReduce[_]) =>
-        dbgs(s"True: ${stmt} = ${stmt.op}")
-        true
+//      case stmt@Op(red:OpReduce[_]) =>
+//        dbgs(s"True: ${stmt} = ${stmt.op}")
+//        true
       case s if s.isMem =>
         val result = (s.writers union s.readers) forall {
           case Op(_:StreamOutWrite[_]) | Op(_:StreamInRead[_]) =>
@@ -242,6 +240,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             stage(FIFOEnq(fifo, memTokens(f(mem)), isLastEn))
                         }
 
+                        dbgs(s"stmt: $stmt")
+                        dbgs(s"Duplication Read FIFOs: $duplicationReadFIFOs")
                         dbgs(s"Duplication Write FIFOs: $duplicationWriteFIFOs")
 
                         stmtWrites foreach {
@@ -282,7 +282,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     replacement
   }
 
-  val visitStack = mutable.ArrayStack[Sym[_]]()
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     (rhs match {
       case AccelScope(_) => inAccel {
@@ -291,16 +290,9 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
       case foreach:OpForeach if inHw && canTransform(lhs, rhs) =>
         dbgs(s"Transforming: $lhs = $rhs")
-        visitStack.push(lhs)
-        val result = isolateSubst(lhs) {
-          converged = false
-          indent {
-            transformForeach(lhs, foreach)
-          }
+        indent {
+          transformForeach(lhs, foreach)
         }
-        visitStack.pop()
-        result
-
       case _ => super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }

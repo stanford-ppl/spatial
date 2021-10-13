@@ -117,18 +117,16 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val regElim               = RegWriteReadElimination(state)
     lazy val unitpipeDestruction   = UnitpipeDestruction(state)
     lazy val loopPerfecter         = LoopPerfecter(state)
-    lazy val loopCompaction        = LoopCompaction(state)
     lazy val allocMotion           = AllocMotion(state)
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
-    lazy val loopPerfection = Seq(loopPerfecter, printer, loopCompaction, printer) ++ DCE
-    lazy val unitpipeReform = Seq(regElim, printer, allocMotion, pipeInserter, printer)
+    lazy val loopPerfection = Seq(loopPerfecter, printer) ++ DCE
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
-    lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, printer)
-    lazy val streamifyAnalysis = Seq(unitPipeToForeach, retimingAnalyzer) ++
-      bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, printer, pipeInserter) ++ DCE ++ Seq(streamChecks)
+    lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
+    lazy val streamifyAnalysis = Seq(unitPipeToForeach) ++
+      bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, pipeInserter, printer) ++ Seq(streamChecks)
 
     lazy val streamify = RepeatedTraversal(state, streamifyAnalysis)
 
@@ -181,7 +179,7 @@ trait Spatial extends Compiler with ParamLoader {
         regReadCSE          ==>
         /** Dead code elimination */
         DCE ==>
-        (!spatialConfig.imperfect ? loopPerfection) ==>
+//        (!spatialConfig.imperfect ? loopPerfection) ==>
         /** Metapipelines to Streams */
         spatialConfig.streamify ? streamify ==>
         /** Stream controller rewrites */

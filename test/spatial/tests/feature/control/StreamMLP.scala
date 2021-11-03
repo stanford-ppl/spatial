@@ -16,8 +16,6 @@ class MLP_Variant_Streamed_nobind extends MLP_Variant_Streamed {
   override def compileArgs = "--streamify --vv --noBindParallels"
 }
 
-class MLP_Variant_Streamed_exp extends MLP_Variant_Streamed_nobind
-
 @spatial abstract class MLP_Variants(
                                       val N:scala.Int = 1024,
                                       val batch:scala.Int = 4,

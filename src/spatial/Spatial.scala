@@ -118,6 +118,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeDestruction   = UnitpipeDestruction(state)
     lazy val loopPerfecter         = LoopPerfecter(state)
     lazy val allocMotion           = AllocMotion(state)
+    lazy val reduceToForeach        = ReduceToForeach(state)
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
@@ -125,7 +126,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
-    lazy val streamifyAnalysis = Seq(unitPipeToForeach) ++
+    lazy val streamifyAnalysis = Seq(unitPipeToForeach, reduceToForeach) ++
       bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, pipeInserter, printer) ++ Seq(streamChecks)
 
     lazy val streamify = RepeatedTraversal(state, streamifyAnalysis)

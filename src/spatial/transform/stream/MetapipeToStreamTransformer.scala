@@ -61,9 +61,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
       case stmt@Op(foreach:OpForeach) =>
         dbgs(s"True: ${stmt} = ${stmt.op}")
         true
-//      case stmt@Op(red:OpReduce[_]) =>
-//        dbgs(s"True: ${stmt} = ${stmt.op}")
-//        true
       case s if s.isMem =>
         val result = (s.writers union s.readers) forall {
           case Op(_:StreamOutWrite[_]) | Op(_:StreamInRead[_]) =>
@@ -72,7 +69,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         }
         dbgs(s"$result: ${s} = ${s.op}")
         result
-      case s if s.isCounter || s.isCounterChain => true
+      case s if s.isCounterChain => true
+      case Op(ctr@CounterNew(start, end, step, par)) =>
+        // Allowed if all params are either static or defined outside parent.
+        val syms = Seq(start, end, step, par)
+        dbgs(s"Checking Counter params are either static or defined outside of parent ($lhs): $syms")
+        syms forall { sym =>
+          dbgs(s"$sym: Const: ${sym.isConst} = ${sym.op}")
+          dbgs(s"$sym: HasImmediateParent: ${sym.hasAncestor(lhs.toCtrl)}")
+          sym.isConst || !sym.hasAncestor(lhs.toCtrl)
+        }
       case s =>
         dbgs(s"False: ${s} = ${s.op}")
         false
@@ -100,8 +106,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     val replacement = stageWithFlow(UnitPipe(
       foreach.ens, stageBlock {
         // for each parent shift, we restage the entire thing.
-
-        // for each block which reads this mem, convert it into a FIFO.
 
         parentShifts foreach {
           pShift =>
@@ -270,7 +274,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 throw new Exception()
             }
         }
-      }, foreach.stopWhen
+      }, f(foreach.stopWhen)
     )) {
       lhs2 =>
         lhs2.rawSchedule = Streaming
@@ -282,18 +286,22 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     replacement
   }
 
+  private def defaultTransform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+    val tmp = super.transform(lhs, rhs)
+    tmp
+  }
+
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     (rhs match {
       case AccelScope(_) => inAccel {
-        super.transform(lhs, rhs)
+        dbgs(s"InCopyMode: $copyMode")
+        defaultTransform(lhs, rhs)
       }
 
       case foreach:OpForeach if inHw && canTransform(lhs, rhs) =>
         dbgs(s"Transforming: $lhs = $rhs")
-        indent {
-          transformForeach(lhs, foreach)
-        }
-      case _ => super.transform(lhs, rhs)
+        transformForeach(lhs, foreach)
+      case _ => defaultTransform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }
 }

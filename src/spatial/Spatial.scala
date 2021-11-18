@@ -23,6 +23,7 @@ import spatial.traversal._
 import spatial.model.RuntimeModelGenerator
 import spatial.report._
 import spatial.flows.SpatialFlowRules
+import spatial.metadata.memory.{Dispatch, Duplicates}
 import spatial.rewrites.SpatialRewriteRules
 import spatial.transform.stream._
 import spatial.util.spatialConfig
@@ -118,7 +119,13 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeDestruction   = UnitpipeDestruction(state)
     lazy val loopPerfecter         = LoopPerfecter(state)
     lazy val allocMotion           = AllocMotion(state)
-    lazy val reduceToForeach        = ReduceToForeach(state)
+    lazy val reduceToForeach       = ReduceToForeach(state)
+    lazy val retimeStrippers       = Seq(
+      printer,
+      MetadataStripper[Duplicates](state),
+      MetadataStripper[Dispatch](state),
+      MetadataStripper[spatial.metadata.memory.Ports](state),
+      printer)
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
@@ -127,9 +134,9 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach, reduceToForeach) ++
-      bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, pipeInserter, printer) ++ Seq(streamChecks)
+      bankingAnalysis ++ createDump("AfterBanking") ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, pipeInserter, printer) ++ Seq(streamChecks)
 
-    lazy val streamify = RepeatedTraversal(state, streamifyAnalysis)
+    lazy val streamify = createDump("PreCrash") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ retimeStrippers))
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

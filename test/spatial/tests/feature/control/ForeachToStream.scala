@@ -60,7 +60,7 @@ object ForeachToStream {
   }
 }
 
-@spatial class ForeachToStreamSRAM(numConsumers: scala.Int, ip: scala.Int = 1, op: scala.Int = 1, bufferDepth: Option[scala.Int] = Some(1)) extends SpatialTest {
+@spatial class ForeachToStreamSRAM(numConsumers: scala.Int, ip: scala.Int = 1, op: scala.Int = 1) extends SpatialTest {
 
   val iters = 16
   val innerIters = 4
@@ -78,10 +78,6 @@ object ForeachToStream {
         i =>
           val sram = SRAM[I32](innerIters)
           sram.explicitName = "inner_SRAM"
-          bufferDepth match {
-            case Some(v) => sram.bufferAmount = v
-            case None =>
-          }
 
           'Producer.Foreach(innerIters by 1 par ip) {
             j =>
@@ -156,11 +152,4 @@ class ForeachToStreamSRAM1ip2_streamed extends ForeachToStreamSRAM1ip2 with Stre
 class ForeachToStreamSRAM1ip4 extends ForeachToStreamSRAM(1, 4, 1)
 class ForeachToStreamSRAM1ip4_streamed extends ForeachToStreamSRAM1ip4 with Streamified
 
-class ForeachToStreamSRAMBuffered(bufferDepth: scala.Int) extends ForeachToStreamSRAM(2, 2, 2, Some(bufferDepth))
-class ForeachToStreamSRAMBuffered1 extends ForeachToStreamSRAMBuffered(1)
-class ForeachToStreamSRAMBuffered2 extends ForeachToStreamSRAMBuffered(2)
-class ForeachToStreamSRAMBuffered4 extends ForeachToStreamSRAMBuffered(4)
-class ForeachToStreamSRAMBuffered8 extends ForeachToStreamSRAMBuffered(8)
-
-class ForeachToStreamSRAMBufferedStreamed(bufferDepth: scala.Int) extends ForeachToStreamSRAM(2, 2, 2, Some(bufferDepth)) with Streamified
-class ForeachToStreamSRAMBufferedStreamedAuto extends ForeachToStreamSRAM(2, 2, 2, None) with Streamified
+class ForeachToStreamSRAMBufferedStreamedAuto extends ForeachToStreamSRAM(2, 2, 2) with Streamified

@@ -127,6 +127,7 @@ object modeling {
   case class AccessPair(mem: Sym[_], access: Sym[_])
   case class AccumTriple(mem: Sym[_], read: Sym[_], write: Sym[_])
 
+  case class MemDuplicatePair(mem: Sym[_], duplicate: Int)
   case class ScopeAccumInfo(
     readers: Map[Sym[_],Seq[Sym[_]]], // Memory -> readers
     writers: Map[Sym[_],Seq[Sym[_]]], // Memory -> writers
@@ -343,7 +344,11 @@ object modeling {
           val accs = accesses.filter(_.dispatches.values.exists(_.contains(id))).filter(!_.op.get.isInstanceOf[FIFOPeek[_]])
 
           val muxPairs = accs.map { access =>
-            val muxes = access.ports(0).values.map(_.muxPort)
+            dbgs(s"Access: $access -> Ports: ${access.getPorts}")
+            val (portID, portAccess) = access.getPorts.get.minBy(_._1)
+            dbgs(s"First Port: $portAccess")
+//            val muxes = access.ports(0).values.map(_.muxPort)
+            val muxes = portAccess.values.map(_.muxPort)
             (access, paths.getOrElse(access, 0.0), muxes.maxOrElse(0))
           }
           // Keep accesses with the same mux index together, even if they have different delays

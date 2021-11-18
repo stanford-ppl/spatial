@@ -37,7 +37,7 @@ class SpatialConfig extends Config {
   var mersenneRadius: Int = 16
   var enableOptimizedReduce: Boolean = true
   var distributeStreamCtr: Boolean = true
-  var streamify: Boolean = false
+  var streamify: Boolean = true
   var imperfect: Boolean = false
   var useAreaModels: Boolean = true
   var reportArea: Boolean = false

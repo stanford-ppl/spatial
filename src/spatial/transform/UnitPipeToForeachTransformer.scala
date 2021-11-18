@@ -16,6 +16,7 @@ case class UnitPipeToForeachTransformer(IR: State) extends MutateTransformer wit
     case AccelScope(_) => inAccel{ super.transform(lhs,rhs) }
 
     case UnitPipe(ens, block, stopWhen) if inHw =>
+      dbgs(s"Transforming ${lhs} = ${rhs}")
       val ctr = stage(CounterNew(I32(0), I32(1), I32(1), I32(1)))
       val ccnew = stage(CounterChainNew(Seq(ctr)))
       val iter = boundVar[I32]

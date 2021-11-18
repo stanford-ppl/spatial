@@ -19,6 +19,7 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
   }
 
   private def transformReduce[A](sym: Sym[A], reduceOp: OpReduce[A]) = {
+    dbgs(s"Transforming: $sym = $reduceOp")
     // re-staging map portion.
     // This section mirrors the ctrchain exactly.
     val newCChain = mirrorSym(reduceOp.cchain)
@@ -47,17 +48,31 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
 
     // TODO: Should change this to be dynamic based on par factor, but that requires messing with accumulators
     val reduceSize = reduceOp.cchain.approxIters
+    dbgs(s"CChain: ${reduceOp.cchain}")
+    dbgs(s"Reduce Size: $reduceSize")
+    val newAccum = f(reduceOp.accum)
+    dbgs(s"Mirrored accum: ${newAccum}")
+    newAccum.explicitName = newAccum.explicitName.getOrElse("") + "ToForeach"
 
 //    val numAccums = I32(16)
 //    val accumulators = RegFile(numAccums)
+//    val reduceStage = isolateSubst() {
+//      stage(OpForeach(f(reduceOp.ens), flattenedCChain, stageBlock {
+//        // Take the entire width of elements at the same time, and reduce
+//        val elements = commFIFO.deqVec(reduceSize)
+//        val values = elements.elems.map {_.value}
+//        val result = values.reduceTree { case (a, b) => reduceOp.reduce.reapply(a, b) }
+//        f(reduceOp.accum) := result
+//      }, newReduceIters, None))
+//    }
     val reduceStage = isolateSubst() {
-      stage(OpForeach(f(reduceOp.ens), flattenedCChain, stageBlock {
+      stage(UnitPipe(f(reduceOp.ens), stageBlock {
         // Take the entire width of elements at the same time, and reduce
         val elements = commFIFO.deqVec(reduceSize)
         val values = elements.elems.map {_.value}
         val result = values.reduceTree { case (a, b) => reduceOp.reduce.reapply(a, b) }
         f(reduceOp.accum) := result
-      }, newReduceIters, None))
+      }, None))
     }
     f(reduceOp.accum)
   }

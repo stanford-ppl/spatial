@@ -20,7 +20,7 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
   def expandMem(mem: Sym[_]) = mem.op match {
     case Some(srn@SRAMNew(dims)) =>
       dbgs(s"Expanding SRAM: $mem = $srn")
-      val bufferAmount = mem.bufferAmountOr1
+      val bufferAmount = mem.bufferAmountOr1 * 2
       val newDims = Seq(I32(bufferAmount)) ++ dims
       type A = srn.A.R
       lazy implicit val bitsEV: Bits[A] = srn.A
@@ -29,19 +29,20 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
       newMem.r = dims.size + 1
       transferData(mem, newMem)
       newMem.fullybankdim(0)
+      newMem.fullybanked
       newMem.bufferAmount = None
-//      mem.getInstance match {
-//        case Some(memory) =>
-//          val Ns = Seq(bufferAmount) ++ memory.nBanks
-//          val Bs = Seq(1) ++ memory.Bs
-//          val alphas = Seq(1) ++ memory.alphas
-//          val Ps = Seq(1) ++ memory.Ps
-//          dbgs(s"Inferring banking: $Ns, $Bs, $alphas, $Ps")
-//          newMem.forcebank(Ns, Bs, alphas, Some(Ps))
-//        case None =>
-//          dbgs(s"Could not infer memory banking for $newMem from $mem")
-//          newMem.fullybankdim(0)
-//      }
+      mem.getInstance match {
+        case Some(memory) =>
+          val Ns = Seq(bufferAmount) ++ memory.nBanks
+          val Bs = Seq(1) ++ memory.Bs
+          val alphas = Seq(1) ++ memory.alphas
+          val Ps = Seq(bufferAmount) ++ memory.Ps
+          dbgs(s"Inferring banking: $Ns, $Bs, $alphas, $Ps")
+          newMem.fullybankdim(0)
+          newMem.forcebank(Ns, Bs, alphas, None)
+        case None =>
+          dbgs(s"Could not infer memory banking for $newMem from $mem")
+      }
       dbgs(s"NewMem: $newMem = ${newMem.op.get}")
       newMem
   }

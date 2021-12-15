@@ -19,7 +19,7 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
 
   override val ext: String = "html"
   override val lang: String = "banking"
-  override val entryFile: String = "decisions.html"
+  override def entryFile: String = s"decisions_${state.pass}.html"
 
 
   override protected def emitEntry(block: Block[_]): Unit = gen(block)
@@ -109,13 +109,13 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
   override protected def process[R](block: Block[R]): Block[R] = {
     val enGen = config.enGen
     config.enGen = true
-    inGen(out, "decisions.html") {
+    withGen(out, entryFile) {
       emitHeader()
       run()
-      enWarn = Some(false)  // Disable warnings after the first run
+//      enWarn = Some(false)  // Disable warnings after the first run
       emitFooter()
     }
-    info(s"Banking summary report written to $out/decisions.html")
+    info(s"Banking summary report written to $out/$entryFile")
     config.enGen = enGen
     block
   }

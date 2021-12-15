@@ -121,6 +121,12 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   /** Indicate if a dimension should be fully banked **/
   def fullybankdim(dim: Int): C[A] = { this.fullyBankDim = dim; hierarchical; me }
 
+  /** indicate if the memory should be fully banked. This is intended for correctness debugging */
+  @stateful def fullybanked: C[A] = {
+    dbgs(s"Fully banking $this - ${this.constDims}")
+    bank(this.constDims, Seq.fill(this.rank)(1), Seq.fill(this.rank)(1), Some(this.constDims))
+  }
+
   def coalesce: C[A] = { this.shouldCoalesce = true; me }
 
   // --- Typeclass Methods

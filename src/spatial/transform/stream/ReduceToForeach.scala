@@ -44,7 +44,7 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
 
 
     val flattenedCChain = spatial.util.TransformUtils.expandCounterPars(reduceOp.cchain)
-    val newReduceIters = makeIters(flattenedCChain.unbox.counters).asInstanceOf[Seq[I32]]
+//    val newReduceIters = makeIters(flattenedCChain.unbox.counters).asInstanceOf[Seq[I32]]
 
     // TODO: Should change this to be dynamic based on par factor, but that requires messing with accumulators
     val reduceSize = reduceOp.cchain.approxIters

@@ -122,6 +122,9 @@ package object access {
     def prDeqGrp: Option[Int] = metadata[PriorityDeqGroup](a).map(_.grp)
     def prDeqGrp_=(grp: Int): Unit = metadata.add(a, PriorityDeqGroup(grp))
 
+    def stuffed: Boolean = metadata[StuffedFIFO](a).exists(_.flag)
+    def stuffed_=(flag: Boolean): Unit = metadata.add(a, StuffedFIFO(flag))
+
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
     def isVectorAccess: Boolean = a.op.exists(_.isVectorAccess)
     def isDeqInterface: Boolean = a.op.exists(_.isDeqInterface)

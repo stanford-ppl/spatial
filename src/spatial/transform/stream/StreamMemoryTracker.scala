@@ -135,8 +135,8 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
     dbgs(s"Computing Buffer Depths: ${result}")
     // For maximum throughput, buffer depth = sum(buffer depths) + 1
     // For minimum throughput, buffer depth = max(buffer depths) + 1
-    val minBufferDepth = spatial.util.roundUpToPow2(result.values.max + 1)
-    val maxBufferDepth = spatial.util.roundUpToPow2(result.values.sum + 1)
+    val minBufferDepth = spatial.util.roundUpToPow2(result.values.max + 8)
+    val maxBufferDepth = spatial.util.roundUpToPow2(result.values.sum + 8)
     mem.bufferAmount = StreamBufferAmount(maxBufferDepth, minBufferDepth, maxBufferDepth)
 
     ((result.keys map {k => (k -> (maxBufferDepth * 2))}).toMap, maxBufferDepth)
@@ -211,7 +211,7 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
 
             // Memory was previously written, now need a new fifo.
             val writerLatency = wr.children.length
-            val latencyEpsilon = 4
+            val latencyEpsilon = 8
 
             lazy implicit val bits: Bits[mem.L] = mem.A.asInstanceOf[Bits[mem.L]]
             val fifoDepth = I32(writerLatency + latencyEpsilon)

@@ -20,7 +20,7 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
   def expandMem(mem: Sym[_]) = mem.op match {
     case Some(srn@SRAMNew(dims)) =>
       dbgs(s"Expanding SRAM: $mem = $srn")
-      val bufferAmount = mem.bufferAmountOr1 * 2
+      val bufferAmount = mem.bufferAmountOr1
       val newDims = Seq(I32(bufferAmount)) ++ dims
       type A = srn.A.R
       lazy implicit val bitsEV: Bits[A] = srn.A

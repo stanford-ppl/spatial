@@ -107,7 +107,7 @@ object ForeachToStream {
           (i, j) =>
             val fetched = recv(i, j)
             val gold = i + 3*j + 7*n
-//            assert(fetched == gold, r"($n, $i, $j), Fetched: $fetched, Gold: $gold")
+            assert(fetched == gold, r"($n, $i, $j), Fetched: $fetched, Gold: $gold")
         }
     }
     assert(Bit(true))

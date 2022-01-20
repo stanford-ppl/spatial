@@ -136,6 +136,7 @@ trait ExternalAliases extends InternalAliases {
   type Fix[S,I,F] = argon.lang.Fix[S,I,F]
   lazy val Fix = argon.lang.Fix
   lazy val I32 = argon.lang.I32
+  lazy val U32 = argon.lang.U32
   lazy val FixPtType = argon.lang.FixPtType
 
   type FltFmt[M,E] = argon.lang.FltFmt[M,E]

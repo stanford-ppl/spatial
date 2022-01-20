@@ -217,6 +217,10 @@ object I32 {
   @rig def p(c: Int): I32 = parameter[I32](FixedPoint.fromInt(c))
 }
 
+object U32 {
+  def apply(c: Int): U32 = uconst[U32](FixedPoint.fromUInt(c))
+}
+
 object FixPtType {
   def unapply(x: Type[_]): Option[(Boolean,Int,Int)] = x match {
     case t: Fix[_,_,_] => Some((t.sign,t.ibits,t.fbits))

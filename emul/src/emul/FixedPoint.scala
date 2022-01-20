@@ -144,6 +144,7 @@ object FixedPoint {
   def fromByte(x: Byte): FixedPoint = FixedPoint(x, FixFormat(true,8,0))
   def fromShort(x: Short): FixedPoint = FixedPoint(x, FixFormat(true,16,0))
   def fromInt(x: Int): FixedPoint = FixedPoint(x, FixFormat(true,32,0))
+  def fromUInt(x: Int): FixedPoint = FixedPoint(x, FixFormat(false,32,0))
   def fromLong(x: Long): FixedPoint = FixedPoint(x, FixFormat(true,64,0))
 
   def apply(x: Boolean, fmt: FixFormat): FixedPoint = FixedPoint(if (x) 1 else 0,fmt)

@@ -58,11 +58,11 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Multiply-high of two fixed point values */
-@op case class FixMulH[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](_^_) {
+@op case class FixMulH[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp1[S,I,F] {
   // override def absorber: Option[Fix[S,I,F]] = Some(a.ones)
-  override def absorber: Option[Fix[S,I,F]] = Some(R.uconst(0))
+//   override def absorber: Option[Fix[S,I,F]] = Some(R.uconst(0))
   // override def identity: Option[Fix[S,I,F]] = Some(R.uconst(0))
-  override def isAssociative: Boolean = true
+//   override def isAssociative: Boolean = true
 }
 
 /** Fixed point addition */

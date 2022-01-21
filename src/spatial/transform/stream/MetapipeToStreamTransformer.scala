@@ -185,7 +185,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                         dbgs(s"MemTokens: ${memTokens}")
 
-                        dbgs(s"Blk: ${block.nestedStms}")
                         block.nestedStms foreach {
                           stmt =>
                             val mems = stmt.readMem ++ stmt.writtenMem
@@ -223,15 +222,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                   subst += (oldIter -> shifted)
                               }
 
-                              isolateSubst() { indent {
+                              inCopyMode(true) { isolateSubst() { indent {
                                 block.stms foreach {
                                   stm =>
                                     dbgs(s"Mirroring Inside Loop: $stm = ${stm.op}")
-                                    register(stm -> mirrorSym(stm))
+//                                    register(stm -> mirrorSym(stm))
+                                    visit(stm)
                                     dbgs(s"  -> ${f(stm)} = ${f(stm).op}")
                                 }
                               }}
-                            }
+                            }}
                         }
 
                         val isLastEn = innerIters.map {
@@ -265,10 +265,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 }}
               case stmt if shouldDuplicate(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")
-                subst += (stmt -> mirrorSym(stmt))
+//                subst += (stmt -> mirrorSym(stmt))
+                inCopyMode(true) {
+                  visit(stmt)
+                }
               case stmt if !stmt.isControl =>
                 dbgs(s"Didn't know how to convert: $stmt of type ${stmt.op}")
-                subst += (stmt -> mirrorSym(stmt))
+//                subst += (stmt -> mirrorSym(stmt))
+                inCopyMode(true) {
+                  visit(stmt)
+                }
               case stmt if stmt.isControl =>
                 error(s"Could not convert controller: $stmt of type ${stmt.op}")
                 throw new Exception()
@@ -286,22 +292,22 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     replacement
   }
 
-  private def defaultTransform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
-    val tmp = super.transform(lhs, rhs)
-    tmp
-  }
-
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
     (rhs match {
       case AccelScope(_) => inAccel {
-        dbgs(s"InCopyMode: $copyMode")
-        defaultTransform(lhs, rhs)
+        super.transform(lhs, rhs)
       }
 
       case foreach:OpForeach if inHw && canTransform(lhs, rhs) =>
         dbgs(s"Transforming: $lhs = $rhs")
-        transformForeach(lhs, foreach)
-      case _ => defaultTransform(lhs, rhs)
+        indent {
+          transformForeach(lhs, foreach)
+        }
+      case _ =>
+        dbgs(s"PassThrough: $copyMode $lhs = $rhs")
+        indent {
+          super.transform(lhs, rhs)
+        }
     }).asInstanceOf[Sym[A]]
   }
 }

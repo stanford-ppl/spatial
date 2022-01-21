@@ -66,6 +66,13 @@ object TransformUtils {
       n
     }
   }
+
+  def makeSymOpPair(sym: Sym[_]): Option[(Sym[_], Op[_])] = {
+    sym.op match {
+      case Some(op) => Some((sym, op))
+      case None => None
+    }
+  }
 }
 
 trait TransformerUtilMixin {

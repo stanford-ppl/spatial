@@ -113,13 +113,14 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
     * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
     * due to data-dependent control flow or that you don't care if one write gets dropped
     */
-  def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
+  def conflictable: C[A] = { this.shouldIgnoreConflicts = Range(0, rank).toSet; me }
   /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will crash. It will also assume only one duplicate */
-  def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = (N, B, alpha, P); me }
+  def bank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = Seq(BankingScheme(N, B, alpha, P)); me }
   /** Provide explicit banking scheme that you want to use.  If this scheme is unsafe, it will NOT crash. It will also assume only one duplicate */
-  def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = (N, B, alpha, P); this.forceExplicitBanking = true; me }
+  def forcebank(N: Seq[Int], B: Seq[Int], alpha: Seq[Int], P: Option[Seq[Int]] = None): C[A] = { this.explicitBanking = Seq(BankingScheme(N, B, alpha, P)); this.forceExplicitBanking = true; me }
+  def forcebank(schemes: Seq[BankingScheme]): C[A] = { this.explicitBanking = schemes; this.forceExplicitBanking = true; me}
   /** Indicate if a dimension should be fully banked **/
-  def fullybankdim(dim: Int): C[A] = { this.fullyBankDim = dim; hierarchical; me }
+  def fullybankdim(dim: Int): C[A] = { this.fullyBankDims = this.fullyBankDims + dim; hierarchical; me }
 
   /** indicate if the memory should be fully banked. This is intended for correctness debugging */
   @stateful def fullybanked: C[A] = {

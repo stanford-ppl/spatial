@@ -125,18 +125,18 @@ trait Spatial extends Compiler with ParamLoader {
       MetadataStripper[Duplicates](state),
       MetadataStripper[Dispatch](state),
       MetadataStripper[spatial.metadata.memory.Ports](state),
+      MetadataStripper[spatial.metadata.memory.GroupId](state),
       printer)
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
-    lazy val loopPerfection = Seq(loopPerfecter, printer) ++ DCE
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(unitPipeToForeach) ++
       bankingAnalysis ++ createDump("AfterBanking") ++ Seq(metapipeToStream, printer, streamBufferExpansion, allocMotion, pipeInserter, printer) ++ Seq(streamChecks)
 
-    lazy val streamify = createDump("PreCrash") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ retimeStrippers))
+    lazy val streamify = Seq(RepeatedTraversal(state, streamifyAnalysis ++ retimeStrippers)) ++ createDump("PostStreamify")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -187,7 +187,6 @@ trait Spatial extends Compiler with ParamLoader {
         regReadCSE          ==>
         /** Dead code elimination */
         DCE ==>
-//        (!spatialConfig.imperfect ? loopPerfection) ==>
         /** Metapipelines to Streams */
         spatialConfig.streamify ? streamify ==>
         /** Stream controller rewrites */
@@ -342,6 +341,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("streamify").action {(_, _) =>
       spatialConfig.streamify = true
     }.text("Enable automatically transforming controllers into streams.")
+
+    cli.opt[Unit]("nostreamify").action {(_, _) =>
+      spatialConfig.streamify = false
+    }.text("Disable automatically transforming controllers into streams.")
 
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false

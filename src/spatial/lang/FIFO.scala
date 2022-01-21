@@ -68,7 +68,7 @@ import scala.collection.mutable.Queue
     * Use in cases where FIFOs are used in stream controllers and have enq's in multiple places that the user
     * knows are mutually exclusive
     */
-  def conflictable: FIFO[A] = { this.shouldIgnoreConflicts = true; me }
+  def conflictable: FIFO[A] = { this.shouldIgnoreConflicts = Set(0); me }
   /** Do not attempt to bank memory by duplication */
   def noduplicate: FIFO[A] = { this.isNoFission = true; me }
 

@@ -63,36 +63,45 @@ package object memory {
     }
     def blockCyclicBs_=(bs: Seq[Int]): Unit = metadata.add(s, BlockCyclicBs(bs))
 
-    def shouldIgnoreConflicts: Boolean = metadata[IgnoreConflicts](s).exists(_.flag)
-    def shouldIgnoreConflicts_=(flag: Boolean): Unit = metadata.add(s, IgnoreConflicts(flag))
+    def shouldIgnoreConflicts: Set[Int] = metadata[IgnoreConflicts](s).map(_.flags).getOrElse(Set.empty)
+    def shouldIgnoreConflicts_=(flags: Set[Int]): Unit = metadata.add(s, IgnoreConflicts(flags))
+    def ignoreAllConflicts: Boolean = shouldIgnoreConflicts == s.rawRank.toSet
 
     @stateful def bankingEffort: Int = metadata[BankingEffort](s).map(_.effort).getOrElse(spatialConfig.bankingEffort)
     def bankingEffort_=(effort: Int): Unit = metadata.add(s, BankingEffort(effort))
 
-    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])] = metadata[ExplicitBanking](s).map(_.scheme)
-    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])): Unit = metadata.add(s, ExplicitBanking(scheme))
-    def fullyBankDim: Option[Int] = metadata[FullyBankDim](s).map(_.dim)
-    def fullyBankDim_=(dim: Int): Unit = metadata.add(s, FullyBankDim(dim))
-    def explicitNs: Seq[Int] = explicitBanking.get._1
-    def explicitBs: Seq[Int] = explicitBanking.get._2
-    def explicitAlphas: Seq[Int] = explicitBanking.get._3
-    def explicitPs: Option[Seq[Int]] = explicitBanking.get._4
-    @stateful def explicitScheme: Seq[ModBanking] = {
+//    def explicitBanking: Option[(Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])] = metadata[ExplicitBanking](s).map(_.scheme)
+//    def explicitBanking_=(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])): Unit = metadata.add(s, ExplicitBanking(scheme))
+    def explicitBanking: Option[Seq[BankingScheme]] = metadata[ExplicitBanking](s).map(_.schemes)
+    def explicitBanking_=(scheme: Seq[BankingScheme]): Unit = metadata.add(s, ExplicitBanking(scheme))
+
+    def fullyBankDims: Set[Int] = metadata[FullyBankDims](s).map(_.dims).getOrElse(Set.empty)
+    def fullyBankDims_=(dims: Set[Int]): Unit = metadata.add(s, FullyBankDims(dims))
+
+    private def getDupBanking(dup: Int): BankingScheme = explicitBanking.get(dup)
+    def numExplicitDuplicates: Option[Int] = explicitBanking.map(_.size)
+    def explicitNs: Seq[Int] = getDupBanking(0).Ns
+    def explicitBs: Seq[Int] = getDupBanking(0).Bs
+    def explicitAlphas: Seq[Int] = getDupBanking(0).Alphas
+    def explicitPs: Option[Seq[Int]] = getDupBanking(0).Ps
+
+    @stateful def explicitSchemeDup(dup: Int): Seq[ModBanking] = {
       import spatial.metadata.types._
       import utils.math.{computeP, bestPByVolume}
-      if (explicitNs.size == 1) {
-        val P = explicitPs.getOrElse({
-          val allP = computeP(explicitNs.head, explicitBs.head, explicitAlphas, s.stagedDims.map(_.toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
+      val explicit = getDupBanking(dup)
+      if (explicit.Ns.size == 1) {
+        val P = explicit.Ps.getOrElse({
+          val allP = computeP(explicit.Ns.head, explicit.Bs.head, explicit.Alphas, s.stagedDims.map(_.toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
           bestPByVolume(allP, s.stagedDims.map(_.toInt))
         })
-        Seq(ModBanking(explicitNs.head, explicitBs.head, explicitAlphas, Seq.tabulate(explicitNs.size) { i => i }, P, 1, 0))
+        Seq(ModBanking(explicit.Ns.head, explicit.Bs.head, explicit.Alphas, Seq.tabulate(explicit.Ns.size) { i => i }, P, 1, 0))
       }
       else {
-        Seq.tabulate(explicitNs.size){i =>
-          val n = explicitNs(i)
-          val b = explicitBs(i)
-          val a = explicitAlphas(i)
-          val P = explicitPs.getOrElse({
+        Seq.tabulate(explicit.Ns.size){i =>
+          val n = explicit.Ns(i)
+          val b = explicit.Bs(i)
+          val a = explicit.Alphas(i)
+          val P = explicit.Ps.getOrElse({
             val allP = computeP(n,b,Seq(a), Seq(s.stagedDims(i).toInt), error(ctx, s"Cannot fence region for explicitly banked memory, $s.  Is there a proper way to fence regions for offset calculations?"))
             bestPByVolume(allP, s.stagedDims.map(_.toInt))
           })
@@ -100,7 +109,16 @@ package object memory {
         }
       }
     }
-    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).map(_.flag).getOrElse(false)
+
+    @stateful def explicitSchemes: Seq[Seq[ModBanking]] = {
+      numExplicitDuplicates match {
+        case Some(dups) =>
+          Range(0, dups).map(explicitSchemeDup)
+        case None => Seq.empty
+      }
+    }
+
+    def forceExplicitBanking: Boolean = metadata[ForceExplicitBanking](s).exists(_.flag)
     def forceExplicitBanking_=(flag: Boolean): Unit = metadata.add(s, ForceExplicitBanking(flag))
 
     def isNoFlatBank: Boolean = metadata[NoFlatBank](s).exists(_.flag)

@@ -28,21 +28,13 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
       val newMem = stageWithFlow(SRAMNew[A, SRAMN](newDims)) { nm => transferData(mem, nm) }
       newMem.r = dims.size + 1
       transferData(mem, newMem)
-      newMem.fullybankdim(0)
-      newMem.fullybanked
+      // Shift fully banked dims back by 1, then fully bank this one.
+      newMem.fullyBankDims = mem.fullyBankDims.map(_ + 1) + 0
+      newMem.shouldIgnoreConflicts = mem.shouldIgnoreConflicts.map(_ + 1) + 0
+      dbgs(s"Old Fully Banked Dims: ${mem.fullyBankDims}")
+      dbgs(s"New Fully Banked Dims: ${newMem.fullyBankDims}")
       newMem.bufferAmount = None
-      mem.getInstance match {
-        case Some(memory) =>
-          val Ns = Seq(bufferAmount) ++ memory.nBanks
-          val Bs = Seq(1) ++ memory.Bs
-          val alphas = Seq(1) ++ memory.alphas
-          val Ps = Seq(bufferAmount) ++ memory.Ps
-          dbgs(s"Inferring banking: $Ns, $Bs, $alphas, $Ps")
-          newMem.fullybankdim(0)
-          newMem.forcebank(Ns, Bs, alphas, None)
-        case None =>
-          dbgs(s"Could not infer memory banking for $newMem from $mem")
-      }
+      newMem.hierarchical
       dbgs(s"NewMem: $newMem = ${newMem.op.get}")
       newMem
   }

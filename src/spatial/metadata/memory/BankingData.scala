@@ -294,7 +294,7 @@ case class Padding(dims: Seq[Int]) extends Data[Padding](SetBy.Analysis.Self)
   * Readers should have at most one dispatch ID.
   *
   * Option:  sym.getDispatches     --- for the entire map
-  * Option:  sym.getDispach(uid)   --- for a single unrolled instance id
+  * Option:  sym.getDispatch(uid)   --- for a single unrolled instance id
   * Getter:  sym.dispatches        --- for the entire map
   * Getter:  sym.dispatch(uid)     --- for a single unrolled instance id
   * Setter:  sym.dispatches = (Map[ Seq[Int],Set[Int] ])
@@ -474,7 +474,8 @@ case class ShouldCoalesce(flag: Boolean) extends Data[ShouldCoalesce](SetBy.User
   * Setter:  sym.shouldIgnoreConflicts = (true | false)
   * Default: false
   */
-case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)
+//case class IgnoreConflicts(flag: Boolean) extends Data[IgnoreConflicts](SetBy.User)
+case class IgnoreConflicts(flags: Set[Int]) extends Data[IgnoreConflicts](SetBy.User)
 
 /** Flag set by the user to specify a specific banking effort to be put into this particular memory
   *
@@ -639,7 +640,9 @@ case object AlphaRelaxed extends AlphaStrictness {
   * Setter:  sym.explicitBanking = (Seq[Int], Seq[Int], Seq[Int])
   * Default: None
   */
-case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])) extends Data[ExplicitBanking](SetBy.User)
+//case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int]])) extends Data[ExplicitBanking](SetBy.User)
+case class BankingScheme(Ns: Seq[Int], Bs: Seq[Int], Alphas: Seq[Int], Ps: Option[Seq[Int]])
+case class ExplicitBanking(schemes: Seq[BankingScheme]) extends Data[ExplicitBanking](SetBy.User)
 
 /** Info set by the user to specify a specific a dimension that must be fully banked
   *
@@ -647,7 +650,8 @@ case class ExplicitBanking(scheme: (Seq[Int], Seq[Int], Seq[Int], Option[Seq[Int
   * Setter:  sym.explicitBanking = Int
   * Default: None
   */
-case class FullyBankDim(dim: Int) extends Data[FullyBankDim](SetBy.User)
+//case class FullyBankDim(dim: Int) extends Data[FullyBankDim](SetBy.User)
+case class FullyBankDims(dims: Set[Int]) extends Data[FullyBankDims](SetBy.User)
 
 /** Flag set by the user to specify that a banking scheme must be used even if it is unsafe
   *

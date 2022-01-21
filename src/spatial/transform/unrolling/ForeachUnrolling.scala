@@ -46,7 +46,7 @@ trait ForeachUnrolling extends UnrollingBase {
         }
       }
       val lhs3 = stage(ParallelPipe(newEns, blocks))
-      lhs3       
+      lhs3
     }
   }
 
@@ -68,7 +68,7 @@ trait ForeachUnrolling extends UnrollingBase {
       val blk   = inLanes(unrLanes){ substituteBlock(func) }
       val lhs2  = stageWithFlow(UnrolledForeach(newEns, cchain, blk, is, vs, stopWhen)){lhs2 => transferData(lhs,lhs2) }
       dbgs(s"Created foreach ${stm(lhs2)}")
-      lhs2      
+      lhs2
     } else {
       val blocks = stageBlock { 
         unrLanes.foreach{ case List(p) => 
@@ -81,7 +81,7 @@ trait ForeachUnrolling extends UnrollingBase {
         }
       }
       val lhs3 = stage(ParallelPipe(newEns, blocks))
-      lhs3       
+      lhs3
     }
   }
 

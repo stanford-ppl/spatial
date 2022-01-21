@@ -22,7 +22,8 @@ case class IterationDiffAnalyzer(IR: State) extends AccelTraversal {
         if (cycles.nonEmpty) {
           dbgs(s"\n\nFound cycles in $lhs ($iters): ")
           cycles.foreach{c => dbgs(s"  $c")}
-          cycles.collect{case AccumTriple(mem,reader,writer) if mem.isLocalMem && reader != writer && !mem.shouldIgnoreConflicts =>
+          // TODO(stanfurd) The shouldIgnoreConflicts currently ignores if all dims have ignore conflicts.
+          cycles.collect{case AccumTriple(mem,reader,writer) if mem.isLocalMem && reader != writer && mem.ignoreAllConflicts =>
 
             if (reader.affineMatrices.nonEmpty && writer.affineMatrices.nonEmpty) {
               val huge = 99999

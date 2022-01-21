@@ -128,7 +128,7 @@ abstract class LockSRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< LockSRAM[A,C])
     * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
     * due to data-dependent control flow or that you don't care if one write gets dropped
     */
-  def conflictable: C[A] = { this.shouldIgnoreConflicts = true; me }
+  def conflictable: C[A] = { this.shouldIgnoreConflicts = Range(0, rank).toSet; me }
 
 
   // --- Typeclass Methods

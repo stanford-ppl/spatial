@@ -147,7 +147,7 @@ case class FullyBanked()(implicit IR: State, isl: ISL) extends BankingStrategy {
       val myGrps = myReads ++ myWrites
       myGrps.foreach{x => x.foreach{y => lowRankMapping += (y -> Set(y))}}
       if (mem.isSingleton) {
-        if (myWrites.exists(_.size > 1) && !mem.shouldIgnoreConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
+        if (myWrites.exists(_.size > 1) && !mem.ignoreAllConflicts) error(ctx, s"Cannot bank ${mem.ctx} (${mem.name.getOrElse("")})")
         Map(attemptDirectives.head -> Map((myReads.map{x => x.flatMap(reverseAM).toSet} ++ Set(hostReads)) -> Seq(Seq(ModBanking.Unit(rank, Seq.tabulate(mem.stagedDims.size){i => i})))))
       }
       else {

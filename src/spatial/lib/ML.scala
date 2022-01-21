@@ -6,6 +6,8 @@ import spatial.metadata.memory._
 import spatial.lang.types._
 import argon._
 
+import spatial.util.debug._
+
 object ML extends HostML {
 
   @virtualize 
@@ -101,6 +103,7 @@ object ML extends HostML {
     val hiddens = hiddenDims.map { h => SRAM[T](h) }
     hiddens.zipWithIndex foreach {case (sram, ind) =>
       sram.explicitName = s"Hidden_$ind"
+//      sram.fullybanked
     }
     layers.sliding(2,1).foreach { case List(prev,next) =>
       val in = IfElse[I32 => T](prev==0) { input } { hiddens(prev-1)(_) }
@@ -120,11 +123,21 @@ object ML extends HostML {
       val inWithPrint = (x: I32) => {
         val res = in(x)
         println(r"Read: $prev($x) = $res")
+        retimeGate()
+        tagValue(x, s"${prev}_rd_index")
+        tagValue(res, s"${prev}_rd_value")
+        retimeGate()
         res
       }
 
       val outWithPrint = (x: I32, v: T) => {
         println(r"Write: $next($x) = $v")
+//        retimeGate()
+//        tagValue(x, s"${next}_wr_index")
+//        tagValue(v, s"${next}_wr_value")
+////        val sramAcc = SRAMAccess(x, v)
+////        tagValue(sramAcc, s"SRAM_Access_wr_${next}")
+//        retimeGate()
         out(x, v)
       }
       denselayer[T](w, b, activation, in=inWithPrint, nlout=outWithPrint)(ip=ip, mp=mp, op=op)

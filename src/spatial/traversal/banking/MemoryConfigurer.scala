@@ -245,8 +245,8 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val grpId = {
         if (mem.parent == Ctrl.Host) groups.zipWithIndex.indexWhere{case (grp,i) => 
           val samePort = grp.filter{b => requireConcurrentPortAccess(a,b)}
-          if (samePort.nonEmpty && !mem.shouldIgnoreConflicts) dbgs(s"      WARNING: $mem has conflictable writers.  Do you want to add .conflictable flag to it?")
-          samePort.nonEmpty && !mem.shouldIgnoreConflicts
+          if (samePort.nonEmpty && !mem.ignoreAllConflicts) dbgs(s"      WARNING: $mem has conflictable writers.  Do you want to add .conflictable flag to it?")
+          samePort.nonEmpty && !mem.ignoreAllConflicts
         }
         else groups.zipWithIndex.indexWhere{case (grp, i) =>
           // Filter for accesses that require concurrent port access AND either don't overlap or are identical.
@@ -265,7 +265,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
           if (config.enLog) samePort.foreach{b => logs(s"        ${b.short} [${b.parent}]")}
 
           val noConflicts = if (isWrite) {
-            if (conflicts.nonEmpty && !mem.shouldIgnoreConflicts) {
+            if (conflicts.nonEmpty && !mem.ignoreAllConflicts) {
               val contexts = conflicts map {_.access.ctx}
               val uids = conflicts map {_.unroll}
               warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${contexts.mkString(", ")} (uid: ${uids.mkString(", ")}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
@@ -276,7 +276,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
                        "the address pattern is actually safe to bank (i.e. accesses are timed so they won't conflict or are masked so they won't all trigger at the same time")
               warn(s"    Note that banking analysis may hang or crash here...")
               true
-            } else if (conflicts.nonEmpty && mem.shouldIgnoreConflicts) {
+            } else if (conflicts.nonEmpty && mem.ignoreAllConflicts) {
 //              warn(s"Detected potential write conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${conflicts.head.access.ctx} (uid: ${conflicts.head.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
 //              warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
               false
@@ -352,7 +352,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val conflict = if (samePort) {overlapsAddress(a,b) && !canBroadcast(a, b) && (a.segmentAssignment == b.segmentAssignment)} else false
       dbgs(s"   ${a.short} ${b.short} samePort:$samePort conflict:$conflict")
       var canConflict = conflict
-      if (canConflict && mem.shouldIgnoreConflicts) {
+      if (canConflict && mem.ignoreAllConflicts) {
 //        warn(s"Detected potential conflicts on ${a.access.ctx} (uid: ${a.unroll}) and ${a.access.ctx} (uid: ${a.unroll}) to memory ${mem.ctx} (${mem.name.getOrElse("")})")
 //        warn(s"    These are technically unbankable but you signed the waiver (by adding .conflictable) that says you know what you are doing")
         canConflict = false
@@ -712,7 +712,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
       val conflicts  = getInstanceConflict(a, b)
 
       if (spatialConfig.enablePIR) Some("Do not merge accesses for plasticine")
-      else if (commonCtrl.nonEmpty && !isGlobal && !mem.shouldIgnoreConflicts)
+      else if (commonCtrl.nonEmpty && !isGlobal && !mem.ignoreAllConflicts)
         Some(s"Control conflict: Common control (${commonCtrl.mkString(",")})")
       else if (conflicts.nonEmpty)
         Some(s"Instances conflict: ${conflicts.get._1.short} / ${conflicts.get._2.short}")

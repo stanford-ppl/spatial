@@ -30,7 +30,7 @@ import spatial.metadata.memory._
     * Use in cases where writes may happen in parallel but you are either sure that two writes won't happen simultaneously
     * due to data-dependent control flow or that you don't care if one write gets dropped
     */
-  def conflictable: Reg[A] = { this.shouldIgnoreConflicts = true; me }
+  def conflictable: Reg[A] = { this.shouldIgnoreConflicts = Set(0); me }
   /** Do not remove this memory or accesses to this memory, even if anything appears unused*/
   def dontTouch: Reg[A] = { this.keepUnused = true; me }
 

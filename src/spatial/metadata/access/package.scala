@@ -278,8 +278,9 @@ package object access {
     */
   @stateful def dephasingIters(a: AccessMatrix, baseUID: Seq[Int], mem: Sym[_]): Map[(Idx,Seq[Int]),Option[Int]] = {
     val aIters: Seq[Idx] = accessIterators(a.access, mem)
-    if (!aIters.isEmpty) {
+    if (aIters.nonEmpty) {
       val leaf = a.access.parent.s.get
+      dbgs(s"Dephasing Iters: $a -> $leaf")
       // TODO: iterSynchronizationInfo should be standalone helper, not a func defined on a Sym!
       val ofsRules = if (aIters.nonEmpty) leaf.iterSynchronizationInfo(leaf, aIters, baseUID, a.unroll) else Map[Idx,Int]()
       aIters.map{i => ((i,a.unroll) -> ofsRules.get(i))}.toMap

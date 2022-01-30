@@ -6,7 +6,7 @@ import spatial.metadata.control._
 
 case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) extends Issue {
   @stateful override def onUnresolved(traversal: String): Unit = {
-    error(mem.ctx, s"${mem.name.getOrElse("memory")} defined here is used across multiple pipelines.")
+    error(mem.ctx, s"${mem.name.getOrElse("memory")}($mem) defined here is used across multiple pipelines.")
     error(s"Hierarchical buffering is currently disallowed.")
     error(mem.ctx)
 

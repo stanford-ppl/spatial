@@ -992,8 +992,6 @@ package object control {
       _.nIters match {
         case Some(bound) =>
           bound.toInt
-        case None =>
-          1
       }
     }).product
   }

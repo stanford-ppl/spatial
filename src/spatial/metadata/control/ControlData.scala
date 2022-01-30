@@ -2,6 +2,7 @@ package spatial.metadata.control
 
 import argon._
 import spatial.lang._
+import spatial.node.Control
 
 /** Control node schedule */
 sealed abstract class CtrlSchedule
@@ -132,7 +133,13 @@ case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
   * Setter:  sym.counter = (IndexCounterInfo)
   * Default: undefined
   */
-case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self)
+case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self) {
+  override def mirror(f: Tx): IndexCounter = {
+    val newIC = IndexCounter(IndexCounterInfo(f(info.ctr), info.lanes))
+    System.out.println(s"Mirroring: $this -> $newIC")
+    newIC
+  }
+}
 
 
 /** Latency of a given inner pipe body - used for control signal generation.

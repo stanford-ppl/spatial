@@ -95,6 +95,6 @@ trait MetaPipeToStreamBase {
           mem => multiUses.getOrElseUpdate(mem, mutable.ArrayBuffer.empty).append(stmt)
         }
     }
-    (multiUses map {case (k, v) => k -> v.toList}).toMap
+    (singleUseMemories, (multiUses map {case (k, v) => k -> v.toList}).toMap)
   }
 }

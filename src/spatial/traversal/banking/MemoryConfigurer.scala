@@ -137,7 +137,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
 
       if (inst.writes.flatten.isEmpty && mem.name.isDefined && !mem.hasInitialValues && !mem.isStreamIn) {
         inst.reads.iterator.flatten.foreach{read =>
-          warn(read.access.ctx, s"Memory ${mem.name.get} appears to be read here before ever being written.")
+          warn(read.access.ctx, s"Memory $mem(${mem.name.get}) appears to be read here before ever being written.")
           warn(read.access.ctx)
           warn(mem.ctx, s"For memory ${mem.name.get} originally defined here.", noWarning = true)
           warn(mem.ctx)
@@ -149,7 +149,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
     val unused = mem.accesses diff used
     unused.foreach{access =>
       if (mem.name.isDefined && !mem.keepUnused) {
-        val msg = if (access.isReader) s"Read of memory ${mem.name.get} was unused. Read will be removed."
+        val msg = if (access.isReader) s"Read of memory $mem(${mem.name.get}) was unused. Read will be removed."
                   else s"Write to memory ${mem.name.get} is never used. Write will be removed."
         warn(access.ctx, msg)
         warn(access.ctx)

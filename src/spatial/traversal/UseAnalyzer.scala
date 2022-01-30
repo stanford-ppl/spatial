@@ -32,7 +32,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
       }
       else if (!mem.isStreamOut && (mem.readers.isEmpty || mem.readers.forall(isUnusedRead)) && !mem.isBreaker) {
         if (mem.name.isDefined) {
-          warn(mem.ctx, s"${mem.name.get} is defined here but never read.")
+          warn(mem.ctx, s"$mem(${mem.name.get}) is defined here but never read.")
           warn(mem.ctx)
         }
       }

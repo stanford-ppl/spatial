@@ -20,6 +20,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
   with MetaPipeToStreamBase with
   RepeatableTraversal with CounterChainToStream with StreamMemoryTracker {
 
+  override val recurse = Recurse.Always
+
   @struct case class ReduceData[T: Bits](payload: T, emit: Bit, last: Bit)
 
   private val allowableSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
@@ -70,11 +72,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         dbgs(s"$result: ${s} = ${s.op}")
         result
       case s if s.isCounterChain => true
-      case Op(ctr@CounterNew(start, end, step, par)) =>
+      case Op(ctr:CounterNew[_]) =>
         // Allowed if all params are either static or defined outside parent.
-        val syms = Seq(start, end, step, par)
-        dbgs(s"Checking Counter params are either static or defined outside of parent ($lhs): $syms")
-        syms forall { sym =>
+        dbgs(s"Checking Counter params are either static or defined outside of parent ($lhs): ${ctr.inputs}")
+        ctr.inputs forall { sym =>
           dbgs(s"$sym: Const: ${sym.isConst} = ${sym.op}")
           dbgs(s"$sym: HasImmediateParent: ${sym.hasAncestor(lhs.toCtrl)}")
           sym.isConst || !sym.hasAncestor(lhs.toCtrl)
@@ -95,8 +96,15 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
     dbgs(s"InternalMems: ${internalMems.mkString(", ")}")
 
-    val nonLocalUses = computeNonlocalUses(lhs)
+    val (singleUse, nonLocalUses) = computeNonlocalUses(lhs)
     dbgs(s"NonLocal Uses: $nonLocalUses")
+    dbgs(s"Single Uses: $singleUse")
+    val singleWrites = singleUse intersect foreach.effects.writes
+    dbgs(s"Single Writes: $singleWrites")
+    singleWrites.foreach {
+      case sr:SRAM[_, _] => sr.nonbuffer
+      case _ =>
+    }
 
     def getReadRegs(s: Sym[_]) = (s.effects.reads union s.effects.writes) intersect internalRegs
 
@@ -204,9 +212,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                         val cloned = registerDuplicationFIFOReads(stmtReads, duplicationReadFIFOs.getOrElse(stmt, mutable.Map.empty).toMap, en)
 
-                        childShifts foreach {
+                        val remaps = childShifts map {
                           cShift =>
-                            isolateSubst() {
                               val childShift = (cchain.counters zip cShift) map {
                                 case (ctr, shift) =>
                                   implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
@@ -215,24 +222,53 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               }
 
                               val shift = parentShift.shift ++ childShift
-                              dbgs(s"Processing shift: $shift")
-                              ((foreach.iters ++ iters) zip newIters) zip shift foreach {
+                              dbgs(s"Staging Calcs for shift: $shift")
+                              ((foreach.iters ++ iters) zip newIters) zip shift map {
                                 case ((oldIter, newIter), s) =>
                                   val shifted = newIter + s
-                                  subst += (oldIter -> shifted)
+                                  (oldIter -> shifted)
                               }
-
-                              inCopyMode(true) { isolateSubst() { indent {
-                                block.stms foreach {
-                                  stm =>
-                                    dbgs(s"Mirroring Inside Loop: $stm = ${stm.op}")
-//                                    register(stm -> mirrorSym(stm))
-                                    visit(stm)
-                                    dbgs(s"  -> ${f(stm)} = ${f(stm).op}")
-                                }
-                              }}
-                            }}
                         }
+                        // We need to do some fancy equivalent of isolateSubst between the different shifts.
+                        val remapSubsts = collection.mutable.Map(
+                          (remaps map {
+                            key =>
+                              key -> (subst ++ key)
+                          }):_*)
+                        val cyclingVisit = (stmt: Sym[_]) => {
+                          remaps foreach {
+                            remap =>
+                              // Load the subst for this copy of the controller
+                              subst = remapSubsts(remap)
+                              visit(stmt)
+                              // persist the modified subst to remapSubsts
+                              remapSubsts(remap) = subst
+                          }
+                        }
+                        isolateSubst() { inCopyMode(true) {
+                          block.stms.foreach {
+                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) && cchain.isInnerControl =>
+                              // Complex condition because we transform unitpipes into Foreach loops before this.
+                              // In this case, we collapse the iterations together while replicating.
+                              // To aid with analysis, we perform the same rotating remapping.
+                              // if the controller only runs for 1 iteration, remap iter to ctr.start
+                              // currently doesn't handle par factors.
+                              // TODO(stanfurd): Handle Par Factors
+                              iters foreach {
+                                iter =>
+                                  remaps foreach {
+                                    remap =>
+                                      subst = remapSubsts(remap)
+                                      remapSubsts(remap) += (iter -> f(iter.counter.ctr.start))
+                                  }
+                              }
+                              stageWithFlow(UnitPipe(f(ens), stageBlock {
+                                block.stms.foreach(cyclingVisit)
+                              }, f(stopWhen))) {lhs2 => transferData(oldForeach, lhs2)}
+
+                            case stmt => cyclingVisit(stmt)
+                          }
+                        }}
 
                         val isLastEn = innerIters.map {
                           i =>
@@ -267,14 +303,11 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 dbgs(s"Re-staging memory: $stmt")
 //                subst += (stmt -> mirrorSym(stmt))
                 inCopyMode(true) {
-                  visit(stmt)
+                  register(stmt -> mirrorSym(stmt))
                 }
               case stmt if !stmt.isControl =>
-                dbgs(s"Didn't know how to convert: $stmt of type ${stmt.op}")
-//                subst += (stmt -> mirrorSym(stmt))
-                inCopyMode(true) {
-                  visit(stmt)
-                }
+                dbgs(s"Default Mirroring: $stmt of type ${stmt.op}")
+                register(stmt -> mirrorSym(stmt))
               case stmt if stmt.isControl =>
                 error(s"Could not convert controller: $stmt of type ${stmt.op}")
                 throw new Exception()
@@ -303,10 +336,30 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         indent {
           transformForeach(lhs, foreach)
         }
+
+      case genericControl: Control[_] =>
+        dbgs(s"Control: $lhs = $rhs")
+        genericControl.iters.foreach {
+          iter =>
+            val IndexCounterInfo(chain, lanes) = iter.counter
+            val shouldRemap = chain != f(chain) && !subst.contains(iter)
+            dbgs(s"Chain: $chain -> ${f(chain)} Should Remap: ($shouldRemap)")
+            if (shouldRemap) {
+              // Mirror across the IndexCounterInfo
+              implicit def bEV: Bits[chain.CT] = chain.CTeV
+              val newVar = boundVar[chain.CT].asInstanceOf[Bits[chain.CT]]
+              newVar.counter = IndexCounterInfo(f(chain), lanes)
+              register(iter -> newVar)
+            }
+        }
+        super.transform(lhs, rhs)
+
       case _ =>
-        dbgs(s"PassThrough: $copyMode $lhs = $rhs")
         indent {
-          super.transform(lhs, rhs)
+          val result = super.transform(lhs, rhs)
+          dbgs(s"$lhs = $rhs")
+          dbgs(s"    $result = ${result.op}")
+          result
         }
     }).asInstanceOf[Sym[A]]
   }

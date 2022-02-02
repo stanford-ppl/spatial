@@ -34,6 +34,10 @@ object FixFmt {
 @ref class Fix[S:BOOL,I:INT,F:INT] extends Top[Fix[S,I,F]] with Num[Fix[S,I,F]] with Ref[FixedPoint,Fix[S,I,F]] {
   val box = implicitly[Fix[S,I,F] <:< Num[Fix[S,I,F]]]
   val fmt = FixFmt.from[S,I,F]
+  type ST = S
+  type IT = I
+  type FT = F
+  type FixType = FixPt[S,I,F]
   override protected val __typeParams: Seq[Any] = Seq(fmt)
 
   def sign: Boolean = fmt.sign
@@ -209,7 +213,23 @@ object FixFmt {
 }
 
 object Fix {
+  def createFixType(s: Boolean, i: Int, f: Int) = {
+    class BT extends BOOL[BT] {
+      val v = s
+    }
+    class IT extends INT[IT] {
+      val v = i
+    }
+    class FT extends INT[FT] {
+      val v = f
+    }
 
+    implicit def BTEV: BOOL[BT] = new BT
+    implicit def ITEV: INT[IT] = new IT
+    implicit def FTEV: INT[FT] = new FT
+
+    proto(new FixPt[BT, IT, FT])
+  }
 }
 object I32 {
   def apply(c: Int): I32 = uconst[I32](FixedPoint.fromInt(c))

@@ -110,7 +110,7 @@ trait ISL {
         // close FileChannel
         channel.close()
       } catch {
-        case _: Throwable => throw new Exception("Error compiling emptiness")
+        case th: Throwable => throw new Exception(s"Error compiling emptiness: ${th.toString}")
       }
     }
 

@@ -61,7 +61,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     // can transform if all children are foreach loops
     lhs.blocks.flatMap(_.stms).forall {
       case stmt@Op(foreach:OpForeach) =>
-        dbgs(s"True: ${stmt} = ${stmt.op}")
         true
       case s if s.isMem =>
         val result = (s.writers union s.readers) forall {
@@ -80,8 +79,9 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
           dbgs(s"$sym: HasImmediateParent: ${sym.hasAncestor(lhs.toCtrl)}")
           sym.isConst || !sym.hasAncestor(lhs.toCtrl)
         }
+//      case s if s.isTransient => true
       case s =>
-        dbgs(s"False: ${s} = ${s.op}")
+        dbgs(s"Disallowed: ${s} = ${s.op}")
         false
     }
   }
@@ -100,11 +100,14 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     dbgs(s"NonLocal Uses: $nonLocalUses")
     dbgs(s"Single Uses: $singleUse")
     val singleWrites = singleUse intersect foreach.effects.writes
+
     dbgs(s"Single Writes: $singleWrites")
-    singleWrites.foreach {
-      case sr:SRAM[_, _] => sr.nonbuffer
+    singleWrites.filter(_.isSRAM).foreach {
+      case sr: SRAM[_, _] => sr.nonbuffer
       case _ =>
     }
+    val singleReads = (singleUse intersect foreach.effects.reads) diff singleWrites
+    dbgs(s"Single Reads: $singleReads")
 
     def getReadRegs(s: Sym[_]) = (s.effects.reads union s.effects.writes) intersect internalRegs
 
@@ -247,13 +250,14 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         }
                         isolateSubst() { inCopyMode(true) {
                           block.stms.foreach {
-                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) && cchain.isInnerControl =>
+                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) =>
                               // Complex condition because we transform unitpipes into Foreach loops before this.
                               // In this case, we collapse the iterations together while replicating.
                               // To aid with analysis, we perform the same rotating remapping.
                               // if the controller only runs for 1 iteration, remap iter to ctr.start
                               // currently doesn't handle par factors.
                               // TODO(stanfurd): Handle Par Factors
+                              dbgs(s"Intelligently unrolling single-iteration loop $oldForeach = ${oldForeach.op}")
                               iters foreach {
                                 iter =>
                                   remaps foreach {
@@ -266,7 +270,9 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                 block.stms.foreach(cyclingVisit)
                               }, f(stopWhen))) {lhs2 => transferData(oldForeach, lhs2)}
 
-                            case stmt => cyclingVisit(stmt)
+                            case stmt =>
+                              dbgs(s"Dumbly handling: $stmt = ${stmt.op}")
+                              cyclingVisit(stmt)
                           }
                         }}
 
@@ -331,8 +337,9 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         super.transform(lhs, rhs)
       }
 
-      case foreach:OpForeach if inHw && canTransform(lhs, rhs) =>
+      case foreach:OpForeach if inHw && canTransform(lhs, rhs) && foreach.cchain.isStatic && foreach.cchain.approxIters > 1 =>
         dbgs(s"Transforming: $lhs = $rhs")
+//        converged = false
         indent {
           transformForeach(lhs, foreach)
         }

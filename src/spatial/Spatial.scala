@@ -119,6 +119,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val regElim               = RegWriteReadElimination(state)
     lazy val allocMotion           = AllocMotion(state)
     lazy val reduceToForeach       = ReduceToForeach(state)
+    lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)
     lazy val retimeStrippers       = Seq(
       printer,
       MetadataStripper[Duplicates](state),
@@ -132,8 +133,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
-    lazy val streamifyAnalysis = Seq(unitPipeToForeach) ++
-      bankingAnalysis ++ createDump("AfterBanking") ++ Seq(metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, printer, pipeInserter, printer) ++ Seq(streamChecks)
+    lazy val streamifyAnalysis = Seq(reduceToForeach, unitPipeToForeach) ++
+      bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, printer, pipeInserter, printer) ++ Seq(streamChecks)
 
     lazy val streamify = Seq(RepeatedTraversal(state, streamifyAnalysis ++ retimeStrippers)) ++ createDump("PostStreamify")
 

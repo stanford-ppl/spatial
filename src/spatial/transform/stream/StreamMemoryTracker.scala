@@ -164,7 +164,7 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
         dbgs(s"Staging token: $mem -> ${f(mem)}, $fifo, $tokenReg, $tokenRegBuf")
         (f(mem) -> tokenRegBuf)
     }).toMap
-    tmp map {case (m, reg) => m -> reg.value }
+    tmp map {case (m, reg) => m -> reg }
   }
 
   def registerDuplicationFIFOReads(stmtReads: Traversable[Sym[_]], duplicationReadFIFOs: Map[Sym[_], Sym[_]], en: Set[Bit]): Map[Sym[_], Sym[_]] = {

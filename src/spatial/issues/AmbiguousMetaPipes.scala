@@ -13,7 +13,7 @@ case class AmbiguousMetaPipes(mem: Sym[_], mps: Map[Ctrl,Set[(Sym[_],Sym[_])]]) 
     dbgs(stm(mem))
     mps.zipWithIndex.foreach{case ((pipe,accs),i) =>
       val adj = if (i == 0) "First" else "Conflicting"
-      error(pipe.s.get.ctx, s"$adj pipeline defined here.", noError = true)
+      error(pipe.s.get.ctx, s"$adj pipeline defined here. ${pipe.s}", noError = true)
       error(pipe.s.get.ctx)
 //      error("With accesses: ")
 //      val accesses = accs.flatMap{case (s1,s2) => Seq(s1,s2) }

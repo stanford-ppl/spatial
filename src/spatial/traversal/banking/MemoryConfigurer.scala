@@ -325,6 +325,7 @@ class MemoryConfigurer[+C[_]](mem: Mem[_,C], strategy: BankingStrategy)(implicit
   }
 
   private def overlapsAddress(a: AccessMatrix, b: AccessMatrix): Boolean = {
+    dbgs(s"Computing overlaps: ${a.access} = ${a.access.op} - ${b.access} = ${b.access.op}")
     val substRules = divergedIters(a, b, mem)
     val keyRules: scala.collection.immutable.Map[Idx,(Idx,Int)]  = accessIterators(a.access, mem).zipWithIndex.collect{
       case(iter,i) if substRules.contains(iter) && substRules(iter).isDefined =>

@@ -1,12 +1,12 @@
 package argon.passes
-import argon.{Block, dbgs, metadata}
+import argon._
 
 
 trait RepeatableTraversal extends Traversal {
   var converged: Boolean = true
 }
 
-case class RepeatedTraversal(IR: argon.State, passes: Seq[Pass]) extends Pass {
+case class RepeatedTraversal(IR: argon.State, passes: Seq[Pass], postIter: (Int) => Seq[Pass] = (x:Int) => {Seq.empty}, maxIters: Int = 100) extends Pass {
   private def hasConverged: Boolean = {
     passes forall {
       case rt: RepeatableTraversal =>
@@ -26,16 +26,21 @@ case class RepeatedTraversal(IR: argon.State, passes: Seq[Pass]) extends Pass {
 
   override def process[R](block: Block[R]): Block[R] = {
     var blk = block
+    var iters = 0
     // run all passes at least once
     do {
       resetConvergence(true)
-      passes foreach {
-        pass =>
-          dbgs(s"Starting Pass: $pass")
-          blk = pass.run(block)
-          dbgs(s"Ending Pass: $pass")
+      dbgs(s"Starting Iteration: $iters")
+      iters += 1
+      indent {
+        (passes ++ postIter(iters)) foreach {
+          pass =>
+            dbgs(s"Starting Pass: $pass")
+            blk = pass.run(block)
+            dbgs(s"Ending Pass: $pass")
+        }
       }
-    } while (!hasConverged)
+    } while (!hasConverged && iters < maxIters)
     blk
   }
 }

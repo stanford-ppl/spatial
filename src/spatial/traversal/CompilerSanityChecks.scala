@@ -19,6 +19,7 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
   override def postprocess[R](block: Block[R]): Block[R] = {
     visitedStms = Map.empty
     nestedScope = Set.empty
+    if (IR.hadBugs) { throw CompilerErrors(s"${this.getClass} ${IR.pass}", IR.bugs) }
     super.postprocess(block)
   }
 

@@ -459,7 +459,7 @@ object modeling {
         val dist = paths(regWrite).toInt - paths(r).toInt
         // TODO(stanfurd): silence this when the writes are conditional.
         if (regWrite.enables.isEmpty) {
-          warn(s"Avoid reading register (${reg.name.getOrElse("??")}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
+          warn(s"Avoid reading register ($reg = ${reg.name.getOrElse(reg.explicitName.getOrElse(reg.op.toString))}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
         }
         val affectedNodes = (consumersSearch(r.consumers, Set(), scope.toSet) intersect scope) :+ r
         affectedNodes.foreach{

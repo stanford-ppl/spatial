@@ -7,6 +7,7 @@ import spatial.node._
 import spatial.lang._
 import argon.transform.MutateTransformer
 import spatial.metadata.control._
+import spatial.metadata.memory._
 
 case class UnitpipeCombineTransformer(IR: argon.State) extends MutateTransformer with RepeatableTraversal {
   // When multiple unitpipes appear after each other within a block, we can fuse them into a single unitpipe
@@ -57,7 +58,13 @@ case class UnitpipeCombineTransformer(IR: argon.State) extends MutateTransformer
           val canFuse = {
             val previousWrites = currentPipes.flatMap(_.effects.writes).toSet
             val conflicts = previousWrites intersect pipe.effects.reads
-            conflicts.isEmpty
+            val hasConflict = conflicts.isEmpty
+            val writtenStreams = currentPipes.flatMap(_.nestedWrittenMems).filter(_.isFIFO)
+            val readStreams = currentPipes.flatMap(_.nestedReadMems).filter(_.isFIFO)
+
+            val mayLoopStreams = writtenStreams.nonEmpty && readStreams.nonEmpty
+
+            hasConflict || mayLoopStreams
           }
           if (canFuse) {
             currentPipes.append(pipe)
@@ -80,7 +87,9 @@ case class UnitpipeCombineTransformer(IR: argon.State) extends MutateTransformer
     dbgs(s"Visiting Foreach: $lhs = $foreach")
     val newBlock = indent { fuseUnitpipes(foreach.block) }
     stageWithFlow(OpForeach(f(foreach.ens), f(foreach.cchain), newBlock, f(foreach.iters), f(foreach.stopWhen))) {
-      lhs2 => transferData(lhs, lhs2)
+      lhs2 =>
+        dbgs(s"Replacing: $lhs -> $lhs2")
+        transferData(lhs, lhs2)
     }
   }
 

@@ -6,10 +6,12 @@ import utils.io.files._
 import spatial.metadata.control._
 import spatial.metadata.memory._
 
-class MLP_Variant_Base extends MLP_Variants(N=8, batch=4,dims=List(4,4,4),ips=List(2,2),mps=List(2,2),ops=List(2,2))
+class MLP_Variant_Base extends MLP_Variants(N=4, batch=4,dims=List(4,4,4),ips=List(2,2),mps=List(1,1),ops=List(1,1))
 class MLP_Variant_exp_stream extends MLP_Variant_Base {
   override def compileArgs = "--streamify --vv"
 }
+
+class MLP_Variant_exp_stream_2 extends MLP_Variant_exp_stream
 
 class MLP_Variant_exp_nostream extends MLP_Variant_Base {
   override def compileArgs = "--nostreamify --vv"

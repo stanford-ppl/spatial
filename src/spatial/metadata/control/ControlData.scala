@@ -133,14 +133,13 @@ case class DefiningBlk(blk: Blk) extends Data[DefiningBlk](SetBy.Flow.Consumer)
   * Setter:  sym.counter = (IndexCounterInfo)
   * Default: undefined
   */
-case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self) {
-  override def mirror(f: Tx): IndexCounter = {
-    val newIC = IndexCounter(IndexCounterInfo(f(info.ctr), info.lanes))
-    System.out.println(s"Mirroring: $this -> $newIC")
-    newIC
-  }
-}
+case class IndexCounter(info: IndexCounterInfo[_]) extends Data[IndexCounter](SetBy.Analysis.Self)
 
+/**
+  * The iterator associated with a counter -- This should be automatically kept in sync with the above data
+  */
+
+case class IterInfo(iter: Sym[_]) extends Data[IterInfo](SetBy.Analysis.Self)
 
 /** Latency of a given inner pipe body - used for control signal generation.
   *

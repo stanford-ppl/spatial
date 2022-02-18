@@ -77,6 +77,20 @@ abstract class SubstTransformer extends Transformer {
     */
   def isolateSubst[A](escape: Sym[_]*)(scope: => A): A = isolateSubstIf(cond=true, escape){ scope }
 
+  /**
+    * Preserve all substitution rules with a few exceptions
+    * @param exclude: symbols to not export from the scope
+    * @param block:
+    * @tparam A
+    * @return
+    */
+  def excludeSubst[A](exclude: Sym[_]*)(block: => A): A = {
+    val save = subst
+    val result = block
+    subst = save ++ subst.filterNot { case (s, _) => exclude.contains(s) }
+    result
+  }
+
 
   override protected def blockToFunction0[R](block: Block[R]): () => R = {
     () => isolateSubst(){

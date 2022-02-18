@@ -120,23 +120,31 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val allocMotion           = AllocMotion(state)
     lazy val reduceToForeach       = ReduceToForeach(state)
     lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)
-    lazy val retimeStrippers       = Seq(
-      printer,
-      MetadataStripper[Duplicates](state),
-      MetadataStripper[Dispatch](state),
-      MetadataStripper[spatial.metadata.memory.Ports](state),
-      MetadataStripper[spatial.metadata.memory.GroupId](state),
-      printer)
+    lazy val streamifyAnnotator    = StreamifyAnnotator(state)
+    lazy val transientMotion       = TransientMotion(state)
+//    lazy val retimeStrippers       = Seq(
+//      printer,
+//      MetadataStripper[Duplicates](state),
+//      MetadataStripper[Dispatch](state),
+//      MetadataStripper[spatial.metadata.memory.Ports](state),
+//      MetadataStripper[spatial.metadata.memory.GroupId](state),
+//      printer)
+    import Stripper.S
+    lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
+
+    lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.transform.Streamify], S[spatial.metadata.memory.StreamBufferIndex])
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
-    lazy val streamifyAnalysis = Seq(reduceToForeach, unitPipeToForeach) ++
-      bankingAnalysis ++ Seq(metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, printer, pipeInserter, printer) ++ Seq(streamChecks)
+    lazy val streamifyAnalysis = Seq(reduceToForeach, unitPipeToForeach, pipeInserter, printer, transientMotion) ++ DCE ++
+      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, printer, pipeInserter, streamifyStripper, printer) ++ Seq(streamChecks)
 
-    lazy val streamify = Seq(RepeatedTraversal(state, streamifyAnalysis ++ retimeStrippers)) ++ createDump("PostStreamify")
+    lazy val streamify = Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
+      createDump(s"streamify_$iter")
+    }, maxIters = 2))
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

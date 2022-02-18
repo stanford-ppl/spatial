@@ -8,8 +8,8 @@ import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.transform._
 import spatial.node._
-import spatial.transform.{AllocMotion, PipeInserter}
 import spatial.traversal.AccelTraversal
 
 import scala.collection.mutable
@@ -24,67 +24,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
   @struct case class ReduceData[T: Bits](payload: T, emit: Bit, last: Bit)
 
-  private val allowableSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
-  private def canTransform[A: Type](lhs: Sym[A], rhs: Op[A]): Boolean = {
-    dbgs(s"Considering: $lhs = $rhs")
-    // No point in converting inner controllers
-    if (lhs.isInnerControl) {
-      return false
-    }
-
-    dbgs(s"Schedule: ${lhs.schedule}")
-    if (!allowableSchedules.contains(lhs.schedule)) {
-      return false
-    }
-
-    if (lhs.children.size <= 1) {
-      return false
-    }
-
-    if (lhs.shouldConvertToStreamed.isDefined) {
-      return lhs.shouldConvertToStreamed.get
-    }
-
-    // Don't transform if unitpipe
-    dbgs(s"Expected Iters: ${lhs.approxIters}")
-    if (lhs.approxIters <= 1) {
-      return false
-    }
-
-    val hasForbidden = lhs.blocks.flatMap(_.nestedStms).exists {
-      case Op(_:StreamOutWrite[_]) | Op(_:StreamInRead[_]) | Op(_:StreamInNew[_]) | Op(_:StreamOutNew[_]) =>
-        true
-      case _ => false
-    }
-    if (hasForbidden) { return false }
-
-    // can transform if all children are foreach loops
-    lhs.blocks.flatMap(_.stms).forall {
-      case stmt@Op(foreach:OpForeach) =>
-        true
-      case s if s.isMem =>
-        val result = (s.writers union s.readers) forall {
-          case Op(_:StreamOutWrite[_]) | Op(_:StreamInRead[_]) =>
-            false
-          case _ => true
-        }
-        dbgs(s"$result: ${s} = ${s.op}")
-        result
-      case s if s.isCounterChain => true
-      case Op(ctr:CounterNew[_]) =>
-        // Allowed if all params are either static or defined outside parent.
-        dbgs(s"Checking Counter params are either static or defined outside of parent ($lhs): ${ctr.inputs}")
-        ctr.inputs forall { sym =>
-          dbgs(s"$sym: Const: ${sym.isConst} = ${sym.op}")
-          dbgs(s"$sym: HasImmediateParent: ${sym.hasAncestor(lhs.toCtrl)}")
-          sym.isConst || !sym.hasAncestor(lhs.toCtrl)
-        }
-//      case s if s.isTransient => true
-      case s =>
-        dbgs(s"Disallowed: ${s} = ${s.op}")
-        false
-    }
-  }
 
   private def transformForeach[A: Type](lhs: Sym[A], foreach: OpForeach): Sym[Void] = {
 
@@ -102,10 +41,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
     val singleWrites = singleUse intersect foreach.effects.writes
 
     dbgs(s"Single Writes: $singleWrites")
-    singleWrites.filter(_.isSRAM).foreach {
-      case sr: SRAM[_, _] => sr.nonbuffer
-      case _ =>
-    }
     val singleReads = (singleUse intersect foreach.effects.reads) diff singleWrites
     dbgs(s"Single Reads: $singleReads")
 
@@ -199,7 +134,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         block.nestedStms foreach {
                           stmt =>
                             val mems = stmt.readMem ++ stmt.writtenMem
-                            mems foreach {
+                            mems.filter(internalMems.contains) foreach {
                               mem =>
                                 memTokens.get(f(mem)) match {
                                   case Some(ind) =>
@@ -250,29 +185,23 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         }
                         isolateSubst() { inCopyMode(true) {
                           block.stms.foreach {
-                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) =>
-                              // Complex condition because we transform unitpipes into Foreach loops before this.
-                              // In this case, we collapse the iterations together while replicating.
-                              // To aid with analysis, we perform the same rotating remapping.
-                              // if the controller only runs for 1 iteration, remap iter to ctr.start
-                              // currently doesn't handle par factors.
-                              // TODO(stanfurd): Handle Par Factors
-                              dbgs(s"Intelligently unrolling single-iteration loop $oldForeach = ${oldForeach.op}")
-                              iters foreach {
-                                iter =>
-                                  remaps foreach {
-                                    remap =>
-                                      subst = remapSubsts(remap)
-                                      remapSubsts(remap) += (iter -> f(iter.counter.ctr.start))
-                                  }
+                              // In the case of inner controllers, it's more efficient to unroll deeper inside, especially
+                              // with memory accesses.
+
+                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if oldForeach.isInnerControl =>
+                              dbgs(s"Intelligently unrolling inner loop $oldForeach = ${oldForeach.op}")
+                              indent {
+                                stageWithFlow(OpForeach(f(ens), f(cchain), stageBlock {
+                                  block.stms.foreach(cyclingVisit)
+                                }, f(iters), f(stopWhen))) { lhs2 => transferData(oldForeach, lhs2) }
                               }
-                              stageWithFlow(UnitPipe(f(ens), stageBlock {
-                                block.stms.foreach(cyclingVisit)
-                              }, f(stopWhen))) {lhs2 => transferData(oldForeach, lhs2)}
+
 
                             case stmt =>
                               dbgs(s"Dumbly handling: $stmt = ${stmt.op}")
-                              cyclingVisit(stmt)
+                              indent {
+                                cyclingVisit(stmt)
+                              }
                           }
                         }}
 
@@ -307,13 +236,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 }}
               case stmt if shouldDuplicate(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")
-//                subst += (stmt -> mirrorSym(stmt))
-                inCopyMode(true) {
-                  register(stmt -> mirrorSym(stmt))
-                }
+                register(stmt -> mirrorSym(stmt))
               case stmt if !stmt.isControl =>
                 dbgs(s"Default Mirroring: $stmt of type ${stmt.op}")
-                register(stmt -> mirrorSym(stmt))
+                visit(stmt)
               case stmt if stmt.isControl =>
                 error(s"Could not convert controller: $stmt of type ${stmt.op}")
                 throw new Exception()
@@ -337,12 +263,24 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         super.transform(lhs, rhs)
       }
 
-      case foreach:OpForeach if inHw && canTransform(lhs, rhs) && foreach.cchain.isStatic && foreach.cchain.approxIters > 1 =>
+      case foreach:OpForeach if lhs.streamify =>
         dbgs(s"Transforming: $lhs = $rhs")
-//        converged = false
+        converged = false
         indent {
           transformForeach(lhs, foreach)
         }
+
+      case _: CounterNew[_] if copyMode =>
+        val newCounter = super.transform(lhs, rhs)
+        val asCounter = lhs.asInstanceOf[Counter[_]]
+        val oldIter = asCounter.iter.get
+        implicit def EV: Num[asCounter.CT] = asCounter.CTeV.asInstanceOf[Num[asCounter.CT]]
+        val newIter = boundVar[asCounter.CT]
+        newIter.name = oldIter.name
+        val lanes = oldIter.asInstanceOf[Num[_]].counter.lanes
+        newIter.asInstanceOf[Num[asCounter.CT]].counter = IndexCounterInfo(newCounter.asInstanceOf[Counter[asCounter.CT]], lanes)
+        register(oldIter -> newIter)
+        newCounter
 
       case genericControl: Control[_] =>
         dbgs(s"Control: $lhs = $rhs")
@@ -359,15 +297,14 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
               register(iter -> newVar)
             }
         }
-        super.transform(lhs, rhs)
-
-      case _ =>
         indent {
           val result = super.transform(lhs, rhs)
           dbgs(s"$lhs = $rhs")
           dbgs(s"    $result = ${result.op}")
           result
         }
+      case _ =>
+        super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }
 }

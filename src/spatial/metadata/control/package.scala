@@ -376,7 +376,8 @@ package object control {
     }
 
     /** Use a flat Seq[Idx] to group a corresponding Seq[_] based on whether they appear in the same multilevel counter chain */
-    def bundleLayers[T](leaf: Sym[_], iters: Seq[Idx], elements: Seq[T]): Seq[Seq[T]] = {
+    @stateful def bundleLayers[T](leaf: Sym[_], iters: Seq[Idx], elements: Seq[T]): Seq[Seq[T]] = {
+      dbgs(s"Leaf: $leaf, Iters: $iters, elements: $elements")
       import scala.collection.mutable.ArrayBuffer
       var layer: scala.Int = 0
       var ctrl = iters.head.parent.s.get
@@ -408,6 +409,7 @@ package object control {
       // NOTE: Make sure we extend to leaf
       var current = leaf
       while (current != ctrl) {
+        dbgs(s"Current: $current")
         layer = layer + 1
         groups += ArrayBuffer()
         current = current.parent.s.get
@@ -1067,6 +1069,8 @@ package object control {
         case _ => false
       }
     }
+
+    def iter: Option[Sym[_]] = metadata[IterInfo](x).map(_.iter)
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
@@ -1080,13 +1084,19 @@ package object control {
   implicit class IndexCounterOps[A](i: Num[A]) {
     def getCounter: Option[IndexCounterInfo[A]] = metadata[IndexCounter](i).map(_.info.asInstanceOf[IndexCounterInfo[A]])
     def counter: IndexCounterInfo[A] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
-    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
+    def counter_=(info: IndexCounterInfo[_]): Unit = {
+      metadata.add(i, IndexCounter(info))
+      metadata.add(info.ctr, IterInfo(i))
+    }
   }
 
   implicit class BitsCounterOps(i: Bits[_]) {
     def getCounter: Option[IndexCounterInfo[_]] = metadata[IndexCounter](i).map(_.info)
     def counter: IndexCounterInfo[_] = getCounter.getOrElse{throw new Exception(s"No counter associated with $i") }
-    def counter_=(info: IndexCounterInfo[_]): Unit = metadata.add(i, IndexCounter(info))
+    def counter_=(info: IndexCounterInfo[_]): Unit = {
+      metadata.add(i, IndexCounter(info))
+      metadata.add(info.ctr, IterInfo(i))
+    }
   }
 
   /** True if the given symbol is allowed to be defined on the Host and used in Accel

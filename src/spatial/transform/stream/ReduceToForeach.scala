@@ -28,18 +28,22 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
     implicit def bitsEV: Bits[A] = reduceOp.A
     @struct case class ReduceIterInfo(value: A, isFirst: Bit, isLast: Bit)
     val commFIFO = FIFO[ReduceIterInfo](I32(128))
+    commFIFO.explicitName = s"ReduceToForeach_FIFO_$sym"
 
     val mapStage = isolateSubst() {
       (reduceOp.iters zip newIters) foreach {
         case (oldIter, newIter) => register(oldIter -> newIter)
       }
-      stage(OpForeach(f(reduceOp.ens), newCChain.unbox, stageBlock {
+      stageWithFlow(OpForeach(f(reduceOp.ens), newCChain.unbox, stageBlock {
         reduceOp.map.stms.foreach(visit)
         val result = f(reduceOp.map.result)
         val isFirst = isFirstIter(newIters, newCChain.unbox)
         val isLast = isLastIter(newIters, newCChain.unbox)
         commFIFO.enq(ReduceIterInfo(result.unbox, isFirst.reduceTree {_ && _}, isLast.reduceTree {_ && _}))
-      }, newIters, f(reduceOp.stopWhen)))
+      }, newIters, f(reduceOp.stopWhen))) { pipe =>
+        pipe.explicitName = s"ReduceToForeach_Map_$sym"
+        pipe.userSchedule = Pipelined
+      }
     }
 
 
@@ -52,19 +56,8 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
     dbgs(s"Reduce Size: $reduceSize")
     val newAccum = f(reduceOp.accum)
     dbgs(s"Mirrored accum: ${newAccum}")
-    newAccum.explicitName = newAccum.explicitName.getOrElse("") + "ToForeach"
+    newAccum.explicitName = newAccum.explicitName.getOrElse("") + s"ToForeach_${sym}"
 
-//    val numAccums = I32(16)
-//    val accumulators = RegFile(numAccums)
-//    val reduceStage = isolateSubst() {
-//      stage(OpForeach(f(reduceOp.ens), flattenedCChain, stageBlock {
-//        // Take the entire width of elements at the same time, and reduce
-//        val elements = commFIFO.deqVec(reduceSize)
-//        val values = elements.elems.map {_.value}
-//        val result = values.reduceTree { case (a, b) => reduceOp.reduce.reapply(a, b) }
-//        f(reduceOp.accum) := result
-//      }, newReduceIters, None))
-//    }
     val reduceStage = isolateSubst() {
       stage(UnitPipe(f(reduceOp.ens), stageBlock {
         // Take the entire width of elements at the same time, and reduce

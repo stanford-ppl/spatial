@@ -18,7 +18,7 @@ import spatial.node.InputArguments
 import spatial.metadata.access._
 import spatial.targets.HardwareTarget
 import spatial.dse._
-import spatial.transform._
+import spatial.transform.{FIFOAccessFusion, _}
 import spatial.traversal._
 import spatial.model.RuntimeModelGenerator
 import spatial.report._
@@ -122,6 +122,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)
     lazy val streamifyAnnotator    = StreamifyAnnotator(state)
     lazy val transientMotion       = TransientMotion(state)
+    lazy val fifoAccessFusion      = FIFOAccessFusion(state)
 //    lazy val retimeStrippers       = Seq(
 //      printer,
 //      MetadataStripper[Duplicates](state),
@@ -140,7 +141,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(reduceToForeach, unitPipeToForeach, pipeInserter, printer, transientMotion) ++ DCE ++
-      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, printer, pipeInserter, streamifyStripper, printer) ++ Seq(streamChecks)
+      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer) ++ Seq(streamChecks)
 
     lazy val streamify = Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
       createDump(s"streamify_$iter")

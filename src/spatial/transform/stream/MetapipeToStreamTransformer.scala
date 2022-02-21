@@ -185,15 +185,26 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         }
                         isolateSubst() { inCopyMode(true) {
                           block.stms.foreach {
-                              // In the case of inner controllers, it's more efficient to unroll deeper inside, especially
-                              // with memory accesses.
-
-                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if oldForeach.isInnerControl =>
-                              dbgs(s"Intelligently unrolling inner loop $oldForeach = ${oldForeach.op}")
+                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) =>
+                              // Complex condition because we transform unitpipes into Foreach loops before this.
+                              // In this case, we collapse the iterations together while replicating.
+                              // To aid with analysis, we perform the same rotating remapping.
+                              // if the controller only runs for 1 iteration, remap iter to ctr.start
+                              // currently doesn't handle par factors.
+                              // TODO(stanfurd): Handle Par Factors
+                              dbgs(s"Intelligently unrolling single-iteration loop $oldForeach = ${oldForeach.op}")
                               indent {
-                                stageWithFlow(OpForeach(f(ens), f(cchain), stageBlock {
+                                iters foreach {
+                                  iter =>
+                                    remaps foreach {
+                                      remap =>
+                                        subst = remapSubsts(remap)
+                                        remapSubsts(remap) += (iter -> f(iter.counter.ctr.start))
+                                    }
+                                }
+                                stageWithFlow(UnitPipe(f(ens), stageBlock {
                                   block.stms.foreach(cyclingVisit)
-                                }, f(iters), f(stopWhen))) { lhs2 => transferData(oldForeach, lhs2) }
+                                }, f(stopWhen))) { lhs2 => transferData(oldForeach, lhs2) }
                               }
 
 

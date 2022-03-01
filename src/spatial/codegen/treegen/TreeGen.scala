@@ -138,7 +138,11 @@ case class TreeGen(IR: State, filename: String = "controller_tree", IRFile: Stri
         }
       }
 
-      if (cchain.isDefined) emit(s"""${"  "*ident}<br><font size = "1">Counter: ${link(cchain.get)}</font>""")
+      if (cchain.isDefined) {
+        val ctrs = lhs.cchains.head.counters
+        val ctrText = ctrs.map(_.op.get).mkString(", ")
+        emit(s"""${"  "*ident}<br><font size = "1">Counter: ${link(cchain.get)} = ${ctrText}</font>""")
+      }
       emit("")
       print_stream_info(lhs)
     }{

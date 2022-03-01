@@ -38,6 +38,7 @@ class SpatialConfig extends Config {
   var enableOptimizedReduce: Boolean = true
   var distributeStreamCtr: Boolean = true
   var streamify: Boolean = true
+  var maxStreamifyIters: Int = 100
   var imperfect: Boolean = false
   var useAreaModels: Boolean = true
   var reportArea: Boolean = false

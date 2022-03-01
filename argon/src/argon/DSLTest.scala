@@ -136,6 +136,7 @@ trait DSLTest extends Testbench with Compiler with Args { test =>
 
       val name = test.name.replace(".", "/")
       val stageArgs = test.compileArgs.cmds
+      System.out.println(s"Stage Args: ${stageArgs.mkString(",")}")
       stageArgs.iterator.map{cmd => () => {
         try {
           val backArgs = backend.args.split(" ").map(_.trim).filterNot(_.isEmpty)

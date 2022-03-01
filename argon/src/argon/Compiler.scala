@@ -120,6 +120,7 @@ trait Compiler extends DSLRunnable { self =>
     checkBugs("staging")
     checkErrors("staging")
     info(s"Compiling ${config.name} to ${config.genDir}")
+    info(s"Compiling with arguments: ${args.mkString(", ")}")
     if (config.enDbg) info(s"Logging ${config.name} to ${config.logDir}")
     if (config.test) info("Running in testbench mode")
 

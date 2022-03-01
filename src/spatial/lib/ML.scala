@@ -68,6 +68,7 @@ object ML extends HostML {
       case N if N <= ts => inner(N, 0)
       case _ => 
         val totalSum = Reg[T]
+        totalSum.explicitName = "SumValue"
         'Sum_Tiled.Reduce(totalSum)(N by ts par Math.min(N/ts,op)) { io =>
           inner(ts, io)
         } { _ + _ }

@@ -1,17 +1,26 @@
 package spatial.tests.feature.control
 
 import spatial.dsl._
-import spatial.lib.ML._
+import _root_.spatial.SpatialConfig
+import _root_.spatial.lib.ML._
 import utils.io.files._
-import spatial.metadata.control._
-import spatial.metadata.memory._
+import _root_.spatial.metadata.control._
+import _root_.spatial.metadata.memory._
 
-class MLP_Variant_Base extends MLP_Variants(N=4, batch=4,dims=List(4,4,4),ips=List(2,2),mps=List(1,1),ops=List(1,1))
+class MLP_Variant_Base extends MLP_Variants(N=4, batch=4,dims=List(4,4,4),ips=List(2,1),mps=List(2,1),ops=List(1,1))
 class MLP_Variant_exp_stream extends MLP_Variant_Base {
   override def compileArgs = "--streamify --vv"
 }
 
-class MLP_Variant_exp_stream_2 extends MLP_Variant_exp_stream
+class MLP_Variant_exp_stream_1 extends MLP_Variant_exp_stream {
+  override def compileArgs: Args = super.compileArgs + "--maxStreamifyIters=1"
+}
+
+class MLP_Variant_exp_stream_2 extends MLP_Variant_exp_stream {
+  override def compileArgs: Args = super.compileArgs + "--maxStreamifyIters=2"
+}
+
+//class MLP_Variant_exp_stream_3 extends MLP_Variants(N=4, batch=4,dims=List(4,4,4),ips=List(1,1),mps=List(2,1),ops=List(1,1))
 
 class MLP_Variant_exp_nostream extends MLP_Variant_Base {
   override def compileArgs = "--nostreamify --vv"
@@ -31,15 +40,10 @@ class MLP_Variant_exp_nostream extends MLP_Variant_Base {
   type T = Int
 
   def main(args: Array[String]): Unit = {
-    val state = implicitly[argon.State]
-//    state.config.setV(3)
-//    System.out.println(s"Args: $compileArgs")
     val Ws = dims.sliding(2,1).map { case List(prev, next) => Seq.tabulate(prev, next) { (i,j) => (i*next +j) } }.toList
     val Bs = dims.sliding(2,1).map { case List(prev, next) => Seq.tabulate(next) { i => i } }.toList
     val input = Seq.tabulate(N, dims.head) { case (i,j) => i*dims.head + j }
     val goldUnstaged = unstaged_mlp[scala.Int](Ws, Bs, input, unstaged_relu _)
-    //    createDirectories(buildPath(IR.config.genDir, "tungsten"))
-    //    writeCSVNow2D(goldUnstaged, buildPath(IR.config.genDir, "tungsten", "gold.csv"))
 
     val indram = DRAM[T](N, dims.head)
     val outdram = DRAM[T](N, dims.last)
@@ -47,8 +51,6 @@ class MLP_Variant_exp_nostream extends MLP_Variant_Base {
     Accel {
       val weights = Ws.map { W => LUT.fromSeq[T](W.map { _.map { _.to[T]} }) }.toSeq
       val biases = Bs.map { B => LUT.fromSeq[T](B.map { _.to[T]}) }
-      //val weights = dims.sliding(2,1).map { case List(prev, next) => newRLUT[T](prev,next) }.toList
-      //val biases = dims.sliding(2,1).map { case List(prev, next) => newRLUT[T](next) }.toList
       'Outer.Foreach(0 until N by batch) { t =>
         val insram = SRAM[T](batch, dims.head)
         insram.explicitName = "InSRAM"

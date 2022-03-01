@@ -163,24 +163,26 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                               dbgs(s"Staging Calcs for shift: $shift")
                               ((foreach.iters ++ iters) zip newIters) zip shift map {
                                 case ((oldIter, newIter), s) =>
-                                  val shifted = newIter + s
-                                  (oldIter -> shifted)
+                                  (oldIter, (() => { newIter + s}))
                               }
                         }
                         // We need to do some fancy equivalent of isolateSubst between the different shifts.
+                        val oldSubsts = saveSubsts()
                         val remapSubsts = collection.mutable.Map(
                           (remaps map {
                             key =>
-                              key -> (subst ++ key)
+                              restoreSubsts(oldSubsts)
+                              key.foreach {case (a, b) => register(a, b)}
+                              (key -> saveSubsts())
                           }):_*)
                         val cyclingVisit = (stmt: Sym[_]) => {
                           remaps foreach {
                             remap =>
                               // Load the subst for this copy of the controller
-                              subst = remapSubsts(remap)
+                              restoreSubsts(remapSubsts(remap))
                               visit(stmt)
                               // persist the modified subst to remapSubsts
-                              remapSubsts(remap) = subst
+                              remapSubsts(remap) = saveSubsts()
                           }
                         }
                         isolateSubst() { inCopyMode(true) {
@@ -198,8 +200,8 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                   iter =>
                                     remaps foreach {
                                       remap =>
-                                        subst = remapSubsts(remap)
-                                        remapSubsts(remap) += (iter -> f(iter.counter.ctr.start))
+                                        restoreSubsts(remapSubsts(remap))
+                                        subst += (iter -> f(iter.counter.ctr.start))
                                     }
                                 }
                                 stageWithFlow(UnitPipe(f(ens), stageBlock {
@@ -293,7 +295,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         register(oldIter -> newIter)
         newCounter
 
-      case genericControl: Control[_] =>
+      case genericControl: Control[_] if copyMode =>
         dbgs(s"Control: $lhs = $rhs")
         genericControl.iters.foreach {
           iter =>

@@ -140,12 +140,12 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
     lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
-    lazy val streamifyAnalysis = Seq(reduceToForeach, unitPipeToForeach, pipeInserter, printer, transientMotion) ++ DCE ++
+    lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer, transientMotion) ++ DCE ++
       bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer) ++ Seq(streamChecks)
 
     lazy val streamify = Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
       createDump(s"streamify_$iter")
-    }, maxIters = 2))
+    }, maxIters = spatialConfig.maxStreamifyIters))
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -354,6 +354,9 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("nostreamify").action {(_, _) =>
       spatialConfig.streamify = false
     }.text("Disable automatically transforming controllers into streams.")
+
+    cli.opt[Int]("maxStreamifyIters").action { (i, _) =>
+      spatialConfig.maxStreamifyIters = i }.text("Maximum number of iterations transforming controllers into streams")
 
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false

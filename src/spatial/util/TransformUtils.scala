@@ -73,10 +73,17 @@ object TransformUtils {
       case None => None
     }
   }
+
+  @stateful def counterToSeries(ctr: Counter[_]): Seq[Int] = {
+    val start = ctr.start.c.get.asInstanceOf[emul.FixedPoint].toInt
+    val end = ctr.end.c.get.asInstanceOf[emul.FixedPoint].toInt
+    val step = ctr.step.c.get.asInstanceOf[emul.FixedPoint].toInt
+    Range(start, end, step)
+  }
 }
 
 trait TransformerUtilMixin {
-  this: argon.transform.ForwardTransformer =>
+  this: argon.transform.MutateTransformer =>
 
   import TransformUtils._
 
@@ -104,5 +111,34 @@ trait TransformerUtilMixin {
     dbgs(s"New Parent Iters: $newParentIters")
     dbgs(s"New Child Iters: $newChildIters")
     RemappedChainData(ctrChain, newParentIters, newChildIters)
+  }
+
+  def visitWithSubsts(substs: Seq[SubstData], stms: Seq[Sym[_]])(implicit ctx: SrcCtx): Seq[SubstData] = {
+    val substitutions = substs.toArray
+
+    def cyclingVisit(sym: Sym[_]): Unit = {
+      substitutions.zipWithIndex foreach {
+        case (data, ind) =>
+          restoreSubsts(data)
+          visit(sym)
+          substitutions(ind) = saveSubsts()
+      }
+    }
+
+    inCopyMode(substs.size > 1) {
+      stms foreach {
+        case unitpipe@Op(UnitPipe(ens, block, stopWhen)) if unitpipe.isInnerControl =>
+          stageWithFlow(UnitPipe(f(ens), stageBlock {
+            block.stms foreach cyclingVisit
+          }, f(stopWhen))) {
+            lhs2 =>
+              transferData(unitpipe, lhs2)
+              lhs2.ctx = ctx.copy(previous = Some(lhs2.ctx))
+          }
+
+        case stm => cyclingVisit(stm)
+      }
+    }
+    substitutions.toSeq
   }
 }

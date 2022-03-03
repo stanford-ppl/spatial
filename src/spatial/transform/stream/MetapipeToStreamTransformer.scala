@@ -187,7 +187,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                         }
                         isolateSubst() { inCopyMode(true) {
                           block.stms.foreach {
-                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) =>
+                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) && oldForeach.isInnerControl =>
                               // Complex condition because we transform unitpipes into Foreach loops before this.
                               // In this case, we collapse the iterations together while replicating.
                               // To aid with analysis, we perform the same rotating remapping.
@@ -206,7 +206,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                 }
                                 stageWithFlow(UnitPipe(f(ens), stageBlock {
                                   block.stms.foreach(cyclingVisit)
-                                }, f(stopWhen))) { lhs2 => transferData(oldForeach, lhs2) }
+                                }, f(stopWhen))) { lhs2 =>
+                                  transferData(oldForeach, lhs2)
+                                  lhs2.ctx = implicitly[SrcCtx].copy(previous=Some(oldForeach.ctx))
+                                }
                               }
 
 

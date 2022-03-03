@@ -15,6 +15,6 @@ object SrcCtxMacro {
     val column = pos.column
     val lineContent = if (line > 0) Some(pos.source.lineToString(line-1)) else None
 
-    c.Expr(q"forge.SrcCtx($path, $filename, $line, $column, $lineContent)")
+    c.Expr(q"forge.SrcCtx($path, $filename, $line, $column, $lineContent, None)")
   }
 }

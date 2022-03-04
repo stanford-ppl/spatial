@@ -23,34 +23,15 @@ object TransformUtils {
     stage(CounterChainNew(newCounters))
   }
 
-  @stateful def isFirstIter[T: Num](iter: Seq[T], cchain: CounterChain): Seq[Bit] = {
-    assert(iter.size == cchain.counters.size, s"Iterator(${iter.size}) and CChain (${cchain.counters.size}) must have identical sizes.")
-    (iter zip cchain.counters) map {
-      case (it, ctr) =>
-        type TP = ctr.CT
-        implicit def tpev: Num[TP] = ctr.CTeV.asInstanceOf[Num[TP]]
-        implicit def cast: argon.Cast[T, TP] = argon.lang.implicits.numericCast[T, TP]
-        isFirstIter(it.to[TP], ctr.asInstanceOf[Counter[TP]])
-    }
+  @stateful def isFirstIter[T: Num](iter: Num[T]): Bit = {
+    val ctr = iter.counter.ctr.asInstanceOf[Counter[Num[T]]]
+    implicit def castEV: Cast[I32, T] = argon.lang.implicits.numericCast[I32, T]
+    iter < (ctr.start.unbox + (ctr.step.unbox * ctr.ctrPar.to[T]))
   }
 
-  @stateful def isLastIter[T: Num](iter: Seq[T], cchain: CounterChain): Seq[Bit] = {
-    assert(iter.size == cchain.counters.size, s"Iterator(${iter.size}) and CChain (${cchain.counters.size}) must have identical sizes.")
-    (iter zip cchain.counters) map {
-      case (it, ctr) =>
-        type TP = ctr.CT
-        implicit def tpev: Num[TP] = ctr.CTeV.asInstanceOf[Num[TP]]
-        implicit def cast: argon.Cast[T, TP] = argon.lang.implicits.numericCast[T, TP]
-        isLastIter(it.to[TP], ctr.asInstanceOf[Counter[TP]])
-    }
-  }
-
-  @stateful def isFirstIter[T: Num](iter: T, ctr: Counter[T]): Bit = {
-    ctr.start.unbox.asInstanceOf[Num[T]].eql(iter)
-  }
-
-  @stateful def isLastIter[T: Num: Arith](iter: T, ctr: Counter[T]): Bit = {
-    val nextIter = iter.asInstanceOf[Arith[T]] + ctr.step.unbox
+  @stateful def isLastIter[T: Num](iter: Num[T]): Bit = {
+    val ctr = iter.counter.ctr.asInstanceOf[Counter[T]]
+    val nextIter = iter + ctr.step.unbox
     ctr.end.unbox.asInstanceOf[Num[T]] >= nextIter
   }
 
@@ -113,14 +94,26 @@ trait TransformerUtilMixin {
     RemappedChainData(ctrChain, newParentIters, newChildIters)
   }
 
+  def createSubstData(thunk: => Unit): SubstData = {
+    val tmp = saveSubsts()
+    thunk
+    val result = saveSubsts()
+    restoreSubsts(tmp)
+    result
+  }
+
   def visitWithSubsts(substs: Seq[SubstData], stms: Seq[Sym[_]])(implicit ctx: SrcCtx): Seq[SubstData] = {
     val substitutions = substs.toArray
 
     def cyclingVisit(sym: Sym[_]): Unit = {
+      updateSubstsWith({visit(sym)})
+    }
+
+    def updateSubstsWith(thunk: => Unit): Unit = {
       substitutions.zipWithIndex foreach {
         case (data, ind) =>
           restoreSubsts(data)
-          visit(sym)
+          thunk
           substitutions(ind) = saveSubsts()
       }
     }
@@ -135,7 +128,22 @@ trait TransformerUtilMixin {
               transferData(unitpipe, lhs2)
               lhs2.ctx = ctx.copy(previous = Some(lhs2.ctx))
           }
+        case disguisedUnitpipe@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if disguisedUnitpipe.isInnerControl && cchain.isStatic && cchain.approxIters == 1 =>
+          updateSubstsWith({
+            iters foreach {
+              iter =>
+                val counterStart = iter.ctrStart.asSym
+                register(iter.asSym, () => f(counterStart))
+            }
+          })
 
+          stageWithFlow(UnitPipe(f(ens), stageBlock {
+            block.stms foreach cyclingVisit
+          }, f(stopWhen))) {
+            lhs2 =>
+              transferData(disguisedUnitpipe, lhs2)
+              lhs2.ctx = ctx.copy(previous = Some(lhs2.ctx))
+          }
         case stm => cyclingVisit(stm)
       }
     }

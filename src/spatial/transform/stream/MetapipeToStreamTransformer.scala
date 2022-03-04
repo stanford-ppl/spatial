@@ -11,6 +11,7 @@ import spatial.metadata.memory._
 import spatial.metadata.transform._
 import spatial.node._
 import spatial.traversal.AccelTraversal
+import spatial.util.TransformerUtilMixin
 
 import scala.collection.mutable
 
@@ -18,7 +19,7 @@ import scala.collection.mutable
   */
 case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with AccelTraversal
   with MetaPipeToStreamBase with
-  RepeatableTraversal with CounterChainToStream with StreamMemoryTracker {
+  RepeatableTraversal with CounterChainToStream with StreamMemoryTracker with TransformerUtilMixin {
 
   override val recurse = Recurse.Always
 
@@ -56,16 +57,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
         parentShifts foreach {
           pShift =>
 
-            implicit val parentShift = ParentShift((foreach.cchain.counters zip pShift) map {
+            implicit val parentShift = (foreach.cchain.counters zip pShift) map {
               case (ctr, shift) =>
                 implicit def NumEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
                 implicit def cast: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
                 ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
-            })
+            }
 
             initializeMemoryTracker(foreach.block.stms, nonLocalUses)
 
-            val newParentCtrs = (foreach.cchain.counters zip parentShift.shift) map {
+            val newParentCtrs = (foreach.cchain.counters zip parentShift) map {
               case (ctr, pshift) =>
                 ctr match {
                   case Op(CounterNew(start, stop, step, par)) =>
@@ -152,6 +153,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                         val remaps = childShifts map {
                           cShift =>
+                            createSubstData {
                               val childShift = (cchain.counters zip cShift) map {
                                 case (ctr, shift) =>
                                   implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
@@ -159,67 +161,16 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                                   ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
                               }
 
-                              val shift = parentShift.shift ++ childShift
+                              val shift = parentShift ++ childShift
                               dbgs(s"Staging Calcs for shift: $shift")
                               ((foreach.iters ++ iters) zip newIters) zip shift map {
                                 case ((oldIter, newIter), s) =>
-                                  (oldIter, (() => { newIter + s}))
+                                  register(oldIter, () => {newIter + s})
                               }
+                            }
                         }
-                        // We need to do some fancy equivalent of isolateSubst between the different shifts.
-                        val oldSubsts = saveSubsts()
-                        val remapSubsts = collection.mutable.Map(
-                          (remaps map {
-                            key =>
-                              restoreSubsts(oldSubsts)
-                              key.foreach {case (a, b) => register(a, b)}
-                              (key -> saveSubsts())
-                          }):_*)
-                        val cyclingVisit = (stmt: Sym[_]) => {
-                          remaps foreach {
-                            remap =>
-                              // Load the subst for this copy of the controller
-                              restoreSubsts(remapSubsts(remap))
-                              visit(stmt)
-                              // persist the modified subst to remapSubsts
-                              remapSubsts(remap) = saveSubsts()
-                          }
-                        }
-                        isolateSubst() { inCopyMode(true) {
-                          block.stms.foreach {
-                            case oldForeach@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if cchain.isStatic && (cchain.approxIters == 1) && oldForeach.isInnerControl =>
-                              // Complex condition because we transform unitpipes into Foreach loops before this.
-                              // In this case, we collapse the iterations together while replicating.
-                              // To aid with analysis, we perform the same rotating remapping.
-                              // if the controller only runs for 1 iteration, remap iter to ctr.start
-                              // currently doesn't handle par factors.
-                              // TODO(stanfurd): Handle Par Factors
-                              dbgs(s"Intelligently unrolling single-iteration loop $oldForeach = ${oldForeach.op}")
-                              indent {
-                                iters foreach {
-                                  iter =>
-                                    remaps foreach {
-                                      remap =>
-                                        restoreSubsts(remapSubsts(remap))
-                                        subst += (iter -> f(iter.counter.ctr.start))
-                                    }
-                                }
-                                stageWithFlow(UnitPipe(f(ens), stageBlock {
-                                  block.stms.foreach(cyclingVisit)
-                                }, f(stopWhen))) { lhs2 =>
-                                  transferData(oldForeach, lhs2)
-                                  lhs2.ctx = implicitly[SrcCtx].copy(previous=Some(oldForeach.ctx))
-                                }
-                              }
 
-
-                            case stmt =>
-                              dbgs(s"Dumbly handling: $stmt = ${stmt.op}")
-                              indent {
-                                cyclingVisit(stmt)
-                              }
-                          }
-                        }}
+                        visitWithSubsts(remaps, block.stms)
 
                         val isLastEn = innerIters.map {
                           i =>
@@ -325,6 +276,3 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
   }
 }
 
-case class ParentControl[R:Type](ctrl: Control[R])
-case class ChildControl[R:Type](ctrl:Control[R])
-case class ParentShift(shift: Seq[I32])

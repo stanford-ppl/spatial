@@ -123,13 +123,6 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamifyAnnotator    = StreamifyAnnotator(state)
     lazy val transientMotion       = TransientMotion(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
-//    lazy val retimeStrippers       = Seq(
-//      printer,
-//      MetadataStripper[Duplicates](state),
-//      MetadataStripper[Dispatch](state),
-//      MetadataStripper[spatial.metadata.memory.Ports](state),
-//      MetadataStripper[spatial.metadata.memory.GroupId](state),
-//      printer)
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
 

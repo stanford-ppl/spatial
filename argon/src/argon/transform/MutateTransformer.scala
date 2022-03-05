@@ -1,6 +1,7 @@
 package argon
 package transform
 
+import argon.node.Enabled
 import utils.tags.instrument
 
 abstract class MutateTransformer extends ForwardTransformer {
@@ -14,6 +15,15 @@ abstract class MutateTransformer extends ForwardTransformer {
     copyMode = copy
     val result = block
     copyMode = saveCopy
+    result
+  }
+
+  protected var enables: Set[argon.lang.Bit] = Set.empty
+  protected def withEns[T](ens: Set[argon.lang.Bit])(thunk: => T): T = {
+    val tEnables = enables
+    enables = enables ++ ens
+    val result = thunk
+    enables = tEnables
     result
   }
 
@@ -51,5 +61,15 @@ abstract class MutateTransformer extends ForwardTransformer {
     }
   }
 
-  def updateNode[A](node: Op[A]): Unit = node.update(f)
+  def updateNode[A](node: Op[A]): Unit = node match {
+    case enabled: Enabled[_] =>
+      enabled.updateEn(f, f(enables))
+    case _ =>
+      node.update(f)
+  }
+
+  override def mirrorNode[A](rhs: Op[A]): Op[A] = rhs match {
+    case en:Enabled[A] => en.mirrorEn(f, f(enables))
+    case _ => super.mirrorNode(rhs)
+  }
 }

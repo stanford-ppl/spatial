@@ -61,6 +61,10 @@ object TransformUtils {
     val step = ctr.step.c.get.asInstanceOf[emul.FixedPoint].toInt
     Range(start, end, step)
   }
+
+  @api def withPreviousCtx(previousCtx: SrcCtx): SrcCtx = {
+    implicitly[SrcCtx].copy(previous=Some(previousCtx))
+  }
 }
 
 trait TransformerUtilMixin {
@@ -148,5 +152,16 @@ trait TransformerUtilMixin {
       }
     }
     substitutions.toSeq
+  }
+
+  def mapSubsts[T](s: T, substs: Seq[SubstData])(func: T => T): Seq[T] = {
+    val current = saveSubsts()
+    val values = substs map {
+      subst =>
+        restoreSubsts(subst)
+        func(s)
+    }
+    restoreSubsts(current)
+    values
   }
 }

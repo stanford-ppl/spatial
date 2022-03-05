@@ -31,13 +31,13 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
   /** Valid bits - tracks all valid bits associated with the current scope to handle edge cases
     * e.g. cases where parallelization is not an even divider of counter max
     */
-  private var validBits: Set[Bit] = Set.empty
-  def withValids[T](valids: Seq[Bit])(blk: => T): T = {
-    val prevValids = validBits
-    validBits = if (!_passEns) valids.toSet else prevValids ++ valids.toSet
+//  private var validBits: Set[Bit] = Set.empty
+  override def withEns[T](ens: Set[argon.lang.Bit])(thunk: => T): T = {
+    val prevValids = enables
+    enables = if (!_passEns) ens else prevValids ++ ens
     // TODO: Should this be ++= ?
-    val result = blk
-    validBits = prevValids
+    val result = thunk
+    enables = prevValids
     result
   }
 
@@ -53,8 +53,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
     result
   }
 
-  /** Set of valid bits associated with current unrolling scope */
-  def enables: Set[Bit] = validBits
+//  /** Set of valid bits associated with current unrolling scope */
+//  def enables: Set[Bit] = validBits
 
   /** Unroll numbers - gives the unroll index of each pre-unrolled (prior to transformer) index
     * Used to determine which duplicate a particular memory access should be associated with
@@ -76,7 +76,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 
   /** Lanes tracking duplications in this scope */
   var lanes: Unroller = UnitUnroller("Accel", isInnerLoop = false)
-  
+
   /** Mapping between each lane of an Unroller to sequence of Syms to be grouped in that lane (PoM only) */
   var laneMapping: Map[(Unroller, Int), Seq[Block[_]]] = Map.empty
 
@@ -210,17 +210,17 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
 //      val a = f(struct)
 //      println(s"$a")
 //      FieldDeq(f(struct), field, f(ens)) // TODO: Figure out why mirroring this node complains about casting Void to StreamStruct
-    case e:Enabled[_] => (e mirrorEn(f, enables)).asInstanceOf[Op[A]]
+//    case e:Enabled[_] => (e mirrorEn(f, enables)).asInstanceOf[Op[A]]
     case LaneStatic(iter, resolutions) if unrollNum.getOrElse(iter.asInstanceOf[Idx], Seq()).size == 1 =>
       val i = iter.asInstanceOf[Idx]
       LaneStatic[FixPt[TRUE,_32,_0]](iter.asInstanceOf[FixPt[TRUE,_32,_0]], Seq(resolutions(unrollNum(i).head))).asInstanceOf[Op[A]]
       // resolutions(unrollNum(i).head).asInstanceOf[Op[A]]
     case x => super.mirrorNode(rhs)
   }
-  override def updateNode[A](node: Op[A]): Unit = node match {
-    case e:Enabled[_] => e.updateEn(f, enables)
-    case _ => super.updateNode(node)
-  }
+//  override def updateNode[A](node: Op[A]): Unit = node match {
+//    case e:Enabled[_] => e.updateEn(f, enables)
+//    case _ => super.updateNode(node)
+//  }
 
   override def isolateSubstIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
     super.isolateSubstIf(cond, escape){ lanes.isolateIf(cond, escape){ block } }
@@ -264,7 +264,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       else List.tabulate(P) { p => List(p) }
     }
     /*
-     * @param p is lane index. 
+     * @param p is lane index.
      * Return the iter/valid index of each counter for lane p
      * */
     def parAddr(p: Int): List[Int] = List.tabulate(N){d => (p / prods(d)) % Ps(d) }
@@ -332,7 +332,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       memories ++= memContexts(i)
 
       val result = withUnrollNums(inds.zip(addr)) {
-        withValids(valids(i)) {
+        withEns(valids(i).toSet) {
           block
         }
       }
@@ -439,7 +439,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
         case lanes if mop => indexValids.map { vec => vec.head }
         case List(p) => indexValids(p)
       }
-      laneIdxValids ++ validBits
+      laneIdxValids ++ enables
     }
 
     // Substitution for each duplication "lane"

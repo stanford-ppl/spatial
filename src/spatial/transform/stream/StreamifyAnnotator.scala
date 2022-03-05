@@ -37,7 +37,7 @@ case class StreamifyAnnotator(IR: argon.State) extends AccelTraversal {
     // can transform if all children are foreach loops
     (lhs.blocks.flatMap(_.stms).forall {
       case stmt@Op(foreach:OpForeach) =>
-        true
+        stmt.isOuterControl
       case s if s.isMem =>
         val result = (s.writers union s.readers) forall {
           case Op(_:StreamOutWrite[_]) | Op(_:StreamInRead[_]) =>

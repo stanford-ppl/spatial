@@ -12,16 +12,6 @@ import spatial.metadata.memory._
 case class UnitpipeCombineTransformer(IR: argon.State) extends MutateTransformer with RepeatableTraversal {
   // When multiple unitpipes appear after each other within a block, we can fuse them into a single unitpipe
 
-  var enStack = Set.empty[Bit]
-
-  def withEns[T](ens: Set[Bit])(thunk: => T): T = {
-    val oldStack = enStack
-    enStack ++= ens
-    val result = thunk
-    enStack = oldStack
-    result
-  }
-
   def stagePipes(currentPipes: collection.mutable.ListBuffer[Sym[_]]): Unit = {
 //    converged = false
     if (currentPipes.isEmpty) return
@@ -31,7 +21,6 @@ case class UnitpipeCombineTransformer(IR: argon.State) extends MutateTransformer
       return
     }
     dbgs(s"Staging Pipes: ${currentPipes.mkString(", ")}")
-    dbgs(s"EnStack: $enStack")
     val unitBlock = stageBlock {
       currentPipes foreach {
         case Op(UnitPipe(ens, block, _)) =>
@@ -93,22 +82,14 @@ case class UnitpipeCombineTransformer(IR: argon.State) extends MutateTransformer
     }
   }
 
-  def updateEnables(en: Sym[_]): Unit = {
-    en.op.get.asInstanceOf[Enabled[_]].updateEn(f, f(enStack))
-  }
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = indent {
     (rhs match {
       case foreach: OpForeach =>
         val result = visitForeach(lhs, foreach)
-        updateEnables(result)
+        updateNode(result.op.get)
         result
 
-      case en: Enabled[_] =>
-        val enNew = super.transform(lhs, rhs)
-        updateEnables(enNew)
-        dbgs(s"Updating Enables: $lhs = $rhs -> $enNew = ${enNew.op}")
-        enNew
       case _ => super.transform(lhs, rhs)
     }).asInstanceOf[Sym[A]]
   }

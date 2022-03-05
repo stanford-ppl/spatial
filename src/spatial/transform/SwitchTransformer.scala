@@ -31,19 +31,19 @@ import spatial.traversal.AccelTraversal
   * We can pull this logic out of the outer condition if they meet normal code motion rules
   */
 case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTraversal {
-  private var enables: Set[Bit] = Set.empty
-
-  private def withEn[T](en: Bit)(blk: => T): T = {
-    val saveEnables = enables
-    enables += en
-    val result = blk
-    enables = saveEnables
-    result
-  }
+//  private var enables: Set[Bit] = Set.empty
+//
+//  private def withEn[T](en: Bit)(blk: => T): T = {
+//    val saveEnables = enables
+//    enables += en
+//    val result = blk
+//    enables = saveEnables
+//    result
+//  }
 
   private def createCase[T:Type](cond: Bit, body: Block[T])(implicit ctx: SrcCtx) = () => {
     dbgs(s"Creating SwitchCase from cond $cond and body $body")
-    val c = withEn(cond){ Switch.op_case(f(body) )}
+    val c = withEns(Set(cond)){ Switch.op_case(f(body) )}
     dbgs(s"  ${stm(c)}")
     c
   }
@@ -58,7 +58,7 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
     // Flatten switch only if there are no enabled primitives or controllers
     case Op(IfThenElse(cond,thenBlk,elseBlk)) if shouldMotionFromConditional(block.stms,inHw) =>
       // Move all statements except the result out of the case
-      withEn(prevCond){ block.stms.dropRight(1).foreach(visit) }
+      withEns(Set(prevCond)){ block.stms.dropRight(1).foreach(visit) }
       val cond2 = f(cond)
       val thenCond = cond2 & prevCond
       val elseCond = !cond2 & prevCond
@@ -87,10 +87,10 @@ case class SwitchTransformer(IR: State) extends MutateTransformer with AccelTrav
     case _ => super.transform(lhs,rhs)
   }
 
-  override def updateNode[A](node: Op[A]): Unit = node match {
-    case e:Enabled[_] => e.updateEn(f, enables)
-    case _ => super.updateNode(node)
-  }
+//  override def updateNode[A](node: Op[A]): Unit = node match {
+//    case e:Enabled[_] => e.updateEn(f, enables)
+//    case _ => super.updateNode(node)
+//  }
 }
 
 

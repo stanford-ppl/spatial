@@ -106,22 +106,13 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                 indent { isolateSubst() {
                   stmt match {
-                    case loop@Op(loopCtrl@OpForeach(ens, cchain, block, iters, stopWhen)) =>
+                    case loop@Op(loopCtrl@OpForeach(ens, cchain, block, iters, stopWhen)) if loop.isOuterControl =>
                       dbgs(s"Staging fused loop $loop = ${loop.op}")
-                      // Unroll early here.
-                      // start, stop, step, par ->
-                      // start, stop, step * par, 1
-
-
                       val shape = cchain.counters map {_.ctrParOr1}
-
                       val (ccnew, newIters) = stagePreamble(loopCtrl.asInstanceOf[Control[_]], newParentCtrs, foreach.iters)
-
                       stage(OpForeach(ens, ccnew, stageBlock {
                         val innerIters = newIters.takeRight(iters.size)
-                        val en = innerIters.map {
-                          i => i === i.counter.ctr.start
-                        }.toSet
+                        val en = innerIters.map(spatial.util.TransformUtils.isFirstIter(_)).toSet
 
                         // Hook up notifications
                         dbgs(s"Setting up notifications for $stmt")
@@ -198,7 +189,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                             }
                           case _ =>
                         }
-                      }, newIters, stopWhen))
+                      }, newIters, f(stopWhen)))
                   }
                 }}
               case stmt if shouldDuplicate(stmt) =>

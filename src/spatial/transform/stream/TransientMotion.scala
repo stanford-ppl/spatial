@@ -40,7 +40,7 @@ case class TransientMotion(IR: State) extends MutateTransformer with AccelTraver
     case foreach: OpForeach if inHw =>
       dbgs(s"Processing: $lhs = $rhs")
       register(foreach.block -> motionBlock(foreach.block))
-      mirrorSym(lhs)
+      update(lhs, rhs)
     case _ => super.transform(lhs, rhs)
   }
 }

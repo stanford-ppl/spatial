@@ -90,10 +90,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
               case s if canTransformMem(s) && shouldDuplicate(s) =>
                 dbgs(s"Skipping re-staging $s since it can be transformed")
 
-              case stmt if stmt.isControl =>
-                val stmtReads = getReadRegs(stmt)
-                val stmtWrites = getWrittenRegs(stmt)
-                dbgs(s"Stmt: $stmt, effects: ${stmt.effects} reads: $stmtReads, writes: $stmtWrites")
+              case loop@Op(loopCtrl@OpForeach(ens, cchain, block, iters, stopWhen)) =>
+                val stmtReads = getReadRegs(loop)
+                val stmtWrites = getWrittenRegs(loop)
+                dbgs(s"Stmt: $loop, effects: ${loop.effects} reads: $stmtReads, writes: $stmtWrites")
                 // for each stmtRead, we need to create a register of the same type inside.
 
                 // If the register is read, then it is either written by a previous controller, or we use the
@@ -103,95 +103,87 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                 // of the controller.
                 // Since writes can be conditional, we must read the previous value before muxing between the
                 // two on enqueue.
+                dbgs(s"Staging fused loop $loop = ${loop.op}")
+                val shape = cchain.counters map {_.ctrParOr1}
 
-                indent { isolateSubst() {
-                  stmt match {
-                    case loop@Op(loopCtrl@OpForeach(ens, cchain, block, iters, stopWhen)) if loop.isOuterControl =>
-                      dbgs(s"Staging fused loop $loop = ${loop.op}")
-                      val shape = cchain.counters map {_.ctrParOr1}
-                      val (ccnew, newIters) = stagePreamble(loopCtrl.asInstanceOf[Control[_]], newParentCtrs, foreach.iters)
-                      stage(OpForeach(ens, ccnew, stageBlock {
-                        val innerIters = newIters.takeRight(iters.size)
-                        val en = innerIters.map(spatial.util.TransformUtils.isFirstIter(_)).toSet
 
-                        // Hook up notifications
-                        dbgs(s"Setting up notifications for $stmt")
-                        dbgs(s"Recv FIFOs: ${memoryBufferNotifs.getRecvFIFOs(stmt)}")
-                        dbgs(s"Send FIFOs: ${memoryBufferNotifs.getSendFIFOs(stmt)}")
+                // Hook up notifications
+                dbgs(s"Setting up notifications for $loop")
+                dbgs(s"Recv FIFOs: ${memoryBufferNotifs.getRecvFIFOs(loop)}")
+                dbgs(s"Send FIFOs: ${memoryBufferNotifs.getSendFIFOs(loop)}")
 
-                        val memTokens = getMemTokens(stmt, en, memoryBufferNotifs)
+                val childShifts = spatial.util.computeShifts(shape)
+                dbgs(s"Unrolling with shifts: $childShifts")
 
-                        dbgs(s"MemTokens: ${memTokens}")
+                val (ccnew, newIters) = stagePreamble(loopCtrl.asInstanceOf[Control[_]], newParentCtrs, foreach.iters)
 
-                        block.nestedStms foreach {
-                          stmt =>
-                            val mems = stmt.readMem ++ stmt.writtenMem
-                            mems.filter(internalMems.contains) foreach {
-                              mem =>
-                                memTokens.get(f(mem)) match {
-                                  case Some(ind) =>
-                                    dbgs(s"Adding Buffering Info to: $stmt = $ind")
-                                    stmt.bufferIndex = ind
-                                  case None =>
-                                }
+                def remaps = childShifts map {
+                  cShift =>
+                    createSubstData {
+                      val childShift = (cchain.counters zip cShift) map {
+                        case (ctr, shift) =>
+                          implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+                          implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
+                          ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
+                      }
+
+                      val shift = parentShift ++ childShift
+                      dbgs(s"Staging Calcs for shift: $shift")
+                      ((foreach.iters ++ iters) zip newIters) zip shift map {
+                        case ((oldIter, newIter), s) =>
+                          register(oldIter, () => {newIter + s})
+                      }
+                    }
+                }
+
+                if (loop.isOuterControl) {
+                  stage(OpForeach(ens, ccnew, stageBlock {
+                    val innerIters = newIters.takeRight(iters.size)
+                    val isFirst = innerIters.map(spatial.util.TransformUtils.isFirstIter(_)).toSet
+
+                    val memTokens = getMemTokens(loop, isFirst, memoryBufferNotifs)
+
+                    dbgs(s"MemTokens: ${memTokens}")
+
+                    block.nestedStms foreach {
+                      stmt =>
+                        val mems = stmt.readMem ++ stmt.writtenMem
+                        mems.filter(internalMems.contains) foreach {
+                          mem =>
+                            memTokens.get(f(mem)) match {
+                              case Some(ind) =>
+                                dbgs(s"Adding Buffering Info to: $stmt = $ind")
+                                stmt.bufferIndex = ind
+                              case None =>
                             }
                         }
+                    }
 
-                        val childShifts = spatial.util.computeShifts(shape)
-                        dbgs(s"Unrolling with shifts: $childShifts")
+                    val cloned = registerDuplicationFIFOReads(stmtReads, duplicationReadFIFOs.getOrElse(loop, mutable.Map.empty).toMap, isFirst)
 
-                        val cloned = registerDuplicationFIFOReads(stmtReads, duplicationReadFIFOs.getOrElse(stmt, mutable.Map.empty).toMap, en)
+                    visitWithSubsts(remaps, block.stms)
+                    
+                    val isLastEn = innerIters.map(spatial.util.TransformUtils.isLastIter(_)).toSet
+                    memoryBufferNotifs.getSendFIFOs(loop) foreach {
+                      case(mem, fifo) =>
+                        dbgs(s"Sending fifo: $mem, $fifo")
+                        stage(FIFOEnq(fifo, memTokens(f(mem)), isLastEn))
+                    }
 
-                        val remaps = childShifts map {
-                          cShift =>
-                            createSubstData {
-                              val childShift = (cchain.counters zip cShift) map {
-                                case (ctr, shift) =>
-                                  implicit def numEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
-                                  implicit def castEV: Cast[ctr.CT, I32] = argon.lang.implicits.numericCast[ctr.CT, I32]
-                                  ctr.step.asInstanceOf[ctr.CT].to[I32] * I32(shift)
-                              }
-
-                              val shift = parentShift ++ childShift
-                              dbgs(s"Staging Calcs for shift: $shift")
-                              ((foreach.iters ++ iters) zip newIters) zip shift map {
-                                case ((oldIter, newIter), s) =>
-                                  register(oldIter, () => {newIter + s})
-                              }
-                            }
+                    stmtWrites foreach {
+                      case wr: Reg[_] if duplicationWriteFIFOs(loop) contains wr.asSym =>
+                        // Write the write register to the FIFO.
+                        implicit lazy val ev: Bits[wr.RT] = wr.A.asInstanceOf[Bits[wr.RT]]
+                        val read = cloned(wr).asInstanceOf[Reg[wr.RT]].value
+                        duplicationWriteFIFOs(loop)(wr.asSym) foreach {
+                          s =>
+                            val of = s.asInstanceOf[FIFO[wr.RT]]
+                            stage(FIFOEnq(of, read.asInstanceOf[Bits[wr.RT]], isLastEn))
                         }
-
-                        visitWithSubsts(remaps, block.stms)
-
-                        val isLastEn = innerIters.map {
-                          i =>
-                            (i.unbox + i.counter.ctr.step.asInstanceOf[I32]) >= i.counter.ctr.end.asInstanceOf[I32]
-                        }.toSet
-                        memoryBufferNotifs.getSendFIFOs(stmt) foreach {
-                          case(mem, fifo) =>
-                            dbgs(s"Sending fifo: $mem, $fifo")
-                            stage(FIFOEnq(fifo, memTokens(f(mem)), isLastEn))
-                        }
-
-                        dbgs(s"stmt: $stmt")
-                        dbgs(s"Duplication Read FIFOs: $duplicationReadFIFOs")
-                        dbgs(s"Duplication Write FIFOs: $duplicationWriteFIFOs")
-
-                        stmtWrites foreach {
-                          case wr: Reg[_] if duplicationWriteFIFOs(stmt) contains wr.asSym =>
-                            // Write the write register to the FIFO.
-                            implicit lazy val ev: Bits[wr.RT] = wr.A.asInstanceOf[Bits[wr.RT]]
-                            val read = cloned(wr).asInstanceOf[Reg[wr.RT]].value
-                            duplicationWriteFIFOs(stmt)(wr.asSym) foreach {
-                              s =>
-                                val of = s.asInstanceOf[FIFO[wr.RT]]
-                                stage(FIFOEnq(of, read.asInstanceOf[Bits[wr.RT]], isLastEn))
-                            }
-                          case _ =>
-                        }
-                      }, newIters, f(stopWhen)))
-                  }
-                }}
+                      case _ =>
+                    }
+                  }, newIters, f(stopWhen)))
+                }
               case stmt if shouldDuplicate(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")
                 register(stmt -> mirrorSym(stmt))

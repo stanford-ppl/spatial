@@ -32,7 +32,7 @@ object TransformUtils {
   @stateful def isLastIter[T: Num](iter: Num[T]): Bit = {
     val ctr = iter.counter.ctr.asInstanceOf[Counter[T]]
     val nextIter = iter + ctr.step.unbox
-    ctr.end.unbox.asInstanceOf[Num[T]] >= nextIter
+    ctr.end.unbox.asInstanceOf[Num[T]] <= nextIter
   }
 
   @stateful def CreateVecEV[T: Bits](length: Int): Bits[Vec[T]] = {

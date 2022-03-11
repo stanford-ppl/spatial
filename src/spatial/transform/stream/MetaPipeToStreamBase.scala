@@ -37,31 +37,28 @@ trait MetaPipeToStreamBase {
 
     stmts foreach {
       case mem if mem.isMem =>
-        dbgs(s"Adding mem: $mem")
         localMems.add(mem)
       case stmt =>
-        dbgs(s"stmt: $stmt = ${stmt.op}")
         (stmt.effects.reads diff stmt.effects.writes) intersect localMems foreach {
           mem =>
-            dbgs(s"Registering Reader: $stmt <- $mem")
+//            dbgs(s"Registering Reader: $stmt <- $mem")
             lastWrite.get(mem) match {
               case Some(wr) =>
                 states(mem)(wr).add(stmt)
               case None =>
-                bug(s"Could not find writer for $mem")
                 throw new Exception(s"Could not find writer for $mem in statement $stmt")
             }
         }
 
         stmt.effects.writes intersect localMems foreach {
           mem =>
-            dbgs(s"Registering Writer: $stmt -> $mem")
+//            dbgs(s"Registering Writer: $stmt -> $mem")
             lastWrite(mem) = stmt
             states.getOrElseUpdate(mem, mutable.LinkedHashMap.empty)(stmt) = mutable.Set.empty
         }
     }
 
-    dbgs(s"Local Mems: $localMems")
+//    dbgs(s"Local Mems: $localMems")
 
     new LinearizedUseData(states)
   }

@@ -59,40 +59,9 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
         pipe =>
           transferData(sym, pipe)
           pipe.ctx = withPreviousCtx(sym.ctx)
+          pipe.userSchedule = Pipelined
       }
     }
-
-//    isolateSubst() {
-//      // Fully unrolled
-//      val iterSpaces = reduceOp.cchain.counters map { TransformUtils.counterToSeries }
-//      dbgs(s"Iteration Spaces: $iterSpaces")
-//      val allIters = spatial.util.crossJoin(iterSpaces)
-//
-//      stageWithFlow(UnitPipe(f(reduceOp.ens), stageBlock {
-//        val savedSubsts = saveSubsts()
-//        val substitutions = allIters map {
-//          iters =>
-//            restoreSubsts(savedSubsts)
-//            (reduceOp.iters zip iters) foreach {
-//              case (oldIter, newIter) => register(oldIter -> I32(newIter))
-//            }
-//            saveSubsts()
-//        }
-//        val resultantSubsts = visitWithSubsts(substitutions.toSeq, reduceOp.map.stms)
-//        dbgs(s"Substitutions: $resultantSubsts")
-//        val subResults = resultantSubsts map {
-//          subs =>
-//            restoreSubsts(subs)
-//            f(reduceOp.map.result)
-//        }
-//        val values = Vec.fromSeq(subResults map {
-//          result => ReduceIterInfo(result.unbox, Bit(false), Bit(false))
-//        })
-//        commFIFO.enqVec(values)
-//      }, None)) {
-//        lhs2 => lhs2.explicitName = s"ReduceToForeach_Map_$sym"
-//      }
-//    }
 
     // TODO: Should change this to be dynamic based on par factor, but that requires messing with accumulators
     val reduceSize = reduceOp.cchain.approxIters
@@ -113,6 +82,7 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
       }, None)) {
         lhs2 =>
           lhs2.explicitName = s"ReduceToForeach_Red_$sym"
+          lhs2.userSchedule = Pipelined
       }
     }
     newAccum

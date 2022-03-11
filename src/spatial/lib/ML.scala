@@ -124,21 +124,11 @@ object ML extends HostML {
       val inWithPrint = (x: I32) => {
         val res = in(x)
         println(r"Read: $prev($x) = $res")
-        retimeGate()
-        tagValue(x, s"${prev}_rd_index")
-        tagValue(res, s"${prev}_rd_value")
-        retimeGate()
         res
       }
 
       val outWithPrint = (x: I32, v: T) => {
         println(r"Write: $next($x) = $v")
-//        retimeGate()
-//        tagValue(x, s"${next}_wr_index")
-//        tagValue(v, s"${next}_wr_value")
-////        val sramAcc = SRAMAccess(x, v)
-////        tagValue(sramAcc, s"SRAM_Access_wr_${next}")
-//        retimeGate()
         out(x, v)
       }
       denselayer[T](w, b, activation, in=inWithPrint, nlout=outWithPrint)(ip=ip, mp=mp, op=op)

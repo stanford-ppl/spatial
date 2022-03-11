@@ -62,8 +62,15 @@ object TransformUtils {
     Range(start, end, step)
   }
 
-  @api def withPreviousCtx(previousCtx: SrcCtx): SrcCtx = {
-    implicitly[SrcCtx].copy(previous=Some(previousCtx))
+  @api def withPreviousCtx(previousCtx: SrcCtx*): SrcCtx = {
+    implicitly[SrcCtx].copy(previous=previousCtx)
+  }
+
+  @api def persistentDequeue[T: Bits](fifo: FIFO[T], en: Set[Bit]): T = {
+    val v = stage(FIFODeq(fifo, en))
+    val reg = Reg[T]
+    stage(RegWrite(reg, v, en))
+    mux(en.toSeq.reduceTree {_ && _}, v, reg.value)
   }
 }
 
@@ -130,7 +137,7 @@ trait TransformerUtilMixin {
           }, f(stopWhen))) {
             lhs2 =>
               transferData(unitpipe, lhs2)
-              lhs2.ctx = ctx.copy(previous = Some(lhs2.ctx))
+              lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
           }
         case disguisedUnitpipe@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if disguisedUnitpipe.isInnerControl && cchain.isStatic && cchain.approxIters == 1 =>
           updateSubstsWith({
@@ -146,7 +153,7 @@ trait TransformerUtilMixin {
           }, f(stopWhen))) {
             lhs2 =>
               transferData(disguisedUnitpipe, lhs2)
-              lhs2.ctx = ctx.copy(previous = Some(lhs2.ctx))
+              lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
           }
         case stm => cyclingVisit(stm)
       }

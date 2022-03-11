@@ -167,7 +167,7 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
     tmp map {case (m, reg) => m -> reg }
   }
 
-  def registerDuplicationFIFOReads(stmtReads: Traversable[Sym[_]], duplicationReadFIFOs: Map[Sym[_], Sym[_]], en: Set[Bit]): Map[Sym[_], Sym[_]] = {
+  def registerDuplicationFIFOReads(isOuter: Boolean)(stmtReads: Traversable[Sym[_]], duplicationReadFIFOs: Map[Sym[_], Sym[_]], en: Set[Bit]): Map[Sym[_], Sym[_]] = {
     val cloned = mutable.Map[Sym[_], Sym[_]]()
     stmtReads foreach {
       case read: Reg[_] =>
@@ -177,12 +177,23 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
         cloned(read) = tmp
 
         // All of the original register reads/writes are now delegated to a proxy register.
-        register(read -> tmp)
+
 
         tmp.explicitName = read.explicitName.getOrElse(s"InsertedReg_$read")
-        if (duplicationReadFIFOs contains read) {
-          val deq = stage(FIFODeq(duplicationReadFIFOs(read).asInstanceOf[FIFO[T]], en))
-          stage(RegWrite(tmp.unbox, deq, en))
+        register(read -> tmp)
+
+        duplicationReadFIFOs.get(read) match {
+          case Some(fifo) =>
+            val deq = stage(FIFODeq(fifo.asInstanceOf[FIFO[T]], en))
+            if (isOuter) {
+              stage(RegWrite(tmp.unbox, deq, en))
+            } else {
+              val nonBuffered = mirrorSym(read).asInstanceOf[Reg[T]]
+              nonBuffered.nonbuffer
+              nonBuffered.write(deq, en.toSeq:_*)
+              tmp.unbox := nonBuffered
+            }
+          case None =>
         }
     }
     cloned.toMap

@@ -188,6 +188,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                     lhs2.ctx = lhs2.ctx.copy(previous=Seq(loop.ctx))
                     lhs2.prevNames = lhs2.prevNames ++ loop.prevNames
                     lhs2.userSchedule = loop.userSchedule
+                    lhs2.haltIfStarved = false
                 }
               case stmt if shouldDuplicate(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")

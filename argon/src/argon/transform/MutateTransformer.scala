@@ -10,6 +10,14 @@ abstract class MutateTransformer extends ForwardTransformer {
   /** Determines whether the default transform rule is to mirror (copy) or update nodes. */
   protected var copyMode: Boolean = false
 
+  case class MutateTransformerState(ens: Set[argon.lang.Bit]) extends TransformerState {
+    override def restore(): Unit = { enables = ens }
+  }
+
+  override def saveSubsts(): TransformerStateBundle = {
+    super.saveSubsts() ++ Seq(MutateTransformerState(enables))
+  }
+
   protected def inCopyMode[A](copy: Boolean)(block: => A): A = {
     val saveCopy = copyMode
     copyMode = copy

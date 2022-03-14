@@ -105,7 +105,7 @@ trait TransformerUtilMixin {
     RemappedChainData(ctrChain, newParentIters, newChildIters)
   }
 
-  def createSubstData(thunk: => Unit): SubstData = {
+  def createSubstData(thunk: => Unit): TransformerStateBundle = {
     val tmp = saveSubsts()
     thunk
     val result = saveSubsts()
@@ -113,7 +113,7 @@ trait TransformerUtilMixin {
     result
   }
 
-  def visitWithSubsts(substs: Seq[SubstData], stms: Seq[Sym[_]])(implicit ctx: SrcCtx): Seq[SubstData] = {
+  def visitWithSubsts(substs: Seq[TransformerStateBundle], stms: Seq[Sym[_]])(implicit ctx: SrcCtx): Seq[TransformerStateBundle] = {
     val substitutions = substs.toArray
 
     def cyclingVisit(sym: Sym[_]): Unit = {
@@ -161,7 +161,7 @@ trait TransformerUtilMixin {
     substitutions.toSeq
   }
 
-  def mapSubsts[T](s: T, substs: Seq[SubstData])(func: T => T): Seq[T] = {
+  def mapSubsts[T](s: T, substs: Seq[TransformerStateBundle])(func: T => T): Seq[T] = {
     val current = saveSubsts()
     val values = substs map {
       subst =>

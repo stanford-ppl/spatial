@@ -9,14 +9,21 @@ abstract class SubstTransformer extends Transformer {
   var blockSubst: Map[Block[_],Block[_]] = Map.empty
   var delayedSubst: Map[Sym[_], () => Sym[_]] = Map.empty
 
-  case class SubstData(subst: Map[Sym[_], Sym[_]], blockSubst: Map[Block[_],Block[_]], delayedSubst: Map[Sym[_], () => Sym[_]])
+  type TransformerStateBundle = Seq[TransformerState]
 
-  def saveSubsts(): SubstData = SubstData(subst, blockSubst, delayedSubst)
-  def restoreSubsts(substData: SubstData): Unit = {
-    subst = substData.subst
-    blockSubst = substData.blockSubst
-    delayedSubst = substData.delayedSubst
+  trait TransformerState {
+    def restore(): Unit
   }
+  case class SubstTransformerState(s: Map[Sym[_], Sym[_]], b: Map[Block[_],Block[_]], d: Map[Sym[_], () => Sym[_]]) extends TransformerState {
+    override def restore(): Unit = {
+      subst = s
+      blockSubst = b
+      delayedSubst = d
+    }
+  }
+
+  def saveSubsts(): TransformerStateBundle = Seq(SubstTransformerState(subst, blockSubst, delayedSubst))
+  def restoreSubsts(substData: TransformerStateBundle): Unit = substData.foreach(_.restore())
 
   /** Register a substitution rule.
     * Usage: register(a -> a').

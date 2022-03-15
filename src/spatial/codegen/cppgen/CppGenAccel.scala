@@ -155,7 +155,7 @@ trait CppGenAccel extends CppGenCommon {
       val str = src"""${m.getOrElse("\"API assert failed with no message provided\"")}"""
       emit(src"""string $lhs = ("\n=================\n" + ($str + "\n=================\n"));""")
       val enable = if (en.toList.isEmpty) "true" else en.map(quote).mkString("&")
-      emit(src"""if ($enable) { ASSERT($cond, "%s", $lhs.c_str()); }""")
+      emit(src"""if ($enable) { std::cout << std::flush; ASSERT($cond, "%s", $lhs.c_str()); }""")
       if (inHw) earlyExits = earlyExits :+ lhs
 
     case BreakpointIf(_) =>

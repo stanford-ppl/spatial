@@ -21,8 +21,14 @@ trait MiscAPI {
   }
 
   @api def retime[T:Bits](delay: scala.Int, payload: Bits[T]): T = {
-    val x = stage(DelayLine(delay, payload))
-    x.asInstanceOf[Sym[_]].userInjectedDelay = true
-    x
+    if (delay < 0) {
+      throw new IllegalArgumentException("Attempted to create a delayline with delay < 0")
+    } else if (delay == 0) {
+      payload.unbox
+    } else {
+      val x = stage(DelayLine(delay, payload))
+      x.asInstanceOf[Sym[_]].userInjectedDelay = true
+      x
+    }
   }
 }

@@ -1,7 +1,6 @@
 package spatial.tests.compiler
 import spatial.dsl._
-import _root_.spatial.metadata.memory._
-import _root_.spatial.node.{SRAMRead, SRAMWrite}
+import spatial.metadata.memory._
 
 @spatial class ContinualStreaming extends SpatialTest {
   override def compileArgs = super.compileArgs + "--nostreamify"

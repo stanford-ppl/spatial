@@ -84,8 +84,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     val commonEns = ens.head.collect{case e if ens.forall(_.contains(e)) && !e.isBroadcastAddr => e}
     val enslist = ens.map{e => and(e.filter(!commonEns.contains(_)).filter(!_.isBroadcastAddr))}
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
-    val nonlut_mask = if (mem.isLUT) "true.B" else src"$forwardpressure"
-    val connectRPortCall = src"$mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && $nonlut_mask && ${implicitEnableRead(lhs,mem)} && ${and(commonEns)} ${enString}), ${!mem.broadcastsAnyRead})"
+    val nonlut_mask = if (mem.isLUT) "true.B" else DL(src"$forwardpressure", lhs.fullDelay, true)
+    emit(src"""val ${lhs}_shared_en = ($nonlut_mask && ${implicitEnableRead(lhs, mem)} && ${and(commonEns)} $enString).suggestName("${lhs}_shared_en")""")
+    val connectRPortCall = src"$mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${lhs}_shared_en), ${!mem.broadcastsAnyRead})"
     emit(src"""$lhs.toSeq.zip($connectRPortCall).foreach{case (a,b) => a.r := b.r}""")
   }
 

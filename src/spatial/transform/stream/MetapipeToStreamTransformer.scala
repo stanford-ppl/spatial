@@ -187,7 +187,10 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                   lhs2 =>
                     lhs2.ctx = lhs2.ctx.copy(previous=Seq(loop.ctx))
                     lhs2.prevNames = lhs2.prevNames ++ loop.prevNames
-                    lhs2.userSchedule = loop.userSchedule
+                    loop.getUserSchedule match {
+                      case Some(sched) => lhs2.userSchedule = sched
+                      case None =>
+                    }
                     lhs2.haltIfStarved = false
                 }
               case stmt if shouldDuplicate(stmt) =>

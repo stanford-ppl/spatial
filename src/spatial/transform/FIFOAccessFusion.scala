@@ -62,7 +62,7 @@ case class FIFOAccessFusion(IR: State) extends MutateTransformer {
       }
     }
 
-    stageBlock {
+    stageScope(f(block.inputs), block.options) {
       block.stms foreach {
         case stmt@Op(FIFOEnq(mem, data, ens)) =>
           dbgs(s"Appending: $stmt = ${stmt.op.get}")

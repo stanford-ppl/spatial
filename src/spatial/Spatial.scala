@@ -26,6 +26,7 @@ import spatial.flows.SpatialFlowRules
 import spatial.metadata.memory.{Dispatch, Duplicates}
 import spatial.rewrites.SpatialRewriteRules
 import spatial.transform.stream._
+import spatial.transform.streamify.EarlyUnroller
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -123,6 +124,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamifyAnnotator    = StreamifyAnnotator(state)
     lazy val transientMotion       = TransientMotion(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
+    lazy val earlyUnroller         = EarlyUnroller(state)
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
 
@@ -136,9 +138,10 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer) ++ DCE ++
       bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer) ++ Seq(streamChecks)
 
-    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
-      createDump(s"streamify_$iter")
-    }, maxIters = spatialConfig.maxStreamifyIters))
+//    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
+//      createDump(s"streamify_$iter")
+//    }, maxIters = spatialConfig.maxStreamifyIters))
+    lazy val streamify = createDump("PreStream") ++ Seq(earlyUnroller, printer, pipeInserter, printer, fifoAccessFusion) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -170,7 +173,7 @@ trait Spatial extends Compiler with ParamLoader {
         (blackboxLowering1)   ==> printer ==> transformerChecks ==>
         /** More black box lowering */
         (blackboxLowering2)   ==> printer ==> transformerChecks ==>
-        (spatialConfig.enableSynth && !spatialConfig.enableSim) ? textCleanup ==>
+        (spatialConfig.textCleanup) ? textCleanup ==>
         /** DSE */
         ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
         /** Optional scala model generator */
@@ -350,6 +353,9 @@ trait Spatial extends Compiler with ParamLoader {
 
     cli.opt[Int]("maxStreamifyIters").action { (i, _) =>
       spatialConfig.maxStreamifyIters = i }.text("Maximum number of iterations transforming controllers into streams")
+
+    cli.opt[Boolean]("textCleanup").action { (i, _) =>
+      spatialConfig.textCleanup = i }.text("Remove Nodes with canAccel=false from the Accel block -- usually text and stuff")
 
     cli.opt[Unit]("noBindParallels").action{ (_,_) => 
       spatialConfig.enableParallelBinding = false

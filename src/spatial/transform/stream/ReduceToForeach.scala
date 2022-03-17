@@ -50,7 +50,7 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
       })
       stageWithFlow(OpForeach(f(reduceOp.ens), newCChain.unbox, stageBlock {
         val updatedSubsts = indent { visitWithSubsts(substitutions, reduceOp.map.stms) }
-        val mappedValues = mapSubsts(reduceOp.map.result, updatedSubsts)(f.apply)
+        val mappedValues = mapSubsts(updatedSubsts){f(reduceOp.map.result)}
         val signalValues = mappedValues map {
           value => ReduceIterInfo(value.unbox)
         }

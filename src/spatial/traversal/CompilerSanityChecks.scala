@@ -94,9 +94,10 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         if (lhs.parent match { case Ctrl.Host => false; case _ => true }) error(ctx, s"Please declare Blackbox implementation outside of Accel!")
         inBox { check(lhs,rhs); super.visit(lhs, rhs) }
       case FIFODeq(_, _) | FIFOBankedDeq(_, _) =>
-        dbgs(s"Found dequeue $lhs with delay ${lhs.fullDelay}")
-        if (lhs.fullDelay >= 1) {
-          error(lhs.ctx, s"Found a banked dequeue ${lhs} with delay ${lhs.fullDelay}")
+        val inputDelays = rhs.inputs.map(_.fullDelay)
+        if (inputDelays.exists(_ > 1.0)) {
+          val dbgDelays = (rhs.inputs zip inputDelays) map { case (i, d) => s"$i ($d)"}
+          error(lhs.ctx, s"Found a banked dequeue ${lhs} with input delays ${dbgDelays.mkString(", ")}")
         }
       case SRAMRead(mem, addr, _) =>
         if (mem.rank != addr.size) {

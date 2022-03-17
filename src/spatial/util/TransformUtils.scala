@@ -39,13 +39,15 @@ object TransformUtils {
     Vec.fromSeq(Range(0, length) map {_ => implicitly[Bits[T]].zero})
   }
 
-  @api def makeIters(ctrs: Seq[Counter[_]]): Seq[_] = {
-    ctrs map { ctr =>
-      implicit def tpEV: Type[ctr.CT] = ctr.CTeV.asInstanceOf[Type[ctr.CT]]
-      val n = boundVar[ctr.CT]
-      n.asInstanceOf[Bits[ctr.CT]].counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
-      n
-    }
+  @api def makeIters(ctrs: Seq[Counter[_]]): Seq[Sym[_]] = {
+    ctrs map(makeIter(_))
+  }
+
+  @api def makeIter[T](ctr: Counter[T]): Sym[T] = {
+    implicit def tpEV: Type[ctr.CT] = ctr.CTeV.asInstanceOf[Type[ctr.CT]]
+    val n = boundVar[ctr.CT]
+    n.asInstanceOf[Bits[ctr.CT]].counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1) { i => i })
+    n.asSym
   }
 
   def makeSymOpPair(sym: Sym[_]): Option[(Sym[_], Op[_])] = {
@@ -114,6 +116,7 @@ trait TransformerUtilMixin {
   }
 
   def visitWithSubsts(substs: Seq[TransformerStateBundle], stms: Seq[Sym[_]])(implicit ctx: SrcCtx): Seq[TransformerStateBundle] = {
+    val currentSubsts = saveSubsts()
     val substitutions = substs.toArray
 
     def cyclingVisit(sym: Sym[_]): Unit = {
@@ -158,15 +161,16 @@ trait TransformerUtilMixin {
         case stm => cyclingVisit(stm)
       }
     }
+    restoreSubsts(currentSubsts)
     substitutions.toSeq
   }
 
-  def mapSubsts[T](s: T, substs: Seq[TransformerStateBundle])(func: T => T): Seq[T] = {
+  def mapSubsts[T](substs: Seq[TransformerStateBundle])(func: => T): Seq[T] = {
     val current = saveSubsts()
     val values = substs map {
       subst =>
         restoreSubsts(subst)
-        func(s)
+        func
     }
     restoreSubsts(current)
     values

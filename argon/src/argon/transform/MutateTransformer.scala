@@ -1,6 +1,7 @@
 package argon
 package transform
 
+import argon.lang._
 import argon.node.Enabled
 import utils.tags.instrument
 
@@ -10,7 +11,7 @@ abstract class MutateTransformer extends ForwardTransformer {
   /** Determines whether the default transform rule is to mirror (copy) or update nodes. */
   protected var copyMode: Boolean = false
 
-  case class MutateTransformerState(ens: Set[argon.lang.Bit]) extends TransformerState {
+  case class MutateTransformerState(ens: Set[Bit]) extends TransformerState {
     override def restore(): Unit = { enables = ens }
   }
 
@@ -26,8 +27,8 @@ abstract class MutateTransformer extends ForwardTransformer {
     result
   }
 
-  protected var enables: Set[argon.lang.Bit] = Set.empty
-  protected def withEns[T](ens: Set[argon.lang.Bit])(thunk: => T): T = {
+  protected var enables: Set[Bit] = Set.empty
+  protected def withEns[T](ens: Set[Bit])(thunk: => T): T = {
     val tEnables = enables
     enables = enables ++ ens
     val result = thunk

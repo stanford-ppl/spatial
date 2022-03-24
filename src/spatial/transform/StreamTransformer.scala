@@ -29,15 +29,18 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
               stage(ForeverNew())
           }
           val newcchain = stageWithFlow(CounterChainNew(newctrs ++ ctrs2)){lhs2 => transferData(x, lhs2)}
-          subst += (x -> newcchain)
+//          subst += (x -> newcchain)
+          register(x -> newcchain)
           newcchain
         case x@Op(OpForeach(ens, cchain, blk, iters, stopWhen)) if x.isStreamControl && stopWhen.isEmpty && x.isOuterControl =>
           stageWithFlow(UnitPipe(ens, injectCtrs(blk, cchain.counters ++ ctrs, is ++ iters), stopWhen)){lhs2 => transferData(x, lhs2)}
         case x@Op(OpForeach(ens, cchain, blk, iters, stopWhen)) =>
-          val newctrs = subst(cchain).asInstanceOf[CounterChain].counters
+//          val newctrs = subst(cchain).asInstanceOf[CounterChain].counters
+          val newctrs = f(cchain).counters
           val newiters = is.zip(newctrs).map{case (i,ctr) => 
             val n = boundVar[I32]
-            subst += (i -> n)
+//            subst += (i -> n)
+            register(i -> n)
             n.name = i.name
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
             n
@@ -53,7 +56,8 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
           val newcchain = stageWithFlow(CounterChainNew(newctrs)){lhs2 => transferData(x, lhs2)}
           val newiters = is.zip(newctrs).map{case (i,ctr) => 
             val n = boundVar[I32]
-            subst += (i -> n)
+//            subst += (i -> n)
+            register(i -> n)
             n.name = i.name
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
             n

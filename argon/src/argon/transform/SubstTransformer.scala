@@ -3,48 +3,62 @@ package transform
 
 import utils.tags.instrument
 
+trait Substitution {
+  def resolve: Sym[_]
+}
+
+case class FuncSubst(func: () => Sym[_]) extends Substitution {
+  override def resolve: Sym[_] = func()
+}
+
+case class DirectSubst(v: Sym[_]) extends Substitution {
+  override def resolve: Sym[_] = v
+}
+
 /** An IR transformation pass which tracks substitutions using a scoped hash map. */
 abstract class SubstTransformer extends Transformer {
-  var subst: Map[Sym[_],Sym[_]] = Map.empty
+//  var subst: Map[Sym[_],Sym[_]] = Map.empty
   var blockSubst: Map[Block[_],Block[_]] = Map.empty
-  var delayedSubst: Map[Sym[_], () => Sym[_]] = Map.empty
+//  var delayedSubst: Map[Sym[_], () => Sym[_]] = Map.empty
+
+  var subst: Map[Sym[_], Substitution] = Map.empty
 
   type TransformerStateBundle = Seq[TransformerState]
 
   trait TransformerState {
     def restore(): Unit
   }
-  case class SubstTransformerState(s: Map[Sym[_], Sym[_]], b: Map[Block[_],Block[_]], d: Map[Sym[_], () => Sym[_]]) extends TransformerState {
+  case class SubstTransformerState(s: Map[Sym[_], Substitution], b: Map[Block[_],Block[_]]) extends TransformerState {
     override def restore(): Unit = {
       subst = s
       blockSubst = b
-      delayedSubst = d
     }
   }
 
-  def saveSubsts(): TransformerStateBundle = Seq(SubstTransformerState(subst, blockSubst, delayedSubst))
+  def saveSubsts(): TransformerStateBundle = Seq(SubstTransformerState(subst, blockSubst))
   def restoreSubsts(substData: TransformerStateBundle): Unit = substData.foreach(_.restore())
 
   /** Register a substitution rule.
     * Usage: register(a -> a').
     */
-  def register[A](rule: (A,A)): Unit = register(rule._1,rule._2)
+  def register[A, B](rule: (A,B)): Unit = register(rule._1,rule._2)
+  def register[A, B](seq: Seq[(A, B)]): Unit = seq foreach { case (a, b) => register(a, b)}
 
   /** Register a substitution rule orig -> sub. */
   def register[A,B](orig: A, sub: B): Unit = (orig, sub) match {
-    case (s1: Sym[_], s2: Sym[_])       => subst += s1 -> s2
-    case (s1: Sym[_], s2: (() => Sym[_])) => delayedSubst += s1 -> s2
-    case (s1: Seq[_], s2: Seq[_])      => (s1 zip s2) foreach { case (a, b) => register(a, b) }
+    case (s1: Sym[_], s2: Sym[_])       => subst += s1 -> DirectSubst(s2)
+    case (s1: Sym[_], s2: (() => Sym[_])) => subst += s1 -> FuncSubst(s2)
+    case (s1: Seq[_], s2: Seq[_])      =>
+      if (s1.size != s2.size) { throw new Exception(s"Mismatched registration sizes: ${s1.size} != ${s2.size}") }
+      (s1 zip s2) foreach { case (a, b) => register(a, b) }
     case (b1: Block[_], b2: Block[_])   => blockSubst += b1 -> b2
     case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
   }
 
   /** Defines the substitution rule for a symbol s, i.e. the result of f(s). */
-  final override protected def substituteSym[T](s: Sym[T]): Sym[T] = (subst.get(s), delayedSubst.get(s)) match {
-    case (Some(s2), None) => s2.asInstanceOf[Sym[T]]
-    case (None, Some(th)) => th().asInstanceOf[Sym[T]]
-    case (Some(_), Some(_)) => throw new Exception(s"Conflicting rewrite rules for $s!")
-    case (None, None)     => s
+  final override protected def substituteSym[T](s: Sym[T]): Sym[T] = (subst.get(s)) match {
+    case Some(s2) => s2.resolve.asInstanceOf[Sym[T]]
+    case None     => s
   }
 
   /** Defines the substitution rule for a block b, i.e. the result of f(b). */
@@ -82,14 +96,12 @@ abstract class SubstTransformer extends Transformer {
     */
   def isolateSubstIf[A](cond: Boolean, escape: Seq[Sym[_]])(block: => A): A = {
     val save = subst
-    val save2 = delayedSubst
     //dbgs("[Enter] Escape: " + escape.mkString(","))
     //dbgs("[Enter] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
     val result = block
     //dbgs("[Inside] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
     if (cond) {
       subst = save ++ subst.filter{case (s1,_) => escape.contains(s1) }
-      delayedSubst = save2 ++ delayedSubst.filter{case (s1,_) => escape.contains(s1) }
     }
     //dbgs("[Exit] Subst: " + subst.map{case (s1,s2) => s"$s1->$s2"}.mkString(","))
     result
@@ -110,10 +122,8 @@ abstract class SubstTransformer extends Transformer {
     */
   def excludeSubst[A](exclude: Sym[_]*)(block: => A): A = {
     val save = subst
-    val save2 = delayedSubst
     val result = block
     subst = save ++ subst.filterNot { case (s, _) => exclude.contains(s) }
-    delayedSubst = save2 ++ delayedSubst.filterNot { case (s, _) => exclude.contains(s) }
     result
   }
 

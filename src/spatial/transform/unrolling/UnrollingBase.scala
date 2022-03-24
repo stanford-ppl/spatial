@@ -2,10 +2,9 @@ package spatial.transform.unrolling
 
 import argon._
 import argon.node.Enabled
-import argon.transform.MutateTransformer
+import argon.transform.{DirectSubst, MutateTransformer}
 import forge.tags.rig
-import emul.{FixedPoint, Bool}
-
+import emul.{Bool, FixedPoint}
 import utils.math.combs
 import spatial.lang._
 import spatial.node._
@@ -16,7 +15,6 @@ import spatial.metadata.memory._
 import spatial.metadata.types._
 import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
-
 import utils.tags.instrument
 
 /** Options when transforming a statement:
@@ -233,7 +231,7 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       ctx.foreach{case (k,v) => dbgs(s"  $k -> $v") }
     }
     dbgs(s"Subst:")
-    subst.foreach{case (k,v) => dbgs(s"  $k -> $v")}
+//    subst.foreach{case (k,v) => dbgs(s"  $k -> $v")}
     throw new Exception(s"Used removed symbol: $x")
   }
 
@@ -328,7 +326,8 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       val saveMems = memories
       val addr     = lane.map { l => parAddr(l) }.transpose
 
-      subst ++= contexts(i)
+      register(contexts(i).toSeq)
+//      subst ++= contexts(i)
       memories ++= memContexts(i)
 
       val result = withUnrollNums(inds.zip(addr)) {
@@ -338,7 +337,9 @@ abstract class UnrollingBase extends MutateTransformer with AccelTraversal {
       }
 
       // Retain the substitutions added within this scope
-      contexts(i) ++= subst.filterNot(save contains _._1)
+      contexts(i) ++= subst.filterNot(save contains _._1).map {
+        case (a, DirectSubst(v)) => (a, v)
+      }
       memContexts(i) ++= memories.filterNot(saveMems contains _._1)
 
       subst = save

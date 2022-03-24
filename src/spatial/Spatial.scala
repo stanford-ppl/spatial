@@ -184,8 +184,8 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
-        spatialConfig.streamify ? Seq(pipeInserter, earlyUnroller, pipeInserter, printer) ==>
         ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
+        spatialConfig.streamify ? Seq(pipeInserter, earlyUnroller, pipeInserter, printer) ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** CSE on regs */

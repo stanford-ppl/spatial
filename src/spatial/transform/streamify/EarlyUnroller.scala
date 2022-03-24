@@ -13,6 +13,17 @@ import spatial.util.computeShifts
 case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin with spatial.util.CounterIterUpdateMixin {
   private def hasParFactor(cchain: CounterChain): Boolean = !cchain.counters.forall(_.ctrParOr1 == 1)
 
+  private var laneMap: Map[Sym[_], Int] = Map.empty
+  case class UnrollState(iterLanes: Map[Sym[_], Int]) extends TransformerState {
+    override def restore(): Unit = {
+      laneMap = iterLanes
+    }
+  }
+
+  override def saveSubsts(): TransformerStateBundle = {
+    super.saveSubsts() ++ Seq(UnrollState(laneMap))
+  }
+
   private def possiblyOOB(shift: Int, ctr: Counter[_]): Boolean = {
     if (ctr.isForever) { return false }
     (ctr.start, ctr.step, ctr.end, ctr.ctrPar) match {
@@ -44,6 +55,7 @@ case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversa
             }
             // Registered old iters to shifted iters
             register(oldIter, replacement)
+            laneMap += oldIter -> parShift
 
             // Check if the replacement iter is still valid
             // If it is possible to run off this edge of the counter, we include this
@@ -140,6 +152,8 @@ case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversa
       type T = reduceOp.A.R
       implicit def bitsEV: Bits[T] = reduceOp.A
       unrollReduce[T](lhs, reduceOp)
+    case LaneStatic(iter, elems) if laneMap.contains(iter) =>
+      iter.from(elems(laneMap(iter))).asSym
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 }

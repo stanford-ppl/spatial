@@ -117,7 +117,6 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
     lazy val foreachToUnitpipe     = ForeachToUnitpipeTransformer(state)
     lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
-    lazy val regElim               = RegWriteReadElimination(state)
     lazy val allocMotion           = AllocMotion(state)
     lazy val reduceToForeach       = ReduceToForeach(state)
     lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)

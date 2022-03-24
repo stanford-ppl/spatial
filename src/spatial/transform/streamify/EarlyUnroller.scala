@@ -10,7 +10,7 @@ import spatial.util.TransformUtils._
 import spatial.metadata.control._
 import spatial.util.computeShifts
 
-case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin {
+case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin with spatial.util.CounterIterUpdateMixin {
   private def hasParFactor(cchain: CounterChain): Boolean = !cchain.counters.forall(_.ctrParOr1 == 1)
 
   private def possiblyOOB(shift: Int, ctr: Counter[_]): Boolean = {
@@ -134,13 +134,6 @@ case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversa
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _:AccelScope => inAccel { super.transform(lhs, rhs) }
-    case _:CounterNew[_] if inHw && copyMode =>
-      val transformed = super.transform(lhs, rhs)
-      // Update the iter info as well
-      val newIter = makeIter(transformed.asInstanceOf[Counter[_]])
-      val oldIter = lhs.asInstanceOf[Counter[_]].iter.get
-      register(oldIter, newIter)
-      transformed
     case foreach:OpForeach if inHw && hasParFactor(foreach.cchain) =>
       unrollForeach(lhs, foreach)
     case reduceOp:OpReduce[_] if inHw && hasParFactor(reduceOp.cchain) =>

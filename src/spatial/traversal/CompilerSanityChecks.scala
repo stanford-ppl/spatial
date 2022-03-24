@@ -107,6 +107,10 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         if (mem.rank != addr.size) {
           error(lhs.ctx, s"Found an SRAM Write $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
         }
+      case FIFOEnq(mem, data, _) =>
+        if (mem.A.nbits != data.nbits) {
+          error(lhs.ctx, s"")
+        }
       case _ =>
         check(lhs, rhs)
         super.visit(lhs, rhs)

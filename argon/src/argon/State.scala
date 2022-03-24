@@ -82,11 +82,11 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
 //  /** Definition cache used for CSE */
 //  var cache: Map[Op[_], Sym[_]] = Map.empty
 
-  var currentBundle: ScopeBundle = null
+  protected var currentBundle: ScopeBundle = null
 
-  var scopeBundleRegistry = new ScopeBundleRegistry
+  protected var scopeBundleRegistry = new ScopeBundleRegistry
 
-  def saveBundle(): Unit = {
+  def clearBundle(): Unit = {
     assert(currentBundle != null, "Attempting to save null bundle!")
 
     // clean out current bundle
@@ -107,8 +107,8 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
   def cache: Map[Op[_],Sym[_]] = currentBundle.cache
   def cache_=(update: Map[Op[_], Sym[_]]): Unit = currentBundle.cache = update
 
-  def GetBundle = scopeBundleRegistry.GetBundle _
-  def GetCurrentHandle(): BundleHandle = currentBundle.handle
+  def getBundle = scopeBundleRegistry.GetBundle _
+  def getCurrentHandle(): BundleHandle = currentBundle.handle
 
   /** Sets the current scope to the one described by bundle, and executes block in that context. Pops the scope
     * afterwards.
@@ -117,28 +117,28 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
     * @param block The block to be executed
     * @return The result of block
     */
-  def WithScope[R](handle: BundleHandle)(block: => R): R = {
+  def withScope[R](handle: BundleHandle)(block: => R): R = {
 
     // saves existing bundle
     val savedBundle = currentBundle
-    saveBundle()
+    clearBundle()
 
     // uses passed bundle as context for evaluating block
     setBundle(scopeBundleRegistry.GetBundle(handle).get)
     val result = block
-    saveBundle()
+    clearBundle()
 
     setBundle(savedBundle)
     assert(savedBundle == scopeBundleRegistry.GetBundle(savedBundle.handle).get)
     result
   }
 
-  def WithNewScope[R](motion: Boolean)(block: => R): (R, BundleHandle) = {
+  def withNewScope[R](motion: Boolean)(block: => R): (R, BundleHandle) = {
     val newBundle = scopeBundleRegistry.CreateNewBundle(Vector.empty, Vector.empty,
       // Empty the CSE cache in case code motion is disabled
       if (motion) currentBundle.cache else Map.empty
     )
-    (WithScope(newBundle.handle) {block}, newBundle.handle)
+    (withScope(newBundle.handle) {block}, newBundle.handle)
   }
 
   private def resetBundles() = {

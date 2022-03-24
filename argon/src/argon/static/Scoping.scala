@@ -68,11 +68,11 @@ trait Scoping { this: Printing =>
     // CSE with outer scopes should only occur if symbols are not allowed to escape,
     // which isn't true in either of these cases
 
-    val (result, handle) = state.WithNewScope(motion)({
+    val (result, handle) = state.withNewScope(motion)({
       reify(block)
     })
 
-    val bundle = state.GetBundle(handle).get
+    val bundle = state.getBundle(handle).get
 
     (result, bundle.scope, bundle.impure, scheduler, motion)
   }

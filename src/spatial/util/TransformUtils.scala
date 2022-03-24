@@ -3,10 +3,12 @@ package spatial.util
 import argon.lang.implicits.castType
 import argon.lang.types.Bits
 import argon._
+import argon.transform.MutateTransformer
 import forge.tags.{api, stateful}
 import spatial.lang._
 import spatial.node._
 import spatial.metadata.control._
+import spatial.traversal.AccelTraversal
 
 object TransformUtils {
 
@@ -175,4 +177,18 @@ trait TransformerUtilMixin {
     restoreSubsts(current)
     values
   }
+}
+
+trait CounterIterUpdateMixin extends MutateTransformer with AccelTraversal {
+
+  override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
+    case _:CounterNew[_] if inHw && copyMode =>
+      val transformed = super.transform(lhs, rhs)
+      // Update the iter info as well
+      val newIter = TransformUtils.makeIter(transformed.asInstanceOf[Counter[_]])
+      val oldIter = lhs.asInstanceOf[Counter[_]].iter.get
+      register(oldIter, newIter)
+      transformed
+    case _ => super.transform(lhs, rhs)
+  }).asInstanceOf[Sym[A]]
 }

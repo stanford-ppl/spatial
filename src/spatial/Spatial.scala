@@ -140,7 +140,7 @@ trait Spatial extends Compiler with ParamLoader {
 //    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
 //      createDump(s"streamify_$iter")
 //    }, maxIters = spatialConfig.maxStreamifyIters))
-    lazy val streamify = createDump("PreStream") ++ Seq(earlyUnroller, printer, pipeInserter, printer, fifoAccessFusion) ++ createDump("PostStream")
+    lazy val streamify = createDump("PreStream") ++ Seq(printer, fifoAccessFusion) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -184,6 +184,7 @@ trait Spatial extends Compiler with ParamLoader {
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
+        spatialConfig.streamify ? Seq(pipeInserter, earlyUnroller, pipeInserter, printer) ==>
         ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>

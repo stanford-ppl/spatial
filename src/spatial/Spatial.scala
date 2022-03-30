@@ -115,11 +115,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val accumTransformer      = AccumTransformer(state)
     lazy val regReadCSE            = RegReadCSE(state)
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
-    lazy val foreachToUnitpipe     = ForeachToUnitpipeTransformer(state)
     lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
     lazy val allocMotion           = AllocMotion(state)
     lazy val reduceToForeach       = ReduceToForeach(state)
-    lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)
     lazy val streamifyAnnotator    = StreamifyAnnotator(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
     lazy val fifoInitializer       = FIFOInitializer(state)
@@ -127,13 +125,13 @@ trait Spatial extends Compiler with ParamLoader {
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
 
-    lazy val flattenToStream       = FlattenToStream(state)
-
     lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.transform.Streamify], S[spatial.metadata.memory.StreamBufferIndex])
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
+
+    lazy val fifoInitialization = Seq(fifoInitializer, pipeInserter, MetadataStripper(state, S[spatial.metadata.memory.FifoInits]))
 
     lazy val bankingAnalysis = Seq(retimeStrippers, retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer) ++ DCE ++
@@ -141,7 +139,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
       createDump(s"streamify_$iter")
-    }, maxIters = spatialConfig.maxStreamifyIters)) ++ Seq(fifoInitializer, pipeInserter) ++ createDump("PostStream")
+    }, maxIters = spatialConfig.maxStreamifyIters))
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -186,7 +184,6 @@ trait Spatial extends Compiler with ParamLoader {
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
         ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
-//        spatialConfig.streamify ? Seq(pipeInserter, earlyUnroller, pipeInserter, fifoAccessFusion, printer) ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** CSE on regs */
@@ -195,6 +192,9 @@ trait Spatial extends Compiler with ParamLoader {
         DCE ==>
         /** Metapipelines to Streams */
         spatialConfig.streamify ? streamify ==>
+        // Always Run this pass
+        fifoInitialization ==>
+        spatialConfig.streamify ? createDump("PostStream") ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */

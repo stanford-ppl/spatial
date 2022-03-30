@@ -13,6 +13,7 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
     stageScope(block.inputs, block.options) {
       // Stage initializers for the fifos inside
       val fifos = block.stms.filter(_.isFIFO).filter(_.fifoInits.isDefined)
+      fifos.foreach(visit)
       val fPressure = FIFO[Bit](I32(1))
       stage(UnitPipe(Set.empty, stageBlock {
         val isFirst = fPressure.isEmpty
@@ -31,7 +32,7 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
         }
         spatial.lang.void
       }, None))
-      block.stms.foreach(visit)
+      block.stms.filterNot(fifos.contains).foreach(visit)
       f(block.result)
     }
   }

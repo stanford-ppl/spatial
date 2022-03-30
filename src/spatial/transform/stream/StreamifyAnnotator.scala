@@ -81,4 +81,13 @@ case class StreamifyAnnotator(IR: argon.State) extends AccelTraversal {
 
     case _ => super.visit(lhs, rhs)
   }
+
+  override def postprocess[R](block: Block[R]): Block[R] = {
+    val targets = block.nestedStms.filter(_.streamify)
+    targets foreach {
+      stmt =>
+        dbgs(s"Streamifying: $stmt = ${stmt.op.get}")
+    }
+    super.postprocess(block)
+  }
 }

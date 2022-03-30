@@ -7,7 +7,7 @@ import utils.io.files._
 import _root_.spatial.metadata.control._
 import _root_.spatial.metadata.memory._
 
-class MLP_Variant_Base extends MLP_Variants(N=4, batch=4,dims=List(4,4,4),ips=List(2,1),mps=List(2,1),ops=List(1,1))
+class MLP_Variant_Base extends MLP_Variants(N=4, batch=4,dims=List(4,4,4),ips=List(2,1),mps=List(1,1),ops=List(1,1))
 class MLP_Variant_exp_stream extends MLP_Variant_Base {
   override def compileArgs = "--streamify --vv"
 }
@@ -48,7 +48,7 @@ class MLP_Variant_exp_nostream_lite extends MLP_Variant_Lite {
                                       val ops:List[scala.Int] = List(1,1),
                                       val mps:List[scala.Int] = List(1,1),
                                       val ips:List[scala.Int] = List(16,16),
-                                      val ipls:scala.Int = 16,
+                                      val ipls:scala.Int = 1,
                                     ) extends SpatialTest {
 
   type T = Int

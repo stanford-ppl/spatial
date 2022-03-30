@@ -26,7 +26,7 @@ import spatial.flows.SpatialFlowRules
 import spatial.metadata.memory.{Dispatch, Duplicates}
 import spatial.rewrites.SpatialRewriteRules
 import spatial.transform.stream._
-import spatial.transform.streamify.EarlyUnroller
+import spatial.transform.streamify.{EarlyUnroller, FlattenToStream}
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -121,11 +121,13 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val reduceToForeach       = ReduceToForeach(state)
     lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)
     lazy val streamifyAnnotator    = StreamifyAnnotator(state)
-    lazy val transientMotion       = TransientMotion(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
     lazy val earlyUnroller         = EarlyUnroller(state)
+    lazy val unitIterationElimination = UnitIterationElimination(state)
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
+
+    lazy val flattenToStream       = FlattenToStream(state)
 
     lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.transform.Streamify], S[spatial.metadata.memory.StreamBufferIndex])
 
@@ -133,14 +135,14 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val streamBufferExpansion = StreamBufferExpansion(state)
 
-    lazy val bankingAnalysis = Seq(retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
+    lazy val bankingAnalysis = Seq(retimeStrippers, retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer) ++ DCE ++
-      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, foreachToUnitpipe, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer) ++ Seq(streamChecks)
+      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, unitIterationElimination, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer) ++ Seq(streamChecks)
 
-//    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
-//      createDump(s"streamify_$iter")
-//    }, maxIters = spatialConfig.maxStreamifyIters))
-    lazy val streamify = createDump("PreStream") ++ Seq(printer, fifoAccessFusion) ++ createDump("PostStream")
+    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
+      createDump(s"streamify_$iter")
+    }, maxIters = spatialConfig.maxStreamifyIters))
+//    lazy val streamify = createDump("PreStream") ++ Seq(printer, flattenToStream) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -185,7 +187,7 @@ trait Spatial extends Compiler with ParamLoader {
         switchOptimizer     ==> printer ==> transformerChecks ==>
         memoryDealiasing    ==> printer ==> transformerChecks ==>
         ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
-        spatialConfig.streamify ? Seq(pipeInserter, earlyUnroller, pipeInserter, printer) ==>
+//        spatialConfig.streamify ? Seq(pipeInserter, earlyUnroller, pipeInserter, fifoAccessFusion, printer) ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
         /** CSE on regs */

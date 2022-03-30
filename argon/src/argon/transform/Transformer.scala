@@ -103,7 +103,7 @@ abstract class Transformer extends Pass with TransformerInterface {
     }
     metadata.all(src).toList.foreach{case (k,m) => m.transfer match {
       case Transfer.Mirror => metadata.add(dest, k, mirror(m))
-      case Transfer.Remove => metadata.remove(dest, k) 
+      case Transfer.Remove => metadata.remove(dest, k)  // This is very bug prone -- Since memories are visited before their users, this wipes all relevant metadata (i.e. readers, writers)
       case Transfer.Ignore =>  // Do nothing
     }}
   }

@@ -31,10 +31,20 @@ object TransformUtils {
     iter < (ctr.start.unbox + (ctr.step.unbox * ctr.ctrPar.to[T]))
   }
 
+  @stateful def isFirstIters[T: Num](iters: Num[T]*): Seq[Bit] = {
+    val isFirst = iters.map(isFirstIter(_))
+    isFirst.scanRight(Bit(true)){_&_}.dropRight(1)
+  }
+
   @stateful def isLastIter[T: Num](iter: Num[T]): Bit = {
     val ctr = iter.counter.ctr.asInstanceOf[Counter[T]]
     val nextIter = iter + ctr.step.unbox
     ctr.end.unbox.asInstanceOf[Num[T]] <= nextIter
+  }
+
+  @stateful def isLastIters[T: Num](iters: Num[T]*): Seq[Bit] = {
+    val isLast = iters.map(isLastIter(_))
+    isLast.scanRight(Bit(true)){_&_}.dropRight(1)
   }
 
   @stateful def CreateVecEV[T: Bits](length: Int): Bits[Vec[T]] = {

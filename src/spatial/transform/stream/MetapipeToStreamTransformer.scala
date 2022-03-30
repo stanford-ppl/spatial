@@ -65,23 +65,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
             initializeMemoryTracker(foreach.block.stms, nonLocalUses)
 
-            val newParentCtrs = (foreach.cchain.counters zip parentShift) map {
-              case (ctr, pshift) =>
-                ctr match {
-                  case Op(CounterNew(start, stop, step, par)) =>
-                    // we're handling the parent par at a high level.
-                    stage(CounterNew(
-                      f(start).asInstanceOf[I32],
-                      f(stop).asInstanceOf[I32] - pshift,
-                      f(step).asInstanceOf[I32] * par, I32(1)
-                    ))
-
-                  case Op(ForeverNew()) =>
-                    // Don't need to shift, since ForeverNews are parallelized by 1.
-                    stage(ForeverNew())
-                }
-            }
-
             foreach.block.stms foreach {
               case stmt if stmt.isCounter || stmt.isCounterChain =>
                 dbgs(s"Eliding counter operations: ${stmt}")
@@ -115,6 +98,23 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
 
                 val childShifts = spatial.util.computeShifts(shape)
                 dbgs(s"Unrolling with shifts: $childShifts")
+
+                val newParentCtrs = (foreach.cchain.counters zip parentShift) map {
+                  case (ctr, pshift) =>
+                    ctr match {
+                      case Op(CounterNew(start, stop, step, par)) =>
+                        // we're handling the parent par at a high level.
+                        stage(CounterNew(
+                          f(start).asInstanceOf[I32],
+                          f(stop).asInstanceOf[I32] - pshift,
+                          f(step).asInstanceOf[I32] * par, I32(1)
+                        ))
+
+                      case Op(ForeverNew()) =>
+                        // Don't need to shift, since ForeverNews are parallelized by 1.
+                        stage(ForeverNew())
+                    }
+                }
 
                 val (ccnew, newIters) = stagePreamble(loopCtrl.asInstanceOf[Control[_]], newParentCtrs, foreach.iters)
 
@@ -172,7 +172,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                   }
 
                   stmtWrites foreach {
-                    case wr: Reg[_] if duplicationWriteFIFOs(loop) contains wr.asSym =>
+                    case wr: Reg[_] if duplicationWriteFIFOs.getOrElse(loop, mutable.Map.empty) contains wr.asSym =>
                       // Write the write register to the FIFO.
                       implicit lazy val ev: Bits[wr.RT] = wr.A.asInstanceOf[Bits[wr.RT]]
                       val read = cloned(wr).asInstanceOf[Reg[wr.RT]].value

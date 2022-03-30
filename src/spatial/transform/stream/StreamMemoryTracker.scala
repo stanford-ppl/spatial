@@ -62,14 +62,7 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
       notifiers.append(Internal(src, dst, mem, fifo))
       if (initialTokens > 0) {
         fifo.conflictable
-
-        val enableReg = Reg[Bit](true)
-        enableReg.explicitName = s"CommFIFO_Initial_${src}_${dst}"
-        enableReg.dontTouch
-        ('TokenInitializer.Pipe {
-          fifo.enqVec(Vec.fromSeq(Range(0, initialTokens) map {i => I32(i)}), enableReg.value)
-          enableReg := false
-        }).asSym.shouldConvertToStreamed = false
+        fifo.fifoInits = Range(0, initialTokens) map { i => I32(i)}
       }
     }
 
@@ -202,10 +195,6 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
   def initializeMemoryTracker(stms: Seq[Sym[_]], nonLocalUses: Map[Sym[_], List[Sym[_]]]): Unit = {
 
     // For Duplicated Memories
-    // Reader -> Memory -> FIFO
-//    val duplicationReadFIFOs = mutable.Map[Sym[_], mutable.Map[Sym[_], Sym[_]]]()
-
-    // Writer -> Memory -> FIFOs
     duplicationWriteFIFOs.clear()
     duplicationReadFIFOs.clear()
 

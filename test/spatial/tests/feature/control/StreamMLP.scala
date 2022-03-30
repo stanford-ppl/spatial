@@ -48,7 +48,7 @@ class MLP_Variant_exp_nostream_lite extends MLP_Variant_Lite {
                                       val ops:List[scala.Int] = List(1,1),
                                       val mps:List[scala.Int] = List(1,1),
                                       val ips:List[scala.Int] = List(16,16),
-                                      val ipls:scala.Int = 1,
+                                      val ipls:scala.Int = 16,
                                     ) extends SpatialTest {
 
   type T = Int

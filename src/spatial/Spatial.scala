@@ -25,7 +25,7 @@ import spatial.report._
 import spatial.flows.SpatialFlowRules
 import spatial.metadata.memory.{Dispatch, Duplicates}
 import spatial.rewrites.SpatialRewriteRules
-import spatial.transform.stream._
+import spatial.transform.stream.{FIFOInitializer, _}
 import spatial.transform.streamify.{EarlyUnroller, FlattenToStream}
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
@@ -122,7 +122,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitpipeCombine       = UnitpipeCombineTransformer(state)
     lazy val streamifyAnnotator    = StreamifyAnnotator(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
-    lazy val earlyUnroller         = EarlyUnroller(state)
+    lazy val fifoInitializer       = FIFOInitializer(state)
     lazy val unitIterationElimination = UnitIterationElimination(state)
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
@@ -141,8 +141,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
       createDump(s"streamify_$iter")
-    }, maxIters = spatialConfig.maxStreamifyIters))
-//    lazy val streamify = createDump("PreStream") ++ Seq(printer, flattenToStream) ++ createDump("PostStream")
+    }, maxIters = spatialConfig.maxStreamifyIters)) ++ Seq(fifoInitializer, pipeInserter) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

@@ -45,7 +45,7 @@ case class StreamTransformer(IR: State) extends MutateTransformer with AccelTrav
             n.counter = IndexCounterInfo(ctr, Seq.tabulate(ctr.ctrParOr1){i => i})
             n
           }
-          stageWithFlow(OpForeach(ens, subst(cchain).asInstanceOf[CounterChain], stageBlock{blk.stms.foreach(visit)}, newiters ++ iters, stopWhen)){lhs2 => transferData(x, lhs2)}
+          stageWithFlow(OpForeach(ens, f(cchain), stageBlock{blk.stms.foreach(visit)}, newiters ++ iters, stopWhen)){lhs2 => transferData(x, lhs2)}
         case x@Op(UnitPipe(ens, blk, stopWhen)) =>
           val newctrs = ctrs.map{
             case Op(CounterNew(start, stop, step, par)) =>

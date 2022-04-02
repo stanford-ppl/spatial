@@ -191,7 +191,6 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
                       case Some(sched) => lhs2.userSchedule = sched
                       case None =>
                     }
-                    lhs2.haltIfStarved = false
                 }
               case stmt if shouldDuplicate(stmt) =>
                 dbgs(s"Re-staging memory: $stmt")

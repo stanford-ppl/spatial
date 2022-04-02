@@ -26,8 +26,11 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     val lhs2: Sym[A] = if (!subst.contains(lhs)) {
       // Untransformed case: no rule yet exists for this symbol
       val lhs2 = transform(lhs, rhs)
+      if (printRegister) {
+        dbgs(s"Create Subst Rule: $lhs -> ${subst.get(lhs)}")
+      }
       subst.get(lhs) match {
-        case Some(lhs3) if lhs2 != lhs3 =>
+        case Some(DirectSubst(lhs3)) if lhs2 != lhs3 =>
           throw new Exception(s"Conflicting substitutions: $lhs had rule $lhs -> $lhs3 when creating rule $lhs -> $lhs2")
         case _ => lhs2
       }

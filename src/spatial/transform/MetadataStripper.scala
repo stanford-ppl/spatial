@@ -4,7 +4,7 @@ import argon._
 import argon.passes.Traversal
 
 case class Stripper[M<:Data[M]:Manifest]() {
-  private val metadataName = implicitly[Manifest[M]].toString()
+  val metadataName: String = implicitly[Manifest[M]].toString()
   def strip(sym: Sym[_]): Unit = {
     metadata[M](sym) match {
       case Some(meta) =>
@@ -23,5 +23,10 @@ case class MetadataStripper(IR: argon.State, strippers: Stripper[_]*) extends Tr
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {
     strippers foreach {_.strip(lhs)}
     super.visit(lhs, rhs)
+  }
+
+  override def preprocess[R](block: Block[R]): Block[R] = {
+    dbgs(s"Stripping: ${strippers.map(_.metadataName).mkString(", ")}")
+    super.preprocess(block)
   }
 }

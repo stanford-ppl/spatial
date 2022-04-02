@@ -6,6 +6,7 @@ import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.debug._
 import spatial.node._
 
 import scala.collection.mutable
@@ -140,6 +141,7 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
       case(mem, fifo) =>
         val tokenRegBuf = Reg[I32]
         tokenRegBuf.explicitName = s"TokenReg_${mem}_${fifo}_buf"
+        tokenRegBuf.noWarnWR = true
         ((mem, fifo) -> tokenRegBuf)
     }).toMap
 
@@ -151,6 +153,7 @@ trait StreamMemoryTracker extends MetaPipeToStreamBase {
 
         tokenReg.explicitName = s"TokenReg_${mem}_${fifo}"
         tokenReg.nonbuffer
+        tokenReg.noWarnWR = true
         tokenReg.write(token, en.toSeq:_*)
         tokenRegBuf := tokenReg
 

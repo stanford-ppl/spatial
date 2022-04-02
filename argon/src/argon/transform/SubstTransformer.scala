@@ -44,20 +44,29 @@ abstract class SubstTransformer extends Transformer {
   def register[A, B](rule: (A,B)): Unit = register(rule._1,rule._2)
   def register[A, B](seq: Seq[(A, B)]): Unit = seq foreach { case (a, b) => register(a, b)}
 
+  var printRegister: Boolean = false
   /** Register a substitution rule orig -> sub. */
-  def register[A,B](orig: A, sub: B): Unit = (orig, sub) match {
-    case (s1: Sym[_], s2: Sym[_])       => subst += s1 -> DirectSubst(s2)
-    case (s1: Sym[_], s2: (() => Sym[_])) => subst += s1 -> FuncSubst(s2)
-    case (s1: Seq[_], s2: Seq[_])      =>
-      if (s1.size != s2.size) { throw new Exception(s"Mismatched registration sizes: ${s1.size} != ${s2.size}") }
-      (s1 zip s2) foreach { case (a, b) => register(a, b) }
-    case (b1: Block[_], b2: Block[_])   => blockSubst += b1 -> b2
-    case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
+  def register[A,B](orig: A, sub: B): Unit = {
+    if (printRegister) { dbgs(s"Register: $orig -> $sub") }
+    (orig, sub) match {
+      case (s1: Sym[_], s2: Sym[_]) => subst += s1 -> DirectSubst(s2)
+      case (s1: Sym[_], s2: (() => Sym[_])) => subst += s1 -> FuncSubst(s2)
+      case (s1: Seq[_], s2: Seq[_]) =>
+        if (s1.size != s2.size) {
+          throw new Exception(s"Mismatched registration sizes: ${s1.size} != ${s2.size}")
+        }
+        (s1 zip s2) foreach { case (a, b) => register(a, b) }
+      case (b1: Block[_], b2: Block[_]) => blockSubst += b1 -> b2
+      case _ => throw new Exception(s"Cannot register ${orig.getClass} -> ${sub.getClass}")
+    }
   }
 
   /** Defines the substitution rule for a symbol s, i.e. the result of f(s). */
-  final override protected def substituteSym[T](s: Sym[T]): Sym[T] = (subst.get(s)) match {
-    case Some(s2) => s2.resolve.asInstanceOf[Sym[T]]
+  final override protected def substituteSym[T](s: Sym[T]): Sym[T] = subst.get(s) match {
+    case Some(s2) =>
+      val result = s2.resolve.asInstanceOf[Sym[T]]
+      dbgs(s"Substituting: $s -> $result")
+      result
     case None     => s
   }
 

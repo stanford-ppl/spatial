@@ -9,3 +9,6 @@ import argon._
   * Default: empty set
   */
 case class ShouldDumpFinal(flag: Boolean) extends Data[ShouldDumpFinal](SetBy.User)
+
+case class NoWarnWriteRead(flag: Boolean) extends Data[NoWarnWriteRead](Transfer.Mirror)
+

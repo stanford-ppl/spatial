@@ -122,6 +122,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
     lazy val fifoInitializer       = FIFOInitializer(state)
     lazy val unitIterationElimination = UnitIterationElimination(state)
+    lazy val streamPipeCollapse    = PipeCollapse(state)
+
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
 
@@ -135,7 +137,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = Seq(retimeStrippers, retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer) ++ DCE ++
-      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, unitIterationElimination, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer) ++ Seq(streamChecks)
+      bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, unitIterationElimination, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer, streamPipeCollapse, printer) ++ Seq(streamChecks)
 
     lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
       createDump(s"streamify_$iter")
@@ -192,17 +194,13 @@ trait Spatial extends Compiler with ParamLoader {
         DCE ==>
         /** Metapipelines to Streams */
         spatialConfig.streamify ? streamify ==>
-        // Always Run this pass
-        fifoInitialization ==>
-        spatialConfig.streamify ? createDump("PostStream") ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
-        /** Memory analysis */
-        retimingAnalyzer    ==>
-        accessAnalyzer      ==>
-        iterationDiffAnalyzer   ==>
-        memoryAnalyzer      ==>
-        memoryAllocator     ==> printer ==>
+        // Always Run this pass
+        fifoInitialization ==> bankingAnalysis ==>
+        spatialConfig.streamify ? createDump("PostStream") ==>
+//        /** Memory analysis */
+//        bankingAnalysis ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */

@@ -2,8 +2,9 @@ package spatial.transform.stream
 
 import argon._
 import argon.lang._
-import argon.transform.{ForwardTransformer, MutateTransformer}
-import spatial.lang.{FIFO, FIFOReg}
+import argon.transform.ForwardTransformer
+import spatial.dsl.retimeGate
+import spatial.lang.FIFO
 import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.metadata.memory._
@@ -15,9 +16,9 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
       val fifos = block.stms.filter(_.isFIFO).filter(_.fifoInits.isDefined)
       fifos.foreach(visit)
       val fPressure = FIFO[Bit](I32(1))
+      fPressure.explicitName = s"RunOnceFIFO"
       stage(UnitPipe(Set.empty, stageBlock {
         val isFirst = fPressure.isEmpty
-        fPressure.enq(Bit(true), !isFirst)
         fifos foreach {
           case fifo:FIFO[_] =>
             type T = fifo.A.R
@@ -28,8 +29,10 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
 
             implicit def bEV: Bits[T] = fifo.A
             val dataVec = Vec.fromSeq(data)
-            fifo.enqVec(dataVec, isFirst)
+            f(fifo).enqVec(dataVec, isFirst)
         }
+        retimeGate()
+        fPressure.enq(Bit(true), !isFirst)
         spatial.lang.void
       }, None))
       block.stms.filterNot(fifos.contains).foreach(visit)

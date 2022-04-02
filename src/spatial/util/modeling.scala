@@ -9,6 +9,7 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.retiming._
 import spatial.metadata.types._
+import spatial.metadata.debug._
 import spatial.node._
 import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
 import utils.implicits.collections._
@@ -458,8 +459,10 @@ object modeling {
       readsAfter.foreach{r => 
         val dist = paths(regWrite).toInt - paths(r).toInt
         // TODO(stanfurd): silence this when the writes are conditional.
-        if (regWrite.enables.isEmpty) {
+        if (regWrite.enables.isEmpty && !reg.noWarnWR) {
           warn(s"Avoid reading register ($reg = ${reg.name.getOrElse(reg.explicitName.getOrElse(reg.op.toString))}) after writing to it in the same inner loop, if this is not an accumulation (write: ${regWrite.ctx}, read: ${r.ctx})")
+          // Stop complaining about this register now.
+          reg.noWarnWR = true
         }
         val affectedNodes = (consumersSearch(r.consumers, Set(), scope.toSet) intersect scope) :+ r
         affectedNodes.foreach{

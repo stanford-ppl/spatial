@@ -269,22 +269,30 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
 
 
   def memFrom[A](s: Bits[A], inStream: Boolean = false): LocalMem[A,C forSome{type C[_]}] = {
-    implicit val ctx: SrcCtx = s.ctx
+    implicit val ctx: SrcCtx = state.ctxWithPass(s.ctx)
     implicit val tA: Bits[A] = s.tp.view[Bits]
     if (inStream) FIFOReg.alloc[A](s.zero).asInstanceOf[LocalMem[A,C forSome{type C[_]}]]
     else          Reg.alloc[A](s.zero).asInstanceOf[LocalMem[A,C forSome{type C[_]}]]
   }
   def memRead[A](x: LocalMem[A,C forSome{type C[_]}], inStream: Boolean = false): Sym[A] = {
-    implicit val ctx: SrcCtx = x.ctx
+    implicit val ctx: SrcCtx = state.ctxWithPass(x.ctx)
     implicit val tA: Bits[A] = x.A
-    if (x.isInstanceOf[FIFOReg[A]]) tA.box(FIFOReg.deq(x.asInstanceOf[FIFOReg[A]]))
-    else                         tA.box(Reg.read(x.asInstanceOf[Reg[A]]))
+    (x.asSym match {
+      case fr: FIFOReg[A] => fr.deq()
+      case reg: Reg[A] => reg.value
+    }).asSym
+//    if (x.isInstanceOf[FIFOReg[A]]) tA.box(FIFOReg.deq(x.asInstanceOf[FIFOReg[A]]))
+//    else                         tA.box(Reg.read(x.asInstanceOf[Reg[A]]))
     
   }
   def memWrite[A](x: LocalMem[A,C forSome{type C[_]}], data: Bits[A]): Unit = {
-    implicit val ctx: SrcCtx = x.ctx
-    if (x.isInstanceOf[FIFOReg[_]]) FIFOReg.enq(x.asInstanceOf[FIFOReg[A]],data)
-    else                         Reg.write(x.asInstanceOf[Reg[A]],data)
+    implicit val ctx: SrcCtx = state.ctxWithPass(x.ctx)
+    x.asSym match {
+      case fr: FIFOReg[A] => fr.enq(data.unbox)
+      case reg: Reg[A] => reg.write(data.unbox)
+    }
+//    if (x.isInstanceOf[FIFOReg[_]]) FIFOReg.enq(x.asInstanceOf[FIFOReg[A]],data)
+//    else                         Reg.write(x.asInstanceOf[Reg[A]],data)
   }
 
   def varFrom[A](s: Type[A])(implicit ctx: SrcCtx): Var[A] = {

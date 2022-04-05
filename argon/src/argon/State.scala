@@ -73,6 +73,10 @@ class State(val app: DSLRunnable) extends forge.AppState with Serializable {
   def maxId: Int = id-1 // Inclusive
   def nextId(): Int = { id += 1; id }
 
+  def ctxWithPass(ctx: SrcCtx): SrcCtx = {
+    ctx.copy(content = Some(s"${ctx.content.getOrElse("")}(Pass $pass)"))
+  }
+
 //  /** Statements in the current scope. */
 //  var scope: Vector[Sym[_]] = _
 //

@@ -72,7 +72,7 @@ case class MetapipeToStreamTransformer(IR: State) extends MutateTransformer with
               case s if canTransformMem(s) && shouldDuplicate(s) =>
                 dbgs(s"Skipping re-staging $s since it can be transformed")
 
-              case loop@Op(loopCtrl@OpForeach(ens, cchain, block, iters, stopWhen)) =>
+              case loop@Op(loopCtrl@OpForeach(ens, cchain, block, iters, stopWhen)) if !loop.isOuterStreamControl =>
                 val stmtReads = getReadRegs(loop)
                 val stmtWrites = getWrittenRegs(loop)
                 dbgs(s"Stmt: $loop, effects: ${loop.effects} reads: $stmtReads, writes: $stmtWrites")

@@ -216,11 +216,41 @@ package object access {
     @stateful def mustFollow(b: Sym[_], p: Sym[_]): Boolean = {
       val (ctrlA,distA) = LCAWithDataflowDistance(a, p) // Positive for a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDataflowDistance(b, p) // Positive for b * p, negative otherwise
-      val ctrlAB = LCA(a,b)
-      if      (distA > 0 && distB > 0) { distA < distB && a.mustOccurWithin(ctrlAB) }   // b a p
-      else if (distA > 0 && distB < 0) { ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // a p b
-      else if (distA < 0 && distB < 0) { distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB) } // p b a
-      else false
+
+      dbgs(s"Mustfollow: b($b) -> a($a) - p($p)")
+      indent {
+        dbgs(s"CtrlA: $ctrlA ($distA)")
+        dbgs(s"CtrlB: $ctrlB ($distB)")
+      }
+
+      // if LCA(a, p) == LCA(a, b), then we can directly compare the dataflow distances as yielded.
+      if (ctrlA == ctrlB) {
+        val ctrlAB = LCA(a, b)
+        if (distA > 0 && distB > 0) {
+          distA < distB && a.mustOccurWithin(ctrlAB)
+        } // b a p
+        else if (distA > 0 && distB < 0) {
+          ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB)
+        } // a p b
+        else if (distA < 0 && distB < 0) {
+          distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB)
+        } // p b a
+        else false
+      } else {
+        // LCA(a, p) != LCA(a, b)
+        // This means that one of the accesses is "closer" in the hierarchy to p.
+        // A mustFollow B w.r.t. P if A is at a closer level of the hierarchy, A happens before P
+        // and A must occur within LCA(a, p)
+        val aIsCloser = ctrlA.hasAncestor(ctrlB)
+        if (!aIsCloser) {
+          false
+        } else {
+          // If A is closer in the hierarchy to p, then A will happen before P if:
+          //   -- A happens before P
+          //   -- A is unconditional
+          (distA > 0) && a.mustOccurWithin(ctrlA)
+        }
+      }
     }
 
 
@@ -370,15 +400,17 @@ package object access {
     reachingWrites
   }
 
-  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): (Set[Sym[_]], Set[Sym[_]]) = {
     val preceding = writes.filter{write => write.mayPrecede(read)}
     val (before, after) = preceding.partition{write => !write.mayFollow(read) }
-
+    dbgs(s"Before: $before, After: $after")
     val reachingBefore = before.filterNot{wr => (before - wr).exists{w => w.mustFollow(wr, read)}}
     val reachingAfter  = after.filterNot{wr => ((after - wr) ++ before).exists{w => w.mustFollow(wr, read)}}
-    val reaching = reachingBefore ++ reachingAfter
-
-    reaching
+    dbgs(s"ReachingBefore: $reachingBefore")
+    dbgs(s"ReachingAfter: $reachingAfter")
+//    val reaching = reachingBefore ++ reachingAfter
+//    reaching
+    (reachingBefore, reachingAfter)
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

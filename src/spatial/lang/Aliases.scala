@@ -13,6 +13,7 @@ trait InternalAliases extends argon.lang.ExternalAliases {
   type LocalMem3[A,C[T]<:LocalMem3[T,C]] = spatial.lang.types.LocalMem3[A,C]
   type LocalMem4[A,C[T]<:LocalMem4[T,C]] = spatial.lang.types.LocalMem4[A,C]
   type LocalMem5[A,C[T]<:LocalMem5[T,C]] = spatial.lang.types.LocalMem5[A,C]
+  type LocalMem6[A,C[T]<:LocalMem6[T,C]] = spatial.lang.types.LocalMem6[A,C]
 
   type RemoteMem[A,C[_]] = spatial.lang.types.RemoteMem[A,C]
 
@@ -67,11 +68,13 @@ trait ExternalAliases extends InternalAliases {
   type DRAM3[A] = spatial.lang.DRAM3[A]
   type DRAM4[A] = spatial.lang.DRAM4[A]
   type DRAM5[A] = spatial.lang.DRAM5[A]
+  type DRAM6[A] = spatial.lang.DRAM6[A]
   lazy val DRAM1 = spatial.lang.DRAM1
   lazy val DRAM2 = spatial.lang.DRAM2
   lazy val DRAM3 = spatial.lang.DRAM3
   lazy val DRAM4 = spatial.lang.DRAM4
   lazy val DRAM5 = spatial.lang.DRAM5
+  lazy val DRAM6 = spatial.lang.DRAM6
   lazy val DRAM = spatial.lang.DRAM
 
   type SRAM[A,C[T]] = spatial.lang.SRAM[A,C]
@@ -80,6 +83,7 @@ trait ExternalAliases extends InternalAliases {
   type SRAM3[A] = spatial.lang.SRAM3[A]
   type SRAM4[A] = spatial.lang.SRAM4[A]
   type SRAM5[A] = spatial.lang.SRAM5[A]
+  type SRAM6[A] = spatial.lang.SRAM6[A]
   lazy val SRAM = spatial.lang.SRAM
 
   type LUT[A,C[T]] = spatial.lang.LUT[A,C]

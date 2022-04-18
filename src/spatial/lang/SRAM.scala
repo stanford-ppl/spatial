@@ -14,6 +14,7 @@ abstract class SRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< SRAM[A,C]) extends
   protected def M3: Type[SRAM3[A]] = implicitly[Type[SRAM3[A]]]
   protected def M4: Type[SRAM4[A]] = implicitly[Type[SRAM4[A]]]
   protected def M5: Type[SRAM5[A]] = implicitly[Type[SRAM5[A]]]
+  protected def M6: Type[SRAM6[A]] = implicitly[Type[SRAM6[A]]]
 
   def rank: Int
   @api def dims: Seq[I32] = Seq.tabulate(rank){d => stage(MemDim(this,d)) }
@@ -139,6 +140,9 @@ object SRAM {
 
   /** Allocates a 5-dimensional [[SRAM5]] with the given dimensions and elements of type A. */
   @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): SRAM5[A] = stage(SRAMNew[A,SRAM5](Seq(d0,d1,d2,d3,d4)))
+  
+  /** Allocates a 6-dimensional [[SRAM6]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, d5: I32): SRAM6[A] = stage(SRAMNew[A,SRAM6](Seq(d0,d1,d2,d3,d4,d5)))
 }
 
 /** A 1-dimensional SRAM with elements of type A. */
@@ -235,6 +239,27 @@ object SRAM {
 
 }
 
+
+
+
+
+/** A 6-dimensional SRAM with elements of type A. */
+@ref class SRAM6[A:Bits]
+      extends SRAM[A,SRAM6]
+         with LocalMem6[A,SRAM6]
+         with ReadMem6[A]
+         with Mem6[A,SRAM1,SRAM2,SRAM3,SRAM4,SRAM5,SRAM6]
+         with Ref[Array[Any],SRAM6[A]] {
+
+  def rank: Int = 6
+
+  /** Returns the value at (`d0`,`d1`,`d2`,`d3`,`d4`). */
+  @api def apply(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, d5: I32): A = stage(SRAMRead(this,Seq(d0,d1,d2,d3,d4,d5),Set.empty))
+
+  /** Updates the value at (`d0`,`d1`,`d2`,`d3`,`d4`) to `data`. */
+  @api def update(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, d5: I32, data: A): Void = stage(SRAMWrite(this, data, Seq(d0,d1,d2,d3,d4,d5), Set.empty))
+
+}
 
 
 

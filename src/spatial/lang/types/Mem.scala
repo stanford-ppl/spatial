@@ -30,6 +30,10 @@ trait TensorMem[A] {
   @api def dim3: I32 = dims.indexOrElse(3, I32(1))
   /** Returns dim4 of this DRAM, or else 1 if memory is lower dimensional */
   @api def dim4: I32 = dims.indexOrElse(4, I32(1))
+  /** Returns dim5 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim5: I32 = dims.indexOrElse(5, I32(1))
+  /** Returns dim6 of this DRAM, or else 1 if memory is lower dimensional */
+  @api def dim6: I32 = dims.indexOrElse(6, I32(1))
 }
 
 trait RemoteMem[A,C[_]] extends Mem[A,C] {
@@ -113,6 +117,20 @@ trait LocalMem5[A,C[T]<:LocalMem5[T,C]] extends LocalMem[A,C] {
     stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
   }
 }
+
+trait LocalMem6[A,C[T]<:LocalMem6[T,C]] extends LocalMem[A,C] {
+  private implicit def C: Type[C[A]] = this.selfType
+
+  /** Create a dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def load(dram: DRAM6[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true))
+  }
+  /** Create an aligned dense burst load from the given region of DRAM to this on-chip memory. */
+  @api def alignload(dram: DRAM6[A]): Void = {
+    stage(DenseTransfer(dram,me,isLoad = true, forceAlign=true))
+  }
+}
+
 
 
 trait Mem1[A,M1[T]] extends Mem[A,M1] {
@@ -290,6 +308,29 @@ trait Mem5[A,M1[T],M2[T],M3[T],M4[T],M5[T]] extends Mem[A,M5] {
   @api def apply(x: Rng, q: Rng, p: Rng, r: Rng, c: Rng): M5[A] = stage(MemDenseAlias[A,M5,M5](me, Seq(x, q, p, r, c)))
 }
 
+
+trait Mem6[A,M1[T],M2[T],M3[T],M4[T],M5[T],M6[T]] extends Mem[A,M6] {
+  protected def M1: Type[M1[A]]
+  protected def M2: Type[M2[A]]
+  protected def M3: Type[M3[A]]
+  protected def M4: Type[M4[A]]
+  protected def M5: Type[M5[A]]
+  private implicit def M1Type: Type[M1[A]] = M1
+  private implicit def M2Type: Type[M2[A]] = M2
+  private implicit def M3Type: Type[M3[A]] = M3
+  private implicit def M4Type: Type[M4[A]] = M4
+  private implicit def M5Type: Type[M5[A]] = M5
+  private implicit def M6Type: Type[M6[A]] = this.selfType
+  
+  @api def apply(x: Rng, q: Rng, p: Rng, r: Rng, c: Rng, z: Rng): M6[A] = stage(MemDenseAlias[A,M6,M6](me, Seq(x, q, p, r, c, z)))
+}
+
+
+
+
+
+
+
 trait ReadMem1[A] {
   @api def apply(pos: I32): A
   @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
@@ -310,3 +351,8 @@ trait ReadMem5[A] {
   @api def apply(d0: I32, d1: I32, d2: I32, d3:I32, d4:I32): A
   @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
 }
+trait ReadMem6[A] {
+  @api def apply(d0: I32, d1: I32, d2: I32, d3:I32, d4:I32, d5:I32): A
+  @api def __read(addr: Seq[Idx], ens: Set[Bit] = Set.empty): A 
+}
+

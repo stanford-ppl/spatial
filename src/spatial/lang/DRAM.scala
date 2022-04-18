@@ -13,6 +13,7 @@ abstract class DRAM[A:Bits,C[T]](implicit val evMem: C[A] <:< DRAM[A,C]) extends
   protected def M3: Type[DRAM3[A]] = implicitly[Type[DRAM3[A]]]
   protected def M4: Type[DRAM4[A]] = implicitly[Type[DRAM4[A]]]
   protected def M5: Type[DRAM5[A]] = implicitly[Type[DRAM5[A]]]
+  protected def M6: Type[DRAM6[A]] = implicitly[Type[DRAM6[A]]]
   def rank: Seq[Int]
 
   @api def dims: Seq[I32] = Seq.tabulate(rank.length){d => stage(MemDim(this,rank(d))) }
@@ -52,6 +53,9 @@ object DRAM {
 
   /** Allocates a 5-dimensional [[DRAM5]] with the given dimensions and elements of type A. */
   @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32): DRAM5[A] = stage(DRAMHostNew[A,DRAM5](Seq(d0,d1,d2,d3,d4),zero[A]))
+  
+  /** Allocates a 6-dimensional [[DRAM6]] with the given dimensions and elements of type A. */
+  @api def apply[A:Bits](d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, d5: I32): DRAM6[A] = stage(DRAMHostNew[A,DRAM6](Seq(d0,d1,d2,d3,d4,d5),zero[A]))
 }
 
 /** A 1-dimensional [[DRAM]] with elements of type A. */
@@ -257,6 +261,34 @@ object DRAM5 {
   @api def apply[A:Bits]: DRAM5[A] = stage(DRAMAccelNew[A,DRAM5](5))
 }
 
+
+
+/** A 5-dimensional [[DRAM]] with elements of type A. */
+@ref class DRAM6[A:Bits] extends DRAM[A,DRAM6] with Ref[Array[Any],DRAM6[A]] with Mem6[A,DRAM1,DRAM2,DRAM3,DRAM4,DRAM5,DRAM6] {
+  def rank: Seq[Int] = Seq(0,1,2,3,4,5)
+
+  @api def alloc(d0: I32, d1: I32, d2: I32, d3: I32, d4: I32, d5: I32): Void = stage(DRAMAlloc(this, Seq(d0, d1, d2, d3, d4, d5)))
+
+  /** Creates a dense, burst transfer from the SRAM6 `data` to this region of main memory. */
+  @api def store(data: SRAM6[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false))
+  }
+  /** Creates an aligned dense, burst transfer from the SRAM6 `data` to this region of main memory. */
+  @api def alignstore(data: SRAM6[A]): Void = {
+    stage(DenseTransfer(this, data, isLoad = false, forceAlign=true))
+  }
+}
+
+object DRAM6 {
+  @api def apply[A:Bits]: DRAM6[A] = stage(DRAMAccelNew[A,DRAM6](6))
+}
+
+
+
+
+
+
+
 /** A sparse, 1-dimensional region of DRAM with elements of type A. */
 @ref class DRAMSparseTile[A:Bits] extends DRAM[A,DRAMSparseTile] with Ref[Array[Any],DRAMSparseTile[A]] {
   def rank: Seq[Int] = Seq(0)
@@ -267,6 +299,9 @@ object DRAM5 {
   }
 
 }
+
+
+
 
 // /** A sparse, 1-dimensional region of DRAM with elements of type A. */
 // @ref class DRAMCoalTile[A:Bits] extends DRAM[A,DRAMCoalTile] with Ref[Array[Any],DRAMCoalTile[A]] {

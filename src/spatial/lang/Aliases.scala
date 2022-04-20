@@ -47,6 +47,8 @@ trait InternalAliases extends argon.lang.ExternalAliases {
   lazy val Tensor4 = spatial.lang.host.Tensor4
   type Tensor5[A] = spatial.lang.host.Tensor5[A]
   lazy val Tensor5 = spatial.lang.host.Tensor5
+  type Tensor6[A] = spatial.lang.host.Tensor6[A]
+  lazy val Tensor6 = spatial.lang.host.Tensor6
   type CSVFile = spatial.lang.host.CSVFile
   type BinaryFile = spatial.lang.host.BinaryFile
 }

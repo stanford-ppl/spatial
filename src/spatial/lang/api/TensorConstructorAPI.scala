@@ -68,12 +68,53 @@ trait TensorConstructorAPI { this: MiscAPI =>
     }
 
     @api def foreach(func: (A,B,C,D,E) => Any): Void = {
-      ranges._1.foreach{i => ranges._2.foreach{j =>
-        ranges._3.foreach{k => ranges._4.foreach{l =>
-          ranges._5.foreach{m => func(i,j,k,l,m); void }
-        }}
-      }}
+      ranges._1.foreach{i => 
+        ranges._2.foreach{j =>
+          ranges._3.foreach{k => 
+            ranges._4.foreach{l =>
+              ranges._5.foreach{
+                m => func(i,j,k,l,m); void 
+              }
+            }
+          }
+        }
+      }
     }
+    
+  }
+  
+  
+  
+  implicit class Tensor6Constructor[A,B,C,D,E,F](ranges: (Series[A], Series[B], Series[C], Series[D], Series[E], Series[F]) ) {
+    @api def apply[R:Type](func: (A,B,C,D,E,F) => R): Tensor6[R] = {
+      val dim0 = ranges._1.length
+      val dim1 = ranges._2.length
+      val dim2 = ranges._3.length
+      val dim3 = ranges._4.length
+      val dim4 = ranges._5.length
+      val dim5 = ranges._6.length
+      Tensor6.tabulate(dim0,dim1,dim2,dim3,dim4,dim5){(i0,i1,i2,i3,i4,i5) =>
+        func(ranges._1.at(i0), ranges._2.at(i1), ranges._3.at(i2), ranges._4.at(i3), ranges._5.at(i4), ranges._6.at(i5))
+      }
+    }
+
+    @api def foreach(func: (A,B,C,D,E,F) => Any): Void = {
+      ranges._1.foreach{i => 
+        ranges._2.foreach{j =>
+          ranges._3.foreach{k => 
+            ranges._4.foreach{l =>
+              ranges._5.foreach{ m => 
+                ranges._6.foreach{ n => 
+                  func(i,j,k,l,m,n); void 
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    
   }
 
 }

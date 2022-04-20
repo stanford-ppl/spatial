@@ -82,11 +82,22 @@ object DenseTransfer {
     val lens: Map[Int,I32] = dram.sparseLens() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
     val rawDims: Seq[I32] = dram.rawDims()
     val strides: Map[Int,I32] = dram.sparseSteps()
-    val pars: Map[Int,I32] = dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
-    val counters: Seq[() => Counter[I32]] = sparseRank.map{d => () => Counter[I32](start = 0, end = lens(d), par = pars(d)) }
+    
+    val pars: IndexedSeq[(Int,I32)] = (dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }).toIndexedSeq.sortBy(_._1)
+    
+    val parMap = pars.toMap
+    
+    
+    // val pars: IndexedSeq[Int,I32] = dram.sparsePars() ++ {if (!normalCounting) Seq(rawRank -> I32(1)) else Nil }
+    
+    System.out.println(pars)
+    
+    val counters: Seq[() => Counter[I32]] = sparseRank.map{d => () => Counter[I32](start = 0, end = lens(d), par = parMap(d)) }
 
     val p = pars.toSeq.maxBy(_._1)._2
     val upperPars = pars.dropRight(1).map(_._2 match {case Expect(p) => p.toInt; case _ => 1})
+    
+    
     if (upperPars.exists(_ > 1)) throw new Exception(s"Cannot parallelize non-leading dimension of tile transfer by more than 1 (${dram.name.getOrElse("")}) <-> ${local} (${local.name.getOrElse("")}).  Please rewrite with metaprogramming.  See Spatial issue #238 for details")
     val lastPar = pars.last._2 match {case Expect(p) => p.toInt; case _ => 1}
     val requestLength: I32 = lens.toSeq.maxBy(_._1)._2

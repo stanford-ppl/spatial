@@ -75,6 +75,15 @@ trait TransferAPI { this: Implicits with MathAPI =>
   @api def getTensor5[A:Bits](dram: DRAM5[A]): Tensor5[A] = {
     Tensor5(getMem(dram), dram.dim0, dram.dim1, dram.dim2, dram.dim3, dram.dim4)
   }
+  
+  
+  @api def setMem[A:Bits,C[T]](dram: DRAM[A,C], tensor6: Tensor6[A]): Void = setMem(dram, tensor6.data)
+
+  @api def getTensor6[A:Bits](dram: DRAM6[A]): Tensor6[A] = {
+    Tensor6(getMem(dram), dram.dim0, dram.dim1, dram.dim2, dram.dim3, dram.dim4, dram.dim5)
+  }
+  
+  
 
   @api def compress[A:Bits,C[T]](dram: DRAM[A,C], tileSize: I32): Void = {
     stage(CompressDRAM(dram,tileSize))

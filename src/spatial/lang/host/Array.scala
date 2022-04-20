@@ -146,6 +146,23 @@ import utils.implicits.Readable._
     assertIf(dim0*dim1*dim2*dim3*dim4 === this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+"x"+dim3.toText+"x"+dim4.toText+")")
     Tensor5(this, dim0, dim1, dim2, dim3, dim4)
   }
+  
+  
+  
+  
+  
+  @virtualize
+  @api def reshape(dim0: I32, dim1: I32, dim2: I32, dim3: I32, dim4: I32, dim5: I32): Tensor6[A] = {
+    assertIf(dim0*dim1*dim2*dim3*dim4*dim5 === this.length, "Number of elements in vector ("+this.length.toText+") must match number of elements in matrix ("+dim0.toText+"x"+dim1.toText+"x"+dim2.toText+"x"+dim3.toText+"x"+dim4.toText+"x"+dim5.toText+")")
+    Tensor6(this, dim0, dim1, dim2, dim3, dim4, dim5)
+  }
+  
+  
+  
+  
+  
+  
+  
 
   @virtualize
   @api def toeplitz(filterdim0: I32, filterdim1: I32, imgdim0: I32, imgdim1: I32, stride0: I32, stride1: I32)(implicit num: Num[A]): Tensor2[A] = {

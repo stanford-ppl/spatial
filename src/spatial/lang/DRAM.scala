@@ -263,7 +263,7 @@ object DRAM5 {
 
 
 
-/** A 5-dimensional [[DRAM]] with elements of type A. */
+/** A 6-dimensional [[DRAM]] with elements of type A. */
 @ref class DRAM6[A:Bits] extends DRAM[A,DRAM6] with Ref[Array[Any],DRAM6[A]] with Mem6[A,DRAM1,DRAM2,DRAM3,DRAM4,DRAM5,DRAM6] {
   def rank: Seq[Int] = Seq(0,1,2,3,4,5)
 

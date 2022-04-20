@@ -466,48 +466,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     }
   }
 
-  private def visitForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
-    // TODO: Compute initTokens
-    val linearizedUses = computeLinearizedUses(lhs, foreachOp.block)
-    lhs
-  }
-
-  /**
-    * Captures a writer and all readers which see that value. We consider writers to kill the previous writer
-    *   even if it is a conditional write. Here, we consider only inner pipelines as readers/writers
-    *   instead of the actual Writer/Reader node.
-    * @param writer -- The Inner Controller which writes to Mem
-    * @param readers -- The Inner Controllers which read that value of Mem
-    */
-  case class LinearizedUse(writer: Option[Sym[_]], readers: cm.ArrayBuffer[Sym[_]])
-  private def computeLinearizedUses(parent: Sym[_], block: Block[_]) = {
-    val mems = block.internalMems
-    val memUseMap = cm.Map[Sym[_], cm.ArrayBuffer[LinearizedUse]](
-      (mems map {mem => (mem -> cm.ArrayBuffer[LinearizedUse]())}):_*
-    )
-    parent.nestedChildren.filter({x => x.isInnerControl || x.isCounter}).foreach {
-      ctrl =>
-        val allReads = ctrl.readMems ++ ctrl.writtenMems
-        val allWrites = ctrl.writtenMems
-
-        allReads.intersect(mems.toSet) foreach {
-          mem =>
-            val useMap = memUseMap(mem)
-            useMap.lastOption match {
-              case Some(uses) => uses.readers.append(ctrl.sym)
-              case None => useMap.append(LinearizedUse(None, cm.ArrayBuffer(ctrl.sym)))
-            }
-        }
-
-        allWrites.intersect(mems.toSet) foreach {
-          mem =>
-            memUseMap(mem).append(LinearizedUse(Some(ctrl.sym), cm.ArrayBuffer.empty))
-        }
-    }
-    dbgs(s"Linearized Uses: $memUseMap")
-    memUseMap
-  }
-
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case accelScope: AccelScope => inAccel {
       memInfo = computeMemInfoMap(lhs)

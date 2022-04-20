@@ -217,11 +217,11 @@ package object access {
       val (ctrlA,distA) = LCAWithDataflowDistance(a, p) // Positive for a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDataflowDistance(b, p) // Positive for b * p, negative otherwise
 
-      dbgs(s"Mustfollow: b($b) -> a($a) - p($p)")
-      indent {
-        dbgs(s"CtrlA: $ctrlA ($distA)")
-        dbgs(s"CtrlB: $ctrlB ($distB)")
-      }
+//      dbgs(s"Mustfollow: b($b) -> a($a) - p($p)")
+//      indent {
+//        dbgs(s"CtrlA: $ctrlA ($distA)")
+//        dbgs(s"CtrlB: $ctrlB ($distB)")
+//      }
 
       // if LCA(a, p) == LCA(a, b), then we can directly compare the dataflow distances as yielded.
       if (ctrlA == ctrlB) {
@@ -248,6 +248,7 @@ package object access {
           // If A is closer in the hierarchy to p, then A will happen before P if:
           //   -- A happens before P
           //   -- A is unconditional
+//          dbgs(s"MustOccur: ${a.mustOccurWithin(ctrlA)}")
           (distA > 0) && a.mustOccurWithin(ctrlA)
         }
       }
@@ -400,17 +401,24 @@ package object access {
     reachingWrites
   }
 
-  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): (Set[Sym[_]], Set[Sym[_]]) = {
-    val preceding = writes.filter{write => write.mayPrecede(read)}
-    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
-    dbgs(s"Before: $before, After: $after")
-    val reachingBefore = before.filterNot{wr => (before - wr).exists{w => w.mustFollow(wr, read)}}
-    val reachingAfter  = after.filterNot{wr => ((after - wr) ++ before).exists{w => w.mustFollow(wr, read)}}
-    dbgs(s"ReachingBefore: $reachingBefore")
-    dbgs(s"ReachingAfter: $reachingAfter")
-//    val reaching = reachingBefore ++ reachingAfter
-//    reaching
-    (reachingBefore, reachingAfter)
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+    // TODO: Handle the difference between .buffer and .nonbuffer
+    // To compute this -- a write to a register is a Reaching Write IFF it's not killed by another.
+    val relevant = writes.filter(_.mayPrecede(read))
+    val alive = relevant.filterNot { write => (writes - write).exists {killer => killer.mustFollow(write, read)} }
+
+//    dbgs(s"Relevant: $relevant")
+//    dbgs(s"Alive: $alive")
+    alive
+//
+//    val preceding = writes.filter{write => write.mayPrecede(read)}
+//    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
+//    dbgs(s"Before: $before, After: $after")
+//    val reachingBefore = before.filterNot{wr => (preceding - wr).exists{w => w.mustFollow(wr, read)}}
+//    val reachingAfter  = after.filterNot{wr => (preceding - wr).exists{w => w.mustFollow(wr, read)}}
+//    dbgs(s"ReachingBefore: $reachingBefore")
+//    dbgs(s"ReachingAfter: $reachingAfter")
+//    (reachingBefore, reachingAfter)
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

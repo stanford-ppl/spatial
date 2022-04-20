@@ -1,7 +1,8 @@
 package spatial.tests.compiler.streaming
+
 import spatial.dsl._
 
-@spatial class SRAMBufferingSimple extends SpatialTest {
+@spatial class RegBuffering extends SpatialTest {
   val outerIters = 16
   val innerIters = 4
 
@@ -10,16 +11,19 @@ import spatial.dsl._
     val output = DRAM[I32](outerIters, innerIters)
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)
-      Foreach(0 until outerIters by 1) {
+      val reg = Reg[I32](0)
+      reg.buffer
+      reg := 3 //x4 (wr)
+      Pipe.Foreach(0 until outerIters by 1) {
         outer =>
-          val sr = SRAM[I32](innerIters)
-          'Producer.Foreach(0 until innerIters by 1) {
-            inner =>
-              sr(inner) = inner + outer
+          'Producer.Sequential.Foreach(0 until innerIters) {
+            i =>
+              reg := reg + i * outer // x14 (wr), x11(rd)
           }
-          'Consumer.Foreach(0 until innerIters by 1) {
+          'Consumer.Sequential.Foreach(0 until innerIters) {
             inner =>
-              outputSR(outer, inner) = sr(inner)
+              outputSR(outer, inner) = reg.value + inner // x19 (rd)
+              reg := 0 // x22 (wr)
           }
       }
       output store outputSR

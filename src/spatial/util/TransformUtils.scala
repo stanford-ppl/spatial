@@ -86,6 +86,14 @@ object TransformUtils {
     stage(RegWrite(reg, v, en))
     mux(en.toSeq.reduceTree {_ && _}, v, reg.value)
   }
+
+  @stateful def getOutermostCounter(ctrls: Seq[Ctrl]): Option[Counter[_]] = {
+    ctrls.flatMap(_.s).flatMap(_.cchains).flatMap(_.counters).headOption
+  }
+
+  @stateful def getOutermostIter(ctrls: Seq[Ctrl]): Option[Sym[_]] = {
+    getOutermostCounter(ctrls).flatMap(_.iter)
+  }
 }
 
 trait TransformerUtilMixin {

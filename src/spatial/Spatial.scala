@@ -125,7 +125,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamPipeCollapse    = PipeCollapse(state)
 
     import Stripper.S
-    lazy val retimeStrippers = MetadataStripper(state, S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports], S[spatial.metadata.memory.GroupId])
+    lazy val retimeStrippers = MetadataStripper(state,
+      S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports],
+      S[spatial.metadata.memory.GroupId])
 
     lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.transform.Streamify], S[spatial.metadata.memory.StreamBufferIndex])
 
@@ -139,9 +141,11 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer) ++ DCE ++
       bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, unitIterationElimination, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer, streamPipeCollapse, printer) ++ Seq(streamChecks)
 
-    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
-      createDump(s"streamify_$iter")
-    }, maxIters = spatialConfig.maxStreamifyIters))
+//    lazy val streamify = createDump("PreStream") ++ Seq(RepeatedTraversal(state, streamifyAnalysis ++ Seq(retimeStrippers), (iter: Int) => {
+//      createDump(s"streamify_$iter")
+//    }, maxIters = spatialConfig.maxStreamifyIters))
+
+    lazy val streamify = bankingAnalysis ++ createDump("PreStream") ++ Seq(FlattenToStream(state), pipeInserter, printer) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

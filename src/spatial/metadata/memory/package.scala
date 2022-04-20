@@ -368,6 +368,8 @@ package object memory {
     def isArgOut: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[ArgOutNew[_]] }
     def isHostIO: Boolean = mem.isReg && mem.op.exists{ _.isInstanceOf[HostIONew[_]] }
 
+    def isGlobalMem: Boolean = isArgIn || isArgOut || isHostIO
+
     def isDRAM: Boolean = mem match {
       case _:DRAM[_,_] => true
       case _ => false
@@ -429,6 +431,7 @@ package object memory {
       case Op(RegNew(_)) => true
       case Op(RegFileNew(_,inits)) => inits.isDefined
       case Op(LUTNew(_,_)) => true
+      case fifo: FIFO[_] => fifo.fifoInits.isDefined
       case _ => false
     }
 

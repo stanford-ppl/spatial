@@ -16,11 +16,11 @@ import spatial.dsl._
       reg := 3 //x4 (wr)
       Pipe.Foreach(0 until outerIters by 1) {
         outer =>
-          'Producer.Sequential.Foreach(0 until innerIters) {
+          'Producer.Foreach(0 until innerIters) {
             i =>
               reg := reg + i * outer // x14 (wr), x11(rd)
           }
-          'Consumer.Sequential.Foreach(0 until innerIters) {
+          'Consumer.Foreach(0 until innerIters) {
             inner =>
               outputSR(outer, inner) = reg.value + inner // x19 (rd)
               reg := 0 // x22 (wr)

@@ -1,6 +1,6 @@
 package spatial.transform.streamify
 
-import argon.transform.MutateTransformer
+import argon.transform.{ForwardTransformer, MutateTransformer}
 import argon._
 import argon.tags.struct
 import spatial.lang._
@@ -48,7 +48,7 @@ sealed trait RWEdge
 case object Forward extends RWEdge
 case object Backward extends RWEdge
 
-case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends MutateTransformer with AccelTraversal with spatial.util.CounterIterUpdateMixin {
+case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTransformer with AccelTraversal {
 
   type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
 
@@ -320,7 +320,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends MutateTran
           }
         }
 
-        dbgs(s"Intakes: $intakes")
+        dbgs(s"Intakes: ${intakes.mkString(", ")}")
         assert(intakes.map(_._1).toSet.size == intakes.size, s"Intake values should have distinct enable signals.")
         val wrVal = oneHotMux(intakes.map(_._1), intakes.map(_._2.asInstanceOf[RT]))
         val wrEn = intakes.map(_._1).reduceTree(_ | _)
@@ -514,23 +514,18 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends MutateTran
       dbgs(s"============MemInfoMap============")
       dbgs(memInfo.toDotGraph)
       dbgs(s"==================================")
-      inCopyMode(true) {
-        stageWithFlow(AccelScope(stageBlock {
-          accelHandle = IR.getCurrentHandle()
-          accelScope.block.stms.foreach(visit)
-        })) {
-          lhs2 => transferData(lhs, lhs2)
+      stageWithFlow(AccelScope(stageBlock {
+        accelHandle = IR.getCurrentHandle()
+        accelScope.block.nestedStms.foreach {
+          case loop@Op(foreachOp: OpForeach) if inHw && loop.isInnerControl =>
+            dbgs(s"Transforming Inner: $loop = $foreachOp")
+            visitInnerForeach(loop, foreachOp)
+          case _ =>
         }
+      })) {
+        lhs2 => transferData(lhs, lhs2)
       }
     }
-
-    case foreachOp: OpForeach if inHw && lhs.isInnerControl =>
-      dbgs(s"Transforming Inner: $lhs = $foreachOp")
-      visitInnerForeach(lhs, foreachOp)
-
-    case genericControl: Control[_] =>
-      dbgs(s"Transforming Outer: $lhs = $genericControl")
-      super.transform(lhs, rhs)
 
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]

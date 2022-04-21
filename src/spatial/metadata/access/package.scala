@@ -196,9 +196,10 @@ package object access {
       *
       * NOTE: Usable only before unrolling (so enables will not yet include boundary conditions)
       */
-    @stateful def mustOccurWithin(ctrl: Ctrl): Boolean = {
+    @stateful def mustOccurWithin(ctrl: Ctrl, considerSelfEns: Boolean = true): Boolean = {
       val parents = a.ancestors(ctrl)
-      val enables = (a +: parents.flatMap(_.s)).flatMap(_.enables)
+      val consideredNodes = (if (considerSelfEns) Seq(a) else Seq.empty) ++ parents.flatMap(_.s)
+      val enables = consideredNodes.flatMap(_.enables)
       !parents.exists(_.isSwitch) && enables.forall{case Const(b) => b.value; case _ => false }
     }
 
@@ -213,7 +214,7 @@ package object access {
       *   4. a p b - true if in a loop and b does not occur within a switch
       *   5. p b a - true if b does not occur within a switch
       */
-    @stateful def mustFollow(b: Sym[_], p: Sym[_]): Boolean = {
+    @stateful def mustFollow(b: Sym[_], p: Sym[_], considerSelfEns: Boolean = true): Boolean = {
       val (ctrlA,distA) = LCAWithDataflowDistance(a, p) // Positive for a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDataflowDistance(b, p) // Positive for b * p, negative otherwise
 
@@ -227,13 +228,13 @@ package object access {
       if (ctrlA == ctrlB) {
         val ctrlAB = LCA(a, b)
         if (distA > 0 && distB > 0) {
-          distA < distB && a.mustOccurWithin(ctrlAB)
+          distA < distB && a.mustOccurWithin(ctrlAB, considerSelfEns)
         } // b a p
         else if (distA > 0 && distB < 0) {
-          ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB)
+          ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB, considerSelfEns)
         } // a p b
         else if (distA < 0 && distB < 0) {
-          distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB)
+          distA < distB && ctrlA.willRunMultiple && a.mustOccurWithin(ctrlAB, considerSelfEns)
         } // p b a
         else false
       } else {
@@ -249,7 +250,7 @@ package object access {
           //   -- A happens before P
           //   -- A is unconditional
 //          dbgs(s"MustOccur: ${a.mustOccurWithin(ctrlA)}")
-          (distA > 0) && a.mustOccurWithin(ctrlA)
+          (distA > 0) && a.mustOccurWithin(ctrlA, considerSelfEns)
         }
       }
     }
@@ -401,24 +402,12 @@ package object access {
     reachingWrites
   }
 
-  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]]): Set[Sym[_]] = {
+  @stateful def reachingWritesToReg(read: Sym[_], writes: Set[Sym[_]], writesAlwaysKill: Boolean = false): Set[Sym[_]] = {
     // TODO: Handle the difference between .buffer and .nonbuffer
     // To compute this -- a write to a register is a Reaching Write IFF it's not killed by another.
     val relevant = writes.filter(_.mayPrecede(read))
-    val alive = relevant.filterNot { write => (writes - write).exists {killer => killer.mustFollow(write, read)} }
-
-//    dbgs(s"Relevant: $relevant")
-//    dbgs(s"Alive: $alive")
+    val alive = relevant.filterNot { write => (writes - write).exists {killer => killer.mustFollow(write, read, !writesAlwaysKill)} }
     alive
-//
-//    val preceding = writes.filter{write => write.mayPrecede(read)}
-//    val (before, after) = preceding.partition{write => !write.mayFollow(read) }
-//    dbgs(s"Before: $before, After: $after")
-//    val reachingBefore = before.filterNot{wr => (preceding - wr).exists{w => w.mustFollow(wr, read)}}
-//    val reachingAfter  = after.filterNot{wr => (preceding - wr).exists{w => w.mustFollow(wr, read)}}
-//    dbgs(s"ReachingBefore: $reachingBefore")
-//    dbgs(s"ReachingAfter: $reachingAfter")
-//    (reachingBefore, reachingAfter)
   }
 
   @rig def flatIndex(indices: Seq[I32], dims: Seq[I32]): I32 = {

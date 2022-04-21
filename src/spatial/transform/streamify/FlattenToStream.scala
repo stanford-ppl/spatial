@@ -95,10 +95,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           val dest = s"struct_${reader.parent.s.get}:$reader"
           val style = edgeType match {
             case Forward => "solid"
-            case Backward => "dotted"
+            case Backward => "dashed"
           }
 
-          s"$source:w -> $dest:w [style = $style]"
+          val position = edgeType match {
+            case Forward => "w"
+            case Backward => "e"
+          }
+
+          s"$source:$position -> $dest:$position [style = $style]"
       }.mkString(";\n")
 
       s"""digraph {
@@ -120,7 +125,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             reader =>
               dbgs(s"Read: $reader")
               indent {
-                val reachingWrites = reachingWritesToReg(reader, reg.writers)
+                val reachingWrites = reachingWritesToReg(reader, reg.writers, writesAlwaysKill = true)
                 // Exclude writers within the same controller -- those get restaged and will be handled internally.
                 val writeTriples = reachingWrites.map {
                   write =>
@@ -280,7 +285,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   }
 
   def handleIntakeRegisters(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit]): Sym[_] = {
-    val stms = lhs.blocks.flatMap(_.stms)
     intakeRegisters(lhs).foreach {
       reg =>
         assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
@@ -289,16 +293,16 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         implicit def bEV: Bits[RT] = reg.A.asInstanceOf[Bits[RT]]
         val castedReg = reg.asInstanceOf[Reg[RT]]
 
-        // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegReads
-        val allRelevant = memInfo.triples.filter { case RWTriple(_, reader, _) => reader.parent.s.contains(lhs) && reader.readMem.contains(reg) }.map {triple => (triple.writer, triple.edgeType)}.toSet
+        // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegReads / RegWrites
+        val allRelevant = memInfo.triples.filter { case RWTriple(_, reader, _) => reader.parent.s.contains(lhs) && reader.readMem.contains(reg) }.map {triple => (triple.writer.flatMap(_.parent.s), triple.edgeType)}.toSet
         dbgs(s"Relevant Triples: $allRelevant")
 
         val intakes = indent {
           allRelevant.toSeq map {
             case (Some(writer), edgeType) =>
-              val (lca, writerPath, readerPath) = LCAWithPaths(writer.parent, lhs.toCtrl)
+              val (lca, writerPath, readerPath) = LCAWithPaths(writer.toCtrl, lhs.toCtrl)
               dbgs(s"Writer: $writer ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
-              val fifo = getRegisterFIFO[RT](writer.parent.s.get, lhs)
+              val fifo = getRegisterFIFO[RT](writer, lhs)
 
               // we should read if it's the first iteration within the LCA
               val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
@@ -307,7 +311,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                 case Forward => isFirstIterInLCA
                 case Backward =>
                   // We read from the backward one if it's not the first iteration of the LCA
-                  val isFirstIterOfLCA = getOutermostIter(lca.ancestors(reg.parent)).map(firstIterMap(_)).get
+                  val isFirstIterOfLCA = getOutermostIter(lca.ancestors(reg.parent).reverse).map(firstIterMap(_)).get
                   isFirstIterInLCA & !isFirstIterOfLCA
               }
               (en, fifo.deq(en))
@@ -339,63 +343,52 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     }
   }
 
-//  def handleOutputRegisters(lhs: argon.Sym[_], lastIterMap: Map[argon.Sym[_], Bit]): Unit = {
-//    val stms = lhs.blocks.flatMap(_.stms)
-//    outputRegisters(lhs).foreach {
-//      reg =>
-//        assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
-//
-//        type RT = reg.RT
-//        implicit def bEV: Bits[RT] = reg.A.asInstanceOf[Bits[RT]]
-//        val castedReg = reg.asInstanceOf[Reg[RT]]
-//        val replacementReg = f(castedReg)
-//
-//        // Where do we write to?
-//        val dependentReaders = reg.asSym.readers.flatMap {
-//          reader =>
-//            val (before, after) = reachingWritesToReg(reader, reg.writers)
-//            // we're either a forward writer or a backedge (or not a reaching writer at all).
-//            if (before.exists(stms.contains)) {
-//              Seq((true, reader))
-//            } else if (after.exists(stms.contains)) {
-//              Seq((false, reader))
-//            } else {
-//              Seq.empty
-//            }
-//        }
-//        dependentReaders.foreach {
-//          case (isForward, reader) =>
-//            val readerParent = reader.parent.s.get
-//            val fwdFIFO = getRegisterFIFO[RT](lhs, readerParent)
-//
-//            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, readerParent.toCtrl)
-//            dbgs(s"Writer: $lhs -> LCA: $lca, writerPath: $writerPath, readerPath: $readerPath")
-//            val isLastIterWithin = getOutermostIter(writerPath.drop(1)) match {
-//              case Some(iter) => lastIterMap(iter)
-//              case None => Bit(true)
-//            }
-//            val shouldWrite = if (isForward) {
-//              // If we're a forward edge, then we write on the last iteration within the LCA
-//              // (i.e. outermost iterator NOT part of the LCA)
-//              isLastIterWithin
-//            } else {
-//              // If we're a backwards edge, then we write on every iteration within EXCEPT the last iter of the LCA
-//              // We're guaranteed one somewhere between the LCA up to the memory's parent.
-//              val isLastIterOfLCA = getOutermostIter(lca.ancestors.reverse) match {
-//                case Some(iter) => lastIterMap(iter)
-//              }
-//              isLastIterWithin & !isLastIterOfLCA
-//            }
-//
-//            fwdFIFO.enq(replacementReg.value, shouldWrite)
-//        }
-//    }
-//  }
+  def handleOutputRegisters(lhs: Sym[_], lastIterMap: Map[Sym[_], Bit]): Unit = {
+    outputRegisters(lhs) foreach {
+      reg =>
+        assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
+        type RT = reg.RT
+        implicit def bEV: Bits[RT] = reg.A.asInstanceOf[Bits[RT]]
+        val castedReg = reg.asInstanceOf[Reg[RT]]
+
+        // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegWrites
+        val allRelevant = memInfo.triples.filter {
+          case RWTriple(Some(writer), _, _) =>
+            // Writers within lhs that write to reg
+            writer.parent.s.contains(lhs) && writer.writtenMem.contains(reg)
+          case _ => false
+        }.map {
+          triple =>
+            // Deduplicate based on reader's parent controller and edge type
+            (triple.reader.parent.s.get, triple.edgeType)
+        }.toSet
+        dbgs(s"Relevant Triples: $allRelevant")
+
+        val wrData = f(castedReg).value
+
+        allRelevant.foreach {
+          case (dest, edgeType) =>
+            val fifo = getRegisterFIFO[RT](lhs, dest)
+
+            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
+            dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
+
+            val isLastIterWithinLCA = getOutermostIter(writerPath.drop(1)).map(lastIterMap(_)).getOrElse(Bit(true))
+            val wrEnable = edgeType match {
+              case Forward => isLastIterWithinLCA
+              case Backward =>
+                // we send the value backward if it isn't the last iteration of the LCA
+                val isLastIterOfLCA = getOutermostIter(lca.ancestors(reg.parent).reverse).map(lastIterMap(_)).get
+                isLastIterOfLCA & !isLastIterOfLCA
+            }
+            fifo.enq(wrData, wrEnable)
+        }
+    }
+  }
 
   private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
     dbgs(s"Visiting Inner Foreach: $lhs = $foreachOp")
     val ancestralChains = lhs.ancestors.flatMap(_.cchains)
-    val ancestralCounters = ancestralChains.flatMap(_.counters)
 
     // TODO: Should we get rid of streamed iters if no chains require external input?
     // This pushes isFirst/isLast calcs in, potentially triggering delayed conditional dequeues if there's enough
@@ -453,10 +446,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
 
       // Release Register values if it was written by this controller
-//      dbgs(s"Writing Register Values")
-//      indent {
-//        handleOutputRegisters(lhs, lastIterMap.toMap)
-//      }
+      dbgs(s"Writing Register Values")
+      indent {
+        handleOutputRegisters(lhs, lastIterMap.toMap)
+      }
 
       // Release Buffer Tokens
 

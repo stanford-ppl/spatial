@@ -8,27 +8,25 @@ import spatial.dsl._
 
   override def main(args: Array[String]) = {
     implicitly[argon.State].config.stop = 43
-    val output = DRAM[I32](outerIters, innerIters)
+    val output = ArgOut[I32]
     Accel {
-      val outputSR = SRAM[I32](outerIters, innerIters)
       val reg = Reg[I32](0)
       reg.buffer
-      reg := 3 //x4 (wr)
+      reg := 3
       Pipe.Foreach(0 until outerIters by 1) {
         outer =>
           'Producer.Foreach(0 until innerIters) {
             i =>
-              reg := reg + i * outer // x14 (wr), x11(rd)
+              reg := reg + i * outer
           }
           'Consumer.Foreach(0 until innerIters) {
             inner =>
-              outputSR(outer, inner) = reg.value + inner // x19 (rd)
-              reg := 0 // x22 (wr)
+              output.write(reg.value + inner, outer == 0 & inner == 0)
+              reg := 0
           }
       }
-      output store outputSR
     }
-    printMatrix(getMatrix(output))
+    println(r"Output: ${output.value}")
     assert(Bit(true))
   }
 }

@@ -145,21 +145,27 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     MemInfoMap(triples.filterNot(_.isInternal))
   }
 
-  // (Source, Dest) -> FIFO
-  private val regFIFOs = cm.Map[(Sym[_], Sym[_]), FIFO[_]]()
+  // (mem, Source, Dest) -> FIFO
+  private val regFIFOs = cm.Map[(Sym[_], Sym[_], Sym[_]), FIFO[_]]()
 
   private var accelHandle: BundleHandle = null
 
-  def getRegisterFIFO[T: Bits](src: Sym[_], dest: Sym[_]): FIFO[T] = {
-    (regFIFOs.get((src, dest)) match {
+  def getRegisterFIFO[T: Bits](mem: Sym[_], src: Sym[_], dest: Sym[_]): FIFO[T] = {
+    val key = (mem, src, dest)
+    (regFIFOs.get(key) match {
       case Some(fifo) => fifo
       case None =>
         IR.withScope(accelHandle) {
-          regFIFOs((src, dest)) = FIFO[T](I32(16))
-          regFIFOs((src, dest))
+          val newFIFO = FIFO[T](I32(32))
+          regFIFOs(key) = newFIFO
+          newFIFO.explicitName = s"comm_${src}_${dest}"
+          newFIFO
         }
     }).asInstanceOf[FIFO[T]]
   }
+
+  // Maps registers to their 'latest' value
+  private val regValues = cm.Map[Sym[_], Sym[_]]()
 
   /**
     * FlattenToStream takes an arbitrary chunk of code and turns it into a single unitpipe containing
@@ -246,12 +252,13 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           // TODO: Parallelize the innermost loop by as much as possible in order to not cause slowdowns here
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
-            val allNewIters = f(allOldIters)
+
             val oldItersAsI32 = allOldIters.map(_.unbox.asInstanceOf[I32])
-            val isFirsts = isFirstIters(oldItersAsI32: _*)
-            val isLasts = isLastIters(oldItersAsI32: _*)
+            val allNewIters = f(oldItersAsI32)
+            val isFirsts = isFirstIters(allNewIters: _*)
+            val isLasts = isLastIters(allNewIters: _*)
             val indexData = allNewIters.zip(isFirsts.zip(isLasts)).map {
-              case (iter, (first, last)) => PseudoIter(iter.unbox.asInstanceOf[I32], first, last)
+              case (iter, (first, last)) => PseudoIter(iter, first, last)
             }
             val pIters = PseudoIters(Vec.fromSeq(indexData))
             iterFIFO.enq(pIters)
@@ -284,7 +291,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     IterFIFOWithInfo(iterFIFO, allOldIters.zipWithIndex.toMap)
   }
 
-  def handleIntakeRegisters(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit]): Sym[_] = {
+  def handleIntakeRegisters(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit], handle: BundleHandle): Sym[_] = {
     intakeRegisters(lhs).foreach {
       reg =>
         assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
@@ -302,7 +309,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             case (Some(writer), edgeType) =>
               val (lca, writerPath, readerPath) = LCAWithPaths(writer.toCtrl, lhs.toCtrl)
               dbgs(s"Writer: $writer ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
-              val fifo = getRegisterFIFO[RT](writer, lhs)
+              val fifo = getRegisterFIFO[RT](reg, writer, lhs)
 
               // we should read if it's the first iteration within the LCA
               val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
@@ -330,9 +337,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         val wrEn = intakes.map(_._1).reduceTree(_ | _)
 
         // mirror the reg
-        val replacement = mirrorSym(castedReg)
+        val replacement = IR.withScope(handle) { mirrorSym(castedReg) }
+        replacement.ctx = withPreviousCtx(replacement.ctx)
 
-        val holdReg = mirrorSym(castedReg)
+        // holdReg holds onto the output of the FIFODeq since it's enabled every few cycles
+        val holdReg = IR.withScope(handle) { mirrorSym(castedReg) }
+        holdReg.ctx = withPreviousCtx(holdReg.ctx)
         holdReg.explicitName = s"${castedReg.explicitName.getOrElse(castedReg.toString)}_${lhs}_holdReg"
         holdReg.unbox.nonbuffer
 
@@ -340,6 +350,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
         replacement.unbox.write(holdReg.unbox.value)
         register(reg -> replacement)
+        regValues(reg) = mux(wrEn, wrVal, replacement.unbox.value)
     }
   }
 
@@ -364,11 +375,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         }.toSet
         dbgs(s"Relevant Triples: $allRelevant")
 
-        val wrData = f(castedReg).value
+//        val wrData = f(castedReg).value
+        val wrData = regValues(castedReg).asInstanceOf[RT]
 
         allRelevant.foreach {
           case (dest, edgeType) =>
-            val fifo = getRegisterFIFO[RT](lhs, dest)
+            val fifo = getRegisterFIFO[RT](reg, lhs, dest)
 
             val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
             dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
@@ -388,7 +400,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
     dbgs(s"Visiting Inner Foreach: $lhs = $foreachOp")
-    val ancestralChains = lhs.ancestors.flatMap(_.cchains)
 
     // TODO: Should we get rid of streamed iters if no chains require external input?
     // This pushes isFirst/isLast calcs in, potentially triggering delayed conditional dequeues if there's enough
@@ -414,6 +425,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       * Where there's a (possible) overlap between streamIters and newInnerIters
       *
       */
+    val stopWhen = foreachOp.stopWhen match {
+      case Some(reg) => f(reg).conflictable
+      case None => Reg[Bit](Bit(false))
+    }
+
+    val foreachHandle = IR.getCurrentHandle()
+
+    regValues.clear()
+
     stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
       val streamIters = iterFIFO.deq().iters
       val firstIterMap = cm.Map[Sym[_], Bit]()
@@ -435,14 +455,33 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       // Fetch Register values
       dbgs(s"Fetching Register Values")
       indent {
-        handleIntakeRegisters(lhs, firstIterMap.toMap)
+        handleIntakeRegisters(lhs, firstIterMap.toMap, foreachHandle)
       }
 
 
       // Fetch Buffer Tokens
 
       // Restage the actual innards of the foreach
-      foreachOp.block.stms.foreach(visit)
+      foreachOp.block.stms.foreach {
+        case rr@Op(RegRead(reg)) if regValues.contains(reg) =>
+          dbgs(s"Forwarding read: $rr = ${rr.op.get} => ${regValues(reg)}")
+          register(rr -> regValues(reg))
+        case rw@Op(RegWrite(reg, data, ens)) if regValues.contains(reg) =>
+          dbgs(s"Forwarding write: $rw = ${rw.op.get}")
+          val alwaysEnabled = ens.forall {
+            case Const(b) => b.value
+            case _ => false
+          }
+          if (alwaysEnabled) {
+            regValues(reg) = f(data)
+          } else {
+            regValues(reg) = mux(f(ens).toSeq.reduceTree(_&_), f(data).asInstanceOf[Bits[reg.RT]], regValues(reg).asInstanceOf[Bits[reg.RT]]).asInstanceOf[Sym[reg.RT]]
+          }
+
+          // stage the write anyways
+          visit(rw)
+        case other => visit(other)
+      }
 
 
       // Release Register values if it was written by this controller
@@ -451,9 +490,14 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         handleOutputRegisters(lhs, lastIterMap.toMap)
       }
 
+      retimeGate()
       // Release Buffer Tokens
+      // Update StopWhen -- on the last iteration, kill the controller.
+      retimeGate()
+      val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
+      stopWhen.write(endOfWorld, endOfWorld)
 
-    }, Seq(foreverIter) ++ newInnerIters.map(_.unbox.asInstanceOf[I32]), f(foreachOp.stopWhen))) {
+    }, Seq(foreverIter) ++ newInnerIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
       newForeach =>
         transferData(lhs, newForeach)
     }
@@ -471,6 +515,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case loop@Op(foreachOp: OpForeach) if inHw && loop.isInnerControl =>
             dbgs(s"Transforming Inner: $loop = $foreachOp")
             visitInnerForeach(loop, foreachOp)
+          case mem if isInternalMem(mem) =>
+            dbgs(s"Mirroring Internal Mem: $mem")
+            super.visit(mem)
           case _ =>
         }
       })) {

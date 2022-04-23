@@ -32,7 +32,7 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
     dbgs(s"Result: ")
     result.foreach{e => dbgs(s"  ${stm(e)}") }
     // The position AFTER the given node
-    val (newLatencies, newCycles) = pipeLatencies(result, scope)
+    val (newLatencies, newCycles) = pipeLatencies(result, scope, verbose=state.config.enDbg)
     val adjustedLatencies = newLatencies.map{case (k,v) => (k , v + lastLatency)}
 
     adjustedLatencies.toList.sortBy(_._2).foreach{case (s,l) => dbgs(s"[$l] ${stm(s)}") }

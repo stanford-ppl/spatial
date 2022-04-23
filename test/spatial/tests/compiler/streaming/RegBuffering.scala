@@ -7,7 +7,6 @@ import spatial.dsl._
   val innerIters = 4
 
   override def main(args: Array[String]) = {
-    implicitly[argon.State].config.stop = 43
     val output = ArgOut[I32]
     Accel {
       val reg = Reg[I32](0)
@@ -21,7 +20,7 @@ import spatial.dsl._
           }
           'Consumer.Foreach(0 until innerIters) {
             inner =>
-              output.write(reg.value + inner, outer == 0 & inner == 0)
+              output.write(reg.value + inner, inner == 0)
               reg := 0
           }
       }

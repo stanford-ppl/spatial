@@ -202,7 +202,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         // Always Run this pass
         fifoInitialization ==> bankingAnalysis ==>
-        spatialConfig.streamify ? createDump("PostStream") ==>
+        spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
 //        bankingAnalysis ==>
         /** Unrolling */

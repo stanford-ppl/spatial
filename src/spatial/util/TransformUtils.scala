@@ -20,34 +20,34 @@ object TransformUtils {
       stage(CounterNew(start.asInstanceOf[Num[CT]], end.asInstanceOf[Num[CT]], (step.asInstanceOf[Num[CT]] * casted).asInstanceOf[Num[CT]], I32(1)))
   }
 
-  @stateful def expandCounterPars(cchain: CounterChain): CounterChain = {
+  @api def expandCounterPars(cchain: CounterChain): CounterChain = {
     val newCounters = cchain.counters.map(expandCounterPar)
     stage(CounterChainNew(newCounters))
   }
 
-  @stateful def isFirstIter[T: Num](iter: Num[T]): Bit = {
+  @api def isFirstIter[T: Num](iter: Num[T]): Bit = {
     val ctr = iter.counter.ctr.asInstanceOf[Counter[Num[T]]]
     implicit def castEV: Cast[I32, T] = argon.lang.implicits.numericCast[I32, T]
     iter < (ctr.start.unbox + (ctr.step.unbox * ctr.ctrPar.to[T]))
   }
 
-  @stateful def isFirstIters[T: Num](iters: Num[T]*): Seq[Bit] = {
+  @api def isFirstIters[T: Num](iters: Num[T]*): Seq[Bit] = {
     val isFirst = iters.map(isFirstIter(_))
     isFirst.scanRight(Bit(true)){_&_}.dropRight(1)
   }
 
-  @stateful def isLastIter[T: Num](iter: Num[T]): Bit = {
+  @api def isLastIter[T: Num](iter: Num[T]): Bit = {
     val ctr = iter.counter.ctr.asInstanceOf[Counter[T]]
     val nextIter = iter + ctr.step.unbox
     ctr.end.unbox.asInstanceOf[Num[T]] <= nextIter
   }
 
-  @stateful def isLastIters[T: Num](iters: Num[T]*): Seq[Bit] = {
+  @api def isLastIters[T: Num](iters: Num[T]*): Seq[Bit] = {
     val isLast = iters.map(isLastIter(_))
     isLast.scanRight(Bit(true)){_&_}.dropRight(1)
   }
 
-  @stateful def CreateVecEV[T: Bits](length: Int): Bits[Vec[T]] = {
+  @api def CreateVecEV[T: Bits](length: Int): Bits[Vec[T]] = {
     Vec.fromSeq(Range(0, length) map {_ => implicitly[Bits[T]].zero})
   }
 
@@ -69,7 +69,7 @@ object TransformUtils {
     }
   }
 
-  @stateful def counterToSeries(ctr: Counter[_]): Seq[Int] = {
+  @api def counterToSeries(ctr: Counter[_]): Seq[Int] = {
     val start = ctr.start.c.get.asInstanceOf[emul.FixedPoint].toInt
     val end = ctr.end.c.get.asInstanceOf[emul.FixedPoint].toInt
     val step = ctr.step.c.get.asInstanceOf[emul.FixedPoint].toInt
@@ -87,11 +87,11 @@ object TransformUtils {
     mux(en.toSeq.reduceTree {_ && _}, v, reg.value)
   }
 
-  @stateful def getOutermostCounter(ctrls: Seq[Ctrl]): Option[Counter[_]] = {
+  @api def getOutermostCounter(ctrls: Seq[Ctrl]): Option[Counter[_]] = {
     ctrls.flatMap(_.s).flatMap(_.cchains).flatMap(_.counters).headOption
   }
 
-  @stateful def getOutermostIter(ctrls: Seq[Ctrl]): Option[Sym[_]] = {
+  @api def getOutermostIter(ctrls: Seq[Ctrl]): Option[Sym[_]] = {
     getOutermostCounter(ctrls).flatMap(_.iter)
   }
 }

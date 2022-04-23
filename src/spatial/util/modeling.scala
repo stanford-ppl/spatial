@@ -170,6 +170,9 @@ object modeling {
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
+      if (verbose) {
+        dbgs(s"Cycle on $mem -> $rds <=> $wrs")
+      }
       rds.cross(wrs).collect{case (rd, wr) if !brokenByRetimeGate(rd,wr,schedule) =>
       // rds.cross(wrs).flatMap{case (rd, wr) =>
         lazy val triple = AccumTriple(mem, rd, wr)
@@ -492,7 +495,8 @@ object modeling {
       }
     }
 
-    val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) => 
+    dbgs(s"Cycles: $cycles")
+    val trueWarCycles = accums.collect{case AccumTriple(mem,reader,writer) =>
       val symbols = cycles(writer).toSortedSeq
       val cycleLengthExact = paths(writer).toInt - paths(reader).toInt + latencyOf(reader, true)
 
@@ -500,7 +504,7 @@ object modeling {
       val cycleLength = if (reader.isStatusReader) cycleLengthExact + 1.0 else cycleLengthExact
       WARCycle(reader, writer, mem, symbols, cycleLength)
     }
-    val pseudoWarCycles = findPseudoWARCycles(schedule)
+    val pseudoWarCycles = findPseudoWARCycles(schedule, verbose)
     val warCycles = trueWarCycles ++ pseudoWarCycles
 
     val aaaCycles = pushMultiplexedAccesses(accumInfo.writers.toSeq ++ accumInfo.readers.toSeq)

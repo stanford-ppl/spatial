@@ -133,7 +133,7 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         }
       case FIFOEnq(mem, data, _) =>
         if (mem.A.nbits != data.nbits) {
-          error(lhs.ctx, s"")
+          error(lhs.ctx, s"Expected a write of size ${mem.A.nbits} but got $data of size ${data.nbits}")
         }
       case _ =>
         check(lhs, rhs)

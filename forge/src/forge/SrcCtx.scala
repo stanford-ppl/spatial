@@ -8,11 +8,7 @@ case class SrcCtx(dir: String, file: String, line: Int, column: Int, content: Op
       case Nil => ""
       case ctxes => s" -- [${ctxes.mkString(", ")}]"
     }
-    val lineOption = content match {
-      case None => ""
-      case Some(str) => s" (${str.trim})"
-    }
-    s"$file:$line:$column$lineOption$previousCtx"
+    s"$file:$line:$column$previousCtx"
   }
 }
 

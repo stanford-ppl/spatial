@@ -284,6 +284,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
+              lhs2.ctx = augmentCtx(cchain.ctx)
           }
       }
     }
@@ -292,7 +293,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     IterFIFOWithInfo(iterFIFO, allOldIters.zipWithIndex.toMap)
   }
 
-  def handleIntakeRegisters(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit], handle: BundleHandle): Sym[_] = {
+  def handleIntakeRegisters(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit]): Sym[_] = {
     intakeRegisters(lhs).foreach {
       reg =>
         assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
@@ -428,8 +429,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       case _ =>
     }
 
-    val foreachHandle = state.getCurrentHandle()
-
     regValues.clear()
 
     stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
@@ -453,7 +452,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       // Fetch Register values
       dbgs(s"Fetching Register Values")
       indent {
-        handleIntakeRegisters(lhs, firstIterMap.toMap, foreachHandle)
+        handleIntakeRegisters(lhs, firstIterMap.toMap)
       }
 
 
@@ -500,6 +499,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     }, Seq(foreverIter) ++ newInnerIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
       newForeach =>
         transferData(lhs, newForeach)
+        newForeach.ctx = augmentCtx(lhs.ctx)
         dbgs(s"Substs: $subst")
     }
   }

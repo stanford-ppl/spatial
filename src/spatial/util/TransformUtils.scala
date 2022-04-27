@@ -80,6 +80,10 @@ object TransformUtils {
     implicitly[SrcCtx].copy(previous=previousCtx)
   }
 
+  @api def augmentCtx(originalCtx: SrcCtx): SrcCtx = {
+    originalCtx.copy(previous = originalCtx.previous ++ Seq(implicitly[SrcCtx]))
+  }
+
   @api def persistentDequeue[T: Bits](fifo: FIFO[T], en: Set[Bit]): T = {
     val v = stage(FIFODeq(fifo, en))
     val reg = Reg[T]

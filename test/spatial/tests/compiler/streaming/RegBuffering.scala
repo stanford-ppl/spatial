@@ -13,10 +13,7 @@ import spatial.dsl._
     Accel {
       val reg = Reg[I32](0)
       reg.buffer
-      Foreach(0 until 1) {
-        i =>
-          reg := 3
-      }
+      reg := 3
       Pipe.Foreach(0 until outerIters by 1) {
         outer =>
           'Producer.Foreach(0 until innerIters) {

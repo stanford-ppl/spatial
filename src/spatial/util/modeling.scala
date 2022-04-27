@@ -170,10 +170,8 @@ object modeling {
     val accums = memories.flatMap{mem =>
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
-      if (verbose) {
-        dbgs(s"Cycle on $mem -> $rds <=> $wrs")
-      }
-      rds.cross(wrs).collect{case (rd, wr) if !brokenByRetimeGate(rd,wr,schedule) =>
+      // Filter out the case where rd == wr, which happens for fifoDeqs.
+      rds.cross(wrs).collect{case (rd, wr) if (rd != wr) && !brokenByRetimeGate(rd,wr,schedule) =>
       // rds.cross(wrs).flatMap{case (rd, wr) =>
         lazy val triple = AccumTriple(mem, rd, wr)
         val path = getAllNodesBetween(rd, wr, scope.toSet)
@@ -288,6 +286,10 @@ object modeling {
           else {
             val inReduce = knownCycles.contains(cur)
             val delay = latencyOf(cur, inReduce)
+            dbgs(s"cur: $cur, inReduce: $inReduce, latency: ${latencyOf(cur, inReduce)}")
+            if (inReduce) {
+              dbgs(s"Known Cycles: ${knownCycles(cur)}")
+            }
             debugs(s"[$delay = max(0) + ${latencyOf(cur, inReduce)}] ${stm(cur)}" + (if (inReduce) "[cycle]" else ""))
             scrubNoise(delay)
           }

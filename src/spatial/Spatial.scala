@@ -123,6 +123,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val fifoInitializer       = FIFOInitializer(state)
     lazy val unitIterationElimination = UnitIterationElimination(state)
     lazy val streamPipeCollapse    = PipeCollapse(state)
+    lazy val duplicateRetimeStripper = DuplicateRetimeStripper(state)
 
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state,
@@ -137,7 +138,9 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val fifoInitialization = Seq(fifoInitializer, pipeInserter, MetadataStripper(state, S[spatial.metadata.memory.FifoInits]))
 
-    lazy val bankingAnalysis = Seq(retimeStrippers, retimingAnalyzer, accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
+    lazy val retimeAnalysisPasses = Seq(retimeStrippers, duplicateRetimeStripper, retimingAnalyzer)
+
+    lazy val bankingAnalysis = retimeAnalysisPasses ++ Seq(accessAnalyzer, iterationDiffAnalyzer, memoryAnalyzer, memoryAllocator, printer)
     lazy val streamifyAnalysis = Seq(reduceToForeach, pipeInserter, unitPipeToForeach, printer) ++ DCE ++
       bankingAnalysis ++ Seq(streamifyAnnotator, printer, metapipeToStream, printer, streamBufferExpansion, printer, unitIterationElimination, printer, allocMotion, pipeInserter, streamifyStripper, printer, fifoAccessFusion, printer, streamPipeCollapse, printer) ++ Seq(streamChecks)
 
@@ -181,7 +184,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** DSE */
         ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
         /** Optional scala model generator */
-        ((spatialConfig.enableRuntimeModel) ? retimingAnalyzer) ==>
+        ((spatialConfig.enableRuntimeModel) ? retimeAnalysisPasses) ==>
         ((spatialConfig.enableRuntimeModel) ? initiationAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? dseRuntimeModelGen) ==>
         (spatialConfig.enableArchDSE ? dsePass) ==> 

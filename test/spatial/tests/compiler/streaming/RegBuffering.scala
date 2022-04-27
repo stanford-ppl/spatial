@@ -6,12 +6,17 @@ import spatial.dsl._
   val outerIters = 16
   val innerIters = 4
 
+  override def compileArgs = "--max_cycles=1000"
+
   override def main(args: Array[String]) = {
     val output = ArgOut[I32]
     Accel {
       val reg = Reg[I32](0)
       reg.buffer
-      reg := 3
+      Foreach(0 until 1) {
+        i =>
+          reg := 3
+      }
       Pipe.Foreach(0 until outerIters by 1) {
         outer =>
           'Producer.Foreach(0 until innerIters) {
@@ -26,6 +31,11 @@ import spatial.dsl._
       }
     }
     println(r"Output: ${output.value}")
+    println(r"Gold: 90")
     assert(Bit(true))
   }
+}
+
+class RegBufferingNoStream extends RegBuffering {
+  override def compileArgs = "--nostreamify"
 }

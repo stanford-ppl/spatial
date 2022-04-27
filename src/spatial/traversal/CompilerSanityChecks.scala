@@ -80,6 +80,30 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         }
       case _ =>
     }
+
+    // check inner controllers to make sure that if latency is defined that they respect retimeGates
+    rhs match {
+      case ctrl: Control[_] if lhs.isInnerControl =>
+        ctrl.blocks.foreach {
+          block =>
+            var mustOccurAfter: Double = -1
+            var currentLatest: Double = 0
+            var lastRetimeGate: Option[Sym[_]] = None
+            block.stms.foreach {
+              case rg if rg.isRetimeGate =>
+                mustOccurAfter = currentLatest
+                lastRetimeGate = Some(rg)
+              case stmt if stmt.delayDefined =>
+                val delay = stmt.fullDelay
+                if (delay <= mustOccurAfter) {
+                  error(s"$stmt occurred at $delay, but previous retimeGate ${lastRetimeGate} had delay $mustOccurAfter.")
+                  error(s"$stmt was created at ${stmt.ctx}.")
+                }
+                currentLatest = scala.math.max(currentLatest, delay)
+            }
+        }
+      case _ =>
+    }
   }
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {

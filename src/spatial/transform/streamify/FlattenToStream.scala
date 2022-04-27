@@ -495,8 +495,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
       retimeGate()
       val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
-      val delayedApocalypse = retime(4, endOfWorld)
-      stopWhen.write(delayedApocalypse, delayedApocalypse)
+      stopWhen.write(endOfWorld, endOfWorld)
 
     }, Seq(foreverIter) ++ newInnerIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
       newForeach =>

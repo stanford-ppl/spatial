@@ -30,9 +30,7 @@ import spatial.dsl._
           }
       }
     }
-    println(r"Output: ${output.value}")
-    println(r"Gold: 90")
-    assert(Bit(true))
+    assert(output.value == 90, r"Expected 90, received ${output.value}")
   }
 }
 

@@ -238,49 +238,72 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val iterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]](I32(32))
     iterFIFO.explicitName = s"IterFIFO_$lhs"
 
-    def recurseHelper(chains: List[CounterChain]): Unit = {
-      chains match {
-        case cchain :: Nil =>
-          // innermost iteration
-          cchain.counters.flatMap(_.inputs) foreach {
+    def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Unit = {
+      def updateFirstIterMap(): Unit = {
+        if (backlog.isEmpty) { return }
+        dbgs(s"Updating First Iter Map: $firstIterMap")
+        // takes the current firstIterMap and fills in all missing entries
+        // backlog is outermost to innermost, all inner compared to entries firstIterMap
+        val isFirsts = isFirstIters(backlog.map(_.unbox.asInstanceOf[I32]):_*)
+        firstIterMap.keys.foreach {
+          iter => firstIterMap(iter) &= isFirsts.head
+        }
+        firstIterMap ++= (backlog zip isFirsts).toMap
+        dbgs(s"Updated First Iter Map: $firstIterMap")
+        backlog.clear()
+      }
+
+      def fetchDeps(deps: Seq[Sym[_]]): Unit = {
+        if (deps.nonEmpty) {
+          updateFirstIterMap()
+          deps foreach {
             case sym@Op(rr:RegRead[_]) =>
               register(sym -> getRegValue(sym,  rr))
           }
+
+        }
+      }
+      chains match {
+        case cchain :: Nil =>
+          // innermost iteration
+
+          fetchDeps(cchain.counters.flatMap(_.inputs))
+
           val newChains = cchain.counters.map(mirrorSym(_).unbox)
           val newCChain = CounterChain(newChains)
           val newIters = makeIters(newChains)
+          backlog.appendAll(newIters)
           register(cchain.counters.flatMap(_.iter), newChains.flatMap(_.iter))
 
           // TODO: Parallelize the innermost loop by as much as possible in order to not cause slowdowns here
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
-
+            updateFirstIterMap()
             val oldItersAsI32 = allOldIters.map(_.unbox.asInstanceOf[I32])
             val allNewIters = f(oldItersAsI32)
-            val isFirsts = isFirstIters(allNewIters: _*)
             val isLasts = isLastIters(allNewIters: _*)
-            val indexData = allNewIters.zip(isFirsts.zip(isLasts)).map {
-              case (iter, (first, last)) => PseudoIter(iter, first, last)
+            val indexData = allNewIters.zip(isLasts).map {
+              case (iter, last) => PseudoIter(iter, firstIterMap(iter), last)
             }
             val pIters = PseudoIters(Vec.fromSeq(indexData))
             iterFIFO.enq(pIters)
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
+              lhs2.ctx = augmentCtx(cchain.ctx)
           }
 
         case cchain :: rest =>
           // Fetch all dependencies of the chain
-          cchain.counters.flatMap(_.inputs) foreach {
-            case sym@Op(rr:RegRead[_]) =>
-              register(sym -> getRegValue(sym,  rr))
-          }
+          fetchDeps(cchain.counters.flatMap(_.inputs))
+
           val newChains = cchain.counters.map(mirrorSym(_).unbox)
           val newCChain = CounterChain(newChains)
           val newIters = makeIters(newChains)
+          backlog.appendAll(newIters)
           register(cchain.counters.flatMap(_.iter), newChains.flatMap(_.iter))
 
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
-            recurseHelper(rest)
+            recurseHelper(rest, backlog, firstIterMap)
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
@@ -288,7 +311,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
       }
     }
-    isolateSubst() { recurseHelper(allChains.toList) }
+    isolateSubst() { recurseHelper(allChains.toList, cm.ListBuffer.empty, cm.Map.empty) }
 
     IterFIFOWithInfo(iterFIFO, allOldIters.zipWithIndex.toMap)
   }

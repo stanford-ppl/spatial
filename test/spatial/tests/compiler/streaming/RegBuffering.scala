@@ -34,3 +34,30 @@ import spatial.dsl._
 class RegBufferingNoStream extends RegBuffering {
   override def compileArgs = "--nostreamify"
 }
+
+@spatial class DataDependentControl extends SpatialTest {
+  override def main(args: Array[String]) = {
+    val output = ArgOut[I32]
+    Accel {
+      Foreach(4 until 8) {
+        outer =>
+          val innerIterReg = Reg[I32](0)
+          'Producer.Foreach(0 until outer) {
+            inner =>
+              innerIterReg := innerIterReg + inner
+          }
+          // innerIterReg = Sum(0 .. outer)
+          'Consumer.Foreach(0 until innerIterReg.value) {
+            inner2 =>
+              output := output + inner2
+          }
+      }
+    }
+    println(r"Result: ${output.value}")
+    assert(Bit(true))
+  }
+}
+
+class DataDependentControlNS extends DataDependentControl {
+  override def compileArgs = "--nostreamify"
+}

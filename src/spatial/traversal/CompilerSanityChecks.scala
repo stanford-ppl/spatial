@@ -100,6 +100,7 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
                   error(s"$stmt was created at ${stmt.ctx}.")
                 }
                 currentLatest = scala.math.max(currentLatest, delay)
+              case _ =>
             }
         }
       case _ =>

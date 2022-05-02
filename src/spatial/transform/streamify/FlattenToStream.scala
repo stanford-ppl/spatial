@@ -52,6 +52,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
 
+  abstract trait MemKey
+  case class InnerMemKey(writeCtrl: Option[Sym[_]], readCtrl: Sym[_], mem: Sym[_]) extends MemKey
+  case class OuterMemKey(writeCtrl: Option[Sym[_]], reader: Sym[_], mem: Sym[_]) extends MemKey
+
   case class RWTriple(writer: Option[Sym[_]], reader: Sym[_], edgeType: RWEdge) {
     writer.foreach {
       wr =>
@@ -61,22 +65,31 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       assert(edgeType == Forward, s"Cannot have backwards initialization")
     }
 
-    def isInternal: Boolean = writer match {
-      case Some(wr) => wr.parent == reader.parent
-      case None => false
-    }
+    def isInternal: Boolean = readParent == wrParent
 
     def mem: Sym[_] = reader.readMem.get
+
+    def readParent: Option[Sym[_]] = reader.blk.s
+    def wrParent: Option[Sym[_]] = writer.flatMap(_.blk.s)
+
+    def toMemKey: MemKey = {
+      // There's a mismatch if dest is a RegRead and is used in a counterchain (i.e. dest is a floating transient)
+      val isInner = reader.blk.s == reader.parent.s
+      if (isInner) {
+        // This deduplicates based on the writing and reading InnerControllers
+        InnerMemKey(wrParent, readParent.get, mem)
+      } else {
+        OuterMemKey(wrParent, reader, mem)
+      }
+    }
   }
 
 
   case class MemInfoMap(triples: Seq[RWTriple]) {
     def toDotGraph: String = {
-      val mems = triples.map(_.mem).toSet
-
       // print all relevant inner controllers
       val nodes = triples.flatMap(triple => Seq(triple.reader) ++ triple.writer.toSeq)
-      val asInnerControls = nodes.groupBy(_.parent)
+      val asInnerControls = nodes.groupBy(_.blk)
       val innerControlString = asInnerControls.map {
         case (ctrl, children) =>
           // Deduplicate the children
@@ -90,9 +103,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }.mkString(";\n")
 
       val edgeString = triples.map {
-        case RWTriple(Some(writer), reader, edgeType) =>
-          val source = s"struct_${writer.parent.s.get}:$writer"
-          val dest = s"struct_${reader.parent.s.get}:$reader"
+        case triple@RWTriple(Some(writer), reader, edgeType) =>
+          val source = s"struct_${triple.wrParent.get}:$writer"
+          val dest = s"struct_${triple.readParent.get}:$reader"
           val style = edgeType match {
             case Forward => "solid"
             case Backward => "dashed"
@@ -104,6 +117,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
 
           s"$source:$position -> $dest:$position [style = $style]"
+        case RWTriple(None, reader, Forward) =>
+          s"// Initialization for $reader"
       }.mkString(";\n")
 
       s"""digraph {
@@ -145,20 +160,17 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     MemInfoMap(triples.filterNot(_.isInternal))
   }
 
-  // (mem, Source, Dest) -> FIFO
-  private val regFIFOs = cm.Map[(Sym[_], Sym[_], Sym[_]), FIFO[_]]()
+  private val regFIFOs = cm.Map[MemKey, FIFO[_]]()
 
   private var accelHandle: BundleHandle = null
 
-  def getRegisterFIFO[T: Bits](mem: Sym[_], src: Sym[_], dest: Sym[_]): FIFO[T] = {
-    val key = (mem, src, dest)
+  def getRegisterFIFO[T: Bits](key: MemKey): FIFO[T] = {
     (regFIFOs.get(key) match {
       case Some(fifo) => fifo
       case None =>
         IR.withScope(accelHandle) {
           val newFIFO = FIFO[T](I32(32))
           regFIFOs(key) = newFIFO
-          newFIFO.explicitName = s"comm_${src}_${dest}_${mem}"
           newFIFO
         }
     }).asInstanceOf[FIFO[T]]
@@ -175,11 +187,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     *   1. Counter Generator and Token Intake
     *   2. Token Distributor
     */
-
-  private def getRegValue(sym: Sym[_], op: RegRead[_]): Sym[_] = {
-    sym
-  }
-
   def isInternalMem(mem: Sym[_]): Boolean = {
     val regReaders = mem.readers.flatMap(_.parent.s)
     val regWriters = mem.writers.flatMap(_.parent.s)
@@ -253,21 +260,39 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         backlog.clear()
       }
 
-      def fetchDeps(deps: Seq[Sym[_]]): Unit = {
+      def fetchDeps(cchain: CounterChain): Unit = {
+        val deps = cchain.counters.flatMap(_.inputs)
         if (deps.nonEmpty) {
           updateFirstIterMap()
-          deps foreach {
-            case sym@Op(rr:RegRead[_]) =>
-              register(sym -> getRegValue(sym,  rr))
-          }
 
+          // Perform recursive remapping of deps
+          val visited = cm.Set[Sym[_]]()
+          def dfs(s: Sym[_]): Unit = {
+            if (visited contains s) { return }
+            visited.add(s)
+            // only take dependencies in the current scope
+            val inputs = s.inputs.filter(_.blk.s == s.blk.s)
+            dbgs(s"Inputs of $s = $inputs")
+            inputs.foreach(visit)
+            // after processing all dependencies, mirror yourself
+            dbgs(s"Substitutions: $subst")
+            s match {
+              case Op(RegRead(mem)) =>
+                register(mem -> mirrorSym(mem))
+                handleIntakeRegisters(cchain.blk.s.get, Seq(s), firstIterMap.toMap)
+                register(s -> regValues(mem))
+              case other if !subst.contains(other) => register(other -> mirrorSym(other))
+              case _ => // pass
+            }
+          }
+          deps.foreach(dfs)
         }
       }
       chains match {
         case cchain :: Nil =>
           // innermost iteration
 
-          fetchDeps(cchain.counters.flatMap(_.inputs))
+          fetchDeps(cchain)
 
           val newChains = cchain.counters.map(mirrorSym(_).unbox)
           val newCChain = CounterChain(newChains)
@@ -294,7 +319,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
         case cchain :: rest =>
           // Fetch all dependencies of the chain
-          fetchDeps(cchain.counters.flatMap(_.inputs))
+          fetchDeps(cchain)
 
           val newChains = cchain.counters.map(mirrorSym(_).unbox)
           val newCChain = CounterChain(newChains)
@@ -316,9 +341,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     IterFIFOWithInfo(iterFIFO, allOldIters.zipWithIndex.toMap)
   }
 
-  def handleIntakeRegisters(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit]): Sym[_] = {
-    intakeRegisters(lhs).foreach {
-      reg =>
+  def handleIntakeRegisters(lhs: Sym[_], reads: Seq[Sym[_]], firstIterMap: Map[Sym[_], Bit]): Sym[_] = {
+    reads.foreach {
+      case read@Op(RegRead(reg)) =>
         assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
 
         type RT = reg.RT
@@ -326,15 +351,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         val castedReg = reg.asInstanceOf[Reg[RT]]
 
         // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegReads / RegWrites
-        val allRelevant = memInfo.triples.filter { case RWTriple(_, reader, _) => reader.parent.s.contains(lhs) && reader.readMem.contains(reg) }.map {triple => (triple.writer.flatMap(_.parent.s), triple.edgeType)}.toSet
+        val allRelevant = memInfo.triples.filter(_.reader == read)
         dbgs(s"Relevant Triples: $allRelevant")
 
         val intakes = indent {
-          allRelevant.toSeq map {
-            case (Some(writer), edgeType) =>
+          allRelevant map {
+            case triple@RWTriple(Some(writer), reader, edgeType) =>
               val (lca, writerPath, readerPath) = LCAWithPaths(writer.toCtrl, lhs.toCtrl)
               dbgs(s"Writer: $writer ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
-              val fifo = getRegisterFIFO[RT](reg, writer, lhs)
+              val fifo = getRegisterFIFO[RT](triple.toMemKey)
 
               // we should read if it's the first iteration within the LCA
               val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
@@ -348,7 +373,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
               }
               dbgs(s"Fetching: $reg <- $fifo.deq($en)")
               (en, fifo.deq(en))
-            case (None, Forward) =>
+            case RWTriple(None, _, Forward) =>
               // This counts as initialization
               val (_, _, pathToReg) = LCAWithPaths(reg.parent, lhs.toCtrl)
               val shouldInit = getOutermostIter(pathToReg.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
@@ -376,15 +401,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
         // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegWrites
         val allRelevant = memInfo.triples.filter {
-          case RWTriple(Some(writer), _, _) =>
+          case tp@RWTriple(Some(writer), _, _) =>
             // Writers within lhs that write to reg
-            writer.parent.s.contains(lhs) && writer.writtenMem.contains(reg)
+            tp.wrParent.contains(lhs) && writer.writtenMem.contains(reg)
           case _ => false
         }.map {
           triple =>
             // Deduplicate based on reader's parent controller and edge type
-            (triple.reader.parent.s.get, triple.edgeType)
-        }.toSet
+            triple.toMemKey -> triple
+        }.toMap
         dbgs(s"Relevant Triples: $allRelevant")
 
         val wrData = regValues.get(castedReg) match {
@@ -393,8 +418,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         }
 
         allRelevant.foreach {
-          case (dest, edgeType) =>
-            val fifo = getRegisterFIFO[RT](reg, lhs, dest)
+          case (memKey, RWTriple(_, dest, edgeType)) =>
+            val fifo = getRegisterFIFO[RT](memKey)
 
             val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
             dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
@@ -429,7 +454,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val foreverIter = makeIter(foreverCtr).unbox
 
     val newCChain = CounterChain(Seq(foreverCtr) ++ newInnerCtrs)
-    val IterFIFOWithInfo(iterFIFO, iterToIndexMap) = createCounterGenerator(lhs)
+    val IterFIFOWithInfo(iterFIFO, iterToIndexMap) = indent { createCounterGenerator(lhs) }
 
     /**
       * What we have here looks like this:
@@ -475,7 +500,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       // Fetch Register values
       dbgs(s"Fetching Register Values")
       indent {
-        handleIntakeRegisters(lhs, firstIterMap.toMap)
+        // Filter to the FIRST read for each intake register
+        val regs = intakeRegisters(lhs)
+        val reads = regs.flatMap(r => foreachOp.block.stms.find(_.readMem.contains(r)))
+        handleIntakeRegisters(lhs, reads.toSeq, firstIterMap.toMap)
       }
 
 
@@ -523,7 +551,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       newForeach =>
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
-        dbgs(s"Substs: $subst")
     }
   }
 
@@ -539,7 +566,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           accelScope.block.nestedStms.foreach {
             case loop@Op(foreachOp: OpForeach) if inHw && loop.isInnerControl =>
               dbgs(s"Transforming Inner: $loop = $foreachOp")
-              indent { visitInnerForeach(loop, foreachOp) }
+              indent { isolateSubst() { visitInnerForeach(loop, foreachOp) } }
             case _ =>
           }
         }
@@ -550,6 +577,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
+
+  override def postprocess[R](block: Block[R]): Block[R] = {
+    val result = super.postprocess(block)
+    accelHandle = null
+    dbgs("="*80)
+    dbgs(s"regFIFOs: $regFIFOs")
+    dbgs("="*80)
+    result
+  }
 }
 
 

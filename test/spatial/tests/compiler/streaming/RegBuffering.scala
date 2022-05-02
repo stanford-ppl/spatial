@@ -27,6 +27,7 @@ import spatial.dsl._
           }
       }
     }
+    println(r"Recv: ${output.value}")
     assert(output.value == 90, r"Expected 90, received ${output.value}")
   }
 }
@@ -36,24 +37,41 @@ class RegBufferingNoStream extends RegBuffering {
 }
 
 @spatial class DataDependentControl extends SpatialTest {
+  override def compileArgs = "--max_cycles=1000"
   override def main(args: Array[String]) = {
     val output = ArgOut[I32]
+    val output2 = ArgOut[I32]
     Accel {
-      Foreach(4 until 8) {
+      val accum1 = Reg[I32](0)
+      val accum2 = Reg[I32](0)
+      Sequential.Foreach(4 until 8) {
         outer =>
           val innerIterReg = Reg[I32](0)
-          'Producer.Foreach(0 until outer) {
+          'Producer.Sequential.Foreach(0 until outer) {
             inner =>
               innerIterReg := innerIterReg + inner
           }
-          // innerIterReg = Sum(0 .. outer)
-          'Consumer.Foreach(0 until innerIterReg.value) {
+          // innerIterReg = 6; 10; 15; 21
+          'Consumer.Sequential.Foreach(0 until innerIterReg.value) {
             inner2 =>
-              output := output + inner2
+              accum1 := accum1 + inner2
+              println(r"Accum1: $accum1, inner2: $inner2, reg: $innerIterReg")
           }
+          // 15; 45; 105; 210
+
+          'Consumer2.Sequential.Foreach(0 until innerIterReg.value) {
+            inner3 =>
+              accum2 := accum2 + inner3 * innerIterReg.value
+              println(r"Accum2: $accum2, inner3: $inner3, reg: $innerIterReg")
+          }
+          // 15*6; 45*10; 105 * 15; 21 * 210
       }
+      output := accum1
+      output2 := accum2
     }
-    println(r"Result: ${output.value}")
+    // output1 = 210
+    // output2 =
+    println(r"Result: ${output.value}, Result2: ${output2.value}")
     assert(Bit(true))
   }
 }

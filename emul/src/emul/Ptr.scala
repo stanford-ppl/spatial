@@ -7,11 +7,9 @@ case class Ptr[T](var x: T) {
   def value: T = x
 
   private var  initValue : T = _
-  private var needsInit: Boolean = true
-  def initMem(init: T): Unit = if (needsInit) {
+  def initMem(init: T): Unit = {
     x = init
-    initValue = init 
-    needsInit = false
+    initValue = init
   }
 
   def reset() : Ptr[T] =  { x = initValue; this }

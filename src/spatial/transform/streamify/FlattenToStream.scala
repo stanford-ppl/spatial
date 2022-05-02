@@ -279,7 +279,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             s match {
               case Op(RegRead(mem)) =>
                 register(mem -> mirrorSym(mem))
-                handleIntakeRegisters(cchain.blk.s.get, Seq(s), firstIterMap.toMap)
+                handleIntakeRegisters(cchain.blk.s.get, Seq(s), firstIterMap.toMap, Map.empty)
                 register(s -> regValues(mem))
               case other if !subst.contains(other) => register(other -> mirrorSym(other))
               case _ => // pass
@@ -341,7 +341,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     IterFIFOWithInfo(iterFIFO, allOldIters.zipWithIndex.toMap)
   }
 
-  def handleIntakeRegisters(lhs: Sym[_], reads: Seq[Sym[_]], firstIterMap: Map[Sym[_], Bit]): Sym[_] = {
+  def handleIntakeRegisters(lhs: Sym[_], reads: Seq[Sym[_]], firstIterMap: Map[Sym[_], Bit], hasBackWrite: Map[Sym[_], Boolean]): Sym[_] = {
     reads.foreach {
       case read@Op(RegRead(reg)) =>
         assert(!reg.isNonBuffer, s"Register $reg was marked nonBuffer -- this breaks when streamifying.")
@@ -387,7 +387,23 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         assert(intakes.map(_._1).toSet.size == intakes.size, s"Intake values should have distinct enable signals.")
         val wrVal = oneHotMux(intakes.map(_._1), intakes.map(_._2.asInstanceOf[RT]))
         val wrEn = intakes.map(_._1).reduceTree(_ | _)
-        regValues(reg) = mux(wrEn, wrVal, f(castedReg).unbox.value)
+        wrEn match {
+          case Const(x) if x.toBoolean =>
+            // If we're always reading, then no hold register is necessary
+            regValues(reg) = mux(wrEn, wrVal, f(castedReg).unbox.value)
+          case _ if hasBackWrite.getOrElse(reg, false) =>
+            // If there's a backwards write, then it'll be respected here as well
+            regValues(reg) = mux(wrEn, wrVal, f(castedReg).unbox.value)
+          case _ =>
+            // If we're not always reading, and there isn't a backwards write inside the same inner controller
+            // then we need to hold the value.
+            val holdReg = mirrorSym(castedReg).unbox
+            holdReg.nonbuffer
+            holdReg.write(wrVal, wrEn)
+            val newCopy = f(castedReg)
+            newCopy.write(holdReg.value)
+            regValues(reg) = newCopy.value
+        }
     }
   }
 
@@ -503,7 +519,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         // Filter to the FIRST read for each intake register
         val regs = intakeRegisters(lhs)
         val reads = regs.flatMap(r => foreachOp.block.stms.find(_.readMem.contains(r)))
-        handleIntakeRegisters(lhs, reads.toSeq, firstIterMap.toMap)
+        val backWriteMap = regs.map(reg => {
+          reg -> lhs.writtenMems.contains(reg)
+        }).toMap[Sym[_], Boolean]
+        handleIntakeRegisters(lhs, reads.toSeq, firstIterMap.toMap, backWriteMap)
       }
 
 

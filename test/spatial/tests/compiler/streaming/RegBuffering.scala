@@ -55,24 +55,25 @@ class RegBufferingNoStream extends RegBuffering {
           'Consumer.Sequential.Foreach(0 until innerIterReg.value) {
             inner2 =>
               accum1 := accum1 + inner2
-              println(r"Accum1: $accum1, inner2: $inner2, reg: $innerIterReg")
+//              println(r"Accum1: $accum1, inner2: $inner2, reg: $innerIterReg")
           }
           // 15; 45; 105; 210
 
           'Consumer2.Sequential.Foreach(0 until innerIterReg.value) {
             inner3 =>
               accum2 := accum2 + inner3 * innerIterReg.value
-              println(r"Accum2: $accum2, inner3: $inner3, reg: $innerIterReg")
+//              println(r"Accum2: $accum2, inner3: $inner3, reg: $innerIterReg")
           }
           // 15*6; 45*10; 105 * 15; 21 * 210
       }
       output := accum1
       output2 := accum2
     }
-    // output1 = 210
-    // output2 =
+    // output1 = 375
+    // output2 = 6525
     println(r"Result: ${output.value}, Result2: ${output2.value}")
-    assert(Bit(true))
+    assert(output.value == 375, r"Expected 375, got ${output.value}")
+    assert(output2.value == 6525, r"Expected 6525, got ${output2.value}")
   }
 }
 

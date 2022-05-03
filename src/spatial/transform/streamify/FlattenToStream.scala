@@ -4,6 +4,7 @@ import argon.transform.{ForwardTransformer, MutateTransformer}
 import argon._
 import argon.tags.struct
 import spatial.lang._
+import spatial.metadata.access
 import spatial.node._
 import spatial.traversal.AccelTraversal
 
@@ -12,17 +13,6 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.access._
 import spatial.util.TransformUtils._
-
-trait MemStrategy
-
-// When a Token is needed and Buffers are needed
-case object Buffered extends MemStrategy
-
-// When the memory should be duplicated -- for registers.
-case object Duplicate extends MemStrategy
-
-// When the object needs ordering, but shouldn't be buffered or duplicated (FIFOs, LIFOs, etc.)
-case object TokenOnly extends MemStrategy
 
 /**
   * A PseudoIter represents an iteration variable that is sent along a FIFO in order to handle variable bounds
@@ -52,14 +42,32 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
 
-  abstract trait MemKey
+  trait MemKey
   case class InnerMemKey(writeCtrl: Option[Sym[_]], readCtrl: Sym[_], mem: Sym[_]) extends MemKey
   case class OuterMemKey(writeCtrl: Option[Sym[_]], reader: Sym[_], mem: Sym[_]) extends MemKey
 
-  case class RWTriple(writer: Option[Sym[_]], reader: Sym[_], edgeType: RWEdge) {
+  trait DependentAccess {
+    def sym: Sym[_]
+    def mem: Sym[_]
+  }
+  case class Read(sym: Sym[_]) extends DependentAccess {
+    def mem = sym.readMem.get
+  }
+  case class Write(sym: Sym[_]) extends DependentAccess {
+    def mem = sym.writtenMem.get
+  }
+
+  object DependentAccess {
+    def apply(sym: Sym[_]): DependentAccess = sym match {
+      case Op(_:Reader[_, _]) => Read(sym)
+      case Op(_:Writer[_]) => Write(sym)
+    }
+  }
+
+  case class RWTriple(writer: Option[Sym[_]], reader: DependentAccess, edgeType: RWEdge) {
     writer.foreach {
       wr =>
-        assert(wr.writtenMem == reader.readMem, s"Expected Writer and Reader to read and write to the same location. Instead, got: Write($wr = ${wr.writtenMem}) != Read($reader = ${reader.readMem})")
+        assert(wr.writtenMem.contains(reader.mem), s"Expected Writer and Reader to read and write to the same location. Instead, got: Write($wr = ${wr.writtenMem}) != Read($reader = ${reader.mem})")
     }
     if (writer.isEmpty) {
       assert(edgeType == Forward, s"Cannot have backwards initialization")
@@ -67,19 +75,19 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     def isInternal: Boolean = readParent == wrParent
 
-    def mem: Sym[_] = reader.readMem.get
+    def mem: Sym[_] = reader.mem
 
-    def readParent: Option[Sym[_]] = reader.blk.s
+    def readParent: Option[Sym[_]] = reader.sym.blk.s
     def wrParent: Option[Sym[_]] = writer.flatMap(_.blk.s)
 
     def toMemKey: MemKey = {
       // There's a mismatch if dest is a RegRead and is used in a counterchain (i.e. dest is a floating transient)
-      val isInner = reader.blk.s == reader.parent.s
+      val isInner = reader.sym.blk.s == reader.sym.parent.s
       if (isInner) {
         // This deduplicates based on the writing and reading InnerControllers
         InnerMemKey(wrParent, readParent.get, mem)
       } else {
-        OuterMemKey(wrParent, reader, mem)
+        OuterMemKey(wrParent, reader.sym, mem)
       }
     }
   }
@@ -88,7 +96,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   case class MemInfoMap(triples: Seq[RWTriple]) {
     def toDotGraph: String = {
       // print all relevant inner controllers
-      val nodes = triples.flatMap(triple => Seq(triple.reader) ++ triple.writer.toSeq)
+      val nodes = triples.flatMap(triple => Seq(triple.reader.sym) ++ triple.writer.toSeq)
       val asInnerControls = nodes.groupBy(_.blk)
       val innerControlString = asInnerControls.map {
         case (ctrl, children) =>
@@ -146,13 +154,32 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                   write =>
                     val (_, dist) = LCAWithDataflowDistance(write, reader)
                     val isForward = dist > 0
-                    RWTriple(Some(write), reader, if (isForward) Forward else Backward)
+                    RWTriple(Some(write), DependentAccess(reader), if (isForward) Forward else Backward)
                 }
                 val canInit = writeTriples.forall(_.edgeType == Backward)
-                writeTriples ++ (if (canInit) Seq(RWTriple(None, reader, Forward)) else Seq.empty)
+                writeTriples ++ (if (canInit) Seq(RWTriple(None, DependentAccess(reader), Forward)) else Seq.empty)
               }
           }
         }
+
+      case sram: SRAM[_, _] =>
+        dbgs(s"SRAM: $sram")
+        indent {
+          (sram.readers ++ sram.writers).flatMap {
+            acc =>
+              dbgs(s"Read/Write: $acc = ${acc.op}")
+              indent {
+                val reachingWrites = access.reachingWrites(acc.affineMatrices.toSet, sram.writers.flatMap(_.affineMatrices), false)
+                reachingWrites.map(_.access).map {
+                  write =>
+                    val (_, dist) = LCAWithDataflowDistance(write, acc)
+                    val isForward = dist > 0
+                    RWTriple(Some(write), DependentAccess(acc), if (isForward) Forward else Backward)
+                }
+              }
+          }
+        }
+
       case _ => Seq.empty
     }
     dbgs(s"Analyzed Triples: $triples")
@@ -351,7 +378,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         val castedReg = reg.asInstanceOf[Reg[RT]]
 
         // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegReads / RegWrites
-        val allRelevant = memInfo.triples.filter(_.reader == read)
+        val allRelevant = memInfo.triples.filter(_.reader.sym == read)
         dbgs(s"Relevant Triples: $allRelevant")
 
         val intakes = indent {
@@ -437,7 +464,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case (memKey, RWTriple(_, dest, edgeType)) =>
             val fifo = getRegisterFIFO[RT](memKey)
 
-            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
+            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.sym.toCtrl)
             dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
 
             val isLastIterWithinLCA = getOutermostIter(writerPath.drop(1)).map(lastIterMap(_)).getOrElse(Bit(true))
@@ -527,6 +554,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
 
       // Fetch Buffer Tokens
+      dbgs(s"Fetching Buffer Tokens")
+      indent {
+        // We need tokens
+      }
 
       // Restage the actual innards of the foreach
       foreachOp.block.stms.foreach {
@@ -594,7 +625,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }
     }
 
-    case _ => super.transform(lhs, rhs)
+    case _ =>
+      dbgs(s"Transforming: $lhs = $rhs")
+      super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 
   override def postprocess[R](block: Block[R]): Block[R] = {

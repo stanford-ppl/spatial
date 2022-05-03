@@ -6,7 +6,7 @@ import spatial.dsl._
   val innerIters = 4
 
   override def main(args: Array[String]) = {
-    implicitly[argon.State].config.stop = 43
+    implicitly[argon.State].config.stop = 49
     val output = DRAM[I32](outerIters, innerIters)
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)

@@ -148,7 +148,7 @@ trait Spatial extends Compiler with ParamLoader {
 //      createDump(s"streamify_$iter")
 //    }, maxIters = spatialConfig.maxStreamifyIters))
 
-    lazy val streamify = bankingAnalysis ++ createDump("PreStream") ++ Seq(unitPipeToForeach, FlattenToStream(state), pipeInserter, printer) ++ createDump("PostStream")
+    lazy val streamify = createDump("PreStream") ++ Seq(unitPipeToForeach) ++ bankingAnalysis ++ Seq(FlattenToStream(state), pipeInserter, streamBufferExpansion, printer) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

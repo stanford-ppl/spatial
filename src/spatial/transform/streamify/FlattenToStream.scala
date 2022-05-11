@@ -38,6 +38,10 @@ sealed trait RWEdge
 case object Forward extends RWEdge
 case object Backward extends RWEdge
 
+object RWEdge {
+  def apply(distance: Int) = if (distance > 0) Forward else Backward
+}
+
 case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTransformer with AccelTraversal {
 
   type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
@@ -45,29 +49,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   trait MemKey
   case class InnerMemKey(writeCtrl: Option[Sym[_]], readCtrl: Sym[_], mem: Sym[_]) extends MemKey
   case class OuterMemKey(writeCtrl: Option[Sym[_]], reader: Sym[_], mem: Sym[_]) extends MemKey
+  case class InitMemKey(mem: Sym[_]) extends MemKey
 
-  trait DependentAccess {
-    def sym: Sym[_]
-    def mem: Sym[_]
-  }
-  case class Read(sym: Sym[_]) extends DependentAccess {
-    def mem = sym.readMem.get
-  }
-  case class Write(sym: Sym[_]) extends DependentAccess {
-    def mem = sym.writtenMem.get
-  }
-
-  object DependentAccess {
-    def apply(sym: Sym[_]): DependentAccess = sym match {
-      case Op(_:Reader[_, _]) => Read(sym)
-      case Op(_:Writer[_]) => Write(sym)
-    }
-  }
-
-  case class RWTriple(writer: Option[Sym[_]], reader: DependentAccess, edgeType: RWEdge) {
+  case class RegRWTriple(writer: Option[Sym[_]], reader: Sym[_], edgeType: RWEdge) {
     writer.foreach {
       wr =>
-        assert(wr.writtenMem.contains(reader.mem), s"Expected Writer and Reader to read and write to the same location. Instead, got: Write($wr = ${wr.writtenMem}) != Read($reader = ${reader.mem})")
+        assert(wr.writtenMem == reader.readMem, s"Expected Writer and Reader to read and write to the same location. Instead, got: Write($wr = ${wr.writtenMem}) != Read($reader = ${reader.readMem})")
     }
     if (writer.isEmpty) {
       assert(edgeType == Forward, s"Cannot have backwards initialization")
@@ -75,28 +62,189 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     def isInternal: Boolean = readParent == wrParent
 
-    def mem: Sym[_] = reader.mem
+    lazy val mem: Sym[_] = reader.readMem.get
 
-    def readParent: Option[Sym[_]] = reader.sym.blk.s
-    def wrParent: Option[Sym[_]] = writer.flatMap(_.blk.s)
+    lazy val readParent: Option[Sym[_]] = reader.blk.s
+    lazy val wrParent: Option[Sym[_]] = writer.flatMap(_.blk.s)
 
     def toMemKey: MemKey = {
       // There's a mismatch if dest is a RegRead and is used in a counterchain (i.e. dest is a floating transient)
-      val isInner = reader.sym.blk.s == reader.sym.parent.s
+      val isInner = reader.blk.s == reader.parent.s
       if (isInner) {
         // This deduplicates based on the writing and reading InnerControllers
         InnerMemKey(wrParent, readParent.get, mem)
       } else {
-        OuterMemKey(wrParent, reader.sym, mem)
+        OuterMemKey(wrParent, reader, mem)
       }
     }
   }
 
+  case class TokenSource(sources: Set[Sym[_]])
 
-  case class MemInfoMap(triples: Seq[RWTriple]) {
+  // These refer to Controllers instead of actual operations for simplicity
+  // If a controller is a WRITER:
+  //    -- It must first gather all tokens from before it, either from the immediate previous writer, or all immediate previous readers
+  //    -- It then broadcasts the token to all readers after it
+  // Read from source, for mem
+  case class SourceData(source: Sym[_], edgeType: RWEdge)
+  case class DestData(dest: Sym[_], edgeType: RWEdge)
+  /**
+    *
+    * @param destinationMap A map from each controller to the destinations where it broadcasts its tokens
+    * @param sourceMap A map from each controller to the sources it reads from. All sources from the same bundle must give the same token
+    */
+  case class BufferData(destinationMap: Map[(Sym[_], Sym[_]), Seq[DestData]], sourceMap: Map[(Sym[_], Sym[_]), Seq[Seq[SourceData]]])
+  var bufferData: BufferData = null
+
+  private def computeBufferInfo(lhs: Sym[_]) = {
+    val mems = lhs.blocks.flatMap(_.nestedStms).filter(_.isSRAM).filterNot(isInternalMem)
+    val destinationMap = cm.Map[(Sym[_], Sym[_]), cm.ArrayBuffer[DestData]]()
+    val sourceMap = cm.Map[(Sym[_], Sym[_]), cm.ArrayBuffer[Seq[SourceData]]]()
+    mems.foreach {
+      mem =>
+        dbgs(s"Mem: $mem")
+        indent {
+          // each group is either a set of readers or a writer.
+          val ctrlers = (mem.readers ++ mem.writers).groupBy(_.parent)
+          val accessData = ctrlers.groupBy {
+            case (parent, accesses) =>
+              val representative = accesses.head
+              val reachingWrites = access.reachingWrites(
+                representative.affineMatrices.toSet,
+                mem.writers.flatMap(_.affineMatrices),
+                false).map(_.access).filter(_.parent != parent).flatMap(_.parent.s)
+              val withDirection = reachingWrites.map {
+                write =>
+                  val (_, dist) = LCAWithDataflowDistance(write, representative)
+                  write -> RWEdge(dist)
+              }
+              withDirection
+          }
+          indent {
+            dbgs(s"Access Data:")
+            indent {
+              accessData.foreach {
+                case (producer, consumers) =>
+                  dbgs(s"Producer: $producer")
+                  indent {
+                    consumers.foreach {
+                      case (ctrl, children) =>
+                        dbgs(s"Ctrl: $ctrl -> [${children.mkString(", ")}]")
+                    }
+                  }
+              }
+            }
+          }
+          // Accessdata structure:
+          // producers -> [ConsumerCtrl -> [Consumer Nodes]]
+
+          // Find the initializing access
+          val initial = {
+            val tmp = accessData.find {
+              case (producers, consumers) =>
+                // We're "initial" if all of our producers are backedges
+                producers.forall(_._2 == Backward)
+            }.get._2
+
+            assert(tmp.size == 1, s"Expected 1 initial producer of $mem, got $tmp instead")
+            tmp.head
+          }
+
+          dbgs(s"Initial: $initial")
+
+
+          accessData.foreach {
+            case (producers, consumers) =>
+              val (writers, readers) = consumers.partition { case (Ctrl.Node(sym, _), _) => sym.writtenMems.contains(mem) }
+              assert(writers.size <= 1, s"There can be at most writer consuming each consumer set, found: $writers")
+
+              val readerCtrlSyms = readers.map { case (Ctrl.Node(sym, _), _) => sym }
+
+              // Is there an ordering between readers and writers? Depends on if there's a stream control involved.
+              // TODO: Currently assuming that Write happens after Read, ignoring parallel/stream control.
+
+              // Set up the broadcast / recv info for readers
+              readerCtrlSyms.foreach {
+                sym =>
+                  producers.foreach {
+                    case (producer, edgeType) =>
+                      val destinations = destinationMap.getOrElseUpdate((mem, producer), cm.ArrayBuffer.empty)
+                      destinations.append(DestData(sym, edgeType))
+                  }
+                  sourceMap.getOrElseUpdate((mem, sym), cm.ArrayBuffer.empty).append(producers.toSeq.map {
+                    case (producer, edgeType) => SourceData(producer, edgeType)
+                  })
+              }
+
+              // By necessity, the ordering is readers -> writers because otherwise the writer would kill the readers
+              // If there aren't writers, then we're trailing readers, and thus need to loop tokens back to the first
+              // writer/reader
+              writers.headOption match {
+                case Some((Ctrl.Node(wrCtrlSym, _), _)) =>
+                  // Assume that the write control follows the readers
+                  if (readers.nonEmpty) {
+                    val source = readerCtrlSyms.map {
+                      rdSym =>
+                        val (_, dist) = LCAWithDataflowDistance(rdSym, wrCtrlSym)
+
+                        val destinations = destinationMap.getOrElseUpdate((mem, rdSym), cm.ArrayBuffer.empty)
+                        destinations.append(DestData(wrCtrlSym, RWEdge(dist)))
+                        SourceData(rdSym, RWEdge(dist))
+                    }
+                    sourceMap.getOrElseUpdate((mem, wrCtrlSym), cm.ArrayBuffer.empty).append(source.toSeq)
+                  } else {
+                    producers.foreach {
+                      case (producer, edgeType) =>
+                        val destinations = destinationMap.getOrElseUpdate((mem, producer), cm.ArrayBuffer.empty)
+                        destinations.append(DestData(wrCtrlSym, edgeType))
+                    }
+                    sourceMap.getOrElseUpdate((mem, wrCtrlSym), cm.ArrayBuffer.empty).append(producers.toSeq.map {
+                      case (producer, edgeType) => Seq(SourceData(producer, edgeType))
+                    }:_*)
+                  }
+                case None =>
+              }
+          }
+
+          dbgs(s"SourceMap: $sourceMap")
+          dbgs(s"DestMap: $destinationMap")
+          // The "Tail" is the node for which there is no destination -- instead wire this to the init
+          // If the tail concluded with a write, then it'll show up as the sole tail
+          // otherwise, it'll have all of the reads.
+          val tail = accessData.flatMap {
+            case (_, consumers) =>
+              dbgs(s"Consumers: $consumers")
+              consumers.flatMap {
+                case (Ctrl.Node(consSym, _), _) if !destinationMap.get((mem, consSym)).exists(_.nonEmpty) => Seq(consSym)
+                case _ => Nil
+              }
+          }
+          dbgs(s"Tail: $tail")
+          // connect the tail back to the head
+          val bundle = tail.map(SourceData(_, Backward)).toSeq
+          val initCtrl = initial._1.s.get
+          sourceMap.getOrElseUpdate((mem, initCtrl), cm.ArrayBuffer.empty).append(bundle)
+          tail.foreach {
+            acc => destinationMap.getOrElseUpdate((mem, acc), cm.ArrayBuffer.empty).append(DestData(initCtrl, Backward))
+          }
+
+          dbgs(s"With Reflow:")
+          indent {
+            dbgs(s"SourceMap: $sourceMap")
+            dbgs(s"DestMap: $destinationMap")
+          }
+        }
+    }
+    BufferData(
+      destinationMap.toMap,
+      sourceMap.toMap
+    )
+  }
+
+  case class MemInfoMap(triples: Seq[RegRWTriple]) {
     def toDotGraph: String = {
       // print all relevant inner controllers
-      val nodes = triples.flatMap(triple => Seq(triple.reader.sym) ++ triple.writer.toSeq)
+      val nodes = triples.flatMap(triple => Seq(triple.reader) ++ triple.writer.toSeq)
       val asInnerControls = nodes.groupBy(_.blk)
       val innerControlString = asInnerControls.map {
         case (ctrl, children) =>
@@ -111,9 +259,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }.mkString(";\n")
 
       val edgeString = triples.map {
-        case triple@RWTriple(Some(writer), reader, edgeType) =>
+        case triple@RegRWTriple(Some(writer), reader, edgeType) =>
           val source = s"struct_${triple.wrParent.get}:$writer"
-          val dest = s"struct_${triple.readParent.get}:$reader"
+          val dest = s"struct_${triple.readParent.get}:${reader}"
           val style = edgeType match {
             case Forward => "solid"
             case Backward => "dashed"
@@ -125,7 +273,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
 
           s"$source:$position -> $dest:$position [style = $style]"
-        case RWTriple(None, reader, Forward) =>
+        case RegRWTriple(None, reader, Forward) =>
           s"// Initialization for $reader"
       }.mkString(";\n")
 
@@ -140,7 +288,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   private def computeMemInfoMap(lhs: Sym[_]): MemInfoMap = {
     val allMems = lhs.blocks.flatMap(_.nestedStms).filter(_.isMem)
-    val triples = allMems.flatMap {
+    val triples = allMems.collect {
       case reg: Reg[_] =>
         dbgs(s"Reg: $reg")
         indent {
@@ -154,49 +302,30 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                   write =>
                     val (_, dist) = LCAWithDataflowDistance(write, reader)
                     val isForward = dist > 0
-                    RWTriple(Some(write), DependentAccess(reader), if (isForward) Forward else Backward)
+                    RegRWTriple(Some(write), reader, if (isForward) Forward else Backward)
                 }
                 val canInit = writeTriples.forall(_.edgeType == Backward)
-                writeTriples ++ (if (canInit) Seq(RWTriple(None, DependentAccess(reader), Forward)) else Seq.empty)
+                writeTriples ++ (if (canInit) Seq(RegRWTriple(None, reader, Forward)) else Seq.empty)
               }
           }
         }
-
-      case sram: SRAM[_, _] =>
-        dbgs(s"SRAM: $sram")
-        indent {
-          (sram.readers ++ sram.writers).flatMap {
-            acc =>
-              dbgs(s"Read/Write: $acc = ${acc.op}")
-              indent {
-                val reachingWrites = access.reachingWrites(acc.affineMatrices.toSet, sram.writers.flatMap(_.affineMatrices), false)
-                reachingWrites.map(_.access).map {
-                  write =>
-                    val (_, dist) = LCAWithDataflowDistance(write, acc)
-                    val isForward = dist > 0
-                    RWTriple(Some(write), DependentAccess(acc), if (isForward) Forward else Backward)
-                }
-              }
-          }
-        }
-
-      case _ => Seq.empty
     }
-    dbgs(s"Analyzed Triples: $triples")
+    val filtered = triples.flatten.filterNot(_.isInternal)
+    dbgs(s"Analyzed Triples: $filtered")
 
-    MemInfoMap(triples.filterNot(_.isInternal))
+    MemInfoMap(filtered)
   }
 
   private val regFIFOs = cm.Map[MemKey, FIFO[_]]()
 
   private var accelHandle: BundleHandle = null
 
-  def getRegisterFIFO[T: Bits](key: MemKey): FIFO[T] = {
+  private def getFIFO[T: Bits](key: MemKey, depth: Option[I32] = None): FIFO[T] = {
     (regFIFOs.get(key) match {
       case Some(fifo) => fifo
       case None =>
         IR.withScope(accelHandle) {
-          val newFIFO = FIFO[T](I32(32))
+          val newFIFO = FIFO[T](depth.getOrElse(I32(32)))
           regFIFOs(key) = newFIFO
           newFIFO
         }
@@ -378,15 +507,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         val castedReg = reg.asInstanceOf[Reg[RT]]
 
         // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegReads / RegWrites
-        val allRelevant = memInfo.triples.filter(_.reader.sym == read)
+        val allRelevant = memInfo.triples.filter(_.reader == read)
         dbgs(s"Relevant Triples: $allRelevant")
 
         val intakes = indent {
           allRelevant map {
-            case triple@RWTriple(Some(writer), reader, edgeType) =>
+            case triple@RegRWTriple(Some(writer), reader, edgeType) =>
               val (lca, writerPath, readerPath) = LCAWithPaths(writer.toCtrl, lhs.toCtrl)
               dbgs(s"Writer: $writer ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
-              val fifo = getRegisterFIFO[RT](triple.toMemKey)
+              val fifo = getFIFO[RT](triple.toMemKey)
 
               // we should read if it's the first iteration within the LCA
               val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
@@ -400,7 +529,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
               }
               dbgs(s"Fetching: $reg <- $fifo.deq($en)")
               (en, fifo.deq(en))
-            case RWTriple(None, _, Forward) =>
+            case RegRWTriple(None, _, Forward) =>
               // This counts as initialization
               val (_, _, pathToReg) = LCAWithPaths(reg.parent, lhs.toCtrl)
               val shouldInit = getOutermostIter(pathToReg.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
@@ -434,6 +563,55 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     }
   }
 
+  private def computeBufferDepth(mem: Sym[_]): Int = {
+    // we need 2 copies in each user at the level of the mem.
+    2 * mem.parent.children.count(ctrl => (ctrl.sym.readMems ++ ctrl.sym.writtenMems).contains(mem))
+  }
+
+  private def handleIntakeTokens(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit]): Map[Sym[_], I32] = {
+    ((lhs.readMems ++ lhs.writtenMems).filter(_.isSRAM).filterNot(isInternalMem) map {
+      mem =>
+        dbgs(s"Handling Tokens for $mem")
+        val inputTokens = bufferData.sourceMap((mem, lhs))
+        val intakes = inputTokens.map {
+          bundle =>
+            // A bundle contains one or more sources, and all sources must agree.
+            dbgs(s"Bundle: $bundle")
+            val signals = bundle.map {
+              case SourceData(source, edgeType) =>
+                val key = InnerMemKey(Some(source), lhs, mem)
+                val fifo = getFIFO[I32](key)
+                val (lca, writerPath, readerPath) = LCAWithPaths(source.toCtrl, lhs.toCtrl)
+                dbgs(s"Source: $source ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
+                val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
+
+                val en = edgeType match {
+                  case Forward => isFirstIterInLCA
+                  case Backward =>
+                    // We read from the backward one if it's not the first iteration of the LCA
+                    val isFirstIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(firstIterMap(_)).getOrElse(Bit(true))
+                    isFirstIterInLCA & !isFirstIterOfLCA
+                }
+                dbgs(s"Fetching: $mem <- $fifo.deq($en)")
+                (en, fifo.deq(en))
+            }
+            // Nathan: I'm pretty sure that all of the bundle is enabled at the same time
+            assert(signals.map(_._1).toSet.size == 1, s"Expected 1 (unique) Enable signal, got ${signals.map(_._1)}")
+            signals.head
+        }
+
+        val wrVal = oneHotMux(intakes.map(_._1), intakes.map(_._2))
+        val wrEn = intakes.map(_._1).reduceTree(_ | _)
+        val readReg = Reg[I32]
+        readReg.nonbuffer
+        readReg.write(wrVal, wrEn)
+
+        val valueReg = Reg[I32]
+        valueReg := readReg.value
+        mem -> valueReg.value
+    }).toMap
+  }
+
   def handleOutputRegisters(lhs: Sym[_], lastIterMap: Map[Sym[_], Bit]): Unit = {
     outputRegisters(lhs) foreach {
       reg =>
@@ -444,7 +622,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
         // Get all triples which write to the register within LHS, but deduplicate in case there are multiple RegWrites
         val allRelevant = memInfo.triples.filter {
-          case tp@RWTriple(Some(writer), _, _) =>
+          case tp@RegRWTriple(Some(writer), _, _) =>
             // Writers within lhs that write to reg
             tp.wrParent.contains(lhs) && writer.writtenMem.contains(reg)
           case _ => false
@@ -461,10 +639,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         }
 
         allRelevant.foreach {
-          case (memKey, RWTriple(_, dest, edgeType)) =>
-            val fifo = getRegisterFIFO[RT](memKey)
+          case (memKey, RegRWTriple(_, dest, edgeType)) =>
+            val fifo = getFIFO[RT](memKey)
 
-            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.sym.toCtrl)
+            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
             dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
 
             val isLastIterWithinLCA = getOutermostIter(writerPath.drop(1)).map(lastIterMap(_)).getOrElse(Bit(true))
@@ -477,6 +655,45 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             }
             fifo.enq(wrData, wrEnable)
         }
+    }
+  }
+
+  private def handleOutputTokens(lhs: Sym[_], lastIterMap: Map[Sym[_], Bit], tokenMap: Map[Sym[_], I32]): Unit = {
+    (lhs.readMems ++ lhs.writtenMems).filter(_.isSRAM) foreach {
+      mem =>
+        val allRelevant = memInfo.triples.filter {
+          case tp@RegRWTriple(Some(writer), _, _) =>
+            // Writers within lhs that write to reg
+            tp.wrParent.contains(lhs) && writer.writtenMem.contains(mem)
+          case _ => false
+        }.map {
+          triple =>
+            // Deduplicate based on reader's parent controller and edge type
+            triple.toMemKey -> triple
+        }.toMap
+        dbgs(s"Relevant Triples: $allRelevant")
+
+        val wrData = tokenMap(mem)
+
+        allRelevant.foreach {
+          case (memKey, RegRWTriple(_, dest, edgeType)) =>
+            val fifo = getFIFO[I32](memKey)
+
+            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
+            dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
+
+            val isLastIterWithinLCA = getOutermostIter(writerPath.drop(1)).map(lastIterMap(_)).getOrElse(Bit(true))
+            val wrEnable = edgeType match {
+              case Forward => isLastIterWithinLCA
+              case Backward =>
+                // we send the value backward if it isn't the last iteration of the LCA
+                val isLastIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(lastIterMap(_)).get
+                isLastIterWithinLCA & !isLastIterOfLCA
+            }
+            fifo.enq(wrData, wrEnable)
+        }
+
+        // Alternatively, are we the last one?
     }
   }
 
@@ -554,10 +771,13 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
 
       // Fetch Buffer Tokens
-      dbgs(s"Fetching Buffer Tokens")
-      indent {
-        // We need tokens
+      dbgs(s"Fetching SRAM Tokens")
+      val intakeTokens = indent {
+        // Acquire tokens for each SRAM that we read/write
+        handleIntakeTokens(lhs, firstIterMap.toMap)
       }
+
+      dbgs(s"Intake Tokens: $intakeTokens")
 
       // Restage the actual innards of the foreach
       foreachOp.block.stms.foreach {
@@ -589,7 +809,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         handleOutputRegisters(lhs, lastIterMap.toMap)
       }
 
-      retimeGate()
+      dbgs(s"Releasing Tokens")
+      indent {
+        handleOutputTokens(lhs, lastIterMap.toMap, intakeTokens)
+      }
       // Release Buffer Tokens
       // Update StopWhen -- on the last iteration, kill the controller.
       // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
@@ -606,10 +829,16 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case accelScope: AccelScope => inAccel {
-      memInfo = computeMemInfoMap(lhs)
+      dbgs(s"Computing Buffer Data")
+      indent {
+        memInfo = computeMemInfoMap(lhs)
+      }
       dbgs(s"============MemInfoMap============")
       dbgs(memInfo.toDotGraph)
-      dbgs(s"==================================")
+      dbgs(s"============MemInfoMap============")
+      bufferData = computeBufferInfo(lhs)
+      dbgs(s"============BufferData============")
+      dbgs(s"============BufferData============")
       stageWithFlow(AccelScope(stageBlock {
         Stream {
           accelHandle = IR.getCurrentHandle()

@@ -37,6 +37,21 @@ import spatial.util.TransformUtils._
 sealed trait RWEdge
 case object Forward extends RWEdge
 case object Backward extends RWEdge
+case object Return extends RWEdge
+
+sealed trait MemStrategy
+case object Buffer extends MemStrategy
+case object Duplicate extends MemStrategy
+case object Arbitrate extends MemStrategy
+case object Unknown extends MemStrategy
+
+object MemStrategy {
+  def apply(mem: Sym[_]) = mem match {
+    case mem if mem.isReg => Duplicate
+    case mem if mem.isSRAM => Buffer
+    case _ => Unknown
+  }
+}
 
 object RWEdge {
   def apply(distance: Int) = if (distance > 0) Forward else Backward
@@ -221,11 +236,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
           dbgs(s"Tail: $tail")
           // connect the tail back to the head
-          val bundle = tail.map(SourceData(_, Backward)).toSeq
+          val bundle = tail.map(SourceData(_, Return)).toSeq
           val initCtrl = initial._1.s.get
           sourceMap.getOrElseUpdate((mem, initCtrl), cm.ArrayBuffer.empty).append(bundle)
           tail.foreach {
-            acc => destinationMap.getOrElseUpdate((mem, acc), cm.ArrayBuffer.empty).append(DestData(initCtrl, Backward))
+            acc => destinationMap.getOrElseUpdate((mem, acc), cm.ArrayBuffer.empty).append(DestData(initCtrl, Return))
           }
 
           dbgs(s"With Reflow:")
@@ -565,7 +580,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   private def computeBufferDepth(mem: Sym[_]): Int = {
     // we need 2 copies in each user at the level of the mem.
-    2 * mem.parent.children.count(ctrl => (ctrl.sym.readMems ++ ctrl.sym.writtenMems).contains(mem))
+    2 * mem.parent.children.count(ctrl => (ctrl.sym.effects.reads ++ ctrl.sym.effects.writes).contains(mem))
   }
 
   private def handleIntakeTokens(lhs: Sym[_], firstIterMap: Map[Sym[_], Bit]): Map[Sym[_], I32] = {
@@ -591,6 +606,13 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                     // We read from the backward one if it's not the first iteration of the LCA
                     val isFirstIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(firstIterMap(_)).getOrElse(Bit(true))
                     isFirstIterInLCA & !isFirstIterOfLCA
+                  case Return =>
+                    // We read from the return edge if it's the first iteration of our LCA, like a Forward edge,
+                    // since it will be stuffed beforehand.
+                    val initDepth = computeBufferDepth(mem)
+                    dbgs(s"Populating $fifo with depth $initDepth")
+                    fifo.fifoInits = Range(0, initDepth).map(I32(_))
+                    isFirstIterInLCA
                 }
                 dbgs(s"Fetching: $mem <- $fifo.deq($en)")
                 (en, fifo.deq(en))
@@ -659,41 +681,28 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   }
 
   private def handleOutputTokens(lhs: Sym[_], lastIterMap: Map[Sym[_], Bit], tokenMap: Map[Sym[_], I32]): Unit = {
-    (lhs.readMems ++ lhs.writtenMems).filter(_.isSRAM) foreach {
-      mem =>
-        val allRelevant = memInfo.triples.filter {
-          case tp@RegRWTriple(Some(writer), _, _) =>
-            // Writers within lhs that write to reg
-            tp.wrParent.contains(lhs) && writer.writtenMem.contains(mem)
-          case _ => false
-        }.map {
-          triple =>
-            // Deduplicate based on reader's parent controller and edge type
-            triple.toMemKey -> triple
-        }.toMap
-        dbgs(s"Relevant Triples: $allRelevant")
+    tokenMap foreach {
+      case (mem, token) =>
 
-        val wrData = tokenMap(mem)
-
-        allRelevant.foreach {
-          case (memKey, RegRWTriple(_, dest, edgeType)) =>
+        val destinations = bufferData.destinationMap((mem, lhs))
+        dbgs(s"Issuing tokens for $lhs -> $mem =")
+        destinations.foreach {
+          case DestData(dest, edgeType) =>
+            val memKey = InnerMemKey(Some(lhs), dest, mem)
             val fifo = getFIFO[I32](memKey)
-
             val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
-            dbgs(s"Writer: $lhs ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
-
             val isLastIterWithinLCA = getOutermostIter(writerPath.drop(1)).map(lastIterMap(_)).getOrElse(Bit(true))
             val wrEnable = edgeType match {
-              case Forward => isLastIterWithinLCA
+              case Forward | Return =>
+                // We also send the token back for Return so thatt it's available for the next iteration.
+                isLastIterWithinLCA
               case Backward =>
                 // we send the value backward if it isn't the last iteration of the LCA
                 val isLastIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(lastIterMap(_)).get
                 isLastIterWithinLCA & !isLastIterOfLCA
             }
-            fifo.enq(wrData, wrEnable)
+            fifo.enq(token, wrEnable)
         }
-
-        // Alternatively, are we the last one?
     }
   }
 
@@ -799,6 +808,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           // stage the write anyways
           visit(rw)
+        case sramRead@Op(SRAMRead(mem, _, _)) if intakeTokens.contains(mem) =>
+          visit(sramRead)
+          f(sramRead).bufferIndex = intakeTokens(mem)
+        case sramWrite@Op(SRAMWrite(mem, _, _, _)) if intakeTokens.contains(mem) =>
+          visit(sramWrite)
+          f(sramWrite).bufferIndex = intakeTokens(mem)
         case other => visit(other)
       }
 
@@ -829,6 +844,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case accelScope: AccelScope => inAccel {
+      printRegister = true
       dbgs(s"Computing Buffer Data")
       indent {
         memInfo = computeMemInfoMap(lhs)
@@ -842,17 +858,30 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       stageWithFlow(AccelScope(stageBlock {
         Stream {
           accelHandle = IR.getCurrentHandle()
-          accelScope.block.nestedStms.foreach {
-            case loop@Op(foreachOp: OpForeach) if inHw && loop.isInnerControl =>
-              dbgs(s"Transforming Inner: $loop = $foreachOp")
-              indent { isolateSubst() { visitInnerForeach(loop, foreachOp) } }
-            case _ =>
-          }
+          accelScope.block.stms.foreach(visit)
         }
       })) {
         lhs2 => transferData(lhs, lhs2)
       }
     }
+
+    case foreachOp: OpForeach if inHw && lhs.isInnerControl =>
+      dbgs(s"Transforming Inner: $lhs = $foreachOp")
+      indent { isolateSubst() { visitInnerForeach(lhs, foreachOp) } }
+
+    case ctrlOp: Control[_] if inHw && lhs.isOuterControl =>
+      dbgs(s"Skipping Control: $lhs = $ctrlOp")
+      ctrlOp.blocks.foreach(inlineBlock(_))
+      lhs
+
+    case mem if lhs.isMem && MemStrategy(lhs) == Duplicate =>
+      dbgs(s"Skipping $lhs = $mem since it'll be duplicated.")
+      lhs
+
+    case mem if lhs.isMem && MemStrategy(lhs) == Buffer =>
+      val cloned = super.transform(lhs, mem)
+      cloned.bufferAmount = computeBufferDepth(lhs)
+      cloned
 
     case _ =>
       dbgs(s"Transforming: $lhs = $rhs")

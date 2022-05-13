@@ -148,7 +148,7 @@ trait Spatial extends Compiler with ParamLoader {
 //      createDump(s"streamify_$iter")
 //    }, maxIters = spatialConfig.maxStreamifyIters))
 
-    lazy val streamify = createDump("PreStream") ++ Seq(unitPipeToForeach) ++ bankingAnalysis ++ Seq(FlattenToStream(state), pipeInserter, streamBufferExpansion, printer) ++ createDump("PostStream")
+    lazy val streamify = createDump("PreStream") ++ Seq(unitPipeToForeach) ++ bankingAnalysis ++ Seq(FlattenToStream(state), printer, pipeInserter, streamBufferExpansion, printer) ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -204,10 +204,10 @@ trait Spatial extends Compiler with ParamLoader {
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         // Always Run this pass
-        fifoInitialization ==> bankingAnalysis ==>
+        fifoInitialization ==> printer ==> bankingAnalysis ==>
         spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
-//        bankingAnalysis ==>
+        bankingAnalysis ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */

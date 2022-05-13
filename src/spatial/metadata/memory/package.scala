@@ -445,8 +445,8 @@ package object memory {
     def bufferAmount_=(v: StreamBufferAmount) = metadata.add(mem, v)
     def bufferAmount_=(v: Option[StreamBufferAmount]) = metadata.add(mem, v)
 
-    def bufferIndex: Option[Reg[I32]] = metadata[StreamBufferIndex](mem).map(_.bufferIndex)
-    def bufferIndex_=(index: Reg[I32]): Unit = metadata.add(mem, StreamBufferIndex(index))
+    def bufferIndex: Option[I32] = metadata[StreamBufferIndex](mem).map(_.bufferIndex)
+    def bufferIndex_=(index: I32): Unit = metadata.add(mem, StreamBufferIndex(index))
 
     def fifoInits: Option[Seq[Sym[_]]] = metadata[FifoInits](mem).map(_.values)
     def fifoInits_=(values: Seq[Sym[_]]) = metadata.add(mem, FifoInits(values))

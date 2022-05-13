@@ -42,7 +42,7 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
 
   def expandWriter(sym: Sym[_], writer: Writer[_]) = {
     dbgs(s"Expanding Writer: $sym = $writer")
-    val insertedDim = sym.bufferIndex.get.value.asInstanceOf[Idx]
+    val insertedDim = sym.bufferIndex.get.asInstanceOf[Idx]
     writer.mem match {
       case sr:SRAM[_, _] =>
         type A = sr.A.R
@@ -56,7 +56,7 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
 
   def expandReader(sym: Sym[_], reader: Reader[_, _]) = {
     dbgs(s"Expanding Reader: $sym = $reader")
-    val insertedDim = sym.bufferIndex.get.value.asInstanceOf[Idx]
+    val insertedDim = sym.bufferIndex.get.asInstanceOf[Idx]
     reader.mem match {
       case sr: SRAM[_, _] =>
         type A = sr.A.R

@@ -108,6 +108,6 @@ case class StreamBufferAmount(buffering: Int, min: Int = 0, max: Int = Int.MaxVa
   * Memory Buffering Index
   */
 
-case class StreamBufferIndex(bufferIndex: spatial.lang.Reg[spatial.lang.I32]) extends Data[StreamBufferIndex](Transfer.Mirror)
+case class StreamBufferIndex(bufferIndex: spatial.lang.I32) extends Data[StreamBufferIndex](Transfer.Mirror)
 
 case class FifoInits(values: Seq[Sym[_]]) extends Data[FifoInits](Transfer.Mirror)

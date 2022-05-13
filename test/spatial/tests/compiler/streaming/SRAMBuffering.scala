@@ -2,11 +2,13 @@ package spatial.tests.compiler.streaming
 import spatial.dsl._
 
 @spatial class SRAMBufferingSimple extends SpatialTest {
+  override def compileArgs = "--max_cycles=10000"
+
   val outerIters = 16
   val innerIters = 4
 
   override def main(args: Array[String]) = {
-    implicitly[argon.State].config.stop = 49
+//    implicitly[argon.State].config.stop = 80
     val output = DRAM[I32](outerIters, innerIters)
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)
@@ -27,4 +29,8 @@ import spatial.dsl._
     printMatrix(getMatrix(output))
     assert(Bit(true))
   }
+}
+
+class SRAMBufferingSimpleNoStream extends SRAMBufferingSimple {
+  override def compileArgs = super.compileArgs + "--nostreamify"
 }

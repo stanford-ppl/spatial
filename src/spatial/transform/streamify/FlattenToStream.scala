@@ -465,13 +465,25 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           fetchDeps(cchain)
 
-          val newChains = cchain.counters.map(mirrorSym(_).unbox)
+          var shouldFullyPar = true
+          val newChains = cchain.counters.reverse.map {
+            ctr =>
+              if (shouldFullyPar && ctr.isStatic) {
+                type CT = ctr.CT
+                implicit def numEV: Num[CT] = ctr.CTeV.asInstanceOf[Num[CT]]
+                val castedCtr = ctr.asInstanceOf[Counter[CT]]
+                val parFactor = castedCtr.end.unbox.to[I32] - castedCtr.start.unbox.to[I32]
+                stage(CounterNew(castedCtr.start.unbox, castedCtr.end.unbox, castedCtr.step.unbox, parFactor))
+              } else {
+                shouldFullyPar = false
+                mirrorSym(ctr).unbox
+              }
+          }.reverse
           val newCChain = CounterChain(newChains)
           val newIters = makeIters(newChains)
           backlog.appendAll(newIters)
           register(cchain.counters.flatMap(_.iter), newChains.flatMap(_.iter))
 
-          // TODO: Parallelize the innermost loop by as much as possible in order to not cause slowdowns here
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
             updateFirstIterMap()
             val oldItersAsI32 = allOldIters.map(_.unbox.asInstanceOf[I32])

@@ -27,6 +27,10 @@ import spatial.dsl._
       output store outputSR
     }
     printMatrix(getMatrix(output))
+    val reference = Matrix.tabulate(outerIters, innerIters) {
+      (outer, inner) => outer + inner
+    }
+    assert(checkGold(output, reference))
     assert(Bit(true))
   }
 }

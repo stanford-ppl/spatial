@@ -28,7 +28,8 @@ object TransformUtils {
   @api def isFirstIter[T: Num](iter: Num[T]): Bit = {
     val ctr = iter.counter.ctr.asInstanceOf[Counter[Num[T]]]
     implicit def castEV: Cast[I32, T] = argon.lang.implicits.numericCast[I32, T]
-    iter < (ctr.start.unbox + (ctr.step.unbox * ctr.ctrPar.to[T]))
+//    iter < (ctr.start.unbox + (ctr.step.unbox * ctr.ctrPar.to[T]))
+    iter === ctr.start.unbox
   }
 
   @api def isFirstIters[T: Num](iters: Num[T]*): Seq[Bit] = {

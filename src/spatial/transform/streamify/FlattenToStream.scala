@@ -413,8 +413,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     // This is just a hack to create the Bits evidence needed.
     implicit def vecBitsEV: Bits[Vec[PseudoIter]] = Vec.fromSeq(allCounters map {x => PseudoIter(I32(0), Bit(true), Bit(true))})
-    val scope = state.getCurrentHandle()
-    var iterFIFO: FIFO[PseudoIters[Vec[PseudoIter]]] = null
+    val iterFIFO: FIFO[PseudoIters[Vec[PseudoIter]]] = FIFO[PseudoIters[Vec[PseudoIter]]](I32(256))
+    iterFIFO.explicitName = s"IterFIFO_$lhs"
 
     def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Unit = {
       def updateFirstIterMap(): Unit = {
@@ -498,9 +498,13 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             }
             val pIters = PseudoIters(Vec.fromSeq(indexData))
 
-            state.withScope(scope) {
-              iterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]](totalPar * 2)
-              iterFIFO.explicitName = s"IterFIFO_$lhs"
+            // update the size of the FIFO to be sufficiently large as to not block.
+            iterFIFO.asSym match {
+              case Op(fnew@FIFONew(size)) =>
+                isolateSubst() {
+                  register(size -> totalPar*2)
+                  fnew.update(f)
+                }
             }
 
             iterFIFO.enq(pIters)

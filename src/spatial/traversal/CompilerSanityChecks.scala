@@ -136,6 +136,23 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         if (mem.A.nbits != data.nbits) {
           error(lhs.ctx, s"Expected a write of size ${mem.A.nbits} but got $data of size ${data.nbits}")
         }
+      case FIFOVecEnq(mem, data, _, _) =>
+        mem match {
+          case Op(FIFONew(size)) =>
+            val intSize = size.c.get.toInt
+            if (intSize < data.width) {
+              error(lhs.ctx, s"Attempting a write of size ${data.width} to a FIFO of depth ${intSize}. This doesn't fit!")
+            }
+        }
+      case FIFOVecDeq(mem, addr, _) =>
+        mem match {
+          case Op(FIFONew(size)) =>
+            val intSize = size.c.get.toInt
+            if (intSize < addr.size) {
+              error(lhs.ctx, s"Attempting a dequeue of size ${addr.size} from a FIFO of depth ${intSize}. This will always stall!")
+            }
+        }
+
       case _ =>
         check(lhs, rhs)
         super.visit(lhs, rhs)

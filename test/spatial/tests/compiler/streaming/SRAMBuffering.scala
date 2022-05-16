@@ -24,7 +24,7 @@ import spatial.dsl._
               outputSR(outer, inner) = sr(inner)
           }
       }
-      output store outputSR
+      output store outputSR(0::outerIters, 0::innerIters)
     }
     printMatrix(getMatrix(output))
     val reference = Matrix.tabulate(outerIters, innerIters) {

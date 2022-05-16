@@ -413,8 +413,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     // This is just a hack to create the Bits evidence needed.
     implicit def vecBitsEV: Bits[Vec[PseudoIter]] = Vec.fromSeq(allCounters map {x => PseudoIter(I32(0), Bit(true), Bit(true))})
-    val iterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]](I32(32))
-    iterFIFO.explicitName = s"IterFIFO_$lhs"
+    val scope = state.getCurrentHandle()
+    var iterFIFO: FIFO[PseudoIters[Vec[PseudoIter]]] = null
 
     def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Unit = {
       def updateFirstIterMap(): Unit = {
@@ -466,6 +466,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           fetchDeps(cchain)
 
           var shouldFullyPar = true
+          var totalPar = I32(1)
           val newChains = cchain.counters.reverse.map {
             ctr =>
               if (shouldFullyPar && ctr.isStatic) {
@@ -473,6 +474,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                 implicit def numEV: Num[CT] = ctr.CTeV.asInstanceOf[Num[CT]]
                 val castedCtr = ctr.asInstanceOf[Counter[CT]]
                 val parFactor = castedCtr.end.unbox.to[I32] - castedCtr.start.unbox.to[I32]
+
+                totalPar *= parFactor
+
                 stage(CounterNew(castedCtr.start.unbox, castedCtr.end.unbox, castedCtr.step.unbox, parFactor))
               } else {
                 shouldFullyPar = false
@@ -493,6 +497,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
               case (iter, last) => PseudoIter(iter, firstIterMap(iter), last)
             }
             val pIters = PseudoIters(Vec.fromSeq(indexData))
+
+            state.withScope(scope) {
+              iterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]](totalPar * 2)
+              iterFIFO.explicitName = s"IterFIFO_$lhs"
+            }
+
             iterFIFO.enq(pIters)
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>

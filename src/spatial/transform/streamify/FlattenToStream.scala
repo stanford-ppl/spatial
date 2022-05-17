@@ -101,8 +101,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   //    -- It must first gather all tokens from before it, either from the immediate previous writer, or all immediate previous readers
   //    -- It then broadcasts the token to all readers after it
   // Read from source, for mem
-  case class SourceData(source: Sym[_], edgeType: RWEdge)
-  case class DestData(dest: Sym[_], edgeType: RWEdge)
+  case class SourceData(source: Sym[_], edgeType: RWEdge) {
+    assert(source.isControl, s"SRAM Source Token Data refers to controllers")
+  }
+  case class DestData(dest: Sym[_], edgeType: RWEdge) {
+    assert(dest.isControl, s"SRAM Destination Token Data refers to controllers")
+  }
   /**
     *
     * @param destinationMap A map from each controller to the destinations where it broadcasts its tokens
@@ -123,16 +127,18 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           val ctrlers = (mem.readers ++ mem.writers).groupBy(_.parent)
           val accessData = ctrlers.groupBy {
             case (parent, accesses) =>
-              val representative = accesses.head
-              val reachingWrites = access.reachingWrites(
-                representative.affineMatrices.toSet,
-                mem.writers.flatMap(_.affineMatrices),
-                false).map(_.access).filter(_.parent != parent).flatMap(_.parent.s)
-              val withDirection = reachingWrites.map {
+              val otherWriters = mem.writers -- accesses
+              val reachingWrites = access.reachingWrites(accesses.flatMap(_.affineMatrices).toSet,
+                otherWriters.flatMap(_.affineMatrices).toSet, mem.isGlobalMem)
+
+              dbgs(s"Ctrler: $parent, accesses: $accesses, reaching: ${reachingWrites.map(_.access)}")
+              val condensed = reachingWrites.map(_.access.parent.s.get).toSet
+              val withDirection = condensed.map {
                 write =>
-                  val (_, dist) = LCAWithDataflowDistance(write, representative)
+                  val (_, dist) = LCAWithDataflowDistance(write.toCtrl, parent)
                   write -> RWEdge(dist)
               }
+              dbgs(s"Condensed With Direction: $withDirection")
               withDirection
           }
           indent {
@@ -170,10 +176,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           accessData.foreach {
             case (producers, consumers) =>
+              dbgs(s"Consumers: $consumers")
               val (writers, readers) = consumers.partition { case (Ctrl.Node(sym, _), _) => sym.writtenMems.contains(mem) }
               assert(writers.size <= 1, s"There can be at most writer consuming each consumer set, found: $writers")
 
               val readerCtrlSyms = readers.map { case (Ctrl.Node(sym, _), _) => sym }
+              dbgs(s"Reader Control Syms: $readerCtrlSyms")
 
               // Is there an ordering between readers and writers? Depends on if there's a stream control involved.
               // TODO: Currently assuming that Write happens after Read, ignoring parallel/stream control.
@@ -181,6 +189,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
               // Set up the broadcast / recv info for readers
               readerCtrlSyms.foreach {
                 sym =>
+                  dbgs(s"Producers: $producers")
                   producers.foreach {
                     case (producer, edgeType) =>
                       val destinations = destinationMap.getOrElseUpdate((mem, producer), cm.ArrayBuffer.empty)
@@ -220,21 +229,16 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                 case None =>
               }
           }
-
-          dbgs(s"SourceMap: $sourceMap")
-          dbgs(s"DestMap: $destinationMap")
           // The "Tail" is the node for which there is no destination -- instead wire this to the init
           // If the tail concluded with a write, then it'll show up as the sole tail
           // otherwise, it'll have all of the reads.
           val tail = accessData.flatMap {
             case (_, consumers) =>
-              dbgs(s"Consumers: $consumers")
               consumers.flatMap {
                 case (Ctrl.Node(consSym, _), _) if !destinationMap.get((mem, consSym)).exists(_.nonEmpty) => Seq(consSym)
                 case _ => Nil
               }
           }
-          dbgs(s"Tail: $tail")
           // connect the tail back to the head
           val bundle = tail.map(SourceData(_, Return)).toSeq
           val initCtrl = initial._1.s.get
@@ -243,11 +247,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             acc => destinationMap.getOrElseUpdate((mem, acc), cm.ArrayBuffer.empty).append(DestData(initCtrl, Return))
           }
 
-          dbgs(s"With Reflow:")
-          indent {
-            dbgs(s"SourceMap: $sourceMap")
-            dbgs(s"DestMap: $destinationMap")
-          }
+          dbgs(s"SourceMap: $sourceMap")
+          dbgs(s"DestMap: $destinationMap")
         }
     }
     BufferData(
@@ -613,50 +614,52 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     ((lhs.readMems ++ lhs.writtenMems).filter(_.isSRAM).filterNot(isInternalMem) map {
       mem =>
         dbgs(s"Handling Tokens for $mem")
-        val inputTokens = bufferData.sourceMap((mem, lhs))
-        val intakes = inputTokens.map {
-          bundle =>
-            // A bundle contains one or more sources, and all sources must agree.
-            dbgs(s"Bundle: $bundle")
-            val signals = bundle.map {
-              case SourceData(source, edgeType) =>
-                val key = InnerMemKey(Some(source), lhs, mem)
-                val fifo = getFIFO[I32](key)
-                val (lca, writerPath, readerPath) = LCAWithPaths(source.toCtrl, lhs.toCtrl)
-                dbgs(s"Source: $source ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
-                val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
+        indent {
+          val inputTokens = bufferData.sourceMap((mem, lhs))
+          val intakes = inputTokens.map {
+            bundle =>
+              // A bundle contains one or more sources, and all sources must agree.
+              dbgs(s"Bundle: $bundle")
+              val signals = bundle.map {
+                case SourceData(source, edgeType) =>
+                  val key = InnerMemKey(Some(source), lhs, mem)
+                  val fifo = getFIFO[I32](key)
+                  val (lca, writerPath, readerPath) = LCAWithPaths(source.toCtrl, lhs.toCtrl)
+                  dbgs(s"Source: $source ; LCA: $lca ; writerPath: $writerPath ; readerPath: $readerPath")
+                  val isFirstIterInLCA = getOutermostIter(readerPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
 
-                val en = edgeType match {
-                  case Forward => isFirstIterInLCA
-                  case Backward =>
-                    // We read from the backward one if it's not the first iteration of the LCA
-                    val isFirstIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(firstIterMap(_)).getOrElse(Bit(true))
-                    isFirstIterInLCA & !isFirstIterOfLCA
-                  case Return =>
-                    // We read from the return edge if it's the first iteration of our LCA, like a Forward edge,
-                    // since it will be stuffed beforehand.
-                    val initDepth = computeBufferDepth(mem)
-                    dbgs(s"Populating $fifo with depth $initDepth")
-                    fifo.fifoInits = Range(0, initDepth).map(I32(_))
-                    isFirstIterInLCA
-                }
-                dbgs(s"Fetching: $mem <- $fifo.deq($en)")
-                (en, fifo.deq(en))
-            }
-            // Nathan: I'm pretty sure that all of the bundle is enabled at the same time
-            assert(signals.map(_._1).toSet.size == 1, s"Expected 1 (unique) Enable signal, got ${signals.map(_._1)}")
-            signals.head
+                  val en = edgeType match {
+                    case Forward => isFirstIterInLCA
+                    case Backward =>
+                      // We read from the backward one if it's not the first iteration of the LCA
+                      val isFirstIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(firstIterMap(_)).getOrElse(Bit(true))
+                      isFirstIterInLCA & !isFirstIterOfLCA
+                    case Return =>
+                      // We read from the return edge if it's the first iteration of our LCA, like a Forward edge,
+                      // since it will be stuffed beforehand.
+                      val initDepth = computeBufferDepth(mem)
+                      dbgs(s"Populating $fifo with depth $initDepth")
+                      fifo.fifoInits = Range(0, initDepth).map(I32(_))
+                      isFirstIterInLCA
+                  }
+                  dbgs(s"Fetching: $mem <- $fifo.deq($en)")
+                  (en, fifo.deq(en))
+              }
+              // Nathan: I'm pretty sure that all of the bundle is enabled at the same time
+              assert(signals.map(_._1).toSet.size == 1, s"Expected 1 (unique) Enable signal, got ${signals.map(_._1)}")
+              signals.head
+          }
+
+          val wrVal = oneHotMux(intakes.map(_._1), intakes.map(_._2))
+          val wrEn = intakes.map(_._1).reduceTree(_ | _)
+          val readReg = Reg[I32]
+          readReg.nonbuffer
+          readReg.write(wrVal, wrEn)
+
+          val valueReg = Reg[I32]
+          valueReg := readReg.value
+          mem -> valueReg.value
         }
-
-        val wrVal = oneHotMux(intakes.map(_._1), intakes.map(_._2))
-        val wrEn = intakes.map(_._1).reduceTree(_ | _)
-        val readReg = Reg[I32]
-        readReg.nonbuffer
-        readReg.write(wrVal, wrEn)
-
-        val valueReg = Reg[I32]
-        valueReg := readReg.value
-        mem -> valueReg.value
     }).toMap
   }
 
@@ -716,7 +719,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case DestData(dest, edgeType) =>
             val memKey = InnerMemKey(Some(lhs), dest, mem)
             val fifo = getFIFO[I32](memKey)
-            val (lca, writerPath, readerPath) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
+            val (lca, writerPath, _) = LCAWithPaths(lhs.toCtrl, dest.toCtrl)
             val isLastIterWithinLCA = getOutermostIter(writerPath.drop(1)).map(lastIterMap(_)).getOrElse(Bit(true))
             val wrEnable = edgeType match {
               case Forward | Return =>

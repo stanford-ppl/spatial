@@ -183,6 +183,7 @@ trait TransformerUtilMixin {
               transferData(disguisedUnitpipe, lhs2)
               lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
           }
+        case stm if stm.isControl && substs.size > 1 => Parallel {cyclingVisit(stm)}
         case stm => cyclingVisit(stm)
       }
     }

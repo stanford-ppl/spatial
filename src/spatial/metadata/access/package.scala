@@ -218,14 +218,15 @@ package object access {
       val (ctrlA,distA) = LCAWithDataflowDistance(a, p) // Positive for a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDataflowDistance(b, p) // Positive for b * p, negative otherwise
 
-//      dbgs(s"Mustfollow: b($b) -> a($a) - p($p)")
-//      indent {
-//        dbgs(s"CtrlA: $ctrlA ($distA)")
-//        dbgs(s"CtrlB: $ctrlB ($distB)")
-//      }
+      val isStreamA = ctrlA.isCtrl(sched = ForkJoin) || ctrlA.isStreamControl
 
       // if LCA(a, p) == LCA(a, b), then we can directly compare the dataflow distances as yielded.
       if (ctrlA == ctrlB) {
+        if (isStreamA) {
+          // If the LCA is a parallel or streamed controller, then there's no ordering between them.
+          return false
+        }
+
         val ctrlAB = LCA(a, b)
         if (distA > 0 && distB > 0) {
           distA < distB && a.mustOccurWithin(ctrlAB, considerSelfEns)
@@ -244,13 +245,15 @@ package object access {
         // and A must occur within LCA(a, p)
         val aIsCloser = ctrlA.hasAncestor(ctrlB)
         if (!aIsCloser) {
-          false
+          // If LCA-A is closer, then it's not possible UNLESS there's a stream/parallel since those are unordered
+          !isStreamA
         } else {
           // If A is closer in the hierarchy to p, then A will happen before P if:
           //   -- A happens before P
           //   -- A is unconditional
-//          dbgs(s"MustOccur: ${a.mustOccurWithin(ctrlA)}")
-          (distA > 0) && a.mustOccurWithin(ctrlA, considerSelfEns)
+          //   -- ctrlA is NOT a parallel or stream controller
+
+          !isStreamA && ((distA > 0) && a.mustOccurWithin(ctrlA, considerSelfEns))
         }
       }
     }

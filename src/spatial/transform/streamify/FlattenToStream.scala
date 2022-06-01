@@ -14,6 +14,8 @@ import spatial.metadata.memory._
 import spatial.metadata.access._
 import spatial.util.TransformUtils._
 
+import spatial.util.modeling._
+
 /**
   * A PseudoIter represents an iteration variable that is sent along a FIFO in order to handle variable bounds
   * @param i: the value of the iterator
@@ -34,28 +36,6 @@ import spatial.util.TransformUtils._
   * @param reader The Reader symbol
   * @param edgeType Whether the edge is a back-edge
   */
-sealed trait RWEdge
-case object Forward extends RWEdge
-case object Backward extends RWEdge
-case object Return extends RWEdge
-
-sealed trait MemStrategy
-case object Buffer extends MemStrategy
-case object Duplicate extends MemStrategy
-case object Arbitrate extends MemStrategy
-case object Unknown extends MemStrategy
-
-object MemStrategy {
-  def apply(mem: Sym[_]) = mem match {
-    case mem if mem.isReg => Duplicate
-    case mem if mem.isSRAM => Buffer
-    case _ => Unknown
-  }
-}
-
-object RWEdge {
-  def apply(distance: Int) = if (distance > 0) Forward else Backward
-}
 
 case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTransformer with AccelTraversal {
 
@@ -745,13 +725,22 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     // Add a forever counter in order accommodate reading ancestral counters
 
     // Mirror the local chains, but stop at the innermost dynamic counter
-    val staticInnerCtrs = foreachOp.cchain.counters.reverse.takeWhile(_.isStatic).reverse
-    val newInnerCtrs = staticInnerCtrs.map(mirrorSym(_).unbox)
-    val newInnerIters = makeIters(newInnerCtrs)
-    val foreverCtr = stage(ForeverNew())
-    val foreverIter = makeIter(foreverCtr).unbox
+    val allChains = lhs.ancestors.flatMap(_.cchains).flatMap(_.counters)
 
-    val newCChain = CounterChain(Seq(foreverCtr) ++ newInnerCtrs)
+    // We need a forever ctr if there's a dynamic counter.
+    val needForever = allChains.exists(!_.isStatic)
+    val staticInnerCtrs = allChains.reverse.takeWhile(_.isStatic).reverse // foreachOp.cchain.counters.reverse.takeWhile(_.isStatic).reverse
+    val newInnerCtrs = staticInnerCtrs.map(mirrorSym(_).unbox)
+    val newInnerIters = makeIters(newInnerCtrs).map(_.unbox.asInstanceOf[I32])
+
+    val (newCChain, newIters) = if (needForever) {
+      val foreverCtr = stage(ForeverNew())
+      val foreverIter = makeIter(foreverCtr).unbox
+      (CounterChain(Seq(foreverCtr) ++ newInnerCtrs), Seq(foreverIter) ++ newInnerIters)
+    } else {
+      (CounterChain(newInnerCtrs), newInnerIters)
+    }
+
     val IterFIFOWithInfo(iterFIFO, iterToIndexMap) = indent { createCounterGenerator(lhs) }
 
     /**
@@ -864,7 +853,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
       stopWhen.write(endOfWorld, endOfWorld)
 
-    }, Seq(foreverIter) ++ newInnerIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
+    }, newIters, Some(stopWhen))) {
       newForeach =>
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
@@ -874,6 +863,14 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case accelScope: AccelScope => inAccel {
       printRegister = true
+
+      dbgs(s"Computing Global Mem Graph")
+      val tokenComms = accelScope.block.nestedStms.filter(_.isMem).filterNot(isInternalMem).flatMap(computeProducerConsumers(_))
+      indent {
+        tokenComms.foreach(dbgs(_))
+      }
+      dbgs(s"="*100)
+
       dbgs(s"Computing Buffer Data")
       indent {
         memInfo = computeMemInfoMap(lhs)
@@ -903,11 +900,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       ctrlOp.blocks.foreach(inlineBlock(_))
       lhs
 
-    case mem if lhs.isMem && MemStrategy(lhs) == Duplicate =>
+    case mem if lhs.isMem && lhs.isReg =>
       dbgs(s"Skipping $lhs = $mem since it'll be duplicated.")
       lhs
 
-    case mem if lhs.isMem && MemStrategy(lhs) == Buffer =>
+    case mem if lhs.isMem && lhs.isSRAM =>
       val cloned = super.transform(lhs, mem)
       cloned.bufferAmount = computeBufferDepth(lhs)
       cloned

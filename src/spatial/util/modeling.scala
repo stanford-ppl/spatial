@@ -673,4 +673,173 @@ object modeling {
     treeLevel(nLeaves, 0)
   }
 
+  sealed trait MemStrategy
+  case object Buffer extends MemStrategy
+  case object Duplicate extends MemStrategy
+  case object Arbitrate extends MemStrategy
+  case object Unknown extends MemStrategy
+
+  object MemStrategy {
+    def apply(mem: Sym[_]): MemStrategy = mem match {
+      case mem if mem.isReg => Duplicate
+      case mem if mem.isSRAM => Buffer
+      case _ => Unknown
+    }
+  }
+
+  sealed trait AccessKey {
+    def sym: Sym[_]
+  }
+  case class InnerAccessKey(parent: Sym[_]) extends AccessKey {
+    override def sym = parent
+  }
+  case class OuterAccessKey(access: Sym[_]) extends AccessKey {
+    override def sym = access.blk.s.get
+  }
+
+  sealed trait RWEdge
+  case object Forward extends RWEdge
+  case object Backward extends RWEdge
+  case object Return extends RWEdge
+  case class Initialize[T](value: T) extends RWEdge
+
+  object RWEdge {
+    def apply(distance: Int) = if (distance > 0) Forward else Backward
+  }
+
+  case class TokenComm(mem: Sym[_], src: Sym[_], dst: Sym[_], direction: RWEdge, duplicates: Set[Int]) {
+    assert(mem.isMem, s"Expected $mem to be a memory, instead got ${mem.op}")
+
+    override def toString: String = {
+      val dirString = direction match {
+        case Forward => "F"
+        case Backward => "B"
+        case Return => "R"
+        case Initialize(v) => s"I<$v>"
+      }
+      s"$src -$dirString> $dst [$mem = ${mem.op.get} <${duplicates.mkString(", ")}>]"
+    }
+  }
+
+  private def getAllDispatches(access: Sym[_]) = access.dispatches.values.flatten.toSet
+
+  @stateful def computeProducerConsumers(mem: Sym[_])(implicit isl: poly.ISL) = {
+
+    dbgs(s"Computing Prod/Cons for $mem = ${mem.op.get} (${mem.ctx})")
+
+    val comms = mutable.Set[TokenComm]()
+
+    indent {
+
+      val allAccesses = mem.readers ++ mem.writers
+      val grouped = allAccesses.groupBy {
+        access =>
+          val isInnerAccess = access.parent.s == access.blk.s
+          if (isInnerAccess) {
+            InnerAccessKey(access.parent.s.get)
+          } else {
+            OuterAccessKey(access)
+          }
+      }
+
+      MemStrategy(mem) match {
+        case Duplicate =>
+          grouped foreach {
+            case (key, accesses) =>
+              val allOtherWrites = grouped.filter(_._1 != key).flatMap(_._2).filter(_.isWriter)
+              val reaching = reachingWritesToReg(accesses.head, allOtherWrites.toSet, true)
+              reaching.foreach {
+                write =>
+                  val src = write.parent.s.get
+                  val (lca, dist) = LCAWithDataflowDistance(src, key.sym)
+                  // There is only one duplicate of registers and such
+                  comms += TokenComm(mem, src, key.sym, RWEdge(dist), Set(0))
+              }
+          }
+        case Buffer =>
+          val groupedToDispatches = grouped.map {
+            case (key, accesses) => key -> accesses.flatMap(_.dispatches.values).flatten
+          }
+          val groupedToMatrices = grouped.map {
+            case (key, accesses) => key -> accesses.flatMap(_.affineMatrices)
+          }
+          val newComms = grouped flatMap {
+            case (key, accesses) =>
+              // Gather all of the tokens we need.
+              dbgs(s"Group: $key, duplicates: ${groupedToDispatches(key)}")
+
+              groupedToDispatches(key).flatMap {
+                dup =>
+                  // get the reaching accesses
+                  val otherMatrices = groupedToMatrices.filterNot(_._1 == key).flatMap {
+                    case (key, matrices) =>
+                      // only keep matrices that write to the same duplicate
+                      matrices.filter {
+                        matrix =>
+                          getAllDispatches(matrix.access).toSeq.contains(dup)
+                      }
+                  }
+                  val reaching = reachingWrites(groupedToMatrices(key), otherMatrices.toSet, mem.isGlobalMem)
+
+                  reaching.map {
+                    matrix =>
+                      val duplicates = getAllDispatches(matrix.access)
+                      val src = matrix.access.parent.s.get
+                      val (lca, dist) = LCAWithDataflowDistance(src, key.sym)
+                      val comm = TokenComm(mem, src, key.sym, RWEdge(dist), duplicates)
+                      comm
+                  }
+              }
+          }
+          dbgs(s"Adding Comms for $mem")
+          indent {
+            newComms.foreach(dbgs(_))
+          }
+          comms ++= newComms
+          // Now need to set up return edges
+        case _ => dbgs(s"Didn't know how to handle $mem")
+      }
+
+
+      val allNodes = (comms.map(_.src) ++ comms.map(_.dst)).toSet
+
+      // maps each duplicate to its final user
+      val terminal = mutable.Map[Int, Sym[_]]()
+
+      // maps each duplicate to its first user
+      val initial = mutable.Map[Int, Sym[_]]()
+      allNodes.foreach {
+        ctrler =>
+          val recv = comms.filter(_.dst == ctrler).filter(_.direction == Forward)
+          val sent = comms.filter(_.src == ctrler).filter(_.direction == Forward)
+          dbgs(s"Send/Recv for $ctrler")
+          indent {
+            dbgs(s"Recv: ${recv.map(s => s"${s.src}(${s.duplicates.toSortedSeq.mkString(", ")})").mkString(", ")}")
+            dbgs(s"Send: ${sent.map(s => s"${s.dst}(${s.duplicates.toSortedSeq.mkString(", ")})").mkString(", ")}")
+          }
+
+          // For Duplicate, we only need to set up inits
+          // For Arbitrate / Buffer, we need backedges to send the values home
+          val initialDups = sent.flatMap(_.duplicates) -- recv.flatMap(_.duplicates)
+          val terminalDups = recv.flatMap(_.duplicates) -- sent.flatMap(_.duplicates)
+          initialDups.foreach { dup => initial(dup) = ctrler }
+          terminalDups.foreach { dup => terminal(dup) = ctrler}
+      }
+
+      MemStrategy(mem) match {
+        case Duplicate =>
+          initial.foreach {
+            case (dup, ctrl) =>
+              val initVal = mem match {case Op(RegNew(v)) => v}
+              comms += TokenComm(mem, mem.parent.s.get, ctrl, Initialize(initVal), Set(dup))
+          }
+        case Buffer =>
+          terminal.foreach {
+            case (dup, ctrl) =>
+              comms += TokenComm(mem, ctrl, initial(dup), Return, Set(dup))
+          }
+      }
+    }
+    comms.toSeq
+  }
 }

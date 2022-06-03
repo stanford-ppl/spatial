@@ -734,7 +734,7 @@ object modeling {
       val allAccesses = mem.readers ++ mem.writers
       val grouped = allAccesses.groupBy {
         access =>
-          val isInnerAccess = access.parent.s == access.blk.s
+          val isInnerAccess = access.parent.s != access.blk.s
           if (isInnerAccess) {
             InnerAccessKey(access.parent.s.get)
           } else {
@@ -783,10 +783,9 @@ object modeling {
 
                   reaching.map {
                     matrix =>
-                      val duplicates = getAllDispatches(matrix.access)
                       val src = matrix.access.parent.s.get
                       val (lca, dist) = LCAWithDataflowDistance(src, key.sym)
-                      val comm = TokenComm(mem, src, key.sym, RWEdge(dist), duplicates)
+                      val comm = TokenComm(mem, src, key.sym, RWEdge(dist), Set(dup))
                       comm
                   }
               }
@@ -836,10 +835,57 @@ object modeling {
         case Buffer =>
           terminal.foreach {
             case (dup, ctrl) =>
+              comms.remove(TokenComm(mem, ctrl, initial(dup), Backward, Set(dup)))
               comms += TokenComm(mem, ctrl, initial(dup), Return, Set(dup))
           }
       }
     }
     comms.toSeq
+  }
+
+  implicit class TokenCommUtils(comms: Seq[TokenComm]) {
+    def toDotString(implicit state: argon.State): String = {
+
+      val allMems = comms.map(_.mem).toSet
+      dbgs(s"Mems: $allMems")
+      // draw all the nodes first
+      val nodes = (comms.map(_.src) ++ comms.map(_.dst)).toSet
+      val nodeString = nodes.toSeq.sortBy(_.progorder).map {
+        node =>
+          val interestingChildren = node.blocks.flatMap(_.stms).collect {
+            case s if allMems.intersect((s.writtenMem ++ s.readMem).toSet).nonEmpty => s
+            case s if allMems.contains(s) => s
+          }
+          dbgs(s"Node: $node")
+          dbgs(s"InterestingChildren: ${interestingChildren}")
+          val childrenString = interestingChildren.map{
+            case sym@Op(op) => s"$sym = $op"
+          }.mkString("|")
+
+          s"""  $node [shape=record label="{$node (${node.ctx}) | {Accesses|{$childrenString}}}"];"""
+      }.mkString("\n")
+
+      val edgeString = comms.map {
+        case tc@TokenComm(mem, src, dst, edgeType, dups) =>
+          val memStr = mem.explicitName match {
+            case Some(s) => s"$s($mem)"
+            case None => mem.toString
+          }
+          val edgeStyle = edgeType match {
+            case Forward => "solid"
+            case Backward => "dashed"
+            case Return => "dashed"
+            case Initialize(_) => "dotted"
+          }
+          s"""  $src -> $dst [label="$memStr<${dups.mkString(",")}>($edgeType)"; style=$edgeStyle]""";
+      }.mkString("\n")
+
+      s"""
+         |digraph {
+         |$nodeString
+         |$edgeString
+         |}
+         |""".stripMargin
+    }
   }
 }

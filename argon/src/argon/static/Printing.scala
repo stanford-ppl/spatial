@@ -119,6 +119,14 @@ trait Printing {
     r
   } else x
 
+  @stateful def withTab[T](amount: Int)(x: => T): T = if (config.enDbg) {
+    val saveTab = state.logTab
+    state.logTab = amount
+    val r = x
+    state.logTab = saveTab
+    r
+  } else x
+
   @stateful def log(x: => Any): Unit = if (config.enLog) state.log.println(x)
   @stateful def logs(x: => Any): Unit = if (config.enLog) state.log.println("  "*state.logTab + x)
 

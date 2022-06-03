@@ -869,6 +869,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       indent {
         tokenComms.foreach(dbgs(_))
       }
+      withTab(0) {
+        dbgs(tokenComms.toDotString)
+      }
       dbgs(s"="*100)
 
       dbgs(s"Computing Buffer Data")

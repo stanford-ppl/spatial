@@ -2,6 +2,9 @@ package spatial.tests.compiler.streaming
 
 import spatial.dsl._
 
+
+import spatial.metadata.memory._
+
 @spatial class RegBuffering extends SpatialTest {
   val outerIters = 16
   val innerIters = 4
@@ -43,8 +46,10 @@ class RegBufferingNoStream extends RegBuffering {
     val output2 = ArgOut[I32]
     Accel {
       val accum1 = Reg[I32](0)
+      accum1.explicitName = "accum1"
       val accum2 = Reg[I32](0)
-      Sequential.Foreach(4 until 8) {
+      accum2.explicitName = "accum2"
+      'Outer.Sequential.Foreach(4 until 8) {
         outer =>
           val innerIterReg = Reg[I32](0)
           'Producer.Sequential.Foreach(0 until outer) {

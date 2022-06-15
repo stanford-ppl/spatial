@@ -65,7 +65,6 @@ abstract class SubstTransformer extends Transformer {
   final override protected def substituteSym[T](s: Sym[T]): Sym[T] = subst.get(s) match {
     case Some(s2) =>
       val result = s2.resolve.asInstanceOf[Sym[T]]
-//      dbgs(s"Substituting: $s -> $result")
       result
     case None     => s
   }

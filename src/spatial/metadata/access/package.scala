@@ -218,16 +218,25 @@ package object access {
       val (ctrlA,distA) = LCAWithDataflowDistance(a, p) // Positive for a * p, negative otherwise
       val (ctrlB,distB) = LCAWithDataflowDistance(b, p) // Positive for b * p, negative otherwise
 
-      val isStreamA = ctrlA.isCtrl(sched = ForkJoin) || ctrlA.isStreamControl
+      dbgs(s"Mustfollow: $b -> $a -> $p [$considerSelfEns]")
+
+      val isParA = ctrlA.isCtrl(sched = ForkJoin) || ctrlA.isStreamControl
+
+      indent {
+        dbgs(s"CtrlA: $ctrlA [$distA]")
+        dbgs(s"CtrlB: $ctrlB [$distB]")
+        dbgs(s"IsStream: $isParA")
+      }
 
       // if LCA(a, p) == LCA(a, b), then we can directly compare the dataflow distances as yielded.
       if (ctrlA == ctrlB) {
-        if (isStreamA) {
+        if (isParA) {
           // If the LCA is a parallel or streamed controller, then there's no ordering between them.
           return false
         }
 
         val ctrlAB = LCA(a, b)
+        indent { dbgs(s"ctrlAB: $ctrlAB") }
         if (distA > 0 && distB > 0) {
           distA < distB && a.mustOccurWithin(ctrlAB, considerSelfEns)
         } // b a p
@@ -245,15 +254,15 @@ package object access {
         // and A must occur within LCA(a, p)
         val aIsCloser = ctrlA.hasAncestor(ctrlB)
         if (!aIsCloser) {
-          // If LCA-A is closer, then it's not possible UNLESS there's a stream/parallel since those are unordered
-          !isStreamA
+          // If LCA-B is closer, then it's not possible UNLESS there's a stream/parallel since those are unordered
+          false
         } else {
           // If A is closer in the hierarchy to p, then A will happen before P if:
           //   -- A happens before P
           //   -- A is unconditional
           //   -- ctrlA is NOT a parallel or stream controller
 
-          !isStreamA && ((distA > 0) && a.mustOccurWithin(ctrlA, considerSelfEns))
+          !isParA && ((distA > 0) && a.mustOccurWithin(ctrlA, considerSelfEns))
         }
       }
     }
@@ -409,7 +418,13 @@ package object access {
     // TODO: Handle the difference between .buffer and .nonbuffer
     // To compute this -- a write to a register is a Reaching Write IFF it's not killed by another.
     val relevant = writes.filter(_.mayPrecede(read))
-    val alive = relevant.filterNot { write => (writes - write).exists {killer => killer.mustFollow(write, read, !writesAlwaysKill)} }
+    dbgs(s"Relevant: $relevant")
+    val alive = relevant.filterNot { write => (writes - write).exists {
+      killer =>
+        val result = killer.mustFollow(write, read, !writesAlwaysKill)
+        indent { dbgs(s"$write killed by $killer: [$result]") }
+        result
+    }}
     alive
   }
 

@@ -687,15 +687,7 @@ object modeling {
     }
   }
 
-  sealed trait AccessKey {
-    def sym: Sym[_]
-  }
-  case class InnerAccessKey(parent: Sym[_]) extends AccessKey {
-    override def sym = parent
-  }
-  case class OuterAccessKey(access: Sym[_]) extends AccessKey {
-    override def sym = access.blk.s.get
-  }
+  case class AccessKey(path: Seq[Ctrl])
 
   sealed trait RWEdge
   case object Forward extends RWEdge
@@ -704,10 +696,10 @@ object modeling {
   case class Initialize[T](value: T) extends RWEdge
 
   object RWEdge {
-    def apply(distance: Int) = if (distance > 0) Forward else Backward
+    def apply(distance: Int): RWEdge = if (distance > 0) Forward else Backward
   }
 
-  case class TokenComm(mem: Sym[_], src: Sym[_], dst: Sym[_], direction: RWEdge, duplicates: Set[Int]) {
+  case class TokenComm(mem: Sym[_], src: Ctrl, dst: Ctrl, direction: RWEdge, duplicates: Set[Int]) {
     assert(mem.isMem, s"Expected $mem to be a memory, instead got ${mem.op}")
 
     override def toString: String = {
@@ -732,28 +724,28 @@ object modeling {
     indent {
 
       val allAccesses = mem.readers ++ mem.writers
+      dbgs(s"Accesses: $allAccesses")
       val grouped = allAccesses.groupBy {
         access =>
-          val isInnerAccess = access.parent.s != access.blk.s
-          if (isInnerAccess) {
-            InnerAccessKey(access.parent.s.get)
-          } else {
-            OuterAccessKey(access)
-          }
+          AccessKey(access.parent.s.get.ancestors)
       }
+      dbgs(s"Grouped: $grouped")
 
       MemStrategy(mem) match {
         case Duplicate =>
           grouped foreach {
             case (key, accesses) =>
+              dbgs(s"Processing: $key [$accesses]")
               val allOtherWrites = grouped.filter(_._1 != key).flatMap(_._2).filter(_.isWriter)
-              val reaching = reachingWritesToReg(accesses.head, allOtherWrites.toSet, true)
+              dbgs(s"All Other Writes: $allOtherWrites")
+              val reaching = indent { accesses.flatMap { access => reachingWritesToReg(access, allOtherWrites.toSet, true) } }
+              dbgs(s"Reaching Writes: $reaching")
               reaching.foreach {
                 write =>
-                  val src = write.parent.s.get
-                  val (lca, dist) = LCAWithDataflowDistance(src, key.sym)
+                  val src = write.parent
+                  val (lca, dist) = LCAWithDataflowDistance(src, key.path.last)
                   // There is only one duplicate of registers and such
-                  comms += TokenComm(mem, src, key.sym, RWEdge(dist), Set(0))
+                  comms += TokenComm(mem, src, key.path.last, RWEdge(dist), Set(0))
               }
           }
         case Buffer =>
@@ -783,9 +775,9 @@ object modeling {
 
                   reaching.map {
                     matrix =>
-                      val src = matrix.access.parent.s.get
-                      val (lca, dist) = LCAWithDataflowDistance(src, key.sym)
-                      val comm = TokenComm(mem, src, key.sym, RWEdge(dist), Set(dup))
+                      val src = matrix.access.parent
+                      val (lca, dist) = LCAWithDataflowDistance(src, key.path.last)
+                      val comm = TokenComm(mem, src, key.path.last, RWEdge(dist), Set(dup))
                       comm
                   }
               }
@@ -803,10 +795,10 @@ object modeling {
       val allNodes = (comms.map(_.src) ++ comms.map(_.dst)).toSet
 
       // maps each duplicate to its final user
-      val terminal = mutable.Map[Int, Sym[_]]()
+      val terminal = mutable.Map[Int, Ctrl]()
 
       // maps each duplicate to its first user
-      val initial = mutable.Map[Int, Sym[_]]()
+      val initial = mutable.Map[Int, Ctrl]()
       allNodes.foreach {
         ctrler =>
           val recv = comms.filter(_.dst == ctrler).filter(_.direction == Forward)
@@ -830,7 +822,7 @@ object modeling {
           initial.foreach {
             case (dup, ctrl) =>
               val initVal = mem match {case Op(RegNew(v)) => v}
-              comms += TokenComm(mem, mem.parent.s.get, ctrl, Initialize(initVal), Set(dup))
+              comms += TokenComm(mem, mem.parent, ctrl, Initialize(initVal), Set(dup))
           }
         case Buffer =>
           terminal.foreach {
@@ -847,23 +839,30 @@ object modeling {
     def toDotString(implicit state: argon.State): String = {
 
       val allMems = comms.map(_.mem).toSet
-      dbgs(s"Mems: $allMems")
       // draw all the nodes first
-      val nodes = (comms.map(_.src) ++ comms.map(_.dst)).toSet
-      val nodeString = nodes.toSeq.sortBy(_.progorder).map {
+      val nodes = (comms.map(_.src) ++ comms.map(_.dst)).flatMap(_.s)
+      val nodeStrings = nodes.toSeq.sortBy(_.progorder).map {
         node =>
           val interestingChildren = node.blocks.flatMap(_.stms).collect {
             case s if allMems.intersect((s.writtenMem ++ s.readMem).toSet).nonEmpty => s
             case s if allMems.contains(s) => s
           }
-          dbgs(s"Node: $node")
-          dbgs(s"InterestingChildren: ${interestingChildren}")
           val childrenString = interestingChildren.map{
             case sym@Op(op) => s"$sym = $op"
           }.mkString("|")
 
-          s"""  $node [shape=record label="{$node (${node.ctx}) | {Accesses|{$childrenString}}}"];"""
-      }.mkString("\n")
+          val nodeTypeString = if (node.isInnerControl) { "Inner" } else { "Outer" }
+          node -> s"""$node [shape=record label="{$node (${node.ctx}) [${nodeTypeString}] | {Accesses|{$childrenString}}}"];"""
+      }
+      val outerString =
+        s"""
+           |  subgraph {
+           |    rank="same"
+           |    ${nodeStrings.filter(_._1.isOuterControl).map(_._2).mkString("\n|    ")}
+           |  }
+           |""".stripMargin
+
+      val innerString = nodeStrings.filter(_._1.isInnerControl).map(_._2).mkString("\n|  ")
 
       val edgeString = comms.map {
         case tc@TokenComm(mem, src, dst, edgeType, dups) =>
@@ -877,12 +876,13 @@ object modeling {
             case Return => "dashed"
             case Initialize(_) => "dotted"
           }
-          s"""  $src -> $dst [label="$memStr<${dups.mkString(",")}>($edgeType)"; style=$edgeStyle]""";
+          s"""  ${src.s.get} -> ${dst.s.get} [label="$memStr<${dups.mkString(",")}>($edgeType)"; style=$edgeStyle]""";
       }.mkString("\n")
 
       s"""
          |digraph {
-         |$nodeString
+         |$outerString
+         |  $innerString
          |$edgeString
          |}
          |""".stripMargin

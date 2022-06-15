@@ -31,8 +31,7 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
             val dataVec = Vec.fromSeq(data)
             f(fifo).enqVec(dataVec, isFirst)
         }
-        retimeGate()
-        fPressure.enq(Bit(true), !isFirst)
+        fPressure.enq(Bit(true), isFirst)
         spatial.lang.void
       }, None))
       block.stms.filterNot(fifos.contains).foreach(visit)

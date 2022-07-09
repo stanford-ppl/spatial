@@ -269,13 +269,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         backlog.clear()
       }
 
-      updateFirstIterMap()
-      val relevantComms = remainingComms.filter {
-        case TokenComm(mem, _, _, _, lca, _) =>
-          dependencies.contains(mem) && currentCtrl.hasAncestor(lca)
-      }
-      remainingComms --= relevantComms
-
       def updateTokenMap(comms: Seq[TokenComm]): Unit = {
         val enables = computeIntakeEnables(comms, firstIterMap.toMap.withDefaultValue(Bit(true)))
         val regMap = handleIntakeRegisters(enables)
@@ -284,6 +277,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             mem -> (tokenMap.get(mem) match {
               case Some(castedMem: Reg[_]) =>
                 type T = castedMem.A.R
+
                 implicit def bitsEV: Bits[castedMem.A.R] = castedMem.A
 
                 val en = enables(mem)
@@ -295,7 +289,16 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         }).toMap
       }
 
-      updateTokenMap(relevantComms.toSeq)
+      if (dependencies.nonEmpty) {
+        updateFirstIterMap()
+        val relevantComms = remainingComms.filter {
+          case TokenComm(mem, _, _, _, lca, _) =>
+            dependencies.contains(mem) && currentCtrl.hasAncestor(lca)
+        }
+        remainingComms --= relevantComms
+
+        updateTokenMap(relevantComms.toSeq)
+      }
 
       // Mirror all of the relevant inputs for the chain
       {
@@ -322,7 +325,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         case cchain :: Nil =>
           // innermost iteration
 
-          var shouldFullyPar = true
+          var shouldFullyPar = false
           var totalPar = I32(1)
           val newChains = cchain.counters.reverse.map {
             ctr =>

@@ -15,8 +15,12 @@ import spatial.targets.{AreaModel, HardwareTarget, LatencyModel}
 import utils.implicits.collections._
 import models.AreaEstimator
 
+import java.io.PrintStream
 import scala.collection.immutable.SortedSet
 import scala.collection.mutable
+import java.nio.file.{Files, Paths}
+import sys.process._
+import scala.language.postfixOps
 
 object modeling {
 
@@ -699,7 +703,7 @@ object modeling {
     def apply(distance: Int): RWEdge = if (distance > 0) Forward else Backward
   }
 
-  case class TokenComm(mem: Sym[_], src: Ctrl, dst: Ctrl, direction: RWEdge, duplicates: Set[Int]) {
+  case class TokenComm(mem: Sym[_], src: Ctrl, dst: Ctrl, direction: RWEdge, lca: Ctrl, duplicates: Set[Int]) {
     assert(mem.isMem, s"Expected $mem to be a memory, instead got ${mem.op}")
 
     override def toString: String = {
@@ -745,7 +749,7 @@ object modeling {
                   val src = write.parent
                   val (lca, dist) = LCAWithDataflowDistance(src, key.path.last)
                   // There is only one duplicate of registers and such
-                  comms += TokenComm(mem, src, key.path.last, RWEdge(dist), Set(0))
+                  comms += TokenComm(mem, src, key.path.last, RWEdge(dist), lca, Set(0))
               }
           }
         case Buffer =>
@@ -777,7 +781,7 @@ object modeling {
                     matrix =>
                       val src = matrix.access.parent
                       val (lca, dist) = LCAWithDataflowDistance(src, key.path.last)
-                      val comm = TokenComm(mem, src, key.path.last, RWEdge(dist), Set(dup))
+                      val comm = TokenComm(mem, src, key.path.last, RWEdge(dist), lca, Set(dup))
                       comm
                   }
               }
@@ -822,17 +826,30 @@ object modeling {
           initial.foreach {
             case (dup, ctrl) =>
               val initVal = mem match {case Op(RegNew(v)) => v}
-              comms += TokenComm(mem, mem.parent, ctrl, Initialize(initVal), Set(dup))
+              comms += TokenComm(mem, mem.parent, ctrl, Initialize(initVal), mem.parent, Set(dup))
           }
         case Buffer =>
           terminal.foreach {
             case (dup, ctrl) =>
-              comms.remove(TokenComm(mem, ctrl, initial(dup), Backward, Set(dup)))
-              comms += TokenComm(mem, ctrl, initial(dup), Return, Set(dup))
+              val lca = LCA(ctrl, initial(dup))
+              comms.remove(TokenComm(mem, ctrl, initial(dup), Backward, lca, Set(dup)))
+              comms += TokenComm(mem, ctrl, initial(dup), Return, lca, Set(dup))
           }
       }
     }
-    comms.toSeq
+
+    // Expand the tokencomms where the destination isn't an inner control
+    val innerComms = comms.flatMap {
+      case comm if comm.dst.isInnerControl => Seq(comm)
+      case comm@TokenComm(mem, src, dst, dir, lca, dup) =>
+        dbgs(s"Expanding Comm: $comm to Inner Comms")
+        // Here we KEEP the LCA as before. This keeps backedges correct on data-dependent control.
+        dst.nestedChildren.filter(_.isInnerControl).map {
+          inner =>
+            TokenComm(mem, src, inner, dir, lca, dup)
+        }
+    }
+    innerComms.toSeq
   }
 
   implicit class TokenCommUtils(comms: Seq[TokenComm]) {
@@ -841,7 +858,7 @@ object modeling {
       val allMems = comms.map(_.mem).toSet
       // draw all the nodes first
       val nodes = (comms.map(_.src) ++ comms.map(_.dst)).flatMap(_.s)
-      val nodeStrings = nodes.toSeq.sortBy(_.progorder).map {
+      val nodeStrings = nodes.sortBy(_.progorder).map {
         node =>
           val interestingChildren = node.blocks.flatMap(_.stms).collect {
             case s if allMems.intersect((s.writtenMem ++ s.readMem).toSet).nonEmpty => s
@@ -865,7 +882,7 @@ object modeling {
       val innerString = nodeStrings.filter(_._1.isInnerControl).map(_._2).mkString("\n|  ")
 
       val edgeString = comms.map {
-        case tc@TokenComm(mem, src, dst, edgeType, dups) =>
+        case tc@TokenComm(mem, src, dst, edgeType, lca, dups) =>
           val memStr = mem.explicitName match {
             case Some(s) => s"$s($mem)"
             case None => mem.toString
@@ -886,6 +903,17 @@ object modeling {
          |$edgeString
          |}
          |""".stripMargin
+    }
+
+    @stateful def dumpToFile(path: String): Unit = {
+      val dotFile = Paths.get(path, s"${state.paddedPass}_graph.dot")
+      val outputFile = Paths.get(path, s"${state.paddedPass}_graph.svg")
+      val stream = new PrintStream(dotFile.toFile)
+      stream.print(toDotString)
+      stream.close()
+      val cmd = s"dot -Tsvg $dotFile -o $outputFile"
+      dbgs(s"Calling: $cmd")
+      cmd!
     }
   }
 }

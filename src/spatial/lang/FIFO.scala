@@ -76,6 +76,12 @@ import scala.collection.mutable.Queue
   @rig def __read(addr: Seq[Idx], ens: Set[Bit]): A = stage(FIFODeq(this,ens))
   @rig def __write(data: A, addr: Seq[Idx], ens: Set[Bit]): Void = stage(FIFOEnq(this,data,ens))
   @rig def __reset(ens: Set[Bit]): Void = void
+
+  @api def resize(size: I32): Unit = {
+    this match {
+      case Op(op: FIFONew[_]) => op.resize(size)
+    }
+  }
 }
 object FIFO {
   @api def apply[A:Bits](depth: I32): FIFO[A] = stage(FIFONew(depth))

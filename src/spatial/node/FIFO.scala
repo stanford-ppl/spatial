@@ -6,6 +6,16 @@ import spatial.lang._
 
 @op case class FIFONew[A:Bits](depth: I32) extends MemAlloc[A,FIFO] {
   def dims = Seq(depth)
+  def resize(newDepth: I32): Unit = {
+    this.update(new Tx {
+      def apply[T](v: T): T = {
+        v match {
+          case x: I32 if x == depth => newDepth.asInstanceOf[T]
+          case _ => v
+        }
+      }
+    })
+  }
 }
 
 

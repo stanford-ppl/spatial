@@ -126,6 +126,8 @@ trait CppGenArray extends CppGenCommon {
       case FixPtType(s,i,f) => 
         emit(src"${lhs.tp} $lhs=0;")
         emit(src"for (int ${lhs}_i = 0; ${lhs}_i < ${i+f}; ${lhs}_i++) { if(${lhs}_i < ${v}.size()) {${lhs} += ${v}[${lhs}_i] << ${lhs}_i;} }")
+      case BitType() if v.width == 1=>
+        emit(src"${lhs.tp} $lhs = ${v}[0]")
     }
     case DataAsVec(bits)       =>
       val elwidth = bitWidth(lhs.tp.typeArgs.head)

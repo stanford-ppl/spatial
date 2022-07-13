@@ -122,8 +122,6 @@ package object access {
     def prDeqGrp: Option[Int] = metadata[PriorityDeqGroup](a).map(_.grp)
     def prDeqGrp_=(grp: Int): Unit = metadata.add(a, PriorityDeqGroup(grp))
 
-    def stuffed: Boolean = metadata[StuffedFIFO](a).exists(_.flag)
-    def stuffed_=(flag: Boolean): Unit = metadata.add(a, StuffedFIFO(flag))
 
     def isParEnq: Boolean = a.op.exists(_.isParEnq)
     def isVectorAccess: Boolean = a.op.exists(_.isVectorAccess)
@@ -151,6 +149,19 @@ package object access {
     def isPeek: Boolean = a match {
       case Op(_:FIFOPeek[_]) => true
       case _ => false
+    }
+
+    def addNonConflicts(syms: Sym[_]*): Unit = {
+      metadata.add(a, DoesNotConflictWith(a.nonConflictSet ++ syms))
+      syms.foreach {
+        sym => metadata.add(sym, DoesNotConflictWith(sym.nonConflictSet + a))
+      }
+    }
+    def nonConflictSet: Set[Sym[_]] = metadata[DoesNotConflictWith](a).map(_.group).getOrElse(Set.empty)
+
+    @stateful def independentOf(sym: Sym[_]): Boolean = {
+      dbgs(s"NonConflictSets($a, $sym): ${sym.nonConflictSet ++ a.nonConflictSet}")
+      sym.nonConflictSet.contains(a) || nonConflictSet.contains(sym)
     }
 
     @stateful def residualGenerators: List[List[ResidualGenerator]] = {

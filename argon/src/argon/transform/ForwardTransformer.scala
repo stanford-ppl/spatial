@@ -72,5 +72,20 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     block2
   }
 
-
+  override def postprocess[R](block: Block[R]): Block[R] = {
+    val result = super.postprocess(block)
+    // Evolve metadata
+    result.nestedStms.foreach {
+      stmt =>
+        dbgs(s"Evolving Metadata for sym: $stmt")
+        indent {
+          metadata.all(stmt).foreach {
+            case (key, value) =>
+              metadata.remove(stmt, key)
+              metadata.add(stmt, key, value.mirror(f).asInstanceOf[Data[_]])
+          }
+        }
+    }
+    result
+  }
 }

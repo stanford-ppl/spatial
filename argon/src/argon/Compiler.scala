@@ -84,7 +84,7 @@ trait Compiler extends DSLRunnable { self =>
     val issuesBefore = state.issues
 
     if (config.enMemLog) memWatch.note(t.name)
-    if (config.enLog) info(s"Pass: ${t.name}")
+    if (config.enLog) info(s"Pass #${state.pass}: ${t.name}")
     if (t.needsInit) t.init()
     val result = t.run(block)
     // After each traversal, check whether there were any reported errors or unresolved issues

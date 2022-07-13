@@ -468,7 +468,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     dbgs(s"Creating Release Controller")
     indent {
-      createReleaseController(controllerInfo)
+      isolateSubst() { createReleaseController(controllerInfo) }
     }
 
     /**
@@ -510,11 +510,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
       val intakeTokens = cm.Map[Sym[_], I32]()
 
+      val nonConflictData = cm.Map[Sym[_], Sym[_]]()
+
       tokens.foreach {
         case (mem: Reg[_], value) =>
-          regValues(mem) = mux(wrEns(mem), value.asInstanceOf[Bits[mem.RT]], f(mem).value.asInstanceOf[Bits[mem.RT]]).asInstanceOf[Sym[_]]
+          val oldValue = f(mem).value.asInstanceOf[Bits[mem.RT]]
+          val oldRead = oldValue.asSym
+          nonConflictData(mem) = oldRead
+          regValues(mem) = mux(wrEns(mem), value.asInstanceOf[Bits[mem.RT]], oldValue).asInstanceOf[Sym[_]]
+          dbgs(s"Registering read for $mem: $oldRead with enable ${wrEns(mem)}")
         case (mem, value) =>
           intakeTokens(mem) = value.asInstanceOf[I32]
+      }
+
+      val lastWrites = foreachOp.block.stms.filter(_.isWriter).groupBy(_.writtenMem).map {
+        case (Some(mem), writes) => mem -> writes.last
       }
 
       // Restage the actual innards of the foreach
@@ -537,6 +547,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           // stage the write anyways
           visit(rw)
+          if (lastWrites(reg) == rw) {
+            // if this was the last write
+            f(rw).addNonConflicts(nonConflictData(reg))
+          }
         case sramRead@Op(SRAMRead(mem, _, _)) if intakeTokens.contains(mem) =>
           visit(sramRead)
           f(sramRead).bufferIndex = intakeTokens(mem)
@@ -622,7 +636,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     dbgs("="*80)
     dbgs(s"regFIFOs:")
     indent {
-      regFIFOs.foreach(dbgs(_))
+      regFIFOs.foreach {
+        case (comm, fifo) =>
+          dbgs(s"$comm <=> $fifo (tokens: ${computeBufferDepth(comm.mem)})")
+      }
     }
     dbgs("="*80)
     result

@@ -1,6 +1,7 @@
 package spatial.transform.stream
 
 import argon._
+import spatial.lang._
 import argon.transform._
 import spatial.node._
 import spatial.metadata.control._
@@ -47,6 +48,20 @@ case class PipeCollapse(IR: State) extends MutateTransformer {
       spatial.lang.void
     }, f(unitPipe.stopWhen))) {
       lhs2 => transferDataIfNew(lhs, lhs2)
+    }
+  }
+
+  def transformForeach(lhs: Sym[_], foreach: OpForeach, child: Sym[_], childForeach: OpForeach): Sym[_] = {
+    // Only collapse perfectly nested foreach loops.
+    val newEns = f(foreach.ens ++ childForeach.ens)
+    val newCtrs = (foreach.cchain.counters ++ childForeach.cchain.counters).map(mirrorSym(_).unbox)
+    val newCChain = stage(CounterChainNew(newCtrs))
+    val newIters = spatial.util.TransformUtils.makeIters(newCtrs)
+    stageWithFlow(OpForeach(newEns, newCChain, stageBlock {
+      childForeach.block.stms foreach visit
+      spatial.lang.void
+    }, newIters.map(_.unbox.asInstanceOf[I32]), None)) {
+      lhs2 => transferDataIfNew(child, lhs2)
     }
   }
 

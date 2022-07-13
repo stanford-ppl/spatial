@@ -175,7 +175,9 @@ object modeling {
       val rds = readersByMem(mem)
       val wrs = writersByMem(mem)
       // Filter out the case where rd == wr, which happens for fifoDeqs.
-      rds.cross(wrs).collect{case (rd, wr) if (rd != wr) && !brokenByRetimeGate(rd,wr,schedule) =>
+      rds.cross(wrs).collect{case (rd, wr) if (rd != wr) && !brokenByRetimeGate(rd,wr,schedule) && !rd.independentOf(wr) =>
+        dbgs(s"Found Cycle: $rd, $wr")
+        dbgs(s"Exclusions: ${wr.nonConflictSet} ${rd.nonConflictSet} ")
       // rds.cross(wrs).flatMap{case (rd, wr) =>
         lazy val triple = AccumTriple(mem, rd, wr)
         val path = getAllNodesBetween(rd, wr, scope.toSet)
@@ -190,7 +192,7 @@ object modeling {
         if (path.nonEmpty) Some(triple) else None
       }.flatten
     }.toSortedSeq
-    dbgs(s"Done finding cycles")
+    dbgs(s"Done finding cycles: $accums, $cycles")
 
     ScopeAccumInfo(readersByMem, writersByMem, accums, cycles)
   }

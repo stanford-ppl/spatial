@@ -40,12 +40,6 @@ case class ReadUses(reads: Set[Sym[_]]) extends Data[ReadUses](SetBy.Flow.Consum
   */
 case class PriorityDeqGroup(grp: Int) extends Data[PriorityDeqGroup](SetBy.Analysis.Self)
 
-/**
-  * Set a tag indicating that this FIFO should never empty. Instead, the reader should simply continue with a disabled
-  * enable signal passed onwards.
-  *
-  * Getter: sym.stuffed
-  * Setter: sym.stuffed
-  */
-
-case class StuffedFIFO(flag: Boolean) extends Data[StuffedFIFO](SetBy.User)
+case class DoesNotConflictWith(group: Set[Sym[_]]) extends Data[DoesNotConflictWith](Transfer.Mirror) {
+  override def mirror(f: Tx): DoesNotConflictWith = DoesNotConflictWith(f(group))
+}

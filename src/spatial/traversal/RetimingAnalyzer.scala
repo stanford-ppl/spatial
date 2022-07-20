@@ -46,7 +46,7 @@ case class RetimingAnalyzer(IR: State) extends AccelTraversal {
       .foreach{case (s,l) =>
         s.fullDelay = l
         if (cycles.contains(s)) s.inCycle = true
-        dbgs(s"  [$l = ${adjustedLatencies(s)} - ${latencyOf(s, inReduce = cycles.contains(s))}]: ${stm(s)} [cycle = ${cycles.contains(s)}]")
+        dbgs(s"  [$l = ${adjustedLatencies(s)} - ${latencyOf(s, inReduce = s.inCycle)}]: ${stm(s)} [cycle = ${s.inCycle}]")
       }
     if (saveLatency) {
       lastLatency = adjustedLatencies.toList.map(_._2).sorted.reverse.headOption.getOrElse(0.0)

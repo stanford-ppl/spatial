@@ -404,19 +404,27 @@ object modeling {
       if (gateNodes.nonEmpty) {
         val orderedNodes = gateNodes.head.parent.innerBlocks.flatMap(_._2.stms)
         val gates = Seq(0) ++ orderedNodes.zipWithIndex.collect { case (x, i) if x.isRetimeGate => i } ++ Seq(orderedNodes.length)
-        dbgs(s"Found gate nodes at indices $gates")
+        dbgs(s"Found gate nodes at indices $gates (${gates.drop(1).dropRight(1).map{orderedNodes(_)}.mkString(", ")})")
         gates.drop(1).dropRight(1).zipWithIndex.foreach { case (gatePos, idx) =>
           val gateStart = gates(idx)
           val gateStop = gates(idx + 2)
-          val prevNodes = orderedNodes.slice(gateStart, gatePos)
-          val aftNodes = orderedNodes.slice(gatePos + 1, gateStop)
-          val latestPrev = prevNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.lastOption.getOrElse(0.0)
-          val earliestAft = aftNodes.collect { case x if paths.contains(x) => paths(x) }.sorted.headOption.getOrElse(1.0)
+          val prevNodes = orderedNodes.slice(gateStart, gatePos).toList
+          val aftNodes = orderedNodes.slice(gatePos + 1, gateStop).toList
+          val latestPrev = prevNodes.collect { case x if paths.contains(x) => paths(x) }.maxOrElse(0.0)
+          val earliestAft = aftNodes.collect { case x if paths.contains(x) => paths(x) }.minOrElse(1.0)
           dbgs(s"Latest node between $gateStart - $gatePos = $latestPrev, Earliest node between $gatePos - $gateStop = $earliestAft")
-          if (latestPrev >= earliestAft) {
-            val push = latestPrev - earliestAft + 2
-            aftNodes.collect { case x if paths.contains(x) => dbgs(s" - Pushing $x from ${paths(x)} by $push"); paths(x) = paths(x) + push }
+          aftNodes.filter(paths.contains).foreach {
+            x =>
+              val push = latestPrev - earliestAft + 1 + latencyOf(x, inReduce = cycles.contains(x))
+              if (push > 0) {
+                dbgs(s" - Pushing $x from ${paths(x)} by $push")
+                paths(x) = paths(x) + push
+              }
           }
+//          if (latestPrev >= earliestAft) {
+//            val push = latestPrev - earliestAft + 2
+//            aftNodes.collect { case x if paths.contains(x) => dbgs(s" - Pushing $x from ${paths(x)} by $push"); paths(x) = paths(x) + push }
+//          }
         }
       }
     }

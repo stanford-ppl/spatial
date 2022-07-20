@@ -38,7 +38,6 @@ case class VecStructType[T](fields: Seq[(T, Bits[_])], errorOnMismatch: Boolean 
   }
 
   def unpackStruct(vec: Vec[Bit])(implicit srcCtx: SrcCtx): Map[T, Bits[_]] = {
-    dbgs(s"Unpacking $this from vector: $vec of size ${vec.nbits} at $srcCtx")
     assert(bitWidth == vec.nbits, s"Error unpacking a vector of size $bitWidth from $vec (${vec.nbits}) [$srcCtx]")
     (fields map {
       case (name, bits) =>

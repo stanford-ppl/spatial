@@ -41,18 +41,19 @@ class RegBufferingNoStream extends RegBuffering {
 }
 
 @spatial class DataDependentControl extends SpatialTest {
-  override def compileArgs = "--max_cycles=1000"
+  override def compileArgs = "--max_cycles=1000 --vv"
   override def main(args: Array[String]) = {
     val output = ArgOut[I32]
-    val output2 = ArgOut[I32]
+//    val output2 = ArgOut[I32]
     Accel {
       val accum1 = Reg[I32](0)
       accum1.explicitName = "accum1"
-      val accum2 = Reg[I32](0)
-      accum2.explicitName = "accum2"
+//      val accum2 = Reg[I32](0)
+//      accum2.explicitName = "accum2"
       'Outer.Sequential.Foreach(4 until 8) {
         outer =>
           val innerIterReg = Reg[I32](0)
+          innerIterReg.explicitName = "innerIterReg"
           'Producer.Sequential.Foreach(0 until outer) {
             inner =>
               innerIterReg := innerIterReg + inner
@@ -61,25 +62,23 @@ class RegBufferingNoStream extends RegBuffering {
           'Consumer.Sequential.Foreach(0 until innerIterReg.value) {
             inner2 =>
               accum1 := accum1 + inner2
-//              println(r"Accum1: $accum1, inner2: $inner2, reg: $innerIterReg")
           }
           // 15; 45; 105; 210
 
-          'Consumer2.Sequential.Foreach(0 until innerIterReg.value) {
-            inner3 =>
-              accum2 := accum2 + inner3 * innerIterReg.value
-//              println(r"Accum2: $accum2, inner3: $inner3, reg: $innerIterReg")
-          }
+//          'Consumer2.Sequential.Foreach(0 until innerIterReg.value) {
+//            inner3 =>
+//              accum2 := accum2 + inner3 * innerIterReg.value
+//          }
           // 15*6; 45*10; 105 * 15; 21 * 210
       }
       output := accum1
-      output2 := accum2
+//      output2 := accum2
     }
     // output1 = 375
     // output2 = 6525
-    println(r"Result: ${output.value}, Result2: ${output2.value}")
+//    println(r"Result: ${output.value}, Result2: ${output2.value}")
     assert(output.value == 375, r"Expected 375, got ${output.value}")
-    assert(output2.value == 6525, r"Expected 6525, got ${output2.value}")
+//    assert(output2.value == 6525, r"Expected 6525, got ${output2.value}")
   }
 }
 

@@ -156,7 +156,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         implicit def bEV: Bits[r.RT] = r.A
         // We have a bunch of sources for the reg. For this, first we stage into a holding register
         val holdReg = mirrorSym(r).unbox
-        holdReg.nonbuffer
         val shouldWrite = createIntakeReads(holdReg, tokenWithEns)
         r -> holdReg.value.asInstanceOf[Bits[r.RT]].asSym
     }.toMap[Sym[_], Sym[_]]
@@ -242,7 +241,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val allOldIters = allCounters.flatMap(_.iter)
 
     // Maps from memory to either their token or their value (for duplicates)
-    var tokenMap = Map[Sym[_], Bits[_]]()
+    val tokenMap = cm.Map[Sym[_], Bits[_]]()
 
     var remainingComms = controllerInfo.intakeComms.toSet
 
@@ -272,21 +271,20 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       def updateTokenMap(comms: Seq[TokenComm]): Unit = {
         val enables = computeIntakeEnables(comms, firstIterMap.toMap.withDefaultValue(Bit(true)))
         val regMap = handleIntakeRegisters(enables)
-        tokenMap = (regMap map {
+        regMap.foreach {
           case (mem, value) =>
-            mem -> (tokenMap.get(mem) match {
-              case Some(castedMem: Reg[_]) =>
-                type T = castedMem.A.R
+            tokenMap(mem) = tokenMap.get(mem) match {
+              case Some(old: Bits[_]) =>
 
-                implicit def bitsEV: Bits[castedMem.A.R] = castedMem.A
+                implicit def bitsEV: Bits[old.R] = old
 
                 val en = enables(mem)
                 mux(en.map(_._2).reduceTree {
                   _ | _
-                }, value.asInstanceOf[T], castedMem.value.asInstanceOf[T]).asInstanceOf[Bits[T]]
+                }, value.asInstanceOf[old.R], old.asInstanceOf[old.R]).asInstanceOf[Bits[old.R]]
               case None => value.asInstanceOf[Bits[_]]
-            })
-        }).toMap
+            }
+        }
       }
 
       if (dependencies.nonEmpty) {
@@ -302,19 +300,24 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
       // Mirror all of the relevant inputs for the chain
       {
-        val stack = cm.Stack[Sym[_]](headChain.cchains.flatMap(_.inputs): _*)
+        val stack = cm.Stack[Sym[_]](headChain.counters.flatMap(_.inputs): _*)
+        dbgs(s"Processing inputs for counters ${headChain.counters}: $stack")
         while (stack.nonEmpty) {
           val cur = stack.pop()
           cur match {
             // If it's a register read, then we grab the register's value
-            case rr:RegRead[_] if tokenMap.contains(rr.readMem.get) =>
+            case rr@Op(op:RegRead[_]) if tokenMap.contains(rr.readMem.get) =>
+              dbgs(s"Remapping $cur = $op to ${tokenMap(rr.readMem.get)}")
               register(rr -> tokenMap(rr.readMem.get))
+            case _ if subst.contains(cur) => f(cur)
             case _ if cur.inputs.forall(subst.contains) =>
+              dbgs(s"Forwarding $cur since all inputs are available")
               register(cur -> mirrorSym(cur))
             case _ =>
               // not all of the inputs have been processed, push all the inputs that haven't been processed
-              stack.pushAll(cur.inputs.filterNot(subst.contains))
+              dbgs(s"Re-pushing input: $cur -> ${cur.inputs.filterNot(subst.contains)}")
               stack.push(cur)
+              stack.pushAll(cur.inputs.filterNot(subst.contains))
           }
         }
       }
@@ -367,7 +370,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
             controllerInfo.iterFIFO.enq(pIters, isActive)
             controllerInfo.releaseIterFIFO.enq(pIters)
-            val encoded = controllerInfo.tokenStreamType.packStruct(tokenMap)
+            val encoded = controllerInfo.tokenStreamType.packStruct(tokenMap.toMap)
             controllerInfo.tokenFIFO.enq(encoded, isActive)
             controllerInfo.bypassTokenFIFO.enq(encoded, !isActive)
             controllerInfo.tokenSourceFIFO.enq(isActive)
@@ -383,6 +386,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
               lhs2.ctx = augmentCtx(cchain.ctx)
+              lhs2.userSchedule = Pipelined
           }
 
         case cchain :: rest =>
@@ -400,8 +404,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             }
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
-              lhs2.explicitName = s"CounterGen_${cchain.owner}"
+              lhs2.explicitName = s"CounterGen_${cchain}"
               lhs2.ctx = augmentCtx(cchain.ctx)
+              lhs2.userSchedule = Pipelined
           }
       }
     }
@@ -413,7 +418,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val stopWhen = Reg[Bit]
     val forever = stage(ForeverNew())
 
-    stage(OpForeach(Set.empty, CounterChain(Seq(forever)), stageBlock {
+    stageWithFlow(OpForeach(Set.empty, CounterChain(Seq(forever)), stageBlock {
       val streamIters = releaseIterFIFO.deq().iters
 
       val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
@@ -449,7 +454,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
       stopWhen.write(endOfWorld, endOfWorld)
 
-    }, Seq(makeIter(forever).unbox), Some(stopWhen)))
+    }, Seq(makeIter(forever).unbox), Some(stopWhen))) {
+      lhs2 => lhs2.userSchedule = Pipelined
+    }
   }
 
   private def computeBufferDepth(mem: Sym[_]): Int = {
@@ -485,8 +492,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     }
 
     // restage every register used by the controller but not defined within -- we'll maintain a private copy.
-    (lhs.readMems ++ lhs.writtenMems).diff(foreachOp.block.internalMems.toSet).foreach {
-      case reg: Reg[_] if !reg.isGlobalMem =>
+    val incomingRegisters = controllerInfo.tokenStreamType.fields.map(_._1)
+    incomingRegisters.foreach {
+      case reg: Reg[_] =>
         dbgs(s"Mirroring: $reg")
         register(reg -> mirrorSym(reg))
       case _ =>
@@ -514,6 +522,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
       tokens.foreach {
         case (mem: Reg[_], value) =>
+          dbgs(s"Handling Register: $mem -> ${f(mem)}")
           val oldValue = f(mem).value.asInstanceOf[Bits[mem.RT]]
           val oldRead = oldValue.asSym
           nonConflictData(mem) = oldRead
@@ -549,7 +558,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           visit(rw)
           if (lastWrites(reg) == rw) {
             // if this was the last write
-            f(rw).addNonConflicts(nonConflictData(reg))
+//            f(rw).addNonConflicts(nonConflictData(reg))
           }
         case sramRead@Op(SRAMRead(mem, _, _)) if intakeTokens.contains(mem) =>
           visit(sramRead)
@@ -575,6 +584,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       newForeach =>
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
+        newForeach.userSchedule = Pipelined
     }
   }
 
@@ -625,6 +635,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val cloned = super.transform(lhs, mem)
       cloned.bufferAmount = computeBufferDepth(lhs)
       cloned
+
+    case _:CounterNew[_] | _:CounterChainNew =>
+      dbgs(s"Skipping $lhs = $rhs since it'll be re-created later.")
+      lhs
 
     case _ =>
       super.transform(lhs, rhs)

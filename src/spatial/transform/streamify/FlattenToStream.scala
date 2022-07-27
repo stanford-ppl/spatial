@@ -41,19 +41,22 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
 
-  private val regFIFOs = cm.Map[TokenComm, FIFO[_]]()
+  private val commFIFOs = cm.Map[TokenComm, FIFO[_]]()
 
   private var accelHandle: BundleHandle = null
 
   private var tokenComms: Seq[TokenComm] = null
 
+  case class ControllerImpl(counterGen: Sym[_], main: Sym[_], finisher: Sym[_])
+  private val innerControllerMap = cm.Map[Sym[_], ControllerImpl]()
+
   private def createFIFO[T: Bits](key: TokenComm)(implicit srcCtx: argon.SrcCtx) = {
-    assert(!regFIFOs.contains(key), s"Already created a FIFO corresponding to $key at ${srcCtx}")
+    assert(!commFIFOs.contains(key), s"Already created a FIFO corresponding to $key at ${srcCtx}")
     IR.withScope(accelHandle) {
       val bufferDepth = computeBufferDepth(key.mem)
       val newFIFO = FIFO[T](2 * bufferDepth)
       newFIFO.explicitName = s"CommFIFO_${key.mem}_${key.src.s.get}_${key.dst.s.get}"
-      regFIFOs(key) = newFIFO
+      commFIFOs(key) = newFIFO
       if (key.direction == Return) {
         newFIFO.fifoInits = Range(0, bufferDepth).map(I32(_))
       }
@@ -61,7 +64,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   }
 
   private def getFIFO(key: TokenComm): FIFO[_] = {
-    regFIFOs(key)
+    commFIFOs(key)
   }
 
   /**
@@ -151,7 +154,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     shouldWrite
   }
 
-  private def handleIntakeRegisters(tokenEnables: MemTokenEnableMap): Map[Sym[_], Sym[_]] = {
+  private def handleIntakes(tokenEnables: MemTokenEnableMap): Map[Sym[_], Sym[_]] = {
     tokenEnables.collect {
       case (r: Reg[_], tokenWithEns) =>
         implicit def bEV: Bits[r.RT] = r.A
@@ -159,6 +162,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         val holdReg = mirrorSym(r).unbox
         val shouldWrite = createIntakeReads(holdReg, tokenWithEns)
         r -> holdReg.value.asInstanceOf[Bits[r.RT]].asSym
+      case (mem, tokenWithEns) if MemStrategy(mem) == Buffer =>
+        val holdReg = Reg[I32]
+        val shouldWrite = createIntakeReads(holdReg, tokenWithEns)
+        mem -> holdReg.value
     }.toMap[Sym[_], Sym[_]]
   }
 
@@ -195,10 +202,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   case class ControllerInfo(lhs: Sym[_]) {
     val allCounters = lhs.ancestors.flatMap(_.cchains).flatMap(_.counters)
 
-    val fifoDepth = I32(32)
+    val fifoDepth = I32(128)
     val (iterFIFO, releaseIterFIFO) = {
-      // This is just a hack to create the Bits evidence needed.
-      implicit def vecBitsEV: Bits[Vec[PseudoIter]] = Vec.fromSeq(allCounters map {x => PseudoIter(I32(0), Bit(true), Bit(true))})
+      implicit def vecBitsEV: Bits[Vec[PseudoIter]] = Vec.bits[PseudoIter](allCounters.size)
       val iterFIFO: FIFO[PseudoIters[Vec[PseudoIter]]] = FIFO[PseudoIters[Vec[PseudoIter]]](fifoDepth)
       iterFIFO.explicitName = s"IterFIFO_$lhs"
 
@@ -212,8 +218,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     val tokenStreamType = commsToVecStructType(intakeComms)
     val tokenEnableType = VecStructType(intakeComms.map(_.mem).distinct.map(mem => (mem, Bit(false))))
+
+    assert(tokenStreamType.isEmpty == tokenEnableType.isEmpty, s"Mismatch between $tokenStreamType and its enabler $tokenEnableType")
+
     dbgs(s"Token Enable Type: $tokenEnableType")
-    val (tokenFIFO, finishTokenFIFO, bypassTokenFIFO) = {
+    val (tokenFIFO, finishTokenFIFO, bypassTokenFIFO) = if (!tokenStreamType.isEmpty) {
       implicit def bEV: Bits[Vec[Bit]] = tokenStreamType.bitsEV
       val tokenFIFO = FIFO[Vec[Bit]](fifoDepth)
       tokenFIFO.explicitName = s"TokenFIFO_$lhs"
@@ -221,20 +230,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       finishTokenFIFO.explicitName = s"FinishTokenFIFO_$lhs"
       val bypassTokenFIFO = FIFO[Vec[Bit]](fifoDepth)
       bypassTokenFIFO.explicitName = s"BypassTokenFIFO_$lhs"
-      (tokenFIFO, finishTokenFIFO, bypassTokenFIFO)
-    }
+      (Some(tokenFIFO), Some(finishTokenFIFO), Some(bypassTokenFIFO))
+    } else { (None, None, None) }
 
-    val acquireFIFO = {
+    val acquireFIFO = if (!tokenEnableType.isEmpty) {
       implicit def bEV: Bits[Vec[Bit]] = tokenEnableType.bitsEV
       val acquireFIFO = FIFO[Vec[Bit]](fifoDepth)
       acquireFIFO.explicitName = s"AcquireFIFO_$lhs"
-      acquireFIFO
-    }
+      Some(acquireFIFO)
+    } else None
 
     val tokenSourceFIFO = FIFO[Bit](fifoDepth)
+    tokenSourceFIFO.explicitName = s"TokenSourceFIFO_$lhs"
   }
 
-  private def createCounterGenerator(controllerInfo: ControllerInfo): Unit = {
+  private def createCounterGenerator(controllerInfo: ControllerInfo): Sym[_] = {
     import controllerInfo._
     val allChains = lhs.ancestors.flatMap(_.cchains)
     dbgs(s"All chains of $lhs = $allChains")
@@ -246,7 +256,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     var remainingComms = controllerInfo.intakeComms.toSet
 
-    def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Unit = {
+    def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Sym[_] = {
       dbgs(s"All token comms: $remainingComms")
       dbgs(s"Peeling chain: ${chains.head}")
       val headChain = chains.head
@@ -271,7 +281,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
       def updateTokenMap(comms: Seq[TokenComm]): Unit = {
         val enables = computeIntakeEnables(comms, firstIterMap.toMap.withDefaultValue(Bit(true)))
-        val regMap = handleIntakeRegisters(enables)
+        val regMap = handleIntakes(enables)
         regMap.foreach {
           case (mem, value) =>
             tokenMap(mem) = tokenMap.get(mem) match {
@@ -372,17 +382,22 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
             controllerInfo.iterFIFO.enq(pIters, isActive)
             controllerInfo.releaseIterFIFO.enq(pIters)
-            val encoded = controllerInfo.tokenStreamType.packStruct(tokenMap.toMap)
-            controllerInfo.tokenFIFO.enq(encoded, isActive)
-            controllerInfo.bypassTokenFIFO.enq(encoded, !isActive)
-            controllerInfo.tokenSourceFIFO.enq(isActive)
-
+            dbgs(s"Token Map: $tokenMap")
             dbgs(s"Relevant Comms: ${controllerInfo.intakeComms}")
             val allTokenAcquireEnables = computeIntakeEnables(controllerInfo.intakeComms, firstIterMap.toMap).mapValues {
               commsAndBits => commsAndBits.map(_._2).reduceTree(_ || _)
             }
             dbgs(s"All Token Acquires: $allTokenAcquireEnables")
-            controllerInfo.acquireFIFO.enq(controllerInfo.tokenEnableType.packStruct(allTokenAcquireEnables), isActive)
+            val encoded = controllerInfo.tokenStreamType.packStruct(tokenMap.toMap)
+            (tokenFIFO, bypassTokenFIFO, acquireFIFO) match {
+              case (Some(tf), Some(btf), Some(af)) =>
+                tf.enq(encoded, isActive)
+                btf.enq(encoded, !isActive)
+                af.enq(controllerInfo.tokenEnableType.packStruct(allTokenAcquireEnables), isActive)
+              case (None, None, None) => dbgs(s"Skipping CounterGen Tokens -- no tokens found")
+            }
+
+            tokenSourceFIFO.enq(isActive)
 
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
@@ -404,6 +419,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             indent {
               recurseHelper(rest, backlog, firstIterMap)
             }
+            void
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain}"
@@ -415,7 +431,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     isolateSubst() { recurseHelper(allChains.toList, cm.ListBuffer.empty, cm.Map.empty) }
   }
 
-  private def createReleaseController(controllerInfo: ControllerInfo): Unit = {
+  private def createReleaseController(controllerInfo: ControllerInfo): Sym[_] = {
     import controllerInfo._
     val stopWhen = Reg[Bit]
     val forever = stage(ForeverNew())
@@ -430,14 +446,16 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
 
       val source = tokenSourceFIFO.deq()
-      val tokens = {
-        val finishUnpacked = tokenStreamType.unpackStruct(finishTokenFIFO.deq(source))
-        val bypassUnpacked = tokenStreamType.unpackStruct(bypassTokenFIFO.deq(!source))
-        finishUnpacked.map {
-          case (k, v) =>
-            val v2 = bypassUnpacked(k)
-            k -> mux(source, v.asInstanceOf[Bits[v.R]], v2.asInstanceOf[Bits[v.R]])
-        }
+      val tokens = (finishTokenFIFO, bypassTokenFIFO) match {
+        case (Some(ftf), Some(btf)) =>
+          val finishUnpacked = tokenStreamType.unpackStruct(ftf.deq(source))
+          val bypassUnpacked = tokenStreamType.unpackStruct(btf.deq(!source))
+          finishUnpacked.map {
+            case (k, v) =>
+              val v2 = bypassUnpacked(k)
+              k -> mux(source, v.asInstanceOf[Bits[v.R]], v2.asInstanceOf[Bits[v.R]])
+          }
+        case (None, None) => Map.empty[Sym[_], Bits[_]]
       }
 
       val ensAndComms = computeOutputEnablesForCtrl(lhs, lastIterMap)
@@ -458,6 +476,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     }, Seq(makeIter(forever).unbox), Some(stopWhen))) {
       lhs2 => lhs2.userSchedule = Pipelined
+        lhs2.ctx = augmentCtx(lhs.ctx)
     }
   }
 
@@ -471,14 +490,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val controllerInfo = ControllerInfo(lhs)
 
     dbgs(s"Creating Counter Generator and fetching tokens")
-    indent {
+    val counterGen = indent {
       isolateSubst() { createCounterGenerator(controllerInfo) }
     }
 
-    dbgs(s"Creating Release Controller")
-    indent {
-      isolateSubst() { createReleaseController(controllerInfo) }
-    }
 
     /**
       * What we have here looks like this:
@@ -507,7 +522,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     val foreverCounter = stage(ForeverNew())
 
-    stageWithFlow(OpForeach(Set.empty, CounterChain(Seq(foreverCounter)), stageBlock {
+    val mainCtrl = stageWithFlow(OpForeach(Set.empty, CounterChain(Seq(foreverCounter)), stageBlock {
       val streamIters = controllerInfo.iterFIFO.deq().iters
       val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
       register(allOldIters, streamIters.elems.map(_.i))
@@ -518,8 +533,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val regValues = cm.Map[Sym[_], Sym[_]]()
 
       // Reads tokens and their validity from tokens, wrEns
-      val tokens = controllerInfo.tokenStreamType.unpackStruct(controllerInfo.tokenFIFO.deq())
-      val wrEns = controllerInfo.tokenEnableType.unpackStruct(controllerInfo.acquireFIFO.deq()).mapValues(_.as[Bit])
+
+      val (tokens, wrEns) = (controllerInfo.tokenFIFO, controllerInfo.acquireFIFO) match {
+        case (Some(tokenFIFO), Some(acquireFIFO)) =>
+          val tk = controllerInfo.tokenStreamType.unpackStruct(tokenFIFO.deq())
+          val wEns = controllerInfo.tokenEnableType.unpackStruct(acquireFIFO.deq()).mapValues(_.as[Bit])
+          (tk, wEns)
+        case (None, None) =>
+          (Map.empty, Map.empty[Sym[_], Bit])
+      }
 
       val intakeTokens = cm.Map[Sym[_], Bits[_]]()
 
@@ -543,8 +565,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             regValues(mem) = holdReg.value
           }
 
-        case (mem, value) =>
-          implicit def bEV: Bits[value.R] = value.asInstanceOf[Bits[value.R]]
+        case (mem, value) if MemStrategy(mem) == Buffer =>
+          implicit def bEV: Bits[value.R] = value.asSym.tp.asInstanceOf[Bits[value.R]]
           val holdReg = Reg[value.R]
           holdReg.explicitName = s"HoldReg_${lhs}_$mem"
           holdReg.nonbuffer
@@ -582,9 +604,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
         case sramRead@Op(SRAMRead(mem, _, _)) if intakeTokens.contains(mem) =>
           visit(sramRead)
+          dbgs(s"Tagging SRR $sramRead -> ${f(sramRead)} with token ${intakeTokens(mem)}")
           f(sramRead).bufferIndex = intakeTokens(mem).asInstanceOf[I32]
         case sramWrite@Op(SRAMWrite(mem, _, _, _)) if intakeTokens.contains(mem) =>
           visit(sramWrite)
+          dbgs(s"Tagging SRW $sramWrite -> ${f(sramWrite)} with token ${intakeTokens(mem)}")
           f(sramWrite).bufferIndex = intakeTokens(mem).asInstanceOf[I32]
         case other => visit(other)
       }
@@ -592,7 +616,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       retimeGate()
       // Release tokens
       val updatedValues = intakeTokens ++ regValues
-      controllerInfo.finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
+      controllerInfo.finishTokenFIFO match {
+        case Some(finishTokenFIFO) =>
+          finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
+        case None =>
+          dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
+      }
 
       // Update StopWhen -- on the last iteration, kill the controller.
       // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
@@ -604,13 +633,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       newForeach =>
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
-        newForeach.userSchedule = Pipelined
+        dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
+        newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
     }
+
+    dbgs(s"Creating Release Controller")
+    val finisher = indent {
+      isolateSubst() { createReleaseController(controllerInfo) }
+    }
+
+    innerControllerMap(lhs) = ControllerImpl(counterGen, mainCtrl, finisher)
   }
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case accelScope: AccelScope => inAccel {
-      printRegister = true
+      printRegister = false
 
       dbgs(s"Computing Global Mem Graph")
       tokenComms = accelScope.block.nestedStms.filter(_.isMem).filterNot(isInternalMem).flatMap(computeProducerConsumers(_))
@@ -640,18 +677,33 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     case foreachOp: OpForeach if inHw && lhs.isInnerControl =>
       dbgs(s"Transforming Inner: $lhs = $foreachOp")
-      indent { isolateSubst() { visitInnerForeach(lhs, foreachOp) } }
+      indent { isolateSubst() {
+        stageWithFlow(UnitPipe(Set.empty, stageBlock {
+          visitInnerForeach(lhs, foreachOp)
+          spatial.lang.void
+        }, None)) {
+          lhs2 =>
+            transferDataIfNew(lhs, lhs2)
+            lhs2.userSchedule = Streaming
+        }
+      } }
 
     case ctrlOp: Control[_] if inHw && lhs.isOuterControl =>
       dbgs(s"Skipping Control: $lhs = $ctrlOp")
-      ctrlOp.blocks.foreach(inlineBlock(_))
-      lhs
+      stageWithFlow(UnitPipe(Set.empty, stageBlock {
+        ctrlOp.blocks.foreach(inlineBlock(_))
+        spatial.lang.void
+      }, None)) {
+        lhs2 =>
+          transferDataIfNew(lhs, lhs2)
+          lhs2.userSchedule = Streaming
+      }
 
     case mem if inHw && lhs.isMem && lhs.isReg && !isInternalMem(lhs) =>
       dbgs(s"Skipping $lhs = $mem since it'll be duplicated.")
       lhs
 
-    case mem if inHw && lhs.isMem && lhs.isSRAM =>
+    case mem if inHw && lhs.isMem && lhs.isSRAM && !isInternalMem(lhs) =>
       val cloned = super.transform(lhs, mem)
       cloned.bufferAmount = computeBufferDepth(lhs)
       cloned
@@ -668,15 +720,33 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val result = super.postprocess(block)
     accelHandle = null
     dbgs("="*80)
-    dbgs(s"regFIFOs:")
+    dbgs(s"commFIFOs:")
     indent {
-      regFIFOs.foreach {
+      commFIFOs.foreach {
         case (comm, fifo) =>
           dbgs(s"$comm <=> $fifo (tokens: ${computeBufferDepth(comm.mem)})")
       }
     }
     dbgs("="*80)
+    dbgs(s"Controller Mapping:")
+    indent {
+      innerControllerMap.toSeq.sortBy(_._1.progorder).foreach {
+        case (old, ControllerImpl(counterGen, main, finisher)) =>
+          dbgs(s"$old = ${old.op.get}")
+          indent {
+            dbgs(s"CounterGen: $counterGen")
+            dbgs(s"Main: $main")
+            dbgs(s"Finisher: $finisher")
+          }
+      }
+    }
     result
+  }
+
+  override def preprocess[S](block: Block[S]): Block[S] = {
+    commFIFOs.clear()
+    innerControllerMap.clear()
+    super.preprocess(block)
   }
 }
 

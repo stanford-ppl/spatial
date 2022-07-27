@@ -17,7 +17,9 @@ case class VecStructType[T](fields: Seq[(T, Bits[_])], errorOnMismatch: Boolean 
     }
   }.toMap
 
-  def bitWidth: Int = fields.map(_._2.nbits).sum
+  lazy val bitWidth: Int = fields.map(_._2.nbits).sum
+
+  lazy val isEmpty: Boolean = bitWidth == 0
 
   def bitsEV: Bits[Vec[Bit]] = Vec.bits[Bit](bitWidth)
 
@@ -48,7 +50,6 @@ case class VecStructType[T](fields: Seq[(T, Bits[_])], errorOnMismatch: Boolean 
         name -> sliced.as[Bits[bits.R]]
     }).toMap
   }
-
   override def toString: String = {
     s"$VecStructType($fields)]<$fieldLoc>($bitWidth)"
   }

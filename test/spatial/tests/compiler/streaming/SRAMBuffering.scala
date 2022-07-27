@@ -51,17 +51,64 @@ class SRAMBufferingSimpleNoStream extends SRAMBufferingSimple {
 }
 
 class SRAMTransfer extends SpatialTest {
+  val transferSize = 32
   override def compileArgs = "--max_cycles=1000"
   override def main(args: Array[String]): Void = {
-    val input = DRAM[I32](32)
-    val output = DRAM[I32](32)
-    val gold = Array.tabulate(32) {i => i}
+    val input = DRAM[I32](transferSize)
+    val output = DRAM[I32](transferSize)
+    val gold = Array.tabulate(transferSize) {i => i}
     setMem(input, gold)
+    println(r"Set Mem Finished")
     Accel {
-      val sr = SRAM[I32](32)
+      val sr = SRAM[I32](transferSize)
       sr load input
       output store sr
     }
+    assert(checkGold(output, gold))
+  }
+}
+
+class SRAMTransfer2 extends SRAMTransfer {
+  override def compileArgs = "--max_cycles=5000"
+}
+
+class SRAMTransferNS extends SRAMTransfer {
+  override def compileArgs = super.compileArgs + "--nostreamify"
+}
+
+class SRAMStore extends SpatialTest {
+  override def compileArgs = "--max_cycles=500"
+  override def main(args: Array[String]): Void = {
+    val output = DRAM[I32](32)
+    Accel {
+      val sr = SRAM[I32](32)
+      Foreach(0 until 32) {
+        i => sr(i) = i
+      }
+      output store sr
+    }
+    val gold = Array.tabulate(32) {i => i}
+    assert(checkGold(output, gold))
+  }
+}
+
+class SRAMLoad extends SpatialTest {
+  override def compileArgs = "--max_cycles=1000"
+  override def main(args: Array[String]): Void = {
+    val input = DRAM[I32](32)
+    val data = Array.tabulate(32) { i => i }
+    setMem(input, data)
+    val output = ArgOut[I32]
+    Accel {
+      val sr = SRAM[I32](32)
+      sr load input
+      val tmp = Reg[I32](0)
+      Foreach(0 until 32) {
+        i => tmp := tmp + sr(i)
+      }
+      output := tmp
+    }
+    val gold = data.reduce { case (i, j) => i + j }
     assert(checkGold(output, gold))
   }
 }

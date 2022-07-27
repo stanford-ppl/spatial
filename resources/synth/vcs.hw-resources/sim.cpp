@@ -177,6 +177,8 @@ extern "C" {
 
           uint64_t bigptr = remapper->getBig((uint64_t)src);
 
+          EPRINTF("[SIM] Received write request to %p (%p), size %lu\n", (void*)src, (uint64_t*)bigptr, size);
+
           // Now to receive 'size' bytes from the cmd stream
           respChannel->sendFixedBytes((uint64_t*)bigptr, size);
           break;

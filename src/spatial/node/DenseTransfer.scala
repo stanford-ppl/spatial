@@ -323,7 +323,7 @@ object DenseTransfer {
       val dataStream = StreamIn[A](BurstDataBus[A]())
 
       // Command generator
-      Sequential {
+      'AlignedLoadCommand.Sequential {
         val addr = (dramAddr() * bytesPerWord).to[I64] + dram.address
         val addr_bytes = addr
         val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
@@ -334,7 +334,7 @@ object DenseTransfer {
       val load = Fringe.denseLoad(dram, cmdStream, dataStream)
       transferSyncMeta(old, load)
 
-      Foreach(requestLength par p){i =>
+      'AlignedLoadWrite.Foreach(requestLength par p){i =>
         val data = dataStream.value()
         val addr = localAddr(i)
         local.__write(data, addr, Set.empty)

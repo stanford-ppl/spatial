@@ -12,6 +12,7 @@ import scala.collection.{mutable => cm}
 import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.access._
+import spatial.metadata.transform._
 import spatial.util.TransformUtils._
 import spatial.util._
 import spatial.util.modeling._
@@ -30,13 +31,15 @@ import spatial.util.modeling._
   */
 @struct case class PseudoIters[IterVec:Bits](iters: IterVec)
 
-/**
-  * A Triple containing an optional writer, a reader, and whether the write is a back-edge write across iterations.
-  * @param writer Either the Writer symbol, or None for init
-  * @param reader The Reader symbol
-  * @param edgeType Whether the edge is a back-edge
-  */
 
+/**
+  * FlattenToStream takes an arbitrary chunk of code and turns it into a single unitpipe containing
+  *   many stream-synchronized controllers -- one for each inner controller.
+  *
+  * In addition, this also creates two auxiliary structures:
+  *   1. Counter Generator and Token Intake
+  *   2. Token Distributor
+  */
 case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTransformer with AccelTraversal {
 
   type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
@@ -67,19 +70,16 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     commFIFOs(key)
   }
 
-  /**
-    * FlattenToStream takes an arbitrary chunk of code and turns it into a single unitpipe containing
-    *   many stream-synchronized controllers -- one for each inner controller.
-    *
-    * In addition, this also creates two auxiliary structures:
-    *   1. Counter Generator and Token Intake
-    *   2. Token Distributor
-    */
   def isInternalMem(mem: Sym[_]): Boolean = {
-    val regReaders = mem.readers.flatMap(_.parent.s)
-    val regWriters = mem.writers.flatMap(_.parent.s)
-    dbgs(s"Readers and writers for $mem = $regReaders, $regWriters")
-    (regReaders union regWriters).size == 1
+    val allAccesses = mem.readers union mem.writers
+    val mutualLCA = LCA(allAccesses)
+    dbgs(s"isInternalMem($mem):")
+    indent {
+      dbgs(s"Mutual LCA: $mutualLCA")
+      dbgs(s"IsInner: ${mutualLCA.isInnerControl}")
+      dbgs(s"HasStreamPrimitiveAncestor: ${mutualLCA.hasStreamPrimitiveAncestor}")
+    }
+    mutualLCA.isInnerControl || mutualLCA.hasStreamPrimitiveAncestor
   }
 
   type MemTokenEnableMap = Map[Sym[_], Seq[(TokenComm, Bit)]]

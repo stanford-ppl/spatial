@@ -2,11 +2,11 @@ package spatial.metadata.transform
 
 import argon._
 
-/** Flag set by the user to allow buffered writes across metapipeline stages.
+/** Flag that marks whether or not we should dig deeper into the structure for streamification
   *
-  * Getter:  sym.streamify
-  * Setter:  sym.streamify = (true | false)
+  * Getter:  sym.streamPrimitive
+  * Setter:  sym.streamPrimitive = (true | false)
   * Default: false
   */
-case class Streamify(flag: Boolean, reason: Option[String] = None) extends Data[Streamify](Transfer.Remove)
+case class StreamPrimitive(flag: Boolean) extends Data[StreamPrimitive](Transfer.Mirror)
 

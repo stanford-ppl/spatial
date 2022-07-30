@@ -115,10 +115,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val accumTransformer      = AccumTransformer(state)
     lazy val regReadCSE            = RegReadCSE(state)
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
-    lazy val metapipeToStream      = MetapipeToStreamTransformer(state)
     lazy val allocMotion           = AllocMotion(state)
     lazy val reduceToForeach       = ReduceToForeach(state)
-    lazy val streamifyAnnotator    = StreamifyAnnotator(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
     lazy val fifoInitializer       = FIFOInitializer(state)
     lazy val unitIterationElimination = UnitIterationElimination(state)
@@ -131,7 +129,7 @@ trait Spatial extends Compiler with ParamLoader {
       S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports],
       S[spatial.metadata.memory.GroupId])
 
-    lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.transform.Streamify], S[spatial.metadata.memory.StreamBufferIndex])
+    lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.memory.StreamBufferIndex])
 
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 

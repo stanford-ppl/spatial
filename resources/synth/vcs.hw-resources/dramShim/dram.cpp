@@ -28,7 +28,7 @@ int sendResp(dramCmd *cmd) {
       resp.size = 0;
       break;
     default:
-      EPRINTF("[SIM] Command %d not supported!\n", cmd->cmd);
+      EPRINTF("[SIM/DRAM] Command %d not supported!\n", cmd->cmd);
       exit(-1);
   }
 
@@ -54,9 +54,12 @@ void recvDRAMRequest(
 
 void checkDRAMResponse() {
   if (dramRequestQ.size() > 0) {
+    EPRINTF("[SIM/DRAM] DRAM Request Queue Size: %d", dramRequestQ.size());
     DRAMRequest *req = dramRequestQ.front();
     req->elapsed++;
     if(req->elapsed == req->delay) {
+        EPRINTF("[SIM/DRAM] Handling DRAM Request");
+        req->print();
       dramRequestQ.pop();
 
       uint32_t rdata[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -104,14 +107,14 @@ int tick() {
         resp.cmd = cmd->cmd;
         *(uint64_t*)resp.data = (uint64_t)ptr;
         resp.size = sizeof(size_t);
-        EPRINTF("[SIM] MALLOC(%lu), returning %p\n", size, (void*)ptr);
+        EPRINTF("[SIM/DRAM] MALLOC(%lu), returning %p\n", size, (void*)ptr);
         respChannel->send(&resp);
         break;
       }
       case DRAM_FREE: {
         void *ptr = (void*)(*(uint64_t*)cmd->data);
         ASSERT(ptr != NULL, "Attempting to call free on null pointer\n");
-        EPRINTF("[SIM] FREE(%p)\n", ptr);
+        EPRINTF("[SIM/DRAM] FREE(%p)\n", ptr);
         break;
       }
       case DRAM_MEMCPY_H2D: {
@@ -119,7 +122,7 @@ int tick() {
         void *dst = (void*)data[0];
         size_t size = data[1];
 
-        EPRINTF("[SIM] Received memcpy request to %p, size %lu\n", (void*)dst, size);
+        EPRINTF("[SIM/DRAM] Received memcpy request to %p, size %lu\n", (void*)dst, size);
 
         // Now to receive 'size' bytes from the cmd stream
         cmdChannel->recvFixedBytes(dst, size);

@@ -14,8 +14,8 @@ if [[ "$DEBUG_DRAM" = "0" || "$DEBUG_DRAM" = "1" ]]; then
 else
 	dbg_dram=0
 fi
-export USE_IDEAL_DRAM=$ideal
-export DRAM_DEBUG=$dbg_dram
+export USE_IDEAL_DRAM=1
+export DRAM_DEBUG=1
 export DEBUG_REGS=$dbg_reg
 export VPD_ON=0
 export VCD_ON=0

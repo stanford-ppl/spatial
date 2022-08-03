@@ -52,7 +52,7 @@ class SRAMBufferingSimpleNoStream extends SRAMBufferingSimple {
 
 class SRAMTransfer extends SpatialTest {
   val transferSize = 32
-  override def compileArgs = "--max_cycles=1000"
+  override def compileArgs = "--max_cycles=500"
   override def main(args: Array[String]): Void = {
     val input = DRAM[I32](transferSize)
     val output = DRAM[I32](transferSize)
@@ -64,11 +64,8 @@ class SRAMTransfer extends SpatialTest {
       output store sr
     }
     assert(checkGold(output, gold))
+    assert(Bit(true))
   }
-}
-
-class SRAMTransfer2 extends SRAMTransfer {
-  override def compileArgs = "--max_cycles=500"
 }
 
 class SRAMTransferNS extends SRAMTransfer {

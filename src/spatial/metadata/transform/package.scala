@@ -7,7 +7,7 @@ import spatial.metadata.control._
 package object transform {
   implicit class TransformOps(s: Sym[_]) {
     def isStreamPrimitive: Boolean = metadata[StreamPrimitive](s).exists(_.flag)
-    def streamPrimitive_=(flag: Boolean): Unit = metadata.add[StreamPrimitive](s, StreamPrimitive(flag))
+    def isStreamPrimitive_=(flag: Boolean): Unit = metadata.add[StreamPrimitive](s, StreamPrimitive(flag))
   }
 
   implicit class TransformCtrlOps(s: Ctrl) {

@@ -101,8 +101,8 @@ extern "C" {
             *(uint32_t*)resp.data = (uint32_t)*rdataLo;
             *((uint32_t*)resp.data + 1) = (uint32_t)*rdataHi;
             resp.size = sizeof(uint64_t);
-            EPRINTF("Responding to REGRead:");
-            printPkt(&resp);
+//            EPRINTF("Responding to REGRead:");
+//            printPkt(&resp);
             respChannel->send(&resp);
             break;
           default:
@@ -129,8 +129,8 @@ extern "C" {
       uint32_t reg = 0;
       uint64_t data = 0;
 
-      EPRINTF("[SIM] Processing Packet(%i):\n", numCycles);
-      printPkt(cmd);
+//      EPRINTF("[SIM] Processing Packet(%i):\n", numCycles);
+//      printPkt(cmd);
       switch (cmd->cmd) {
         case MALLOC: {
           size_t size = *(size_t*)cmd->data;
@@ -172,8 +172,8 @@ extern "C" {
           resp.cmd = cmd->cmd;
           resp.size = 0;
           respChannel->send(&resp);
-          EPRINTF("[SIM] MEMCPY_H2D:\n");
-          printPkt(&resp);
+//          EPRINTF("[SIM] MEMCPY_H2D:\n");
+//          printPkt(&resp);
           break;
         }
         case MEMCPY_D2H: {

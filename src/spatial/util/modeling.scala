@@ -883,7 +883,7 @@ object modeling {
       val nodes = (comms.map(_.src) ++ comms.map(_.dst)).flatMap(_.s)
       val nodeStrings = nodes.sortBy(_.progorder).map {
         node =>
-          val interestingChildren = node.blocks.flatMap(_.stms).collect {
+          val interestingChildren = node.blocks.flatMap(_.nestedStms).collect {
             case s if allMems.intersect((s.writtenMem ++ s.readMem).toSet).nonEmpty => s
             case s if allMems.contains(s) => s
           }
@@ -894,15 +894,19 @@ object modeling {
           val nodeTypeString = if (node.isInnerControl) { "Inner" } else { "Outer" }
           node -> s"""$node [shape=record label="{$node (${node.ctx}) [${nodeTypeString}] | {Accesses|{$childrenString}}}"];"""
       }
+
+      def isOuter(sym: Sym[_]): Boolean = {
+        sym.isOuterControl && !sym.isStreamPrimitive
+      }
       val outerString =
         s"""
            |  subgraph {
            |    rank="same"
-           |    ${nodeStrings.filter(_._1.isOuterControl).map(_._2).mkString("\n|    ")}
+           |    ${nodeStrings.filter(x => isOuter(x._1)).map(_._2).mkString("\n|    ")}
            |  }
            |""".stripMargin
 
-      val innerString = nodeStrings.filter(_._1.isInnerControl).map(_._2).mkString("\n|  ")
+      val innerString = nodeStrings.filter(x => !isOuter(x._1)).map(_._2).mkString("\n|  ")
 
       val edgeString = comms.map {
         case tc@TokenComm(mem, src, dst, edgeType, lca, dups) =>

@@ -485,6 +485,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     2 * mem.parent.children.count(ctrl => (ctrl.sym.effects.reads ++ ctrl.sym.effects.writes).contains(mem))
   }
 
+  val intakeTokens = cm.Map[Sym[_], Sym[_]]()
   private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
     dbgs(s"Visiting Inner Foreach: $lhs = $foreachOp")
     val controllerInfo = ControllerInfo(lhs)
@@ -543,8 +544,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           (Map.empty, Map.empty[Sym[_], Bit])
       }
 
-      val intakeTokens = cm.Map[Sym[_], Bits[_]]()
-
+      intakeTokens.clear()
       tokens.foreach {
         case (mem: Reg[_], value) =>
           dbgs(s"Handling Register: $mem -> ${f(mem)}")
@@ -554,15 +554,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           holdReg.nonbuffer
           holdReg.write(value.asInstanceOf[mem.RT], wrEns(mem))
 
-          val writesToReg = lhs.writtenMems.contains(mem)
-          if (writesToReg) {
-            // In this case, we want it to grab the value from the previous write
-            val oldValue = f(mem).value.asInstanceOf[Bits[mem.RT]]
-            val oldRead = oldValue.asSym
-            dbgs(s"Registering read for $mem: $oldRead with enable ${wrEns(mem)}")
-            regValues(mem) = mux(wrEns(mem), holdReg.value.asInstanceOf[Bits[mem.RT]], oldValue).asInstanceOf[Sym[_]]
+          if (!lhs.isInnerControl) {
+            // write the result of the regvalue to the reg
+            f(mem).write(holdReg.value, wrEns(mem))
+            regValues(mem) = void
           } else {
-            regValues(mem) = holdReg.value
+            val writesToReg = lhs.writtenMems.contains(mem)
+            if (writesToReg) {
+              // In this case, we want it to grab the value from the previous write
+              val oldValue = f(mem).value.asInstanceOf[Bits[mem.RT]]
+              val oldRead = oldValue.asSym
+              dbgs(s"Registering read for $mem: $oldRead with enable ${wrEns(mem)}")
+              regValues(mem) = mux(wrEns(mem), holdReg.value.asInstanceOf[Bits[mem.RT]], oldValue).asInstanceOf[Sym[_]]
+            } else {
+              regValues(mem) = holdReg.value
+            }
           }
 
         case (mem, value) if MemStrategy(mem) == Buffer =>
@@ -574,43 +580,38 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
       }
 
-      val lastWrites = foreachOp.block.stms.filter(_.isWriter).groupBy(_.writtenMem).map {
-        case (Some(mem), writes) => mem -> writes.last
-      }
-
       // Restage the actual innards of the foreach
-      foreachOp.block.stms.foreach {
-        case rr@Op(RegRead(reg)) if regValues.contains(reg) =>
-          dbgs(s"Forwarding read: $rr = ${rr.op.get} <= ${regValues(reg)} =  ${regValues(reg).op}")
-          register(rr -> regValues(reg))
-        case rw@Op(RegWrite(reg, data, ens)) if regValues.contains(reg) =>
-          dbgs(s"Forwarding write: $rw = ${rw.op.get}")
-          val alwaysEnabled = ens.forall {
-            case Const(b) => b.value
-            case _ => false
-          }
-          if (alwaysEnabled) {
-            regValues(reg) = f(data)
-          } else {
-            regValues(reg) = mux(f(ens).toSeq.reduceTree(_&_), f(data).asInstanceOf[Bits[reg.RT]], regValues(reg).asInstanceOf[Bits[reg.RT]]).asInstanceOf[Sym[reg.RT]]
-          }
-          dbgs(s"reg($reg) = ${regValues(reg)}")
+      if (lhs.isInnerControl) {
+        foreachOp.block.stms.foreach {
+          case rr@Op(RegRead(reg)) if regValues.contains(reg) =>
+            dbgs(s"Forwarding read: $rr = ${rr.op.get} <= ${regValues(reg)} =  ${regValues(reg).op}")
+            register(rr -> regValues(reg))
+          case rw@Op(RegWrite(reg, data, ens)) if regValues.contains(reg) =>
+            dbgs(s"Forwarding write: $rw = ${rw.op.get}")
+            val alwaysEnabled = ens.forall {
+              case Const(b) => b.value
+              case _ => false
+            }
+            if (alwaysEnabled) {
+              regValues(reg) = f(data)
+            } else {
+              regValues(reg) = mux(f(ens).toSeq.reduceTree(_ & _), f(data).asInstanceOf[Bits[reg.RT]], regValues(reg).asInstanceOf[Bits[reg.RT]]).asInstanceOf[Sym[reg.RT]]
+            }
+            dbgs(s"reg($reg) = ${regValues(reg)}")
 
-          // stage the write anyways
-          visit(rw)
-          if (lastWrites(reg) == rw) {
-            // if this was the last write
-//            f(rw).addNonConflicts(nonConflictData(reg))
-          }
-        case sramRead@Op(SRAMRead(mem, _, _)) if intakeTokens.contains(mem) =>
-          visit(sramRead)
-          dbgs(s"Tagging SRR $sramRead -> ${f(sramRead)} with token ${intakeTokens(mem)}")
-          f(sramRead).bufferIndex = intakeTokens(mem).asInstanceOf[I32]
-        case sramWrite@Op(SRAMWrite(mem, _, _, _)) if intakeTokens.contains(mem) =>
-          visit(sramWrite)
-          dbgs(s"Tagging SRW $sramWrite -> ${f(sramWrite)} with token ${intakeTokens(mem)}")
-          f(sramWrite).bufferIndex = intakeTokens(mem).asInstanceOf[I32]
-        case other => visit(other)
+            // stage the write anyways
+            visit(rw)
+          case other => visit(other)
+        }
+      } else {
+        stageWithFlow(UnitPipe(Set.empty, stageBlock {
+          inlineBlock(foreachOp.block)
+        }, None)) {
+          newInner => newInner.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+        }
+        regValues ++= (regValues.keys.toSeq.map {
+          case reg: Reg[_] => reg.asSym -> f(reg).value.asInstanceOf[Sym[_]]
+        })
       }
 
       retimeGate()
@@ -633,8 +634,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       newForeach =>
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
-        dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
-        newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+        if (lhs.isOuterControl) {
+          newForeach.userSchedule = Sequenced
+        }else {
+          dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
+          newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+        }
     }
 
     dbgs(s"Creating Release Controller")
@@ -675,8 +680,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }
     }
 
-    case foreachOp: OpForeach if inHw && lhs.isInnerControl =>
-      dbgs(s"Transforming Inner: $lhs = $foreachOp")
+    case foreachOp: OpForeach if inHw && lhs.isStreamPrimitive || (lhs.isInnerControl && !lhs.toCtrl.hasStreamPrimitiveAncestor) =>
+      dbgs(s"Transforming Foreach: $lhs = $foreachOp")
       indent { isolateSubst() {
         stageWithFlow(UnitPipe(Set.empty, stageBlock {
           visitInnerForeach(lhs, foreachOp)
@@ -708,9 +713,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       cloned.bufferAmount = computeBufferDepth(lhs)
       cloned
 
-    case _:CounterNew[_] | _:CounterChainNew =>
+    case _:CounterNew[_] | _:CounterChainNew if !lhs.hasStreamAncestor =>
       dbgs(s"Skipping $lhs = $rhs since it'll be re-created later.")
       lhs
+
+    case SRAMRead(mem, _, _) if intakeTokens.contains(mem) =>
+      val newRead = mirror(lhs, rhs)
+      dbgs(s"Tagging SRR $rhs -> $newRead with token ${intakeTokens(mem)}")
+      newRead.bufferIndex = intakeTokens(mem).asInstanceOf[I32]
+      newRead
+
+    case SRAMWrite(mem, _, _, _) if intakeTokens.contains(mem) =>
+      val newWrite = mirror(lhs, rhs)
+      dbgs(s"Tagging SRW $rhs -> ${newWrite} with token ${intakeTokens(mem)}")
+      newWrite.bufferIndex = intakeTokens(mem).asInstanceOf[I32]
+      newWrite
 
     case _ =>
       super.transform(lhs, rhs)

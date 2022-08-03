@@ -12,6 +12,8 @@ import spatial.util.modeling.target
 import spatial.util.memops._
 import spatial.util.spatialConfig
 
+import spatial.metadata.transform._
+
 /** A dense transfer between on-chip and off-chip memory
   * If isLoad is true, this is a transfer from off-chip to on-chip.
   * Otherwise, this is a transfer from on-chip to off-chip.
@@ -110,6 +112,7 @@ object DenseTransfer {
         else        store(dramAddr, localAddr)
       }
       top.loweredTransfer = if (isLoad) DenseLoad else DenseStore
+      top.asSym.isStreamPrimitive = true
 //      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
       top.loweredTransferSize = (lens.last._2, pars.last._2, lastPar*A.nbits)
     }
@@ -121,6 +124,7 @@ object DenseTransfer {
         else        store(dramAddr, localAddr)
       }
       top.loweredTransfer = if (isLoad) DenseLoad else DenseStore
+      top.asSym.isStreamPrimitive = true
 //      val alignedSize = lens.last._2 match {case Expect(c) if (c*A.nbits) % target.burstSize == 0 => lens.last._2; case Expect(c) => lens.last._2.from(c - (c % (target.burstSize / A.nbits)) + target.burstSize / A.nbits); case _ => lens.last._2}
       top.loweredTransferSize = (lens.last._2, pars.last._2, lastPar*A.nbits)
     }

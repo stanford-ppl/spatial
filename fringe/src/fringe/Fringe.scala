@@ -76,7 +76,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
   io.argEchos := DontCare
   io.argOuts <> DontCare
 
-//  println(s"[Fringe] loadStreamInfo: $LOAD_STREAMS, storeStreamInfo: $STORE_STREAMS")
+  println(s"[Fringe] loadStreamInfo: $LOAD_STREAMS, storeStreamInfo: $STORE_STREAMS")
   val assignment: List[List[Int]] = channelAssignment.assignments
   val debugChannelID = 0
   val dramArbs = List.tabulate(NUM_CHANNELS){ i =>
@@ -94,7 +94,7 @@ class Fringe(blockingDRAMIssue: Boolean, axiParams: AXI4BundleParameters) extend
       gatherStreamInfo,
       scatterStreamInfo,
       axiParams,
-      debugChannelID == i
+      true
     ))
     dramArb.io <> DontCare
     dramArb.io.app.loads.zip(loadStreams).foreach{ case (l, ls) => l <> ls }

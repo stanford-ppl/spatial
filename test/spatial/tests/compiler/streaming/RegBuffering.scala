@@ -76,7 +76,7 @@ class RegBufferingNoStream extends RegBuffering {
     }
     // output1 = 375
     // output2 = 6525
-//    println(r"Result: ${output.value}, Result2: ${output2.value}")
+    println(r"Result: ${output.value}, Result2: ${output2.value}")
     assert(output.value == 375, r"Expected 375, got ${output.value}")
     assert(output2.value == 6525, r"Expected 6525, got ${output2.value}")
   }

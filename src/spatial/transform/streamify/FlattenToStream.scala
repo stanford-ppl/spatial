@@ -72,6 +72,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   def isInternalMem(mem: Sym[_]): Boolean = {
     val allAccesses = mem.readers union mem.writers
+    dbgs(s"Mem: $mem -- $allAccesses")
+    if (allAccesses.isEmpty) { return true }
     val mutualLCA = LCA(allAccesses)
     dbgs(s"isInternalMem($mem):")
     indent {
@@ -106,7 +108,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
                 isFirstIterInLCA
               case Backward =>
                 // For backward edges, we care if we're NOT on the first iteration OF the LCA (since there won't be data yet)
-                val isFirstIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(firstIterMap(_)).get
+                val isFirstIterOfLCA = getOutermostIter(lca.ancestors(mem.parent).reverse).map(firstIterMap(_)).getOrElse(Bit(true))
                 isFirstIterInLCA & !isFirstIterOfLCA
             }
             comm -> en
@@ -521,13 +523,37 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       case _ =>
     }
 
-    val foreverCounter = stage(ForeverNew())
+    val staticCounters = controllerInfo.allCounters.reverse.takeWhile(_.isStatic).reverse
+    dbgs(s"Static Counters: $staticCounters")
+    val newStaticCounters = staticCounters.map(mirrorSym(_))
+    register(staticCounters, newStaticCounters)
+    val ctrs = {
+      val newCounters = Seq(stage(ForeverNew())) ++ newStaticCounters
+      newCounters.map(_.unbox)
+    }
 
-    val mainCtrl = stageWithFlow(OpForeach(Set.empty, CounterChain(Seq(foreverCounter)), stageBlock {
+    val newCounterChain = CounterChain(ctrs)
+    register(foreachOp.cchain, newCounterChain)
+
+    val newIters = makeIters(ctrs)
+
+    val mainCtrl = stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
       val streamIters = controllerInfo.iterFIFO.deq().iters
       val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
-      register(allOldIters, streamIters.elems.map(_.i))
-      val firstIterMap = allOldIters.zip(streamIters.elems.map(_.isFirst)).toMap
+
+      controllerInfo.allCounters.zipWithIndex foreach {
+        case (oldCtr, i) =>
+          val oldIter = oldCtr.iter.get
+          if (staticCounters contains oldCtr) {
+            dbgs(s"Registering $oldCtr ($oldIter) -> ${f(oldCtr)}(${f(oldCtr).iter.get})")
+            val newIter = f(oldCtr).iter.get
+            register(oldIter, newIter)
+          } else {
+            dbgs(s"Registering $oldCtr ($oldIter) -> Stream")
+            register(oldIter, streamIters(i).i)
+          }
+      }
+
       val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
 
       // Maps registers to their 'latest' value
@@ -578,6 +604,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           holdReg.nonbuffer
           holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
           intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
+          dbgs(s"Registering Intake Token for $mem")
       }
 
       // Restage the actual innards of the foreach
@@ -601,7 +628,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
             // stage the write anyways
             visit(rw)
-          case other => visit(other)
+          case other =>
+            dbgs(s"Default Visiting: $other = ${other.op} inside of Inner Control")
+            visit(other)
         }
       } else {
         stageWithFlow(UnitPipe(Set.empty, stageBlock {
@@ -630,7 +659,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
       stopWhen.write(endOfWorld, endOfWorld)
 
-    }, Seq(makeIter(foreverCounter).unbox), Some(stopWhen))) {
+    }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
       newForeach =>
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
@@ -693,7 +722,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         }
       } }
 
-    case ctrlOp: Control[_] if inHw && lhs.isOuterControl =>
+    case ctrlOp: Control[_] if inHw && lhs.isOuterControl && !lhs.toCtrl.hasStreamPrimitiveAncestor =>
       dbgs(s"Skipping Control: $lhs = $ctrlOp")
       stageWithFlow(UnitPipe(Set.empty, stageBlock {
         ctrlOp.blocks.foreach(inlineBlock(_))
@@ -708,14 +737,24 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       dbgs(s"Skipping $lhs = $mem since it'll be duplicated.")
       lhs
 
-    case mem if inHw && lhs.isMem && lhs.isSRAM && !isInternalMem(lhs) =>
+    case mem if inHw && lhs.isSRAM && !isInternalMem(lhs) =>
       val cloned = super.transform(lhs, mem)
       cloned.bufferAmount = computeBufferDepth(lhs)
+      cloned.isNonBuffer = true
       cloned
 
-    case _:CounterNew[_] | _:CounterChainNew if !lhs.hasStreamAncestor =>
+    case _:CounterNew[_] | _:CounterChainNew if lhs.parent.isStreamPrimitive || (lhs.parent.isInnerControl && !lhs.toCtrl.hasStreamPrimitiveAncestor) =>
       dbgs(s"Skipping $lhs = $rhs since it'll be re-created later.")
       lhs
+
+    case _: CounterNew[_] if inHw =>
+      dbgs(s"Encountered Counter: $lhs")
+      val transformed = super.transform(lhs, rhs)
+      dbgs(s"Updating Counter info for $lhs = $rhs (${lhs.asInstanceOf[Counter[_]].iter})")
+      val newIter = TransformUtils.makeIter(transformed.asInstanceOf[Counter[_]])
+      val oldIter = lhs.asInstanceOf[Counter[_]].iter.get
+      register(oldIter, newIter)
+      transformed
 
     case SRAMRead(mem, _, _) if intakeTokens.contains(mem) =>
       val newRead = mirror(lhs, rhs)
@@ -723,11 +762,19 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       newRead.bufferIndex = intakeTokens(mem).asInstanceOf[I32]
       newRead
 
+    case SRAMRead(_, _, _) =>
+      dbgs(s"Skipping SRAM Read: $lhs = $rhs")
+      super.transform(lhs, rhs)
+
     case SRAMWrite(mem, _, _, _) if intakeTokens.contains(mem) =>
       val newWrite = mirror(lhs, rhs)
       dbgs(s"Tagging SRW $rhs -> ${newWrite} with token ${intakeTokens(mem)}")
       newWrite.bufferIndex = intakeTokens(mem).asInstanceOf[I32]
       newWrite
+
+    case SRAMWrite(mem, _, _, _) =>
+      dbgs(s"Skipping SRAM Write: $lhs = $rhs")
+      super.transform(lhs, rhs)
 
     case _ =>
       super.transform(lhs, rhs)

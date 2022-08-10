@@ -106,14 +106,14 @@ class DRAMArbiter(
       val signalLabels = ListBuffer[String]()
       def connectDbgSig(sig: UInt, label: String): Unit = {
         if (globals.enableDebugRegs) {
-/*
+
           if (isDebugChannel) {
             io.debugSignals(dbgCount) := sig
             val padded_label = if (label.length < 55) {label + "."*(55-label.length)} else label
             signalLabels.append(padded_label)
             dbgCount += 1
           }
-*/
+
         }
       }
 

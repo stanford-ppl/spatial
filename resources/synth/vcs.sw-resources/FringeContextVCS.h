@@ -328,6 +328,9 @@ public:
     debugRegs = envToBool("DEBUG_REGS");
     long envCycles = atol("MAX_CYCLES");
     if (envCycles > 0) maxCycles = envCycles;
+
+    EPRINTF("DEBUG Regs: %d\n", debugRegs);
+    EPRINTF("Env Cycles: %d\n", envCycles);
   }
 
   virtual void load() {
@@ -372,6 +375,7 @@ public:
       EPRINTF("=========================================\n");
       EPRINTF("ERROR: Simulation terminated after %lu cycles\n", numCycles);
       EPRINTF("=========================================\n");
+      dumpAllRegs();
     } else {  // Ran to completion, pull down command signal
       if (status.timeout) { // Hardware timeout
         EPRINTF("=========================================\n");
@@ -443,6 +447,7 @@ public:
     int argOuts = (numArgOuts == 0 & numArgOutInstrs == 0 & numArgEarlyExits == 0) ? 1 : numArgOuts;
     int debugRegStart = 2 + argIns + argOuts + numArgOutInstrs + numArgEarlyExits;
     int totalRegs = argIns + argOuts + numArgOutInstrs + numArgEarlyExits + 2 + NUM_DEBUG_SIGNALS;
+    EPRINTF("Dumping %d Regs:", totalRegs);
     for (int i=0; i<totalRegs; i++) {
       uint32_t value = readReg(i);
       if (i < debugRegStart) {

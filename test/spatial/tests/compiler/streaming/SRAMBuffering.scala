@@ -10,10 +10,10 @@ import spatial.dsl._
   override def main(args: Array[String]) = {
 //    implicitly[argon.State].config.stop = 50
     val output = DRAM[I32](outerIters, innerIters)
-//    val output2 = DRAM[I32](outerIters, innerIters)
+    val output2 = DRAM[I32](outerIters, innerIters)
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)
-//      val outputSR2 = SRAM[I32](outerIters, innerIters)
+      val outputSR2 = SRAM[I32](outerIters, innerIters)
       Foreach(0 until outerIters by 1 par 1) {
         outer =>
           val sr = SRAM[I32](innerIters)
@@ -22,26 +22,27 @@ import spatial.dsl._
               sr(inner) = inner + outer
           }
 
-//          Parallel {
+          Parallel {
             'Consumer.Foreach(0 until innerIters by 1) {
               inner =>
                 outputSR(outer, inner) = sr(inner)
             }
 
-//            'Consumer2.Foreach(0 until innerIters by 1) {
-//              inner =>
-//                outputSR2(outer, inner) = sr(inner) + 1
-//            }
-//          }
+            'Consumer2.Foreach(0 until innerIters by 1) {
+              inner =>
+                outputSR2(outer, inner) = sr(inner) + 1
+            }
+          }
       }
       output store outputSR(0::outerIters, 0::innerIters)
-//      output2 store outputSR2(0::outerIters, 0::innerIters)
+      output2 store outputSR2(0::outerIters, 0::innerIters)
     }
     printMatrix(getMatrix(output))
     val reference = Matrix.tabulate(outerIters, innerIters) {
       (outer, inner) => outer + inner
     }
     assert(checkGold(output, reference))
+    printMatrix(getMatrix(output2))
     assert(Bit(true))
   }
 }
@@ -71,6 +72,8 @@ class SRAMTransfer extends SpatialTest {
 class SRAMTransferNS extends SRAMTransfer {
   override def compileArgs = super.compileArgs + "--nostreamify"
 }
+
+class SRAMTransfer2 extends SRAMTransfer
 
 class SRAMStore extends SpatialTest {
   override def compileArgs = "--max_cycles=500"

@@ -200,7 +200,7 @@ trait Spatial extends Compiler with ParamLoader {
         fifoInitialization ==> printer ==> bankingAnalysis ==>
         spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
-        bankingAnalysis ==>
+        bankingAnalysis ==> createDump("PreUnroll") ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */

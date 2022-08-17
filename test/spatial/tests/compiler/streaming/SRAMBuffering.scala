@@ -2,10 +2,10 @@ package spatial.tests.compiler.streaming
 import spatial.dsl._
 
 @spatial class SRAMBufferingSimple extends SpatialTest {
-  override def compileArgs = "--max_cycles=3000"
+  override def compileArgs = "--max_cycles=100000"
 
   val outerIters = 4
-  val innerIters = 2
+  val innerIters = 128
 
   override def main(args: Array[String]) = {
 //    implicitly[argon.State].config.stop = 50
@@ -14,7 +14,7 @@ import spatial.dsl._
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)
       val outputSR2 = SRAM[I32](outerIters, innerIters)
-      Foreach(0 until outerIters by 1 par 1) {
+      Foreach(0 until outerIters by 1 par 2) {
         outer =>
           val sr = SRAM[I32](innerIters)
           'Producer.Foreach(0 until innerIters by 1) {
@@ -73,8 +73,6 @@ class SRAMTransferNS extends SRAMTransfer {
   override def compileArgs = super.compileArgs + "--nostreamify"
 }
 
-class SRAMTransfer2 extends SRAMTransfer
-
 class SRAMStore extends SpatialTest {
   override def compileArgs = "--max_cycles=500"
   override def main(args: Array[String]): Void = {
@@ -112,42 +110,26 @@ class SRAMLoad extends SpatialTest {
   }
 }
 
-//class SRAMTransferWithIntermediate extends SpatialTest {
-//  val transferSize = 32
-//  override def compileArgs = "--max_cycles=5000"
-//  override def main(args: Array[String]): Void = {
-//    val input = DRAM[I32](transferSize)
-//    val output = DRAM[I32](transferSize)
-//    val gold = Array.tabulate(transferSize) {i => i}
-//    setMem(input, gold)
-//    println(r"Set Mem Finished")
-//    Accel {
-//      val sr = SRAM[I32](transferSize)
-//      val sr2 = SRAM[I32](transferSize)
-//      sr load input
-//      Foreach(0 until transferSize) {
-//        i => sr2(i) = sr(i)
-//      }
-//      output store sr2
-//    }
-//    assert(checkGold(output, gold))
-//  }
-//}
-//
-//class TransferWithFIFOs extends SpatialTest {
-//  val transferSize = 32
-//  override def compileArgs = "--max_cycles=5000"
-//  override def main(args: Array[String]): Void = {
-//    val input = DRAM[I32](transferSize)
-//    val output = DRAM[I32](transferSize)
-//    val gold = Array.tabulate(transferSize) {i => i}
-//    setMem(input, gold)
-//    println(r"Set Mem Finished")
-//    Accel {
-//      val fifo = FIFO[I32](transferSize)
-//      fifo load input
-//      output store fifo
-//    }
-//    assert(checkGold(output, gold))
-//  }
-//}
+class SRAMParFactor extends SpatialTest {
+  override def compileArgs = "--max_cycles=40000"
+
+  override def main(args: Array[String]): Void = {
+    val output = DRAM[I32](32, 32)
+    Accel {
+      val sr = SRAM[I32](32, 32)
+      Foreach(0 until 32 par 1) {
+        i =>
+          Foreach(0 until 32 par 4) {
+            j => sr(i, j) = i * j
+          }
+      }
+      output store sr(0::32, 0::32)
+    }
+    val gold = Matrix.tabulate(32, 32) { (i, j) => i*j }
+    assert(checkGold(output, gold))
+  }
+}
+
+class SRAMParFactorNS extends SRAMParFactor {
+  override def compileArgs = super.compileArgs + "--nostreamify"
+}

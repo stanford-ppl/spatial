@@ -785,7 +785,9 @@ object modeling {
                         getAllDispatches(matrix.access).toSeq.contains(dup)
                     }
                 }
+                dbgs(s"Other Matrices: $otherMatrices")
                 val reaching = reachingWrites(groupedToMatrices(key), otherMatrices.toSet, mem.isGlobalMem)
+                dbgs(s"Reaching: $reaching")
 
                 reaching.map {
                   matrix =>

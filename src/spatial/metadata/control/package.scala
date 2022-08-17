@@ -377,11 +377,11 @@ package object control {
 
     /** Use a flat Seq[Idx] to group a corresponding Seq[_] based on whether they appear in the same multilevel counter chain */
     @stateful def bundleLayers[T](leaf: Sym[_], iters: Seq[Idx], elements: Seq[T]): Seq[Seq[T]] = {
-      dbgs(s"Leaf: $leaf, Iters: $iters, elements: $elements")
       import scala.collection.mutable.ArrayBuffer
       var layer: scala.Int = 0
       var ctrl = iters.head.parent.s.get
       val groups = ArrayBuffer(ArrayBuffer[T]())
+      dbgs(s"Leaf: $leaf, Iters: $iters, target: $ctrl, elements: $elements")
 
       iters.map(_.parent.s.get).zipWithIndex.foreach{case (cur, i) =>
         // Part of this layer

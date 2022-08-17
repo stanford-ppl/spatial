@@ -257,6 +257,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val tokenMap = cm.Map[Sym[_], Bits[_]]()
 
     var remainingComms = controllerInfo.intakeComms.toSet
+//
+//    val stopWhen = Reg[Bit](false)
+//    stopWhen.explicitName = s"TokenGen_${lhs}_stop"
 
     def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Sym[_] = {
       dbgs(s"All token comms: $remainingComms")
@@ -401,6 +404,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
             tokenSourceFIFO.enq(isActive)
 
+//            // Update StopWhen -- on the last iteration, kill the controller.
+//            // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
+//            retimeGate()
+//            val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
+//            stopWhen.write(endOfWorld, endOfWorld)
+
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
@@ -524,11 +533,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     }
 
     val staticCounters = controllerInfo.allCounters.reverse.takeWhile(_.isStatic).reverse
+    val hasDynamicCounters = controllerInfo.allCounters.exists(!_.isStatic)
     dbgs(s"Static Counters: $staticCounters")
     val newStaticCounters = staticCounters.map(mirrorSym(_))
     register(staticCounters, newStaticCounters)
     val ctrs = {
-      val newCounters = Seq(stage(ForeverNew())) ++ newStaticCounters
+      val newCounters = (if (hasDynamicCounters) Seq(stage(ForeverNew())) else Seq.empty) ++ newStaticCounters
       newCounters.map(_.unbox)
     }
 
@@ -636,8 +646,12 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         stageWithFlow(UnitPipe(Set.empty, stageBlock {
           inlineBlock(foreachOp.block)
         }, None)) {
-          newInner => newInner.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+          newInner =>
+            val newSched = lhs.getRawSchedule.getOrElse(Pipelined)
+            dbgs(s"Inner Schedule: $newSched")
+            newInner.userSchedule = newSched
         }
+//        inlineBlock(foreachOp.block)
         regValues ++= (regValues.keys.toSeq.map {
           case reg: Reg[_] => reg.asSym -> f(reg).value.asInstanceOf[Sym[_]]
         })
@@ -664,8 +678,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         transferData(lhs, newForeach)
         newForeach.ctx = augmentCtx(lhs.ctx)
         if (lhs.isOuterControl) {
-          newForeach.userSchedule = Sequenced
-        }else {
+          newForeach.userSchedule = Pipelined
+        } else {
           dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
           newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
         }

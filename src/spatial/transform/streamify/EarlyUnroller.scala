@@ -1,20 +1,25 @@
 package spatial.transform.streamify
 
 import argon._
-import argon.transform.MutateTransformer
+import argon.transform._
 import spatial.lang._
 import spatial.metadata.bounds.Final
 import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.util.TransformUtils._
 import spatial.metadata.control._
+import spatial.metadata.memory._
+import spatial.metadata.access._
 import spatial.util.computeShifts
 
-case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin with spatial.util.CounterIterUpdateMixin {
-  private def hasParFactor(cchain: CounterChain): Boolean = !cchain.counters.forall(_.ctrParOr1 == 1)
+import scala.collection.immutable.{ListMap => LMap}
 
-  private var laneMap: Map[Sym[_], Int] = Map.empty
-  case class UnrollState(iterLanes: Map[Sym[_], Int]) extends TransformerState {
+case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin with spatial.util.CounterIterUpdateMixin {
+//  private def hasParFactor(cchain: CounterChain): Boolean = !cchain.counters.forall(_.ctrParOr1 == 1)
+
+  private var laneMap: LMap[Sym[_], Int] = LMap.empty
+  def currentLane = laneMap.values.toList
+  case class UnrollState(iterLanes: LMap[Sym[_], Int]) extends TransformerState {
     override def restore(): Unit = {
       laneMap = iterLanes
     }
@@ -49,7 +54,7 @@ case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversa
         (foreachOp.iters zip newIters zip shift zip foreachOp.cchain.counters) foreach {
           case (((oldIter, newIter), parShift), ctr) =>
             val castedShift = ctr.CTeV.from(parShift)
-            val replacement = {
+            val replacement = () => {
               val offset = ctr.step.asInstanceOf[Num[ctr.CT]] * castedShift.asInstanceOf[ctr.CT]
               newIter.asInstanceOf[Num[ctr.CT]] + offset.asInstanceOf[ctr.CT]
             }
@@ -146,14 +151,21 @@ case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversa
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _:AccelScope => inAccel { super.transform(lhs, rhs) }
-    case foreach:OpForeach if inHw && hasParFactor(foreach.cchain) =>
+    case foreach:OpForeach if inHw =>
       unrollForeach(lhs, foreach)
-    case reduceOp:OpReduce[_] if inHw && hasParFactor(reduceOp.cchain) =>
+    case reduceOp:OpReduce[_] if inHw =>
       type T = reduceOp.A.R
       implicit def bitsEV: Bits[T] = reduceOp.A
       unrollReduce[T](lhs, reduceOp)
     case LaneStatic(iter, elems) if laneMap.contains(iter) =>
       iter.from(elems(laneMap(iter))).asSym
+//    // TODO ADD SUPPORT FOR DISPATCHES
+//    case _ if lhs.getDispatches.nonEmpty =>
+//      dbgs(s"Processing Dispatches for $lhs = $rhs in $laneMap")
+//      val v = mirrorSym(lhs)
+//      v.dispatches = Map(currentLane -> lhs.dispatches(currentLane))
+//      v
+
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 }

@@ -3,7 +3,7 @@ package spatial.util
 import argon.lang.implicits.castType
 import argon.lang.types.Bits
 import argon._
-import argon.transform.MutateTransformer
+import argon.transform.{ForwardTransformer, MutateTransformer}
 import forge.tags.{api, stateful}
 import spatial.lang._
 import spatial.node._
@@ -157,6 +157,7 @@ trait TransformerUtilMixin {
       }
     }
 
+    dbgs(s"Visitng with substs: $substs")
     inCopyMode(substs.size > 1) {
       stms foreach {
         case unitpipe@Op(UnitPipe(ens, block, stopWhen)) if unitpipe.isInnerControl =>
@@ -203,15 +204,17 @@ trait TransformerUtilMixin {
   }
 }
 
-trait CounterIterUpdateMixin extends MutateTransformer with AccelTraversal {
+trait CounterIterUpdateMixin extends ForwardTransformer with AccelTraversal {
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
-    case _:CounterNew[_] if inHw && copyMode =>
+    case _:CounterNew[_] if inHw =>
       val transformed = super.transform(lhs, rhs)
       // Update the iter info as well
-      val newIter = TransformUtils.makeIter(transformed.asInstanceOf[Counter[_]])
-      val oldIter = lhs.asInstanceOf[Counter[_]].iter.get
-      register(oldIter, newIter)
+      if (transformed != lhs) {
+        val newIter = TransformUtils.makeIter(transformed.asInstanceOf[Counter[_]])
+        val oldIter = lhs.asInstanceOf[Counter[_]].iter.get
+        register(oldIter, newIter)
+      }
       transformed
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]

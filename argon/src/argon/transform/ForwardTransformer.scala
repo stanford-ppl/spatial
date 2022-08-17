@@ -1,6 +1,7 @@
 package argon
 package transform
 
+import argon.lang.Bit
 import argon.passes.Traversal
 import utils.tags.instrument
 
@@ -70,5 +71,26 @@ abstract class ForwardTransformer extends SubstTransformer with Traversal {
     val block2 = substituteBlock(block)
     state.logTab -= 1
     block2
+  }
+
+
+  case class ForwardTransformerState(ens: Set[Bit]) extends TransformerState {
+    override def restore(): Unit = {
+      enables = ens
+    }
+  }
+
+  protected var enables: Set[Bit] = Set.empty
+
+  protected def withEns[T](ens: Set[Bit])(thunk: => T): T = {
+    val tEnables = enables
+    enables = enables ++ ens
+    val result = thunk
+    enables = tEnables
+    result
+  }
+
+  override def saveSubsts(): TransformerStateBundle = {
+    super.saveSubsts() ++ Seq(ForwardTransformerState(enables))
   }
 }

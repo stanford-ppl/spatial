@@ -61,8 +61,8 @@ class SRAMTransfer extends SpatialTest {
     setMem(input, gold)
     Accel {
       val sr = SRAM[I32](transferSize)
-      sr load input
-      output store sr
+      Pipe {sr load input}
+      Pipe {output store sr}
     }
     assert(checkGold(output, gold))
     assert(Bit(true))
@@ -111,7 +111,7 @@ class SRAMLoad extends SpatialTest {
 }
 
 class SRAMParFactor extends SpatialTest {
-  override def compileArgs = "--max_cycles=40000"
+  override def compileArgs = "--max_cycles=2500"
 
   override def main(args: Array[String]): Void = {
     val output = DRAM[I32](32, 32)
@@ -120,12 +120,14 @@ class SRAMParFactor extends SpatialTest {
       Foreach(0 until 32 par 1) {
         i =>
           Foreach(0 until 32 par 4) {
-            j => sr(i, j) = i * j
+            j => sr(i, j) = i * j + 1
           }
       }
-      output store sr(0::32, 0::32)
+      Pipe {
+        output store sr(0 :: 32, 0 :: 32)
+      }
     }
-    val gold = Matrix.tabulate(32, 32) { (i, j) => i*j }
+    val gold = Matrix.tabulate(32, 32) { (i, j) => i*j + 1 }
     assert(checkGold(output, gold))
   }
 }

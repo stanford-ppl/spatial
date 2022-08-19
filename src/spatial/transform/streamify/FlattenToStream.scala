@@ -202,7 +202,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   }
 
   case class ControllerInfo(lhs: Sym[_]) {
-    val allCounters = lhs.ancestors.flatMap(_.cchains).flatMap(_.counters)
+    dbgs(s"Ancestors of $lhs = ${lhs.ancestors} [${lhs.isStreamPrimitive}]")
+    val allCtrlers = lhs.ancestors.dropRight(if (lhs.isStreamPrimitive) 1 else 0)
+    val allChains = allCtrlers.flatMap(_.cchains)
+    val allCounters = allChains.flatMap(_.counters)
+    val allIters = allCounters.flatMap(_.iter)
 
     val fifoDepth = I32(128)
     val (iterFIFO, releaseIterFIFO) = {
@@ -248,18 +252,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   private def createCounterGenerator(controllerInfo: ControllerInfo): Sym[_] = {
     import controllerInfo._
-    val allChains = lhs.ancestors.flatMap(_.cchains)
-    dbgs(s"All chains of $lhs = $allChains")
-    val allCounters = allChains.flatMap(_.counters)
-    val allOldIters = allCounters.flatMap(_.iter)
 
     // Maps from memory to either their token or their value (for duplicates)
     val tokenMap = cm.Map[Sym[_], Bits[_]]()
 
     var remainingComms = controllerInfo.intakeComms.toSet
-//
-//    val stopWhen = Reg[Bit](false)
-//    stopWhen.explicitName = s"TokenGen_${lhs}_stop"
 
     def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Sym[_] = {
       dbgs(s"All token comms: $remainingComms")
@@ -370,7 +367,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
             updateFirstIterMap()
-            val oldItersAsI32 = allOldIters.map(_.unbox.asInstanceOf[I32])
+            val oldItersAsI32 = allIters.map(_.unbox.asInstanceOf[I32])
             val allNewIters = f(oldItersAsI32)
             val isLasts = isLastIters(allNewIters: _*)
             val indexData = oldItersAsI32.zip(isLasts).map {
@@ -452,8 +449,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
       val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
       register(allOldIters, streamIters.elems.map(_.i))
-
-      val firstIterMap = allOldIters.zip(streamIters.elems.map(_.isFirst)).toMap
       val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
 
       val source = tokenSourceFIFO.deq()
@@ -482,7 +477,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }
 
       retimeGate()
-      val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
+      val endOfWorld = getOutermostIter(controllerInfo.allCtrlers).map(lastIterMap(_)).getOrElse(Bit(true))
       stopWhen.write(endOfWorld, endOfWorld)
 
     }, Seq(makeIter(forever).unbox), Some(stopWhen))) {
@@ -498,7 +493,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   val intakeTokens = cm.Map[Sym[_], Sym[_]]()
   private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
-    dbgs(s"Visiting Inner Foreach: $lhs = $foreachOp")
+    dbgs(s"Visiting Foreach: $lhs = $foreachOp [${lhs.isInnerControl}]")
     val controllerInfo = ControllerInfo(lhs)
 
     dbgs(s"Creating Counter Generator and fetching tokens")
@@ -547,142 +542,323 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     val newIters = makeIters(ctrs)
 
-    val mainCtrl = stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
-      val streamIters = controllerInfo.iterFIFO.deq().iters
-      val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
 
-      controllerInfo.allCounters.zipWithIndex foreach {
-        case (oldCtr, i) =>
-          val oldIter = oldCtr.iter.get
-          if (staticCounters contains oldCtr) {
-            dbgs(s"Registering $oldCtr ($oldIter) -> ${f(oldCtr)}(${f(oldCtr).iter.get})")
-            val newIter = f(oldCtr).iter.get
-            register(oldIter, newIter)
-          } else {
-            dbgs(s"Registering $oldCtr ($oldIter) -> Stream")
-            register(oldIter, streamIters(i).i)
+    // Split here based on if we're an inner or outer control
+
+    val mainCtrl = if (lhs.isInnerControl) {
+      stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
+        val streamIters = controllerInfo.iterFIFO.deq().iters
+        val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
+
+        controllerInfo.allCounters.zipWithIndex foreach {
+          case (oldCtr, i) =>
+            val oldIter = oldCtr.iter.get
+            if (staticCounters contains oldCtr) {
+              dbgs(s"Registering $oldCtr ($oldIter) -> ${f(oldCtr)}(${f(oldCtr).iter.get})")
+              val newIter = f(oldCtr).iter.get
+              register(oldIter, newIter)
+            } else {
+              dbgs(s"Registering $oldCtr ($oldIter) -> Stream")
+              register(oldIter, streamIters(i).i)
+            }
+        }
+
+        val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
+
+        // Maps registers to their 'latest' value
+        val regValues = cm.Map[Sym[_], Sym[_]]()
+
+        // Reads tokens and their validity from tokens, wrEns
+
+        val (tokens, wrEns) = (controllerInfo.tokenFIFO, controllerInfo.acquireFIFO) match {
+          case (Some(tokenFIFO), Some(acquireFIFO)) =>
+            val tk = controllerInfo.tokenStreamType.unpackStruct(tokenFIFO.deq())
+            val wEns = controllerInfo.tokenEnableType.unpackStruct(acquireFIFO.deq()).mapValues(_.as[Bit])
+            (tk, wEns)
+          case (None, None) =>
+            (Map.empty, Map.empty[Sym[_], Bit])
+        }
+
+        intakeTokens.clear()
+        tokens.foreach {
+          case (mem: Reg[_], value) =>
+            dbgs(s"Handling Register: $mem -> ${f(mem)}")
+
+            implicit def bEV: Bits[mem.RT] = mem.A.asInstanceOf[Bits[mem.RT]]
+
+            val holdReg = Reg[mem.RT]
+            holdReg.explicitName = s"HoldReg_${lhs}_$mem"
+            holdReg.nonbuffer
+            holdReg.write(value.asInstanceOf[mem.RT], wrEns(mem))
+
+            if (!lhs.isInnerControl) {
+              // write the result of the regvalue to the reg
+              f(mem).write(holdReg.value, wrEns(mem))
+              regValues(mem) = void
+            } else {
+              val writesToReg = lhs.writtenMems.contains(mem)
+              if (writesToReg) {
+                // In this case, we want it to grab the value from the previous write
+                val oldValue = f(mem).value.asInstanceOf[Bits[mem.RT]]
+                val oldRead = oldValue.asSym
+                dbgs(s"Registering read for $mem: $oldRead with enable ${wrEns(mem)}")
+                regValues(mem) = mux(wrEns(mem), holdReg.value.asInstanceOf[Bits[mem.RT]], oldValue).asInstanceOf[Sym[_]]
+              } else {
+                regValues(mem) = holdReg.value
+              }
+            }
+
+          case (mem, value) if MemStrategy(mem) == Buffer =>
+            implicit def bEV: Bits[value.R] = value.asSym.tp.asInstanceOf[Bits[value.R]]
+
+            val holdReg = Reg[value.R]
+            holdReg.explicitName = s"HoldReg_${lhs}_$mem"
+            holdReg.nonbuffer
+            holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
+            intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
+            dbgs(s"Registering Intake Token for $mem")
+        }
+
+        // Restage the actual innards of the foreach
+          foreachOp.block.stms.foreach {
+            case rr@Op(RegRead(reg)) if regValues.contains(reg) =>
+              dbgs(s"Forwarding read: $rr = ${rr.op.get} <= ${regValues(reg)} =  ${regValues(reg).op}")
+              register(rr -> regValues(reg))
+            case rw@Op(RegWrite(reg, data, ens)) if regValues.contains(reg) =>
+              dbgs(s"Forwarding write: $rw = ${rw.op.get}")
+              val alwaysEnabled = ens.forall {
+                case Const(b) => b.value
+                case _ => false
+              }
+              if (alwaysEnabled) {
+                regValues(reg) = f(data)
+              } else {
+                regValues(reg) = mux(f(ens).toSeq.reduceTree(_ & _), f(data).asInstanceOf[Bits[reg.RT]], regValues(reg).asInstanceOf[Bits[reg.RT]]).asInstanceOf[Sym[reg.RT]]
+              }
+              dbgs(s"reg($reg) = ${regValues(reg)}")
+
+              // stage the write anyways
+              visit(rw)
+            case other =>
+              dbgs(s"Default Visiting: $other = ${other.op} inside of Inner Control")
+              visit(other)
           }
+
+        retimeGate()
+        // Release tokens
+        val updatedValues = intakeTokens ++ regValues
+        controllerInfo.finishTokenFIFO match {
+          case Some(finishTokenFIFO) =>
+            finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
+          case None =>
+            dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
+        }
+
+        // Update StopWhen -- on the last iteration, kill the controller.
+        // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
+        retimeGate()
+        val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
+        stopWhen.write(endOfWorld, endOfWorld)
+
+      }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
+        newForeach =>
+          transferData(lhs, newForeach)
+          newForeach.ctx = augmentCtx(lhs.ctx)
+          dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
+          newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
       }
+    } else {
+      stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
+        val streamIters = controllerInfo.iterFIFO.deq().iters
+        val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
+        controllerInfo.allCounters.zipWithIndex foreach {
+          case (oldCtr, i) =>
+            val oldIter = oldCtr.iter.get
+            if (staticCounters contains oldCtr) {
+              dbgs(s"Registering $oldCtr ($oldIter) -> ${f(oldCtr)}(${f(oldCtr).iter.get})")
+              val newIter = f(oldCtr).iter.get
+              register(oldIter, newIter)
+            } else {
+              dbgs(s"Registering $oldCtr ($oldIter) -> Stream")
+              register(oldIter, streamIters(i).i)
+            }
+        }
 
-      val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
+        // Maps registers to their 'latest' value
+        val regValues = cm.Map[Sym[_], Sym[_]]()
 
-      // Maps registers to their 'latest' value
-      val regValues = cm.Map[Sym[_], Sym[_]]()
+        // Reads tokens and their validity from tokens, wrEns
 
-      // Reads tokens and their validity from tokens, wrEns
+        val (tokens, wrEns) = (controllerInfo.tokenFIFO, controllerInfo.acquireFIFO) match {
+          case (Some(tokenFIFO), Some(acquireFIFO)) =>
+            val tk = controllerInfo.tokenStreamType.unpackStruct(tokenFIFO.deq())
+            val wEns = controllerInfo.tokenEnableType.unpackStruct(acquireFIFO.deq()).mapValues(_.as[Bit])
+            (tk, wEns)
+          case (None, None) =>
+            (Map.empty, Map.empty[Sym[_], Bit])
+        }
 
-      val (tokens, wrEns) = (controllerInfo.tokenFIFO, controllerInfo.acquireFIFO) match {
-        case (Some(tokenFIFO), Some(acquireFIFO)) =>
-          val tk = controllerInfo.tokenStreamType.unpackStruct(tokenFIFO.deq())
-          val wEns = controllerInfo.tokenEnableType.unpackStruct(acquireFIFO.deq()).mapValues(_.as[Bit])
-          (tk, wEns)
-        case (None, None) =>
-          (Map.empty, Map.empty[Sym[_], Bit])
-      }
+        intakeTokens.clear()
+        tokens.foreach {
+          case (mem: Reg[_], value) =>
+            dbgs(s"Handling Register: $mem -> ${f(mem)}")
 
-      intakeTokens.clear()
-      tokens.foreach {
-        case (mem: Reg[_], value) =>
-          dbgs(s"Handling Register: $mem -> ${f(mem)}")
-          implicit def bEV: Bits[mem.RT] = mem.A.asInstanceOf[Bits[mem.RT]]
-          val holdReg = Reg[mem.RT]
-          holdReg.explicitName = s"HoldReg_${lhs}_$mem"
-          holdReg.nonbuffer
-          holdReg.write(value.asInstanceOf[mem.RT], wrEns(mem))
+            implicit def bEV: Bits[mem.RT] = mem.A.asInstanceOf[Bits[mem.RT]]
 
-          if (!lhs.isInnerControl) {
+            val holdReg = Reg[mem.RT]
+            holdReg.explicitName = s"HoldReg_${lhs}_$mem"
+            holdReg.nonbuffer
+            holdReg.write(value.asInstanceOf[mem.RT], wrEns(mem))
+
             // write the result of the regvalue to the reg
             f(mem).write(holdReg.value, wrEns(mem))
             regValues(mem) = void
-          } else {
-            val writesToReg = lhs.writtenMems.contains(mem)
-            if (writesToReg) {
-              // In this case, we want it to grab the value from the previous write
-              val oldValue = f(mem).value.asInstanceOf[Bits[mem.RT]]
-              val oldRead = oldValue.asSym
-              dbgs(s"Registering read for $mem: $oldRead with enable ${wrEns(mem)}")
-              regValues(mem) = mux(wrEns(mem), holdReg.value.asInstanceOf[Bits[mem.RT]], oldValue).asInstanceOf[Sym[_]]
-            } else {
-              regValues(mem) = holdReg.value
-            }
-          }
 
-        case (mem, value) if MemStrategy(mem) == Buffer =>
-          implicit def bEV: Bits[value.R] = value.asSym.tp.asInstanceOf[Bits[value.R]]
-          val holdReg = Reg[value.R]
-          holdReg.explicitName = s"HoldReg_${lhs}_$mem"
-          holdReg.nonbuffer
-          holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
-          intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
-          dbgs(s"Registering Intake Token for $mem")
-      }
+          case (mem, value) if MemStrategy(mem) == Buffer =>
+            implicit def bEV: Bits[value.R] = value.asSym.tp.asInstanceOf[Bits[value.R]]
 
-      // Restage the actual innards of the foreach
-      if (lhs.isInnerControl) {
-        foreachOp.block.stms.foreach {
-          case rr@Op(RegRead(reg)) if regValues.contains(reg) =>
-            dbgs(s"Forwarding read: $rr = ${rr.op.get} <= ${regValues(reg)} =  ${regValues(reg).op}")
-            register(rr -> regValues(reg))
-          case rw@Op(RegWrite(reg, data, ens)) if regValues.contains(reg) =>
-            dbgs(s"Forwarding write: $rw = ${rw.op.get}")
-            val alwaysEnabled = ens.forall {
-              case Const(b) => b.value
-              case _ => false
-            }
-            if (alwaysEnabled) {
-              regValues(reg) = f(data)
-            } else {
-              regValues(reg) = mux(f(ens).toSeq.reduceTree(_ & _), f(data).asInstanceOf[Bits[reg.RT]], regValues(reg).asInstanceOf[Bits[reg.RT]]).asInstanceOf[Sym[reg.RT]]
-            }
-            dbgs(s"reg($reg) = ${regValues(reg)}")
-
-            // stage the write anyways
-            visit(rw)
-          case other =>
-            dbgs(s"Default Visiting: $other = ${other.op} inside of Inner Control")
-            visit(other)
+            val holdReg = Reg[value.R]
+            holdReg.explicitName = s"HoldReg_${lhs}_$mem"
+            holdReg.nonbuffer
+            holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
+            intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
+            dbgs(s"Registering Intake Token for $mem")
         }
-      } else {
-        stageWithFlow(UnitPipe(Set.empty, stageBlock {
-          inlineBlock(foreachOp.block)
-        }, None)) {
-          newInner =>
-            val newSched = lhs.getRawSchedule.getOrElse(Pipelined)
-            dbgs(s"Inner Schedule: $newSched")
-            newInner.userSchedule = newSched
-        }
-//        inlineBlock(foreachOp.block)
+
+        val ctrs = lhs.cchains.flatMap(_.counters)
+        register(ctrs, ctrs.map(mirrorSym(_)))
+        register(ctrs.flatMap(_.iter), makeIters(f(ctrs)))
+        register(lhs.cchains, lhs.cchains.map(mirrorSym(_)))
+        mirrorSym(lhs)
+
         regValues ++= (regValues.keys.toSeq.map {
           case reg: Reg[_] => reg.asSym -> f(reg).value.asInstanceOf[Sym[_]]
         })
-      }
 
-      retimeGate()
-      // Release tokens
-      val updatedValues = intakeTokens ++ regValues
-      controllerInfo.finishTokenFIFO match {
-        case Some(finishTokenFIFO) =>
-          finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
-        case None =>
-          dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
-      }
-
-      // Update StopWhen -- on the last iteration, kill the controller.
-      // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
-      retimeGate()
-      val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
-      stopWhen.write(endOfWorld, endOfWorld)
-
-    }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
-      newForeach =>
-        transferData(lhs, newForeach)
-        newForeach.ctx = augmentCtx(lhs.ctx)
-        if (lhs.isOuterControl) {
-          newForeach.userSchedule = Pipelined
-        } else {
-          dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
-          newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+        retimeGate()
+        // Release tokens
+        val updatedValues = intakeTokens ++ regValues
+        controllerInfo.finishTokenFIFO match {
+          case Some(finishTokenFIFO) =>
+            finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
+          case None =>
+            dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
         }
+
+        // Update StopWhen -- on the last iteration, kill the controller.
+        // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
+        retimeGate()
+        val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
+        val endOfWorld = getOutermostIter(controllerInfo.allCtrlers).map(lastIterMap(_)).getOrElse(Bit(true))
+        stopWhen.write(endOfWorld, endOfWorld)
+      }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
+        newForeach =>
+          transferData(lhs, newForeach)
+          newForeach.ctx = augmentCtx(lhs.ctx)
+          newForeach.userSchedule = Pipelined
+      }
+//
+//      stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
+//        val streamIters = controllerInfo.iterFIFO.deq().iters
+//        val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
+//
+//        controllerInfo.allCounters.zipWithIndex foreach {
+//          case (oldCtr, i) =>
+//            val oldIter = oldCtr.iter.get
+//            if (staticCounters contains oldCtr) {
+//              dbgs(s"Registering $oldCtr ($oldIter) -> ${f(oldCtr)}(${f(oldCtr).iter.get})")
+//              val newIter = f(oldCtr).iter.get
+//              register(oldIter, newIter)
+//            } else {
+//              dbgs(s"Registering $oldCtr ($oldIter) -> Stream")
+//              register(oldIter, streamIters(i).i)
+//            }
+//        }
+//
+//        val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
+//
+//        // Maps registers to their 'latest' value
+//        val regValues = cm.Map[Sym[_], Sym[_]]()
+//
+//        // Reads tokens and their validity from tokens, wrEns
+//
+//        val (tokens, wrEns) = (controllerInfo.tokenFIFO, controllerInfo.acquireFIFO) match {
+//          case (Some(tokenFIFO), Some(acquireFIFO)) =>
+//            val tk = controllerInfo.tokenStreamType.unpackStruct(tokenFIFO.deq())
+//            val wEns = controllerInfo.tokenEnableType.unpackStruct(acquireFIFO.deq()).mapValues(_.as[Bit])
+//            (tk, wEns)
+//          case (None, None) =>
+//            (Map.empty, Map.empty[Sym[_], Bit])
+//        }
+//
+//        intakeTokens.clear()
+//        tokens.foreach {
+//          case (mem: Reg[_], value) =>
+//            dbgs(s"Handling Register: $mem -> ${f(mem)}")
+//
+//            implicit def bEV: Bits[mem.RT] = mem.A.asInstanceOf[Bits[mem.RT]]
+//
+//            val holdReg = Reg[mem.RT]
+//            holdReg.explicitName = s"HoldReg_${lhs}_$mem"
+//            holdReg.nonbuffer
+//            holdReg.write(value.asInstanceOf[mem.RT], wrEns(mem))
+//
+//            // write the result of the regvalue to the reg
+//            f(mem).write(holdReg.value, wrEns(mem))
+//            regValues(mem) = void
+//
+//          case (mem, value) if MemStrategy(mem) == Buffer =>
+//            implicit def bEV: Bits[value.R] = value.asSym.tp.asInstanceOf[Bits[value.R]]
+//
+//            val holdReg = Reg[value.R]
+//            holdReg.explicitName = s"HoldReg_${lhs}_$mem"
+//            holdReg.nonbuffer
+//            holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
+//            intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
+//            dbgs(s"Registering Intake Token for $mem")
+//        }
+//
+//
+//        stageWithFlow(UnitPipe(Set.empty, stageBlock {
+//          inlineBlock(foreachOp.block)
+//        }, None)) {
+//          newInner =>
+//            val newSched = lhs.getRawSchedule.getOrElse(Pipelined)
+//            dbgs(s"Inner Schedule: $newSched")
+//            newInner.userSchedule = newSched
+//        }
+//        //        inlineBlock(foreachOp.block)
+//        regValues ++= (regValues.keys.toSeq.map {
+//          case reg: Reg[_] => reg.asSym -> f(reg).value.asInstanceOf[Sym[_]]
+//        })
+//
+//        retimeGate()
+//        // Release tokens
+//        val updatedValues = intakeTokens ++ regValues
+//        controllerInfo.finishTokenFIFO match {
+//          case Some(finishTokenFIFO) =>
+//            finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
+//          case None =>
+//            dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
+//        }
+//
+//        // Update StopWhen -- on the last iteration, kill the controller.
+//        // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
+//        retimeGate()
+//        val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
+//        stopWhen.write(endOfWorld, endOfWorld)
+//
+//      }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
+//        newForeach =>
+//          transferData(lhs, newForeach)
+//          newForeach.ctx = augmentCtx(lhs.ctx)
+//          if (lhs.isOuterControl) {
+//            newForeach.userSchedule = Pipelined
+//          } else {
+//            dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
+//            newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+//          }
+//      }
     }
 
     dbgs(s"Creating Release Controller")

@@ -14,7 +14,7 @@ import spatial.util.computeShifts
 
 import scala.collection.immutable.{ListMap => LMap}
 
-case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin with spatial.util.CounterIterUpdateMixin {
+case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTraversal with spatial.util.TransformerUtilMixin with spatial.util.CounterIterUpdateMixin {
 //  private def hasParFactor(cchain: CounterChain): Boolean = !cchain.counters.forall(_.ctrParOr1 == 1)
 
   private var laneMap: LMap[Sym[_], Int] = LMap.empty
@@ -159,12 +159,21 @@ case class EarlyUnroller(IR: State) extends MutateTransformer with AccelTraversa
       unrollReduce[T](lhs, reduceOp)
     case LaneStatic(iter, elems) if laneMap.contains(iter) =>
       iter.from(elems(laneMap(iter))).asSym
-//    // TODO ADD SUPPORT FOR DISPATCHES
-//    case _ if lhs.getDispatches.nonEmpty =>
-//      dbgs(s"Processing Dispatches for $lhs = $rhs in $laneMap")
-//      val v = mirrorSym(lhs)
-//      v.dispatches = Map(currentLane -> lhs.dispatches(currentLane))
-//      v
+    // TODO ADD SUPPORT FOR DISPATCHES
+    case _ if lhs.getDispatches.nonEmpty =>
+      dbgs(s"Processing Dispatches for $lhs = $rhs in $laneMap")
+      val accessedMem = (lhs.readMem ++ lhs.writtenMem).head
+      indent {
+        dbgs(s"AccessedMem: $accessedMem")
+        val iterators = accessIterators(lhs, accessedMem)
+        dbgs(s"Iterators: ${accessIterators(lhs, accessedMem)}")
+        val mappedIterator = iterators.map(laneMap(_))
+        dbgs(s"MappedIterator: $mappedIterator")
+        dbgs(s"All Dispatches: ${lhs.dispatches}")
+        val v = mirrorSym(lhs)
+        v.dispatches = Map(currentLane -> lhs.dispatches(mappedIterator.toList))
+        v
+      }
 
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]

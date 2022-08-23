@@ -141,7 +141,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = retimeAnalysisPasses ++ Seq(accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
 
-    lazy val streamify = createDump("PreStreamify") ++ Seq(unitPipeToForeach, earlyUnroller, pipeInserter, printer) ++ createDump("PostEarlyUnroll") ++ bankingAnalysis ++ createDump("PreFlatten") ++ Seq(FlattenToStream(state), streamBufferExpansion, pipeInserter, printer, streamChecks)++ createDump("PostStream")
+    lazy val streamify = bankingAnalysis ++ createDump("PreEarlyUnroll") ++ Seq(earlyUnroller, pipeInserter, unitPipeToForeach, printer) ++ createDump("PreFlatten") ++ Seq(FlattenToStream(state), streamBufferExpansion, pipeInserter, printer, streamChecks)++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

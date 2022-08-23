@@ -110,16 +110,16 @@ class SRAMLoad extends SpatialTest {
   }
 }
 
-class SRAMParFactor extends SpatialTest {
+class SRAMParFactor(ip: scala.Int, op: scala.Int) extends SpatialTest {
   override def compileArgs = "--max_cycles=2500"
 
   override def main(args: Array[String]): Void = {
     val output = DRAM[I32](32, 32)
     Accel {
       val sr = SRAM[I32](32, 32)
-      Foreach(0 until 32 par 1) {
+      Foreach(0 until 32 par op) {
         i =>
-          Foreach(0 until 32 par 4) {
+          Foreach(0 until 32 par ip) {
             j => sr(i, j) = i * j + 1
           }
       }
@@ -132,6 +132,13 @@ class SRAMParFactor extends SpatialTest {
   }
 }
 
-class SRAMParFactorNS extends SRAMParFactor {
+class SRAMParFactorNS(ip: scala.Int, op: scala.Int) extends SRAMParFactor(ip, op) {
   override def compileArgs = super.compileArgs + "--nostreamify"
 }
+
+class SRAMParFactorIP extends SRAMParFactor(4, 1)
+class SRAMParFactorIPNS extends SRAMParFactorNS(4, 1)
+
+class SRAMParFactorOP extends SRAMParFactor(1, 4)
+class SRAMParFactorOPNS extends SRAMParFactorNS(1, 4)
+

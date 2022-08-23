@@ -102,7 +102,7 @@ object TransformUtils {
 }
 
 trait TransformerUtilMixin {
-  this: argon.transform.MutateTransformer =>
+  this: argon.transform.ForwardTransformer =>
 
   import TransformUtils._
 
@@ -158,35 +158,33 @@ trait TransformerUtilMixin {
     }
 
     dbgs(s"Visitng with substs: $substs")
-    inCopyMode(substs.size > 1) {
-      stms foreach {
-        case unitpipe@Op(UnitPipe(ens, block, stopWhen)) if unitpipe.isInnerControl =>
-          stageWithFlow(UnitPipe(f(ens), stageBlock {
-            block.stms foreach cyclingVisit
-          }, f(stopWhen))) {
-            lhs2 =>
-              transferData(unitpipe, lhs2)
-              lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
+    stms foreach {
+      case unitpipe@Op(UnitPipe(ens, block, stopWhen)) if unitpipe.isInnerControl =>
+        stageWithFlow(UnitPipe(f(ens), stageBlock {
+          block.stms foreach cyclingVisit
+        }, f(stopWhen))) {
+          lhs2 =>
+            transferData(unitpipe, lhs2)
+            lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
+        }
+      case disguisedUnitpipe@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if disguisedUnitpipe.isInnerControl && cchain.isStatic && cchain.approxIters == 1 =>
+        updateSubstsWith({
+          iters foreach {
+            iter =>
+              val counterStart = iter.ctrStart.asSym
+              register(iter.asSym, () => f(counterStart))
           }
-        case disguisedUnitpipe@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if disguisedUnitpipe.isInnerControl && cchain.isStatic && cchain.approxIters == 1 =>
-          updateSubstsWith({
-            iters foreach {
-              iter =>
-                val counterStart = iter.ctrStart.asSym
-                register(iter.asSym, () => f(counterStart))
-            }
-          })
+        })
 
-          stageWithFlow(UnitPipe(f(ens), stageBlock {
-            block.stms foreach cyclingVisit
-          }, f(stopWhen))) {
-            lhs2 =>
-              transferData(disguisedUnitpipe, lhs2)
-              lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
-          }
-        case stm if stm.isControl && substs.size > 1 => Parallel {cyclingVisit(stm)}
-        case stm => cyclingVisit(stm)
-      }
+        stageWithFlow(UnitPipe(f(ens), stageBlock {
+          block.stms foreach cyclingVisit
+        }, f(stopWhen))) {
+          lhs2 =>
+            transferData(disguisedUnitpipe, lhs2)
+            lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
+        }
+      case stm if stm.isControl && substs.size > 1 => Parallel {cyclingVisit(stm)}
+      case stm => cyclingVisit(stm)
     }
     restoreSubsts(currentSubsts)
     substitutions.toSeq

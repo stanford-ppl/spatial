@@ -108,7 +108,7 @@ object metadata {
     case None =>
       remove(edge, keyOf[M])
   }
-  def all(edge: Sym[_]): Iterator[(Class[_],Data[_])] = edge._data.iterator
+  def all(edge: Sym[_]): Iterator[(Class[_],Data[_])] = edge._data.toList.sortBy {case (k, _) => s"$k"}.iterator
 
   def remove(edge: Sym[_], key: Class[_]): Unit = {
     if (dbgPrint && (dbgPrintClasses contains key.getSimpleName)) {

@@ -157,7 +157,6 @@ trait TransformerUtilMixin {
       }
     }
 
-    dbgs(s"Visitng with substs: $substs")
     stms foreach {
       case unitpipe@Op(UnitPipe(ens, block, stopWhen)) if unitpipe.isInnerControl =>
         stageWithFlow(UnitPipe(f(ens), stageBlock {
@@ -165,22 +164,6 @@ trait TransformerUtilMixin {
         }, f(stopWhen))) {
           lhs2 =>
             transferData(unitpipe, lhs2)
-            lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
-        }
-      case disguisedUnitpipe@Op(OpForeach(ens, cchain, block, iters, stopWhen)) if disguisedUnitpipe.isInnerControl && cchain.isStatic && cchain.approxIters == 1 =>
-        updateSubstsWith({
-          iters foreach {
-            iter =>
-              val counterStart = iter.ctrStart.asSym
-              register(iter.asSym, () => f(counterStart))
-          }
-        })
-
-        stageWithFlow(UnitPipe(f(ens), stageBlock {
-          block.stms foreach cyclingVisit
-        }, f(stopWhen))) {
-          lhs2 =>
-            transferData(disguisedUnitpipe, lhs2)
             lhs2.ctx = ctx.copy(previous = Seq(lhs2.ctx))
         }
       case stm if stm.isControl && substs.size > 1 => Parallel {cyclingVisit(stm)}

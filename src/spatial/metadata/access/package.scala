@@ -391,7 +391,7 @@ package object access {
     val preceding = writes.filter{write =>
       val intersects = read intersects write
       val mayPrecede = write.access.mayPrecede(read.access)
-
+//      dbgs(s"Write: $write -> $intersects $mayPrecede")
       intersects && mayPrecede
     }
     dbgs(s"  Preceding writes for ${read.short}: ")
@@ -415,6 +415,12 @@ package object access {
 
     reads.foreach{read =>
       val (before, after) = precedingWrites(read, remainingWrites)
+//
+//      indent {
+//        dbgs(s"RemainingWrites: $remainingWrites")
+//        dbgs(s"Before: $before")
+//        dbgs(s"After: $after")
+//      }
 
       val reachingBefore = before.filterNot{wr => isKilled(wr, before - wr, read) }
       val reachingAfter  = after.filterNot{wr => isKilled(wr, (after - wr) ++ before, read) }

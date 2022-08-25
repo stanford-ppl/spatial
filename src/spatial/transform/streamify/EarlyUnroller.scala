@@ -18,7 +18,6 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
 //  private def hasParFactor(cchain: CounterChain): Boolean = !cchain.counters.forall(_.ctrParOr1 == 1)
 
   private var laneMap: LMap[Sym[_], Int] = LMap.empty
-  def currentLane = laneMap.values.toList
   case class UnrollState(iterLanes: LMap[Sym[_], Int]) extends TransformerState {
     override def restore(): Unit = {
       laneMap = iterLanes
@@ -60,6 +59,7 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
             }
             // Registered old iters to shifted iters
             register(oldIter, replacement)
+            dbgs(s"Appending to LaneMap: $oldIter -> $parShift")
             laneMap += oldIter -> parShift
 
             // Check if the replacement iter is still valid
@@ -71,11 +71,11 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
             }
         }
       })
-      val newSubsts = visitWithSubsts(substitutions, foreachOp.block.stms)
-      (substitutions zip newSubsts) foreach {
-        case (oldSub, newSub) =>
-          dbgs(s"${oldSub.mkString(",")} -> ${newSub.mkString(", ")}")
-      }
+      val newSubsts = indent { visitWithSubsts(substitutions, foreachOp.block.stms) }
+//      (substitutions zip newSubsts) foreach {
+//        case (oldSub, newSub) =>
+//          dbgs(s"${oldSub.mkString(",")} -> ${newSub.mkString(", ")}")
+//      }
       spatial.lang.void
     }, newIters.asInstanceOf[Seq[I32]], f(foreachOp.stopWhen))) {
       lhs2 =>
@@ -160,21 +160,44 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
     case LaneStatic(iter, elems) if laneMap.contains(iter) =>
       iter.from(elems(laneMap(iter))).asSym
     // TODO ADD SUPPORT FOR DISPATCHES
-    case _ if lhs.getDispatches.nonEmpty =>
+    case _ if lhs.getDispatches.nonEmpty && inHw =>
       dbgs(s"Processing Dispatches for $lhs = $rhs in $laneMap")
       val accessedMem = (lhs.readMem ++ lhs.writtenMem).head
       indent {
         dbgs(s"AccessedMem: $accessedMem")
         val iterators = accessIterators(lhs, accessedMem)
         dbgs(s"Iterators: ${accessIterators(lhs, accessedMem)}")
-        val mappedIterator = iterators.map(laneMap(_))
+        val mappedIterator = iterators.map(laneMap(_)).toList
         dbgs(s"MappedIterator: $mappedIterator")
         dbgs(s"All Dispatches: ${lhs.dispatches}")
+        val newIterator = mappedIterator.map(_ => 0)
         val v = mirrorSym(lhs)
-        v.dispatches = Map(currentLane -> lhs.dispatches(mappedIterator.toList))
+        v.dispatches = Map(newIterator -> lhs.dispatches(mappedIterator))
+        v.clearPorts
+
+        lhs.dispatches(mappedIterator).foreach {
+          disp =>
+            val ports = lhs.ports(disp)
+            ports.filter{_._1 == mappedIterator}.foreach {
+              case (_, port) =>
+                v.addPort(disp, newIterator, port)
+            }
+        }
+
+        v.gids = Map(newIterator -> lhs.gids(mappedIterator))
+
+        val keyReplacement = (laneMap.map {
+          case (iter, offset) => iter.unbox.asInstanceOf[Idx] -> (f(iter).asInstanceOf[Idx], offset)
+        }).toMap[Idx, (Idx, Int)]
+        v.affineMatrices = lhs.affineMatrices.collect {
+          case AccessMatrix(_, matrix, unroll, isReader) if unroll == mappedIterator =>
+            AccessMatrix(v, matrix.replaceKeys(keyReplacement), newIterator, isReader)
+        }
         v
       }
 
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
+
+  printRegister = true
 }

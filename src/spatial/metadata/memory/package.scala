@@ -225,6 +225,7 @@ package object memory {
       case None      => s.gids += (uid -> g)
     }
 
+    def clearPorts: Unit = metadata.clear[Ports](s)
     def getPorts: Option[Map[Int, Map[Seq[Int],Port]]] = metadata[Ports](s).map(_.m)
     def getPorts(dispatch: Int): Option[Map[Seq[Int],Port]] = getPorts.flatMap(_.get(dispatch))
     def ports(dispatch: Int): Map[Seq[Int],Port] = getPorts(dispatch).getOrElse{ throw new Exception(s"No ports defined for $s on dispatch #$dispatch") }

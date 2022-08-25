@@ -116,14 +116,14 @@ class SRAMParFactor(ip: scala.Int, op: scala.Int) extends SpatialTest {
   override def main(args: Array[String]): Void = {
     val output = DRAM[I32](32, 32)
     Accel {
-      val sr = SRAM[I32](32, 32)
-      Foreach(0 until 32 par op) {
-        i =>
-          Foreach(0 until 32 par ip) {
-            j => sr(i, j) = i * j + 1
-          }
-      }
-      Pipe {
+      Foreach(0 until 1) { x =>
+        val sr = SRAM[I32](32, 32)
+        Foreach(0 until 32 par op) {
+          i =>
+            Foreach(0 until 32 par ip) {
+              j => sr(i, j) = i * j + 1
+            }
+        }
         output store sr(0 :: 32, 0 :: 32)
       }
     }
@@ -141,4 +141,6 @@ class SRAMParFactorIPNS extends SRAMParFactorNS(4, 1)
 
 class SRAMParFactorOP extends SRAMParFactor(1, 4)
 class SRAMParFactorOPNS extends SRAMParFactorNS(1, 4)
+
+class SRAMParFactorNoPar extends SRAMParFactor(1, 1)
 

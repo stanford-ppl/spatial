@@ -100,6 +100,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case comm@TokenComm(mem, _, dst, edgeType, lca, _) =>
             dbgs(comm)
             val dstPath = dst.ancestors(lca)
+            dbgs(s"DstPath: $dstPath")
+            dbgs(s"First Iter Map: $firstIterMap")
             val isFirstIterInLCA = getOutermostIter(dstPath.drop(1)).map(firstIterMap(_)).getOrElse(Bit(true))
             val en = edgeType match {
               case Forward | Initialize(_) | Return =>
@@ -268,7 +270,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val curIters = headChain.counters.flatMap(_.iter)
 
       def updateFirstIterMap(): Unit = {
-        if (backlog.isEmpty) { return }
+        if (backlog.isEmpty) {
+          dbgs(s"Skipping Update, Backlog was empty")
+          return
+        }
         dbgs(s"Updating First Iter Map: $firstIterMap")
         // takes the current firstIterMap and fills in all missing entries
         // backlog is outermost to innermost, all inner compared to entries firstIterMap
@@ -386,7 +391,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             controllerInfo.releaseIterFIFO.enq(pIters)
             dbgs(s"Token Map: $tokenMap")
             dbgs(s"Relevant Comms: ${controllerInfo.intakeComms}")
-            val allTokenAcquireEnables = computeIntakeEnables(controllerInfo.intakeComms, firstIterMap.toMap).mapValues {
+            val allTokenAcquireEnables = computeIntakeEnables(controllerInfo.intakeComms, firstIterMap.toMap.withDefaultValue(Bit(true))).mapValues {
               commsAndBits => commsAndBits.map(_._2).reduceTree(_ || _)
             }
             dbgs(s"All Token Acquires: $allTokenAcquireEnables")
@@ -464,7 +469,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         case (None, None) => Map.empty[Sym[_], Bits[_]]
       }
 
-      val ensAndComms = computeOutputEnablesForCtrl(lhs, lastIterMap)
+      val ensAndComms = computeOutputEnablesForCtrl(lhs, lastIterMap.withDefaultValue(Bit(true)))
       ensAndComms foreach {
         case (mem, commsWithEns) =>
           val value = tokens(mem)

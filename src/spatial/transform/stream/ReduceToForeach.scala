@@ -15,7 +15,7 @@ import spatial.util.TransformUtils._
 
 //@argon.tags.struct case class ReduceIterInfo[A: Bits](value: A, isFirst: Bit, isLast: Bit)
 @argon.tags.struct case class ReduceIterInfo[A: Bits](value: A)
-case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin {
+case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin{
 
   private def canReduce(reduceOp: OpReduce[_]): Boolean = {
     reduceOp.cchain.isStatic

@@ -741,6 +741,8 @@ object modeling {
       dbgs(s"Accesses: $allAccesses")
       val grouped = allAccesses.groupBy {
         access =>
+          dbgs(s"Access: $access")
+          dbgs(s"Parent: ${access.parent}")
           val allAncestors = access.parent.s.get.ancestors
           AccessKey(allAncestors)
       }
@@ -794,16 +796,20 @@ object modeling {
                   dbgs(s"Other Matrices: $otherMatrices")
                   val reaching = reachingWrites(groupedToMatrices(key), otherMatrices.toSet, mem.isGlobalMem)
                   dbgs(s"Reaching: $reaching")
-                  reaching.map {
+                  val (parallel, nonParallel) = reaching.partition {
+                    matrix =>
+                      // check if that matrix is parallel with our matrices
+                      val matrixParent = matrix.access.parent
+                      val ourParent = key.path.last
+                      val lca = LCA(matrixParent, ourParent)
+                      lca.isStreamControl || lca.isForkJoinControl
+                  }
+                  dbgs(s"Parallel Accesses: $parallel")
+                  dbgs(s"Sequenced Accesses: $nonParallel")
+                  nonParallel.map {
                     matrix =>
                       val src = matrix.access.parent
                       val (lca, dist) = LCAWithDataflowDistance(src, key.path.last)
-                      indent {
-                        dbgs(s"Distance from $src -<$lca>> ${key.path.last}: $dist (${RWEdge(dist)})")
-                        val (l, sp, dp) = LCAWithPaths(src, key.path.last)
-                        dbgs(s"Path from src: $sp")
-                        dbgs(s"Path from dst: $dp")
-                      }
                       val comm = TokenComm(mem, src, key.path.last, RWEdge(dist), lca, Set(dup))
                       comm
                   }
@@ -834,11 +840,11 @@ object modeling {
 
       val allNodes = (primitiveComms.map(_.src) ++ primitiveComms.map(_.dst)).toSet
 
-      // maps each duplicate to its final user
-      val terminal = mutable.Map[Int, Ctrl]()
+      // maps each duplicate to its final user(s)
+      val terminal = mutable.Map[Int, mutable.Set[Ctrl]]()
 
-      // maps each duplicate to its first user
-      val initial = mutable.Map[Int, Ctrl]()
+      // maps each duplicate to its first user(s)
+      val initial = mutable.Map[Int, mutable.Set[Ctrl]]()
       allNodes.foreach {
         ctrler =>
           val recv = primitiveComms.filter(_.dst == ctrler).filter(_.direction == Forward)
@@ -853,25 +859,31 @@ object modeling {
           // For Arbitrate / Buffer, we need backedges to send the values home
           val initialDups = sent.flatMap(_.duplicates) -- recv.flatMap(_.duplicates)
           val terminalDups = recv.flatMap(_.duplicates) -- sent.flatMap(_.duplicates)
-          initialDups.foreach { dup => initial(dup) = ctrler }
-          terminalDups.foreach { dup => terminal(dup) = ctrler }
+          initialDups.foreach { dup => initial.getOrElseUpdate(dup, mutable.Set.empty[Ctrl]).add(ctrler) }
+          terminalDups.foreach { dup => terminal.getOrElseUpdate(dup, mutable.Set.empty[Ctrl]).add(ctrler) }
       }
 
       MemStrategy(mem) match {
         case Duplicate =>
           initial.foreach {
-            case (dup, ctrl) =>
+            case (dup, ctrls) =>
               val initVal = mem match {
                 case Op(RegNew(v)) => v
               }
-              primitiveComms += TokenComm(mem, mem.parent, ctrl, Initialize(initVal), mem.parent, Set(dup))
+              primitiveComms ++= ctrls.map {ctrl => TokenComm(mem, mem.parent, ctrl, Initialize(initVal), mem.parent, Set(dup)) }
           }
         case Buffer =>
           terminal.foreach {
-            case (dup, ctrl) =>
-              val lca = LCA(ctrl, initial(dup))
-              primitiveComms.remove(TokenComm(mem, ctrl, initial(dup), Backward, lca, Set(dup)))
-              primitiveComms += TokenComm(mem, ctrl, initial(dup), Return, lca, Set(dup))
+            case (dup, ctrls) =>
+              val initials = initial(dup)
+              crossJoin(Seq(ctrls, initials)).foreach {
+                case ctrl::init::Nil =>
+                  val lca = LCA(ctrl, init)
+
+                  primitiveComms.remove(TokenComm(mem, ctrl, init, Backward, lca, Set(dup)))
+                  primitiveComms += TokenComm(mem, ctrl, init, Return, lca, Set(dup))
+              }
+
           }
       }
 
@@ -896,33 +908,35 @@ object modeling {
 
       val allMems = comms.map(_.mem).toSet
       // draw all the nodes first
-      val nodes = (comms.map(_.src) ++ comms.map(_.dst)).flatMap(_.s)
-      val nodeStrings = nodes.sortBy(_.progorder).map {
+      val nodes = (comms.map(_.src) ++ comms.map(_.dst)).flatMap(_.s).distinct
+      val nodeStrings = nodes.map {
         node =>
-          val interestingChildren = node.blocks.flatMap(_.nestedStms).collect {
+          val interestingChildren = node.blocks.flatMap(_.nestedStms).collect({
             case s if allMems.intersect((s.writtenMem ++ s.readMem).toSet).nonEmpty => s
             case s if allMems.contains(s) => s
-          }
-          val childrenString = interestingChildren.map{
+          }).distinct
+          val childrenString = interestingChildren.map {
             case sym@Op(op) => s"$sym = $op"
           }.mkString("|")
 
-          val nodeTypeString = if (node.isInnerControl) { "Inner" } else { "Outer" }
+          val nodeTypeString = if (node.isInnerControl) {
+            "Inner"
+          } else {
+            "Outer"
+          }
           node -> s"""$node [shape=record label="{$node (${node.ctx}) [${nodeTypeString}] | {Accesses|{$childrenString}}}"];"""
       }
 
-      def isOuter(sym: Sym[_]): Boolean = {
-        sym.isOuterControl && !sym.isStreamPrimitive
-      }
-      val outerString =
-        s"""
-           |  subgraph {
-           |    rank="same"
-           |    ${nodeStrings.filter(x => isOuter(x._1)).map(_._2).mkString("\n|    ")}
-           |  }
-           |""".stripMargin
-
-      val innerString = nodeStrings.filter(x => !isOuter(x._1)).map(_._2).mkString("\n|  ")
+      val byProgOrder = nodeStrings.groupBy(_._1.progorder).toSeq.sortBy(_._1)
+      val nodeString = byProgOrder.map({
+        case (_, nodes) =>
+          s"""
+             |  subgraph {
+             |    rank="same"
+             |    ${nodes.map(_._2).mkString("\n|    ")}
+             |  }
+             |""".stripMargin
+      }).mkString("\n")
 
       val edgeString = comms.map {
         case tc@TokenComm(mem, src, dst, edgeType, lca, dups) =>
@@ -941,8 +955,7 @@ object modeling {
 
       s"""
          |digraph {
-         |$outerString
-         |  $innerString
+         |$nodeString
          |$edgeString
          |}
          |""".stripMargin

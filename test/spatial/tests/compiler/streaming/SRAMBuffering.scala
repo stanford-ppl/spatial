@@ -144,3 +144,5 @@ class SRAMParFactorOPNS extends SRAMParFactorNS(1, 4)
 
 class SRAMParFactorNoPar extends SRAMParFactor(1, 1)
 
+class SRAMParFactorAllPar extends SRAMParFactor(8, 8)
+class SRAMParFactorAllParNS extends SRAMParFactorNS(8, 8)

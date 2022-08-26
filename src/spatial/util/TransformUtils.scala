@@ -12,19 +12,6 @@ import spatial.traversal.AccelTraversal
 
 object TransformUtils {
 
-  @api def expandCounterPar(x: Counter[_]): Counter[_] = x match {
-    case ctr@Op(CounterNew(start, end, step, par)) =>
-      type CT = ctr.CT
-      implicit def ev: Num[CT] = ctr.CTeV
-      val casted: CT = argon.lang.implicits.numericCast[I32, CT].apply(par)
-      stage(CounterNew(start.asInstanceOf[Num[CT]], end.asInstanceOf[Num[CT]], (step.asInstanceOf[Num[CT]] * casted).asInstanceOf[Num[CT]], I32(1)))
-  }
-
-  @api def expandCounterPars(cchain: CounterChain): CounterChain = {
-    val newCounters = cchain.counters.map(expandCounterPar)
-    stage(CounterChainNew(newCounters))
-  }
-
   @api def isFirstIter[T: Num](iter: Num[T]): Bit = {
     val ctr = iter.counter.ctr.asInstanceOf[Counter[Num[T]]]
     implicit def castEV: Cast[I32, T] = argon.lang.implicits.numericCast[I32, T]
@@ -104,34 +91,6 @@ object TransformUtils {
 trait TransformerUtilMixin {
   this: argon.transform.ForwardTransformer =>
 
-  import TransformUtils._
-
-  case class RemappedChainData(counterChain: CounterChain, parentIters: Seq[I32], childIters: Seq[I32])
-
-  /**
-    * Creates a new CounterChain and Iters
-    * @param parentChain
-    * @param childChain
-    * @param parentIters
-    * @param childIters
-    */
-  def parentAndFlattenedChildChain(parentChain: CounterChain, childChain: CounterChain, parentIters: Seq[Sym[_]], childIters: Seq[Sym[_]]): RemappedChainData = {
-    val parentCounters = parentChain.counters.map {
-      ctr =>
-        mirrorSym(ctr).unbox
-    }
-    val childCounters = childChain.counters map {
-      ctr => expandCounterPar(ctr)
-    }
-    val ctrChain = stage(CounterChainNew((parentCounters ++ childCounters)))
-    val newParentIters = makeIters(parentCounters).map {_.asInstanceOf[I32]}
-    val newChildIters = makeIters(childCounters).map {_.asInstanceOf[I32]}
-    dbgs(s"New Chain: $ctrChain = ${ctrChain.rhs}")
-    dbgs(s"New Parent Iters: $newParentIters")
-    dbgs(s"New Child Iters: $newChildIters")
-    RemappedChainData(ctrChain, newParentIters, newChildIters)
-  }
-
   def createSubstData(thunk: => Unit): TransformerStateBundle = {
     val tmp = saveSubsts()
     thunk
@@ -182,6 +141,21 @@ trait TransformerUtilMixin {
     }
     restoreSubsts(current)
     values
+  }
+
+  def expandCounterPar(x: Counter[_]): Counter[_] = x match {
+    case ctr@Op(CounterNew(start, end, step, par)) =>
+      type CT = ctr.CT
+
+      implicit def ev: Num[CT] = ctr.CTeV
+
+      val casted: CT = argon.lang.implicits.numericCast[I32, CT].apply(par)
+      stage(CounterNew(f(start).asInstanceOf[Num[CT]], f(end).asInstanceOf[Num[CT]], (f(step).asInstanceOf[Num[CT]] * f(casted)).asInstanceOf[Num[CT]], I32(1)))
+  }
+
+  def expandCounterPars(cchain: CounterChain): CounterChain = {
+    val newCounters = cchain.counters.map(expandCounterPar)
+    stage(CounterChainNew(newCounters))
   }
 }
 

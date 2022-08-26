@@ -261,6 +261,8 @@ package object control {
     /** True if this is a streaming scheduled controller. */
     @stateful def isStreamControl: Boolean = isCtrl(sched = Streaming)
 
+    @stateful def isForkJoinControl: Boolean = isCtrl(sched = ForkJoin)
+
     /** True if this is an inner, sequential controller. */
     @stateful def isInnerSeqControl: Boolean = isCtrl(level = Inner, sched = Sequenced)
 

@@ -260,7 +260,48 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     var remainingComms = controllerInfo.intakeComms.toSet
 
-    def recurseHelper(chains: List[CounterChain], backlog: cm.Buffer[Sym[_]], firstIterMap: cm.Map[Sym[_], Bit]): Sym[_] = {
+    val backlog = cm.Buffer[Sym[_]]()
+    val firstIterMap = cm.Map[Sym[_], Bit]()
+
+    def updateFirstIterMap(): Unit = {
+      if (backlog.isEmpty) {
+        dbgs(s"Skipping Update, Backlog was empty")
+        return
+      }
+      dbgs(s"Updating First Iter Map: $firstIterMap")
+      // takes the current firstIterMap and fills in all missing entries
+      // backlog is outermost to innermost, all inner compared to entries firstIterMap
+      val isFirsts = isFirstIters(f(backlog.map(_.unbox.asInstanceOf[I32])): _*)
+      firstIterMap.keys.foreach {
+        iter => firstIterMap(iter) &= isFirsts.head
+      }
+      firstIterMap ++= (backlog zip isFirsts).toMap
+      dbgs(s"Updated First Iter Map: $firstIterMap")
+      backlog.clear()
+    }
+
+    def updateTokenMap(comms: Seq[TokenComm]): Unit = {
+      val enables = computeIntakeEnables(comms, firstIterMap.toMap.withDefaultValue(Bit(true)))
+      val regMap = handleIntakes(enables)
+      regMap.foreach {
+        case (mem, value) =>
+          tokenMap(mem) = tokenMap.get(mem) match {
+            case Some(old: Bits[_]) =>
+
+              dbgs(s"Overwriting: $mem = $old with $value")
+
+              implicit def bitsEV: Bits[old.R] = old
+
+              val en = enables(mem)
+              mux(en.map(_._2).reduceTree {
+                _ | _
+              }, value.asInstanceOf[old.R], old.asInstanceOf[old.R]).asInstanceOf[Bits[old.R]]
+            case None => value.asInstanceOf[Bits[_]]
+          }
+      }
+    }
+
+    def recurseHelper(chains: List[CounterChain]): Sym[_] = {
       dbgs(s"All token comms: $remainingComms")
       dbgs(s"Peeling chain: ${chains.head}")
       val headChain = chains.head
@@ -268,43 +309,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val dependencies = computeLocalDeps(headChain).filter(_.isMem)
       dbgs(s"Dependencies: $dependencies")
       val curIters = headChain.counters.flatMap(_.iter)
-
-      def updateFirstIterMap(): Unit = {
-        if (backlog.isEmpty) {
-          dbgs(s"Skipping Update, Backlog was empty")
-          return
-        }
-        dbgs(s"Updating First Iter Map: $firstIterMap")
-        // takes the current firstIterMap and fills in all missing entries
-        // backlog is outermost to innermost, all inner compared to entries firstIterMap
-        val isFirsts = isFirstIters(f(backlog.map(_.unbox.asInstanceOf[I32])):_*)
-        firstIterMap.keys.foreach {
-          iter => firstIterMap(iter) &= isFirsts.head
-        }
-        firstIterMap ++= (backlog zip isFirsts).toMap
-        dbgs(s"Updated First Iter Map: $firstIterMap")
-        backlog.clear()
-      }
-
-      def updateTokenMap(comms: Seq[TokenComm]): Unit = {
-        val enables = computeIntakeEnables(comms, firstIterMap.toMap.withDefaultValue(Bit(true)))
-        val regMap = handleIntakes(enables)
-        regMap.foreach {
-          case (mem, value) =>
-            tokenMap(mem) = tokenMap.get(mem) match {
-              case Some(old: Bits[_]) =>
-
-                dbgs(s"Overwriting: $mem = $old with $value")
-                implicit def bitsEV: Bits[old.R] = old
-
-                val en = enables(mem)
-                mux(en.map(_._2).reduceTree {
-                  _ | _
-                }, value.asInstanceOf[old.R], old.asInstanceOf[old.R]).asInstanceOf[Bits[old.R]]
-              case None => value.asInstanceOf[Bits[_]]
-            }
-        }
-      }
 
       if (dependencies.nonEmpty) {
         updateFirstIterMap()
@@ -405,13 +409,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             }
 
             tokenSourceFIFO.enq(isActive)
-
-//            // Update StopWhen -- on the last iteration, kill the controller.
-//            // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
-//            retimeGate()
-//            val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
-//            stopWhen.write(endOfWorld, endOfWorld)
-
           }, newIters.asInstanceOf[Seq[I32]], None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
@@ -430,7 +427,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
             indent {
-              recurseHelper(rest, backlog, firstIterMap)
+              recurseHelper(rest)
             }
             void
           }, newIters.asInstanceOf[Seq[I32]], None)) {
@@ -441,7 +438,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
       }
     }
-    isolateSubst() { recurseHelper(allChains.toList, cm.ListBuffer.empty, cm.Map.empty) }
+    isolateSubst() { recurseHelper(allChains.toList) }
   }
 
   private def createReleaseController(controllerInfo: ControllerInfo): Sym[_] = {

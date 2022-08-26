@@ -26,7 +26,7 @@ import spatial.flows.SpatialFlowRules
 import spatial.metadata.memory.{Dispatch, Duplicates}
 import spatial.rewrites.SpatialRewriteRules
 import spatial.transform.stream.{FIFOInitializer, _}
-import spatial.transform.streamify.{EarlyUnroller, FlattenToStream}
+import spatial.transform.streamify.{AccelPipeInserter, EarlyUnroller, FlattenToStream}
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -123,6 +123,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val streamPipeCollapse    = PipeCollapse(state)
     lazy val duplicateRetimeStripper = DuplicateRetimeStripper(state)
     lazy val earlyUnroller         = EarlyUnroller(state)
+    lazy val accelPipeInserter     = AccelPipeInserter(state)
 
     import Stripper.S
     lazy val retimeStrippers = MetadataStripper(state,
@@ -141,7 +142,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = retimeAnalysisPasses ++ Seq(accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
 
-    lazy val streamify = Seq(unitPipeToForeach, streamChecks) ++ bankingAnalysis ++ createDump("PreEarlyUnroll") ++ Seq(earlyUnroller, streamChecks) ++ createDump("PreFlatten") ++ Seq(FlattenToStream(state), streamBufferExpansion, pipeInserter, printer, streamChecks)++ createDump("PostStream")
+    lazy val streamify = Seq(accelPipeInserter, unitPipeToForeach, streamChecks) ++ bankingAnalysis ++ createDump("PreEarlyUnroll") ++ Seq(earlyUnroller, streamChecks) ++ createDump("PreFlatten") ++ Seq(FlattenToStream(state), streamBufferExpansion, pipeInserter, printer, streamChecks)++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

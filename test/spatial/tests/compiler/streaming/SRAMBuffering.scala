@@ -1,6 +1,10 @@
 package spatial.tests.compiler.streaming
 import spatial.dsl._
 
+trait NoStream extends SpatialTest {
+  override def compileArgs = super.compileArgs + "--nostreamify"
+}
+
 @spatial class SRAMBufferingSimple extends SpatialTest {
   override def compileArgs = "--max_cycles=100000"
 
@@ -116,33 +120,49 @@ class SRAMParFactor(ip: scala.Int, op: scala.Int) extends SpatialTest {
   override def main(args: Array[String]): Void = {
     val output = DRAM[I32](32, 32)
     Accel {
-      Foreach(0 until 1) { x =>
-        val sr = SRAM[I32](32, 32)
-        Foreach(0 until 32 par op) {
-          i =>
-            Foreach(0 until 32 par ip) {
-              j => sr(i, j) = i * j + 1
-            }
-        }
-        output store sr(0 :: 32, 0 :: 32)
+      val sr = SRAM[I32](32, 32)
+      Foreach(0 until 32 par op) {
+        i =>
+          Foreach(0 until 32 par ip) {
+            j => sr(i, j) = i * j + 1
+          }
       }
+      output store sr(0 :: 32, 0 :: 32)
     }
     val gold = Matrix.tabulate(32, 32) { (i, j) => i*j + 1 }
     assert(checkGold(output, gold))
   }
 }
 
-class SRAMParFactorNS(ip: scala.Int, op: scala.Int) extends SRAMParFactor(ip, op) {
-  override def compileArgs = super.compileArgs + "--nostreamify"
-}
-
 class SRAMParFactorIP extends SRAMParFactor(4, 1)
-class SRAMParFactorIPNS extends SRAMParFactorNS(4, 1)
+class SRAMParFactorIPNS extends SRAMParFactorIP with NoStream
 
 class SRAMParFactorOP extends SRAMParFactor(1, 4)
-class SRAMParFactorOPNS extends SRAMParFactorNS(1, 4)
-
-class SRAMParFactorNoPar extends SRAMParFactor(1, 1)
+class SRAMParFactorOPNS extends SRAMParFactorOP with NoStream
 
 class SRAMParFactorAllPar extends SRAMParFactor(8, 8)
-class SRAMParFactorAllParNS extends SRAMParFactorNS(8, 8)
+class SRAMParFactorAllParNS extends SRAMParFactorAllPar with NoStream
+
+class SRAMReduceBase(p: scala.Int) extends SpatialTest {
+  override def compileArgs = "--max_cycles=5000"
+
+  override def main(args: Array[String]): Void = {
+    val output = ArgOut[I32]
+
+    Accel {
+      val out = Reg[I32]
+
+      Reduce(out)(0 until 32 par p) {
+        i => i * 3
+      } {_ + _}
+
+      output := out
+    }
+
+    val gold = 31 * 32 / 2 * 3
+    assert(checkGold(output, I32(gold)))
+  }
+}
+
+class SRAMReduce extends SRAMReduceBase(16)
+class SRAMReduceNS extends SRAMReduce with NoStream

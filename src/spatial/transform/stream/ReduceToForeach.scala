@@ -13,8 +13,7 @@ import spatial.util.{TransformUtils, computeShifts}
 import spatial.util.TransformUtils._
 
 
-//@argon.tags.struct case class ReduceIterInfo[A: Bits](value: A, isFirst: Bit, isLast: Bit)
-@argon.tags.struct case class ReduceIterInfo[A: Bits](value: A)
+@argon.tags.struct case class ReduceIterInfo[A: Bits](value: A, isValid: Bit)
 case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraversal with spatial.util.TransformerUtilMixin{
 
   private def canReduce(reduceOp: OpReduce[_]): Boolean = {
@@ -24,10 +23,6 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
   private def transformReduce[A: Bits](sym: Sym[A], reduceOp: OpReduce[A]) = {
     dbgs(s"Transforming: $sym = $reduceOp")
     // re-staging map portion.
-    // This section mirrors the ctrchain exactly.
-//    val newCChain = mirrorSym(reduceOp.cchain)
-//    val newIters = makeIters(newCChain.unbox.counters).asInstanceOf[Seq[I32]]
-
     val commFIFO = FIFO[ReduceIterInfo[A]](I32(128))
     commFIFO.explicitName = s"ReduceToForeach_FIFO_$sym"
 
@@ -37,22 +32,33 @@ case class ReduceToForeach(IR: State) extends MutateTransformer with AccelTraver
       val newCChain = expandCounterPars(reduceOp.cchain)
       val newIters = makeIters(newCChain.counters)
       val shifts = computeShifts(reduceOp.cchain.counters map {_.ctrParOr1})
-      val substitutions = shifts.map(shift => createSubstData {
-        (reduceOp.iters zip newIters zip shift zip reduceOp.cchain.counters) foreach {
-          case (((oldIter, newIter), parShift), ctr) =>
-            val castedShift = ctr.CTeV.from(parShift)
-            val replacement = () => {
-              val offset =  ctr.step.asInstanceOf[Num[ctr.CT]] * castedShift.asInstanceOf[ctr.CT]
-              newIter.asInstanceOf[Num[ctr.CT]] + offset.asInstanceOf[ctr.CT]
-            }
-            register(oldIter, replacement)
-        }
-      })
       stageWithFlow(OpForeach(f(reduceOp.ens), newCChain.unbox, stageBlock {
+
+        val substitutions = shifts.map(shift => createSubstData {
+          (reduceOp.iters zip newIters zip shift zip reduceOp.cchain.counters) foreach {
+            case (((oldIter, newIter), parShift), ctr) =>
+              val castedShift = ctr.CTeV.from(parShift)
+              val replacement = {
+                val offset = ctr.step.asInstanceOf[Num[ctr.CT]] * castedShift.asInstanceOf[ctr.CT]
+                newIter.asInstanceOf[Num[ctr.CT]] + offset.asInstanceOf[ctr.CT]
+              }
+              register(oldIter, replacement)
+
+          }
+        })
+
         val updatedSubsts = indent { visitWithSubsts(substitutions, reduceOp.map.stms) }
         val mappedValues = mapSubsts(updatedSubsts){f(reduceOp.map.result)}
-        val signalValues = mappedValues map {
-          value => ReduceIterInfo(value.unbox)
+        val mappedEnables = mapSubsts(updatedSubsts) {
+          // Compute if the iterators are valid for this iteration.
+          (reduceOp.iters map {
+            oldIter =>
+              val newIter = f(oldIter)
+              newIter < oldIter.counter.ctr.end.unbox.asInstanceOf[I32]
+          }).reduce(_ & _)
+        }
+        val signalValues = (mappedValues zip mappedEnables) map {
+          case (value, en) => ReduceIterInfo(value.unbox, en)
         }
         commFIFO.enqVec(Vec.fromSeq(signalValues))
       }, newIters.asInstanceOf[Seq[I32]], f(reduceOp.stopWhen))) {

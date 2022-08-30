@@ -38,8 +38,6 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
     }
   }
 
-  private def enableBit = if (enables.isEmpty) { Bit(true) } else { enables.toSeq.reduceTree(_ && _)}
-
   def unrollForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
     dbgs(s"Transforming: $lhs = $foreachOp")
     val newCChain = expandCounterPars(foreachOp.cchain)
@@ -72,10 +70,6 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
         }
       })
       val newSubsts = indent { visitWithSubsts(substitutions, foreachOp.block.stms) }
-//      (substitutions zip newSubsts) foreach {
-//        case (oldSub, newSub) =>
-//          dbgs(s"${oldSub.mkString(",")} -> ${newSub.mkString(", ")}")
-//      }
       spatial.lang.void
     }, newIters.asInstanceOf[Seq[I32]], f(foreachOp.stopWhen))) {
       lhs2 =>
@@ -84,70 +78,75 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
     }
   }
 
-    def unrollReduce[A: Bits](lhs: Sym[_], reduceOp: OpReduce[A]): Sym[_] = {
-      dbgs(s"Transforming: $lhs = $reduceOp")
-      val newCChain = expandCounterPars(reduceOp.cchain)
-      val newIters = makeIters(newCChain.counters)
-      val shifts = computeShifts(reduceOp.cchain.counters map {
-        _.ctrParOr1
-      })
+  def unrollReduce[A: Bits](lhs: Sym[_], reduceOp: OpReduce[A]): Sym[_] = {
+    dbgs(s"Transforming: $lhs = $reduceOp")
+    dbgs(s"Identity: ${reduceOp.ident}")
 
-      // To partially unroll a reduce -- create a new Map block with a reduction tree inside.
-      stageWithFlow(OpReduce(f(reduceOp.ens), newCChain, f(reduceOp.accum), stageBlock {
-        val substitutions = shifts.map(shift => createSubstData {
-          (reduceOp.iters zip newIters zip shift zip reduceOp.cchain.counters) foreach {
-            case (((oldIter, newIter), parShift), ctr) =>
-              val castedShift = ctr.CTeV.from(parShift)
-              val replacement = {
-                val offset = ctr.step.asInstanceOf[Num[ctr.CT]] * castedShift.asInstanceOf[ctr.CT]
-                newIter.asInstanceOf[Num[ctr.CT]] + offset.asInstanceOf[ctr.CT]
-              }
-              // Registered old iters to shifted iters
-              register(oldIter, replacement)
+    val newCChain = expandCounterPars(reduceOp.cchain)
+    val newIters = makeIters(newCChain.counters)
+    val parFactors = reduceOp.cchain.counters.map(_.ctrParOr1)
+    val shifts = computeShifts(parFactors)
 
-              // Check if the replacement iter is still valid
-              if (possiblyOOB(parShift, ctr)) {
-                val isInBounds = replacement.asInstanceOf[Num[ctr.CT]] < ctr.end.asInstanceOf[ctr.CT]
-                enables += isInBounds
-              }
-          }
-        })
-        val newSubsts = visitWithSubsts(substitutions, reduceOp.map.stms)
-        (substitutions zip newSubsts) foreach {
-          case (oldSub, newSub) =>
-            dbgs(s"${oldSub.mkString(",")} -> ${newSub.mkString(", ")}")
-        }
-
-        // need to filter the results based on which ones are valid
-        // If Ident is given, use Ident
-        // Otherwise, need to build a mux tree of enables as well
-        reduceOp.ident match {
-          case Some(identity) =>
-            val results = mapSubsts(newSubsts)({
-              mux(enableBit, f(reduceOp.map.result).unbox, f(identity))
-            }).map(_.unbox)
-            val reduced = results.reduceTree(reduceOp.reduce.reapply)
-            reduced.asInstanceOf[Bits[A]].asSym
-          case None =>
-            val resultsWithEns = mapSubsts(newSubsts) {
-              (f(reduceOp.map.result), enableBit)
-            }
-            (resultsWithEns.reduceTree {
-              case ((val1, valid1), (val2, valid2)) =>
-                val resultValid = valid1 | valid2
-                // if valid1 and valid2: then we take the reduce
-                // if valid1 and not valid2 then we take val1
-                // since we're worried about going over the edge, we don't need to worry about the last case
-                (mux(valid2, reduceOp.reduce.reapply(val1.unbox, val2.unbox), val1.unbox), resultValid)
-            })._1
-        }
-
-      }, f(reduceOp.load), f(reduceOp.reduce), f(reduceOp.store), f(reduceOp.ident), f(reduceOp.fold), newIters.asInstanceOf[Seq[I32]].toList, f(reduceOp.stopWhen))) {
-        lhs2 =>
-          transferData(lhs, lhs2)
-          lhs2.ctx = lhs2.ctx.copy(previous = Seq(lhs.ctx))
+    val finalReductionSize = reduceOp.cchain.counters.map({
+      ctr => ctr.nIters match {
+        case Some(x) => math.ceil(x.toInt.toDouble / ctr.ctrParOr1).toInt
       }
+    }).product
+
+    val commFIFO = FIFO[A](I32(finalReductionSize * 2))
+
+    stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
+      val substitutions = shifts.map(shift => createSubstData {
+        (reduceOp.iters zip newIters zip shift zip reduceOp.cchain.counters) foreach {
+          case (((oldIter, newIter), parShift), ctr) =>
+            val castedShift = ctr.CTeV.from(parShift)
+            val replacement = {
+              val offset = ctr.step.asInstanceOf[Num[ctr.CT]] * castedShift.asInstanceOf[ctr.CT]
+              newIter.asInstanceOf[Num[ctr.CT]] + offset.asInstanceOf[ctr.CT]
+            }
+            // Registered old iters to shifted iters
+            register(oldIter, replacement)
+
+            // Check if the replacement iter is still valid
+            if (possiblyOOB(parShift, ctr)) {
+              val isInBounds = replacement.asInstanceOf[Num[ctr.CT]] < ctr.end.asInstanceOf[ctr.CT]
+              enables += isInBounds
+            }
+        }
+      })
+      val newSubsts = visitWithSubsts(substitutions, reduceOp.map.stms)
+      val mappedValuesWithEnables = mapSubsts(newSubsts) {
+        val enableBit = if (enables.isEmpty) Bit(true) else enables.toSeq.reduceTree({
+          _ & _
+        })
+        (f(reduceOp.map.result).unbox, enableBit)
+      }
+
+      val (result, en) = mappedValuesWithEnables.reduceTree {
+        case ((vA, eA), (vB, eB)) =>
+          // If eA and eB:
+          // If eA and not eB
+          // if not eA and eB
+          // if neither
+          (priorityMux(Seq(eA & eB, eA, eB, Bit(true)), Seq(reduceOp.reduce.reapply(vA, vB), vA, vB, zero[A])), eA | eB)
+      }
+      commFIFO.enq(result)
+    }, newIters.asInstanceOf[Seq[I32]], None)) {
+      lhs2 => transferData(lhs, lhs2)
     }
+
+    // This only runs once per parent loop.
+
+    val innerCtr = Counter(I32(0), I32(1), I32(1), I32(1))
+    stageWithFlow(OpForeach(Set.empty, CounterChain(Seq(innerCtr)), stageBlock {
+      val values = commFIFO.deqVec(finalReductionSize)
+      val reduced = values.elems.reduceTree(reduceOp.reduce.reapply)
+      f(reduceOp.accum) := reduced
+    }, Seq(makeIter(innerCtr).unbox), None)) {
+      reduceCtrl =>
+        reduceCtrl.ctx = withPreviousCtx(lhs.ctx)
+    }
+  }
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _:AccelScope => inAccel { super.transform(lhs, rhs) }

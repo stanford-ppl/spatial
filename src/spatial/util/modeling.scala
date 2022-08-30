@@ -692,13 +692,13 @@ object modeling {
   case object Buffer extends MemStrategy
   case object Duplicate extends MemStrategy
   case object Arbitrate extends MemStrategy
-  case object Unknown extends MemStrategy
+  case class Custom(mem: Sym[_]) extends MemStrategy
 
   object MemStrategy {
     def apply(mem: Sym[_]): MemStrategy = mem match {
       case mem if mem.isReg => Duplicate
       case mem if mem.isSRAM => Buffer
-      case _ => Unknown
+      case _ => Custom(mem)
     }
   }
 
@@ -820,7 +820,23 @@ object modeling {
             newComms.foreach(dbgs(_))
           }
           comms ++= newComms
-        // Now need to set up return edges
+
+        case Custom(mem) if mem.isFIFO =>
+          // group all of the readers together, and all of the writers together
+          grouped.foreach {
+            case (key, accesses) =>
+              dbgs(s"Processing: $key [$accesses]")
+              val hasRead = accesses.exists(_.isReader)
+              val hasWrite = accesses.exists(_.isWriter)
+              val conflictCandidates = grouped.filter {
+                case (otherKey, otherAccesses) if otherKey != key =>
+                  (hasRead && otherAccesses.exists(_.isReader)) || (hasWrite && otherAccesses.exists(_.isWriter))
+                case _ => false
+              }
+              dbgs(s"Conflict Candidates: $conflictCandidates")
+              assert(conflictCandidates.isEmpty, s"Expected conflict candidates to be empty")
+          }
+
         case _ => dbgs(s"Didn't know how to handle $mem")
       }
 
@@ -885,6 +901,8 @@ object modeling {
               }
 
           }
+        case Custom(mem) if mem.isFIFO =>
+          // do nothing
       }
 
 

@@ -150,7 +150,15 @@ trait TransformerUtilMixin {
       implicit def ev: Num[CT] = ctr.CTeV
 
       val casted: CT = argon.lang.implicits.numericCast[I32, CT].apply(par)
-      stage(CounterNew(f(start).asInstanceOf[Num[CT]], f(end).asInstanceOf[Num[CT]], (f(step).asInstanceOf[Num[CT]] * f(casted)).asInstanceOf[Num[CT]], I32(1)))
+      val newStep = (f(step).asInstanceOf[Num[CT]] * f(casted)).asInstanceOf[Num[CT]]
+      val mappedEnd = f(end)
+      // Need to round end up to next multiple
+      val newEnd = {
+        val residual = mappedEnd.asInstanceOf[Num[CT]] % newStep.asInstanceOf[CT]
+        val bump = mux[CT](residual > ctr.CTeV.from(0), newStep - residual, ctr.CTeV.from(0))
+        mappedEnd.asInstanceOf[Num[CT]] + bump
+      }
+      stage(CounterNew(f(start).asInstanceOf[Num[CT]], newEnd.asInstanceOf[Num[CT]], newStep, I32(1)))
   }
 
   def expandCounterPars(cchain: CounterChain): CounterChain = {

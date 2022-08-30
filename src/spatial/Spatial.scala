@@ -18,15 +18,14 @@ import spatial.node.InputArguments
 import spatial.metadata.access._
 import spatial.targets.HardwareTarget
 import spatial.dse._
-import spatial.transform.{FIFOAccessFusion, _}
+import spatial.transform._
 import spatial.traversal._
 import spatial.model.RuntimeModelGenerator
 import spatial.report._
 import spatial.flows.SpatialFlowRules
 import spatial.metadata.memory.{Dispatch, Duplicates}
 import spatial.rewrites.SpatialRewriteRules
-import spatial.transform.stream.{FIFOInitializer, _}
-import spatial.transform.streamify.{AccelPipeInserter, EarlyUnroller, FlattenToStream}
+import spatial.transform.streamify._
 import spatial.util.spatialConfig
 import spatial.util.ParamLoader
 
@@ -116,11 +115,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val regReadCSE            = RegReadCSE(state)
     lazy val unitPipeToForeach     = UnitPipeToForeachTransformer(state)
     lazy val allocMotion           = AllocMotion(state)
-    lazy val reduceToForeach       = ReduceToForeach(state)
     lazy val fifoAccessFusion      = FIFOAccessFusion(state)
     lazy val fifoInitializer       = FIFOInitializer(state)
     lazy val unitIterationElimination = UnitIterationElimination(state)
-    lazy val streamPipeCollapse    = PipeCollapse(state)
     lazy val duplicateRetimeStripper = DuplicateRetimeStripper(state)
     lazy val earlyUnroller         = EarlyUnroller(state)
     lazy val accelPipeInserter     = AccelPipeInserter(state)

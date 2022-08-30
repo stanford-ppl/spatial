@@ -1,14 +1,13 @@
-package spatial.transform.stream
+package spatial.transform.streamify
 
-import argon._
-import argon.lang.{I32, Idx}
+import argon.lang.I32
 import argon.lang.types.Bits
 import argon.transform.MutateTransformer
-import spatial.lang.{SRAM, SRAMN}
+import argon._
+import spatial.lang._
 import spatial.node._
 import spatial.traversal.AccelTraversal
 
-import scala.collection.mutable
 import spatial.metadata.memory._
 
 case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with AccelTraversal {
@@ -24,7 +23,9 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
       val newDims = Seq(I32(bufferAmount)) ++ dims
       type A = srn.A.R
       lazy implicit val bitsEV: Bits[A] = srn.A
+
       implicit def ctx: SrcCtx = mem.ctx
+
       val newMem = stageWithFlow(SRAMNew[A, SRAMN](newDims)) { nm => transferData(mem, nm) }
       newMem.r = dims.size + 1
       transferData(mem, newMem)
@@ -44,11 +45,13 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
     dbgs(s"Expanding Writer: $sym = $writer")
     val insertedDim = sym.bufferIndex.get.asInstanceOf[Idx]
     writer.mem match {
-      case sr:SRAM[_, _] =>
+      case sr: SRAM[_, _] =>
         type A = sr.A.R
         lazy implicit val bitsEV: Bits[A] = sr.A
         val dataAsBits = f(writer.data).asInstanceOf[Bits[A]]
+
         implicit def ctx: SrcCtx = sym.ctx
+
         val newWrite = stage(SRAMWrite(f(writer.mem).asInstanceOf[SRAM[A, SRAMN]], dataAsBits, Seq(insertedDim) ++ f(writer.addr), f(writer.ens)))
         newWrite
     }
@@ -61,7 +64,9 @@ case class StreamBufferExpansion(IR: argon.State) extends MutateTransformer with
       case sr: SRAM[_, _] =>
         type A = sr.A.R
         lazy implicit val bitsEV: Bits[A] = sr.A
+
         implicit def ctx: SrcCtx = sym.ctx
+
         val result = stage(SRAMRead(f(reader.mem).asInstanceOf[SRAM[A, SRAMN]], Seq(insertedDim) ++ f(reader.addr), reader.ens))
         result
     }

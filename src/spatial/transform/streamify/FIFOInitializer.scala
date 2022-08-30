@@ -1,9 +1,8 @@
-package spatial.transform.stream
+package spatial.transform.streamify
 
 import argon._
 import argon.lang._
 import argon.transform.ForwardTransformer
-import spatial.dsl.retimeGate
 import spatial.lang.FIFO
 import spatial.node._
 import spatial.traversal.AccelTraversal
@@ -20,7 +19,7 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
       stage(UnitPipe(Set.empty, stageBlock {
         val isFirst = fPressure.isEmpty
         fifos foreach {
-          case fifo:FIFO[_] =>
+          case fifo: FIFO[_] =>
             type T = fifo.A.R
             val inits = fifo.fifoInits.get
             val data = inits.map(_.unbox).asInstanceOf[Seq[T]]
@@ -28,6 +27,7 @@ case class FIFOInitializer(IR: State) extends ForwardTransformer with AccelTrave
             assert(fifoSize >= data.size, s"FIFO was too small to initialize ($fifoSize < ${data.size})")
 
             implicit def bEV: Bits[T] = fifo.A
+
             val dataVec = Vec.fromSeq(data)
             f(fifo).enqVec(dataVec, isFirst)
         }

@@ -86,10 +86,16 @@ object TransformUtils {
   @api def getOutermostIter(ctrls: Seq[Ctrl]): Option[Sym[_]] = {
     getOutermostCounter(ctrls).flatMap(_.iter)
   }
+
+  @api def pseudoUnitpipe(body: Block[Void]) = {
+    val ctr = Counter(I32(0), I32(1), I32(1), I32(1))
+    val cchain = CounterChain(Seq(ctr))
+    stage(OpForeach(Set.empty, cchain, body, Seq(makeIter(ctr).unbox), None))
+  }
 }
 
-trait TransformerUtilMixin {
-  this: argon.transform.ForwardTransformer =>
+trait TransformerUtilMixin[T <: argon.transform.ForwardTransformer] {
+  this: T =>
 
   def createSubstData(thunk: => Unit): TransformerStateBundle = {
     val tmp = saveSubsts()
@@ -99,12 +105,12 @@ trait TransformerUtilMixin {
     result
   }
 
-  def visitWithSubsts(substs: Seq[TransformerStateBundle], stms: Seq[Sym[_]])(implicit ctx: SrcCtx): Seq[TransformerStateBundle] = {
+  def visitWithSubsts(substs: Seq[TransformerStateBundle], stms: Seq[Sym[_]])(func: Sym[_] => Any)(implicit ctx: SrcCtx): Seq[TransformerStateBundle] = {
     val currentSubsts = saveSubsts()
     val substitutions = substs.toArray
 
     def cyclingVisit(sym: Sym[_]): Unit = {
-      updateSubstsWith({visit(sym)})
+      updateSubstsWith({func(sym)})
     }
 
     def updateSubstsWith(thunk: => Unit): Unit = {
@@ -153,12 +159,12 @@ trait TransformerUtilMixin {
       val newStep = (f(step).asInstanceOf[Num[CT]] * f(casted)).asInstanceOf[Num[CT]]
       val mappedEnd = f(end)
       // Need to round end up to next multiple
-      val newEnd = {
-        val residual = mappedEnd.asInstanceOf[Num[CT]] % newStep.asInstanceOf[CT]
-        val bump = mux[CT](residual > ctr.CTeV.from(0), newStep - residual, ctr.CTeV.from(0))
-        mappedEnd.asInstanceOf[Num[CT]] + bump
-      }
-      stage(CounterNew(f(start).asInstanceOf[Num[CT]], newEnd.asInstanceOf[Num[CT]], newStep, I32(1)))
+//      val newEnd = {
+//        val residual = mappedEnd.asInstanceOf[Num[CT]] % newStep.asInstanceOf[CT]
+//        val bump = mux[CT](residual > ctr.CTeV.from(0), newStep - residual, ctr.CTeV.from(0))
+//        mappedEnd.asInstanceOf[Num[CT]] + bump
+//      }
+      stage(CounterNew(f(start).asInstanceOf[Num[CT]], mappedEnd.asInstanceOf[Num[CT]], newStep, I32(1)))
   }
 
   def expandCounterPars(cchain: CounterChain): CounterChain = {

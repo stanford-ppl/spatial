@@ -398,6 +398,7 @@ trait MemoryUnrolling extends UnrollingBase {
     dbgs(s"Access: $access")
     dbgs(s"Memory: $mem")
     dbgs(s"Iterators between $access and $mem: " + is.mkString(", "))
+    dbgs(s"Unroll: $unrollNum")
 
     val words = len.map{l => Range(0,l)}.getOrElse(Range(0,1)) // For vectors
 

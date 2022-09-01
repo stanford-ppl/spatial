@@ -119,7 +119,7 @@ case class PipeInserter(IR: State) extends MutateTransformer with BlkTraversal {
             val i = stages.lastIndexWhere{stage =>
               // Nodes which produce this value, or nodes which write to a mem read by this sym.
               // this second case is basically a special-case for RegReads, which are transient, but ordered.
-              val stageEffects = stage.nodes// ++ stage.nodes.flatMap(sym => sym.effects.writes)
+              val stageEffects = stage.nodes ++ stage.nodes.flatMap(sym => sym.effects.writes)
               (stageEffects intersect s.inputs).nonEmpty
             }
             val stage = if (i >= 0) stages(i) else stages.head

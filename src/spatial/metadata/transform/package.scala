@@ -8,6 +8,7 @@ package object transform {
   implicit class TransformOps(s: Sym[_]) {
     def isStreamPrimitive: Boolean = metadata[StreamPrimitive](s).exists(_.flag)
     def isStreamPrimitive_=(flag: Boolean): Unit = metadata.add[StreamPrimitive](s, StreamPrimitive(flag))
+    def hasStreamPrimitiveAncestor: Boolean = s.toCtrl.hasStreamPrimitiveAncestor
   }
 
   implicit class TransformCtrlOps(s: Ctrl) {

@@ -950,7 +950,6 @@ object modeling {
         case (_, nodes) =>
           s"""
              |  subgraph {
-             |    rank="same"
              |    ${nodes.map(_._2).mkString("\n|    ")}
              |  }
              |""".stripMargin

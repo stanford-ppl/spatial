@@ -127,8 +127,6 @@ trait Spatial extends Compiler with ParamLoader {
       S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports],
       S[spatial.metadata.memory.GroupId])
 
-    lazy val streamifyStripper = MetadataStripper(state, S[spatial.metadata.memory.StreamBufferIndex])
-
     def createDump(n: String) = Seq(TreeGen(state, n, s"${n}_IR"), HtmlIRGenSpatial(state, s"${n}_IR"))
 
     lazy val fifoInitialization = Seq(fifoInitializer, pipeInserter, MetadataStripper(state, S[spatial.metadata.memory.FifoInits]))

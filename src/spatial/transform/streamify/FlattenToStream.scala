@@ -543,8 +543,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     register(foreachOp.cchain, newCounterChain)
 
     val newIters = makeIters(ctrs)
-
-
     // Split here based on if we're an inner or outer control
 
     val mainCtrl = if (lhs.isInnerControl) {
@@ -580,8 +578,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case (None, None) =>
             (Map.empty, Map.empty[Sym[_], Bit])
         }
-
-        intakeTokens.clear()
         tokens.foreach {
           case (mem: Reg[_], value) =>
             dbgs(s"Handling Register: $mem -> ${f(mem)}")
@@ -617,9 +613,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             holdReg.explicitName = s"HoldReg_${lhs}_$mem"
             holdReg.nonbuffer
             holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
-            val tok = holdReg.value.asInstanceOf[Bits[value.R]]
-            intakeTokens(mem) = tok
-            dbgs(s"Registering Intake Token for $mem = $tok")
+            intakeTokens(mem) = holdReg
+            dbgs(s"Registering Intake Token for $mem = ${intakeTokens(mem)}")
         }
 
         // Restage the actual innards of the foreach
@@ -649,9 +644,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
         retimeGate()
         // Release tokens
-        val updatedValues = intakeTokens ++ regValues
         controllerInfo.finishTokenFIFO match {
           case Some(finishTokenFIFO) =>
+            val updatedValues = intakeTokens.mapValues(_.asInstanceOf[Reg[_]].value) ++ regValues
             finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
           case None =>
             dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
@@ -698,8 +693,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case (None, None) =>
             (Map.empty, Map.empty[Sym[_], Bit])
         }
-
-        intakeTokens.clear()
         tokens.foreach {
           case (mem: Reg[_], value) =>
             dbgs(s"Handling Register: $mem -> ${f(mem)}")
@@ -721,24 +714,26 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             holdReg.explicitName = s"HoldReg_${lhs}_$mem"
             holdReg.nonbuffer
             holdReg.write(value.asInstanceOf[value.R], wrEns(mem))
-            intakeTokens(mem) = holdReg.value.asInstanceOf[Bits[value.R]]
-            dbgs(s"Registering Intake Token for $mem")
+            val bufferReg = Reg[value.R]
+            bufferReg.explicitName = s"BufferedReg_${lhs}_$mem"
+            bufferReg := holdReg.value
+            intakeTokens(mem) = bufferReg
+            dbgs(s"Registering Intake Token for $mem = $bufferReg.value")
         }
 
         val ctrs = lhs.cchains.flatMap(_.counters)
         register(ctrs, ctrs.map(mirrorSym(_)))
         register(ctrs.flatMap(_.iter), makeIters(f(ctrs)))
         register(lhs.cchains, lhs.cchains.map(mirrorSym(_)))
-        mirrorSym(lhs)
-
-        retimeGate()
+//        mirrorSym(lhs)
+        super.transform[Void](lhs.asInstanceOf[Sym[Void]], lhs.op.get.asInstanceOf[Op[Void]])
         // Release tokens
         Pipe {
-          val updatedValues = intakeTokens ++ tokens.collect {
-            case (mem: Reg[_], _) => mem -> f(mem).value
-          }
           controllerInfo.finishTokenFIFO match {
             case Some(finishTokenFIFO) =>
+              val updatedValues = intakeTokens.mapValues(_.asInstanceOf[Reg[_]].value) ++ tokens.collect {
+                case (mem: Reg[_], _) => mem -> f(mem).value
+              }
               finishTokenFIFO.enq(controllerInfo.tokenStreamType.packStruct(updatedValues.toMap.mapValues(_.asInstanceOf[Bits[_]])))
             case None =>
               dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
@@ -764,6 +759,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       isolateSubst() { createReleaseController(controllerInfo) }
     }
 
+    intakeTokens.clear()
     innerControllerMap(lhs) = ControllerImpl(counterGen, mainCtrl, finisher)
   }
 
@@ -826,10 +822,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       lhs
 
     case mem if inHw && lhs.isSRAM && !isInternalMem(lhs) =>
-      val cloned = super.transform(lhs, mem)
-      cloned.bufferAmount = computeBufferDepth(lhs)
-      cloned.isNonBuffer = true
-      cloned
+      expandMem(lhs)
 
     case _:CounterNew[_] | _:CounterChainNew if lhs.parent.isStreamPrimitive || (lhs.parent.isInnerControl && !lhs.toCtrl.hasStreamPrimitiveAncestor) =>
       dbgs(s"Skipping $lhs = $rhs since it'll be re-created later.")
@@ -844,27 +837,11 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       register(oldIter, newIter)
       transformed
 
-    case SRAMRead(mem, _, _) if intakeTokens.contains(mem) =>
-      val newRead = mirror(lhs, rhs)
-      val token = intakeTokens(mem)
-      dbgs(s"Tagging SRR $rhs -> $newRead with token ${token}")
-      newRead.bufferIndex = token.asInstanceOf[I32]
-      newRead
+    case srr@SRAMRead(mem, _, _) if intakeTokens.contains(mem) =>
+      expandReader(lhs, srr, intakeTokens(mem).asInstanceOf[Reg[I32]].value)
 
-    case SRAMRead(_, _, _) =>
-      dbgs(s"Skipping SRAM Read: $lhs = $rhs")
-      super.transform(lhs, rhs)
-
-    case SRAMWrite(mem, _, _, _) if intakeTokens.contains(mem) =>
-      val newWrite = mirror(lhs, rhs)
-      val token = intakeTokens(mem)
-      dbgs(s"Tagging SRW $rhs -> ${newWrite} with token ${token}")
-      newWrite.bufferIndex = token.asInstanceOf[I32]
-      newWrite
-
-    case SRAMWrite(mem, _, _, _) =>
-      dbgs(s"Skipping SRAM Write: $lhs = $rhs")
-      super.transform(lhs, rhs)
+    case srw@SRAMWrite(mem, _, _, _) if intakeTokens.contains(mem) =>
+      expandWriter(lhs, srw, intakeTokens(mem).asInstanceOf[Reg[I32]].value)
 
     case _ =>
       super.transform(lhs, rhs)
@@ -901,6 +878,60 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     commFIFOs.clear()
     innerControllerMap.clear()
     super.preprocess(block)
+  }
+
+  private def expandMem(mem: Sym[_]) = mem match {
+    case Op(srn@SRAMNew(dims)) =>
+      dbgs(s"Expanding SRAM: $mem = $srn")
+      val bufferAmount = mem.bufferAmount.getOrElse(computeBufferDepth(mem))
+      val newDims = Seq(I32(bufferAmount)) ++ dims
+      type A = srn.A.R
+      lazy implicit val bitsEV: Bits[A] = srn.A
+
+      implicit def ctx: SrcCtx = mem.ctx
+
+      val newMem = stageWithFlow(SRAMNew[A, SRAMN](newDims)) { nm => transferData(mem, nm) }
+      newMem.r = dims.size + 1
+      transferData(mem, newMem)
+      // Shift fully banked dims back by 1, then fully bank this one.
+      newMem.fullyBankDims = mem.fullyBankDims.map(_ + 1) + 0
+      newMem.shouldIgnoreConflicts = mem.shouldIgnoreConflicts.map(_ + 1) + 0
+      dbgs(s"Old Fully Banked Dims: ${mem.fullyBankDims}")
+      dbgs(s"New Fully Banked Dims: ${newMem.fullyBankDims}")
+      newMem.bufferAmount = None
+      newMem.hierarchical
+      newMem.nonbuffer
+      dbgs(s"NewMem: $newMem = ${newMem.op.get}")
+      newMem
+  }
+
+  private def expandWriter(sym: Sym[_], writer: Writer[_], insertedDim: Idx) = {
+    dbgs(s"Expanding Writer: $sym = $writer")
+    writer.mem match {
+      case sr: SRAM[_, _] =>
+        type A = sr.A.R
+        lazy implicit val bitsEV: Bits[A] = sr.A
+        val dataAsBits = f(writer.data).asInstanceOf[Bits[A]]
+
+        implicit def ctx: SrcCtx = sym.ctx
+
+        val newWrite = stage(SRAMWrite(f(writer.mem).asInstanceOf[SRAM[A, SRAMN]], dataAsBits, Seq(insertedDim) ++ f(writer.addr), f(writer.ens)))
+        newWrite
+    }
+  }
+
+  private def expandReader(sym: Sym[_], reader: Reader[_, _], insertedDim: Idx) = {
+    dbgs(s"Expanding Reader: $sym = $reader")
+    reader.mem match {
+      case sr: SRAM[_, _] =>
+        type A = sr.A.R
+        lazy implicit val bitsEV: Bits[A] = sr.A
+
+        implicit def ctx: SrcCtx = sym.ctx
+
+        val result = stage(SRAMRead(f(reader.mem).asInstanceOf[SRAM[A, SRAMN]], Seq(insertedDim) ++ f(reader.addr), f(reader.ens)))
+        result
+    }
   }
 }
 

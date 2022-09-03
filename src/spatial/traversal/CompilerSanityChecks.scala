@@ -37,7 +37,7 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
     if (unknownInputs.nonEmpty) {
       bug(lhs.ctx, s"Statement $lhs = $rhs used one or more undefined values: ")
       unknownInputs.foreach { in =>
-        bug("  " + stm(in))
+        bug("  " + stm(in) + s"  [${in.ctx}]")
       }
     }
     if (visitedStms.contains(lhs)) {

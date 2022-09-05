@@ -23,6 +23,11 @@ class MLP_Variant_exp_b1_nostream extends MLP_Variant_Batch_1 {
   override def compileArgs = "--nostreamify --vv"
 }
 
+class MLP_Variant_Small extends MLP_Variants(N=16, batch=16, dims=List(4, 4), ips = List(2, 2), mps = List(2, 2), ops=List(2, 2))
+class MLP_Variant_Small_nostream extends MLP_Variant_Small {
+  override def compileArgs = "--nostreamify --vv"
+}
+
 @spatial abstract class MLP_Variants(
                                       val N:scala.Int = 1024,
                                       val batch:scala.Int = 4,

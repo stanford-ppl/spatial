@@ -9,6 +9,9 @@ package object transform {
     def isStreamPrimitive: Boolean = metadata[StreamPrimitive](s).exists(_.flag)
     def isStreamPrimitive_=(flag: Boolean): Unit = metadata.add[StreamPrimitive](s, StreamPrimitive(flag))
     def hasStreamPrimitiveAncestor: Boolean = s.toCtrl.hasStreamPrimitiveAncestor
+
+    def freezeMem: Boolean = metadata[FreezeMem](s).exists(_.flag)
+    def freezeMem_=(flag: Boolean): Unit = metadata.add[FreezeMem](s, FreezeMem(flag))
   }
 
   implicit class TransformCtrlOps(s: Ctrl) {

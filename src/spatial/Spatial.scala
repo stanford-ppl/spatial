@@ -121,9 +121,10 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val duplicateRetimeStripper = DuplicateRetimeStripper(state)
     lazy val earlyUnroller         = EarlyUnroller(state)
     lazy val accelPipeInserter     = AccelPipeInserter(state)
+    lazy val forceHierarchical     = ForceHierarchical(state)
 
     import Stripper.S
-    lazy val retimeStrippers = MetadataStripper(state,
+    lazy val bankStrippers = MetadataStripper(state,
       S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports],
       S[spatial.metadata.memory.GroupId])
 
@@ -131,11 +132,11 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val fifoInitialization = Seq(fifoInitializer, pipeInserter, MetadataStripper(state, S[spatial.metadata.memory.FifoInits]))
 
-    lazy val retimeAnalysisPasses = Seq(retimeStrippers, duplicateRetimeStripper, retimingAnalyzer)
+    lazy val retimeAnalysisPasses = Seq(duplicateRetimeStripper, retimingAnalyzer)
 
-    lazy val bankingAnalysis = retimeAnalysisPasses ++ Seq(accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
+    lazy val bankingAnalysis = retimeAnalysisPasses  ++ Seq(bankStrippers, accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
 
-    lazy val streamify = Seq(accelPipeInserter, unitPipeToForeach, streamChecks) ++ bankingAnalysis ++ createDump("PreEarlyUnroll") ++ Seq(earlyUnroller, printer, streamChecks) ++ createDump("PreFlatten") ++ Seq(FlattenToStream(state), printer, pipeInserter, printer, streamChecks)++ createDump("PostStream")
+    lazy val streamify = Seq(accelPipeInserter, unitPipeToForeach, forceHierarchical, streamChecks) ++ bankingAnalysis ++ createDump("PreEarlyUnroll") ++ Seq(earlyUnroller, printer, streamChecks) ++ createDump("PreFlatten") ++ Seq(FlattenToStream(state), printer, pipeInserter, printer, streamChecks)++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -191,7 +192,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         // Always Run this pass
-        fifoInitialization ==> printer ==> bankingAnalysis ==>
+        fifoInitialization ==> printer ==>
         spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
         bankingAnalysis ==> createDump("PreUnroll") ==>

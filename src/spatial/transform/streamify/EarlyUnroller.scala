@@ -275,10 +275,8 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
               AccessMatrix(v, matrix.replaceKeys(keyReplacement), makeNewIter(unroll), isReader)
           }
 
-          v.ctx = implicitly[argon.SrcCtx].copy(previous = Seq(lhs.ctx) ++ lhs.ctx.previous)
-          v.isNoFlatBank = true
+          v.explicitName = lhs.explicitName.getOrElse(s"$lhs") + "_" + mappedIterator.flatMap({x => x}).mkString("_")
 
-          dbgs(s"Mapped Dispatches: ${v.dispatches}")
           v
         }
       }

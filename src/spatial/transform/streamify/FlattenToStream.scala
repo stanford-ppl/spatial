@@ -4,7 +4,6 @@ import argon.transform.{ForwardTransformer, MutateTransformer}
 import argon._
 import argon.tags.struct
 import spatial.lang._
-import spatial.metadata.access
 import spatial.node._
 import spatial.traversal.AccelTraversal
 
@@ -493,6 +492,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     2 * mem.parent.children.count(ctrl => (ctrl.sym.effects.reads ++ ctrl.sym.effects.writes).contains(mem))
   }
 
+  private var accessIterSize: Int = -1
+
   val intakeTokens = cm.Map[Sym[_], Sym[_]]()
   private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
     dbgs(s"Visiting Foreach: $lhs = $foreachOp [${lhs.isInnerControl}]")
@@ -544,6 +545,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     val newIters = makeIters(ctrs)
     // Split here based on if we're an inner or outer control
+    accessIterSize = staticCounters.size
 
     val mainCtrl = if (lhs.isInnerControl) {
       stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
@@ -754,6 +756,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }
     }
 
+    accessIterSize = -1
+
     dbgs(s"Creating Release Controller")
     val finisher = indent {
       isolateSubst() { createReleaseController(controllerInfo) }
@@ -898,9 +902,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       newMem.shouldIgnoreConflicts = mem.shouldIgnoreConflicts.map(_ + 1) + 0
       dbgs(s"Old Fully Banked Dims: ${mem.fullyBankDims}")
       dbgs(s"New Fully Banked Dims: ${newMem.fullyBankDims}")
+      newMem.duplicates = mem.duplicates.map {
+        case Memory(banking, depth, padding, accType) =>
+          val newBank = ModBanking(bufferAmount, 1, Seq(1), Seq(0), Seq(bufferAmount))
+          val oldBanks = banking.map {
+            case modBank: ModBanking =>
+              modBank.copy(axes = modBank.axes.map(_ + 1))
+          }
+          Memory(Seq(newBank) ++ oldBanks, 1, Seq(0) ++ padding, accType)
+      }
+      dbgs(s"Old Banking: ${mem.duplicates}")
+      dbgs(s"New Banking: ${newMem.duplicates}")
       newMem.bufferAmount = None
       newMem.hierarchical
       newMem.nonbuffer
+      newMem.freezeMem = true
       dbgs(s"NewMem: $newMem = ${newMem.op.get}")
       newMem
   }
@@ -916,6 +932,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         implicit def ctx: SrcCtx = sym.ctx
 
         val newWrite = stage(SRAMWrite(f(writer.mem).asInstanceOf[SRAM[A, SRAMN]], dataAsBits, Seq(insertedDim) ++ f(writer.addr), f(writer.ens)))
+        copyMemoryMeta(newWrite, sym)
         newWrite
     }
   }
@@ -930,7 +947,46 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         implicit def ctx: SrcCtx = sym.ctx
 
         val result = stage(SRAMRead(f(reader.mem).asInstanceOf[SRAM[A, SRAMN]], Seq(insertedDim) ++ f(reader.addr), f(reader.ens)))
+        copyMemoryMeta(result.asSym, sym)
         result
+    }
+  }
+
+  private def copyMemoryMeta(newSym: Sym[_], oldSym: Sym[_]): Unit = {
+    def toNewUid(oldUid: Iterable[Int]): List[Int] = {
+      // How many iters are there between us and the mem?
+      // For an innerControl:
+      //    accessIterSize has how many counters are staged into the inner foreach. Since everything else is a unitpipe
+      //    The uid should be a list of length accessIterSize.
+      // For a streamPrimitive:
+      //    accessIterSize has the wrapper around the actual primitive
+      //    so in this case, we also need to account for the iterators WITHIN the stream primitive
+      assert(accessIterSize >= 0)
+      if (oldSym.hasStreamPrimitiveAncestor) {
+        // Figure out how many iters there are in the streamPrimitive path
+        val primitiveIters = oldSym.scopes(scope => scope.s.exists(_.isStreamPrimitive)).filterNot(_.stage == -1).flatMap(_.iters).filter(!_.counter.ctr.isForever)
+        List.fill(accessIterSize + primitiveIters.size - oldUid.size)(0) ++ oldUid
+      } else {
+        List.fill(accessIterSize - oldUid.size)(0) ++ oldUid
+      }
+    }
+
+    newSym.dispatches = oldSym.dispatches.map {
+      case (uid, disp) =>
+        toNewUid(uid) -> disp
+    }
+
+    newSym.gids = oldSym.gids.map {
+      case (uid, groups) =>
+        toNewUid(uid) -> groups
+    }
+
+    oldSym.getPorts.getOrElse(Map.empty).foreach {
+      case (disp, portData) =>
+        portData.foreach {
+          case (uid, port) =>
+            newSym.addPort(disp, toNewUid(uid), port)
+        }
     }
   }
 }

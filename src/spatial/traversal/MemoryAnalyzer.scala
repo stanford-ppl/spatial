@@ -12,6 +12,8 @@ import spatial.metadata.memory._
 import spatial.traversal.banking._
 import spatial.util.spatialConfig
 
+import spatial.metadata.transform._
+
 case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator) extends Codegen { // Printing with Pass {
   private val strategy: BankingStrategy = ExhaustiveBanking()
   private val fullyBanked: BankingStrategy = FullyBanked()
@@ -137,7 +139,8 @@ case class MemoryAnalyzer(IR: State)(implicit isl: ISL, areamodel: AreaEstimator
   }).asInstanceOf[MemoryConfigurer[C]]
 
   def run(): Unit = {
-    val memories = LocalMemories.all.toSeq.filter(!_.isCtrlBlackbox)
+//    val memories = LocalMemories.all.toSeq.filter(!_.isCtrlBlackbox).filterNot(_.freezeMem)
+    val (frozen, memories) = LocalMemories.all.toSeq.filterNot(_.isCtrlBlackbox).partition(_.freezeMem)
     val entries = memories.map{m =>  //Seq[(Long, Sym[_], MemoryConfigurer, Double)]
       val startTime = System.currentTimeMillis()
       val conf = configurer(m)

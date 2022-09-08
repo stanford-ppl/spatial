@@ -205,7 +205,9 @@ package object memory {
     def getDispatch(uid: Seq[Int]): Option[Set[Int]] = getDispatches.flatMap(_.get(uid))
     @stateful def dispatch(uid: Seq[Int]): Set[Int] = {
       if (s.readMem.exists(_.isLockDRAM) || s.writtenMem.exists(_.isLockDRAM)) Set(0) // Hack for LockDRAM accesses
-      else getDispatch(uid).getOrElse{throw new Exception(s"No dispatch defined for $s {${uid.mkString(",")}}")}
+      else getDispatch(uid).getOrElse{
+        throw new Exception(s"No dispatch defined for $s {${uid.mkString(",")}} (${dispatches.keys.mkString(", ")})")
+      }
     }
 
     def addDispatch(uid: Seq[Int], d: Int): Unit = getDispatch(uid) match {

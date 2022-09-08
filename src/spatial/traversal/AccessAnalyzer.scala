@@ -14,6 +14,8 @@ import spatial.metadata.control._
 import spatial.metadata.memory._
 import spatial.metadata.types._
 
+import spatial.metadata.transform._
+
 case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
   private var iters: Seq[Idx] = Nil                     // List of loop iterators, ordered outermost to innermost
   private var iterStarts: Map[Idx, Ind[_]] = Map.empty  // Map from loop iterator to its respective start value
@@ -294,11 +296,11 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
         }
       }
 
-    case Dequeuer(mem,adr,_)   if adr.isEmpty => setStreamingPattern(mem, lhs)
-    case Enqueuer(mem,_,adr,_) if adr.isEmpty => setStreamingPattern(mem, lhs)
-    case VectorEnqueuer(mem,data,_,_) => setStreamingPattern(mem, lhs, data.asInstanceOf[Vec[_]].size)
-    case VectorDequeuer(mem,adr,_) =>  setStreamingPattern(mem, lhs, adr.size)
-    case Reader(mem,adr,_)   => 
+    case Dequeuer(mem,adr,_)   if adr.isEmpty && !mem.freezeMem => setStreamingPattern(mem, lhs)
+    case Enqueuer(mem,_,adr,_) if adr.isEmpty && !mem.freezeMem => setStreamingPattern(mem, lhs)
+    case VectorEnqueuer(mem,data,_,_) if !mem.freezeMem => setStreamingPattern(mem, lhs, data.asInstanceOf[Vec[_]].size)
+    case VectorDequeuer(mem,adr,_) if !mem.freezeMem =>  setStreamingPattern(mem, lhs, adr.size)
+    case Reader(mem,adr,_) if !mem.freezeMem  =>
       lhs match {
         case Op(RegRead(reg)) if !reg.isRemoteMem => 
           val reachingWrite = reachingWritesToReg(lhs, reg.writers)
@@ -313,7 +315,7 @@ case class AccessAnalyzer(IR: State) extends Traversal with AccessExpansion {
         case _ =>
       }
       setAccessPattern(mem, lhs, adr)
-    case Writer(mem,_,adr,_) => 
+    case Writer(mem,_,adr,_) if !mem.freezeMem =>
       setAccessPattern(mem, lhs, adr)
     case _ => super.visit(lhs, rhs)
   }

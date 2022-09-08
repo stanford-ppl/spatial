@@ -249,7 +249,7 @@ case class Memory(
     }
     else {
       // TODO: Bank address for mixed dimension groups
-      throw new Exception("Bank address calculation for arbitrary dim groupings unknown")
+      throw new Exception(s"Bank address calculation for arbitrary dim groupings unknown: $banking")
     }
   }
 }

@@ -59,6 +59,7 @@ case class UseAnalyzer(IR: State) extends BlkTraversal {
         case Op(OpMemReduce(_,_,_,_,_,_,_,_,_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(UnrolledForeach(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
         case Op(UnrolledReduce(_,_,_,_,_,Some(breakWhen))) => breakWhen.isBreaker = true
+        case Op(UnitPipe(_, _, Some(breakWhen))) => breakWhen.isBreaker = true
         case _ =>
       }
       inCtrl(lhs){ inspect() }

@@ -85,3 +85,30 @@ class RegBufferingNoStream extends RegBuffering {
 class DataDependentControlNS extends DataDependentControl {
   override def compileArgs = "--nostreamify"
 }
+
+@spatial class DynamicZeroIterForeach extends SpatialTest {
+  override def compileArgs = "--max_cycles=500 --vv"
+
+  override def main(args: Array[String]) = {
+    val output = ArgOut[I32]
+    Accel {
+      val accum1 = Reg[I32](0)
+      accum1.explicitName = "accum1"
+      'Outer.Foreach(0 until 4) {
+        outer =>
+          val innerIterReg = Reg[I32](0)
+          innerIterReg.explicitName = "innerIterReg"
+          'Producer.Foreach(0 until outer) {
+            inner =>
+              innerIterReg := innerIterReg + inner
+          }
+          'Consumer.Foreach(0 until innerIterReg.value) {
+            inner2 =>
+              accum1 := accum1 + inner2
+          }
+      }
+      output := accum1
+    }
+    assert(checkGold(output, I32(3)))
+  }
+}

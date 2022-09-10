@@ -23,7 +23,7 @@ case class VecStructType[T](fields: Seq[(T, Bits[_])], errorOnMismatch: Boolean 
 
   def bitsEV: Bits[Vec[Bit]] = Vec.bits[Bit](bitWidth)
 
-  def packStruct(entries: Map[T, Bits[_]]): Vec[Bit] = {
+  def packStruct(entries: Map[T, Bits[_]])(implicit srcCtx: argon.SrcCtx): Vec[Bit] = {
     val data = fields.map {
       case (name, bits) =>
         entries.get(name) match {

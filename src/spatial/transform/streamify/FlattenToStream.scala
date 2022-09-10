@@ -2,6 +2,7 @@ package spatial.transform.streamify
 
 import argon.transform.{ForwardTransformer, MutateTransformer}
 import argon._
+import argon.node.IfThenElse
 import argon.tags.struct
 import spatial.lang._
 import spatial.node._
@@ -210,16 +211,22 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val allIters = allCounters.flatMap(_.iter)
 
     val fifoDepth = I32(128)
-    val (iterFIFO, releaseIterFIFO) = {
+    val iterFIFO = {
       implicit def vecBitsEV: Bits[Vec[PseudoIter]] = Vec.bits[PseudoIter](allCounters.size)
       val iterFIFO: FIFO[PseudoIters[Vec[PseudoIter]]] = FIFO[PseudoIters[Vec[PseudoIter]]](fifoDepth)
       iterFIFO.explicitName = s"IterFIFO_$lhs"
 
-      val releaseIterFIFO = mirrorSym(iterFIFO).unbox
-      releaseIterFIFO.explicitName = s"ReleaseIterFIFO_$lhs"
-
-      (iterFIFO, releaseIterFIFO)
+      iterFIFO
     }
+
+    val lastIterType = VecStructType(allChains.map(_.counters.head).map {ctr => ctr.iter.get -> Bit(false)})
+    val releaseLastFIFO = {
+      implicit def vecBitsEV = lastIterType.bitsEV
+      val releaseLastFIFO = FIFO[Vec[Bit]](fifoDepth)
+      releaseLastFIFO.explicitName = s"ReleaseLastFIFO_$lhs"
+      releaseLastFIFO
+    }
+
     val intakeComms = tokenComms.filter(_.dst == lhs.toCtrl)
     val releaseComms = tokenComms.filter(_.src == lhs.toCtrl)
 
@@ -261,8 +268,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     val backlog = cm.Buffer[Sym[_]]()
     val firstIterMap = cm.Map[Sym[_], Bit]()
+    val lastIterMap = cm.Map[Sym[_], Bit]()
 
-    def updateFirstIterMap(): Unit = {
+    def updateIterInfoMaps(): Unit = {
       if (backlog.isEmpty) {
         dbgs(s"Skipping Update, Backlog was empty")
         return
@@ -276,7 +284,14 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       }
       firstIterMap ++= (backlog zip isFirsts).toMap
       dbgs(s"Updated First Iter Map: $firstIterMap")
+
+      val isLasts = isLastIters(f(backlog.map(_.unbox.asInstanceOf[I32])):_*)
+      lastIterMap.keys.foreach {
+        iter => lastIterMap(iter) &= isLasts.head
+      }
+      lastIterMap ++= (backlog zip isLasts).toMap
       backlog.clear()
+      dbgs(s"Updated Last Iter Map: $lastIterMap")
     }
 
     def updateTokenMap(comms: Seq[TokenComm]): Unit = {
@@ -310,7 +325,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val curIters = headChain.counters.flatMap(_.iter)
 
       if (dependencies.nonEmpty) {
-        updateFirstIterMap()
+        updateIterInfoMaps()
         val relevantComms = remainingComms.filter {
           case TokenComm(mem, _, _, _, lca, _) =>
             dependencies.contains(mem) && currentCtrl.hasAncestor(lca)
@@ -344,10 +359,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         }
       }
 
-
-      // Now that we've fetched everything, we need to mirror the chain and all of its predecessors.
-      chains match {
-        case cchain :: Nil =>
+      val computeChains = () => chains match {
+        case cchain::Nil =>
           // innermost iteration
 
           var shouldFullyPar = false
@@ -356,7 +369,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             ctr =>
               if (shouldFullyPar && ctr.isStatic) {
                 type CT = ctr.CT
+
                 implicit def numEV: Num[CT] = ctr.CTeV.asInstanceOf[Num[CT]]
+
                 val castedCtr = ctr.asInstanceOf[Counter[CT]]
                 val parFactor = castedCtr.end.unbox.to[I32] - castedCtr.start.unbox.to[I32]
 
@@ -371,10 +386,30 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           val newCChain = CounterChain(newChains)
           val newIters = makeIters(newChains)
           backlog.appendAll(curIters)
-          register(curIters, newChains.flatMap(_.iter))
 
+          register(cchain, newCChain)
+          register(cchain.counters, newChains)
+          register(curIters, newChains.flatMap(_.iter))
+          (newCChain, newIters)
+        case cchain::_ =>
+          val newChains = cchain.counters.map(mirrorSym(_).unbox)
+          val newCChain = CounterChain(newChains)
+          val newIters = makeIters(newChains)
+          backlog.appendAll(curIters)
+
+          register(curIters, newChains.flatMap(_.iter))
+          register(cchain, newCChain)
+          register(cchain.counters, newChains)
+          register(curIters, newChains.flatMap(_.iter))
+          (newCChain, newIters)
+      }
+
+
+      // Now that we've fetched everything, we need to mirror the chain and all of its predecessors.
+      val stageBody = (newCChain: CounterChain, newIters: Seq[I32]) => chains match {
+        case cchain :: Nil =>
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
-            updateFirstIterMap()
+            updateIterInfoMaps()
             val oldItersAsI32 = allIters.map(_.unbox.asInstanceOf[I32])
             val allNewIters = f(oldItersAsI32)
             val isLasts = isLastIters(allNewIters: _*)
@@ -391,7 +426,10 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             val isActive = Bit(true)
 
             controllerInfo.iterFIFO.enq(pIters, isActive)
-            controllerInfo.releaseIterFIFO.enq(pIters)
+            val lastMap = lastIterType.fields.map {
+              case (iter, _) => iter -> lastIterMap(iter.unbox.asInstanceOf[I32])
+            }
+            controllerInfo.releaseLastFIFO.enq(lastIterType.packStruct(lastMap.toMap))
             dbgs(s"Token Map: $tokenMap")
             dbgs(s"Relevant Comms: ${controllerInfo.intakeComms}")
             val allTokenAcquireEnables = computeIntakeEnables(controllerInfo.intakeComms, firstIterMap.toMap.withDefaultValue(Bit(true))).mapValues {
@@ -399,16 +437,15 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             }
             dbgs(s"All Token Acquires: $allTokenAcquireEnables")
             val encoded = controllerInfo.tokenStreamType.packStruct(tokenMap.toMap)
-            (tokenFIFO, bypassTokenFIFO, acquireFIFO) match {
-              case (Some(tf), Some(btf), Some(af)) =>
+            (tokenFIFO, acquireFIFO) match {
+              case (Some(tf), Some(af)) =>
                 tf.enq(encoded, isActive)
-                btf.enq(encoded, !isActive)
                 af.enq(controllerInfo.tokenEnableType.packStruct(allTokenAcquireEnables), isActive)
-              case (None, None, None) => dbgs(s"Skipping CounterGen Tokens -- no tokens found")
+              case (None, None) => dbgs(s"Skipping CounterGen Tokens -- no tokens found")
             }
 
             tokenSourceFIFO.enq(isActive)
-          }, newIters.asInstanceOf[Seq[I32]], None)) {
+          }, newIters, None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain.owner}"
               lhs2.ctx = augmentCtx(cchain.ctx)
@@ -416,41 +453,94 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           }
 
         case cchain :: rest =>
-          // Fetch all dependencies of the chain
-
-          val newChains = cchain.counters.map(mirrorSym(_).unbox)
-          val newCChain = CounterChain(newChains)
-          val newIters = makeIters(newChains)
-          backlog.appendAll(curIters)
-          register(curIters, newChains.flatMap(_.iter))
-
           stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
             indent {
               recurseHelper(rest)
             }
             void
-          }, newIters.asInstanceOf[Seq[I32]], None)) {
+          }, newIters, None)) {
             lhs2 =>
               lhs2.explicitName = s"CounterGen_${cchain}"
               lhs2.ctx = augmentCtx(cchain.ctx)
-              lhs2.userSchedule = Pipelined
+              lhs2.userSchedule = Sequenced
           }
+      }
+
+      // check if we can run for 0 iters.
+
+      val canRunZeroIters = !headChain.isStatic
+      if (canRunZeroIters) {
+        dbgs(s"$headChain can run for zero iterations! Staging an if/then/else to bypass.")
+        val willRun = headChain.counters.filterNot(_.isForever).filterNot(_.isStatic).map({
+          counter =>
+            val castedCounter = counter.asInstanceOf[Counter[counter.CT]]
+
+            implicit def numImpl: Num[counter.CT] = counter.CTeV.asInstanceOf[Num[counter.CT]]
+
+            f(castedCounter.start).asInstanceOf[Num[counter.CT]] < f(castedCounter.end).unbox.asInstanceOf[counter.CT]
+        }).reduceTree(_ & _)
+        val iterInfo = (firstIterMap.clone(), lastIterMap.clone())
+        val comms = remainingComms
+        val tMap = tokenMap.clone()
+        val oldBacklog = backlog.clone()
+        stage(IfThenElse(willRun, stageBlock {
+          dbgs(s"Through path:")
+          indent {
+            val (newCChain, newIters) = computeChains()
+            stageBody(newCChain, newIters.map(_.unbox.asInstanceOf[I32]))
+          }
+        }, stageBlock {
+          dbgs(s"Bypass Path")
+          indent {
+            firstIterMap.clear()
+            firstIterMap ++= iterInfo._1
+            lastIterMap.clear()
+            lastIterMap ++= iterInfo._2
+            backlog.clear()
+            backlog ++= oldBacklog
+            updateIterInfoMaps()
+            // Otherwise, we note that all of the remaining iters are on their last iter, to
+            // immediately release the token.
+            tokenMap.clear()
+            tokenMap ++= tMap
+            updateTokenMap(comms.toSeq)
+            // TODO: Compute bypass for when the controller is inactive (0 iteration ctrls, if/else, etc.)
+
+            dbgs(s"Last Iter Map: $lastIterMap")
+            val lastMap = lastIterType.fields.map {
+              case (iter, _) => iter -> lastIterMap.getOrElse(iter.unbox.asInstanceOf[I32], Bit(true))
+            }
+            releaseLastFIFO.enq(lastIterType.packStruct(lastMap.toMap))
+            dbgs(s"Token Map: $tokenMap")
+            dbgs(s"Relevant Comms: ${controllerInfo.intakeComms}")
+            val allTokenAcquireEnables = computeIntakeEnables(controllerInfo.intakeComms, firstIterMap.toMap.withDefaultValue(Bit(true))).mapValues {
+              commsAndBits => commsAndBits.map(_._2).reduceTree(_ || _)
+            }
+            dbgs(s"All Token Acquires: $allTokenAcquireEnables")
+            bypassTokenFIFO match {
+              case Some(btf) =>
+                val encoded = controllerInfo.tokenStreamType.packStruct(tokenMap.toMap)
+                btf.enq(encoded)
+              case _ => dbgs(s"Skipping CounterGen Tokens -- no tokens found")
+            }
+
+            tokenSourceFIFO.enq(Bit(false))
+          }
+        }))
+      } else {
+        val (newCChain, newIters) = computeChains()
+        stageBody(newCChain, newIters.map(_.unbox.asInstanceOf[I32]))
       }
     }
     isolateSubst() { recurseHelper(allChains.toList) }
   }
 
-  private def createReleaseController(controllerInfo: ControllerInfo): Sym[_] = {
+  private def createReleaseController(controllerInfo: ControllerInfo, killer: Reg[Bit]): Sym[_] = {
     import controllerInfo._
-    val stopWhen = Reg[Bit]
     val forever = stage(ForeverNew())
 
     stageWithFlow(OpForeach(Set.empty, CounterChain(Seq(forever)), stageBlock {
-      val streamIters = releaseIterFIFO.deq().iters
-
-      val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
-      register(allOldIters, streamIters.elems.map(_.i))
-      val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
+      val lastIterMap = lastIterType.unpackStruct(releaseLastFIFO.deq()).mapValues(_.as[Bit])
 
       val source = tokenSourceFIFO.deq()
       val tokens = (finishTokenFIFO, bypassTokenFIFO) match {
@@ -479,9 +569,9 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
       retimeGate()
       val endOfWorld = getOutermostIter(controllerInfo.allCtrlers).map(lastIterMap(_)).getOrElse(Bit(true))
-      stopWhen.write(endOfWorld, endOfWorld)
+      killer.write(endOfWorld, endOfWorld)
 
-    }, Seq(makeIter(forever).unbox), Some(stopWhen))) {
+    }, Seq(makeIter(forever).unbox), None)) {
       lhs2 => lhs2.userSchedule = Pipelined
         lhs2.ctx = augmentCtx(lhs.ctx)
     }
@@ -495,7 +585,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   private var accessIterSize: Int = -1
 
   val intakeTokens = cm.Map[Sym[_], Sym[_]]()
-  private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach): Sym[_] = {
+  private def visitInnerForeach(lhs: Sym[_], foreachOp: OpForeach, killer: Reg[Bit]): Sym[_] = {
     dbgs(s"Visiting Foreach: $lhs = $foreachOp [${lhs.isInnerControl}]")
     val controllerInfo = ControllerInfo(lhs)
 
@@ -513,10 +603,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       * Where there's a (possible) overlap between streamIters and newInnerIters
       *
       */
-    val stopWhen = foreachOp.stopWhen match {
-      case Some(reg) => f(reg).conflictable
-      case None => Reg[Bit](Bit(false)).dontTouch
-    }
 
     // restage every register used by the controller but not defined within -- we'll maintain a private copy.
     val incomingRegisters = controllerInfo.tokenStreamType.fields.map(_._1)
@@ -550,7 +636,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val mainCtrl = if (lhs.isInnerControl) {
       stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
         val streamIters = controllerInfo.iterFIFO.deq().iters
-        val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
 
         controllerInfo.allCounters.zipWithIndex foreach {
           case (oldCtr, i) =>
@@ -564,8 +649,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
               register(oldIter, streamIters(i).i)
             }
         }
-
-        val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
 
         // Maps registers to their 'latest' value
         val regValues = cm.Map[Sym[_], Sym[_]]()
@@ -653,14 +736,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           case None =>
             dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
         }
-
-        // Update StopWhen -- on the last iteration, kill the controller.
-        // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
-        retimeGate()
-        val endOfWorld = getOutermostIter(lhs.ancestors).map(lastIterMap(_)).getOrElse(Bit(true))
-        stopWhen.write(endOfWorld, endOfWorld)
-
-      }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
+      }, newIters.map(_.unbox.asInstanceOf[I32]), None)) {
         newForeach =>
           transferData(lhs, newForeach)
           newForeach.ctx = augmentCtx(lhs.ctx)
@@ -671,7 +747,6 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       // Outer Control / StreamPrimitive case
       stageWithFlow(OpForeach(Set.empty, CounterChain(ctrs), stageBlock {
         val streamIters = controllerInfo.iterFIFO.deq().iters
-        val allOldIters = controllerInfo.allCounters.flatMap(_.iter)
         controllerInfo.allCounters.zipWithIndex foreach {
           case (oldCtr, i) =>
             val oldIter = oldCtr.iter.get
@@ -740,15 +815,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
             case None =>
               dbgs(s"Skipping Finish Token FIFO staging -- no tokens found!")
           }
-
-          // Update StopWhen -- on the last iteration, kill the controller.
-          // By stalling this out, we can guarantee that the preceding writes happen before the controller gets killed
-          retimeGate()
-          val lastIterMap = allOldIters.zip(streamIters.elems.map(_.isLast)).toMap
-          val endOfWorld = getOutermostIter(controllerInfo.allCtrlers).map(lastIterMap(_)).getOrElse(Bit(true))
-          stopWhen.write(endOfWorld, endOfWorld)
         }
-      }, newIters.map(_.unbox.asInstanceOf[I32]), Some(stopWhen))) {
+      }, newIters.map(_.unbox.asInstanceOf[I32]), None)) {
         newForeach =>
           transferData(lhs, newForeach)
           newForeach.ctx = augmentCtx(lhs.ctx)
@@ -760,7 +828,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
     dbgs(s"Creating Release Controller")
     val finisher = indent {
-      isolateSubst() { createReleaseController(controllerInfo) }
+      isolateSubst() { createReleaseController(controllerInfo, killer) }
     }
 
     intakeTokens.clear()
@@ -769,7 +837,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case accelScope: AccelScope => inAccel {
-      printRegister = false
+      printRegister = true
 
       dbgs(s"Computing Global Mem Graph")
       tokenComms = accelScope.block.nestedStms.filter(_.isMem).filterNot(isInternalMem).filterNot(_.isLUT).flatMap(computeProducerConsumers(_))
@@ -800,10 +868,18 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     case foreachOp: OpForeach if inHw && lhs.isStreamPrimitive || (lhs.isInnerControl && !lhs.toCtrl.hasStreamPrimitiveAncestor) =>
       dbgs(s"Transforming Foreach: $lhs = $foreachOp")
       indent { isolateSubst() {
+        val killer = lhs.stopWhen match {
+          case Some(F(kill: Reg[Bit])) =>
+            kill.ignoreAllConflicts
+            kill
+          case None =>
+            Reg[Bit](false)
+        }
+        killer.explicitName = s"${lhs}_killer"
         stageWithFlow(UnitPipe(Set.empty, stageBlock {
-          visitInnerForeach(lhs, foreachOp)
+          visitInnerForeach(lhs, foreachOp, killer)
           spatial.lang.void
-        }, None)) {
+        }, Some(killer))) {
           lhs2 =>
             transferDataIfNew(lhs, lhs2)
             lhs2.userSchedule = Streaming

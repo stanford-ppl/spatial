@@ -75,7 +75,7 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
             // If it is possible to run off this edge of the counter, we include this
             // otherwise the enable would be always true, and this just creates extra HW
             if (possiblyOOB(parShift, ctr)) {
-              val isInBounds = replacement.asInstanceOf[Num[ctr.CT]] < ctr.end.asInstanceOf[ctr.CT]
+              val isInBounds = replacement().asInstanceOf[Num[ctr.CT]] < ctr.end.asInstanceOf[ctr.CT]
               enables += isInBounds
             }
         }
@@ -137,7 +137,7 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
 
             // Check if the replacement iter is still valid
             if (possiblyOOB(parShift, ctr)) {
-              val isInBounds = replacement.asInstanceOf[Num[ctr.CT]] < ctr.end.asInstanceOf[ctr.CT]
+              val isInBounds = replacement().asInstanceOf[Num[ctr.CT]] < ctr.end.asInstanceOf[ctr.CT]
               enables += isInBounds
             }
         }

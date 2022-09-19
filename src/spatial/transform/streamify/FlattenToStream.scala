@@ -579,7 +579,8 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
 
   private def computeBufferDepth(mem: Sym[_]): Int = {
     // we need 2 copies in each user at the level of the mem.
-    2 * mem.parent.children.count(ctrl => (ctrl.sym.effects.reads ++ ctrl.sym.effects.writes).contains(mem))
+//    2 * mem.parent.children.count(ctrl => (ctrl.sym.effects.reads ++ ctrl.sym.effects.writes).contains(mem))
+    mem.duplicates.map(_.depth).max
   }
 
   private var accessIterSize: Int = -1
@@ -741,7 +742,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
           transferData(lhs, newForeach)
           newForeach.ctx = augmentCtx(lhs.ctx)
           dbgs(s"Forwarding schedule: $lhs => ${lhs.getRawSchedule}")
-          newForeach.userSchedule = lhs.getRawSchedule.getOrElse(Pipelined)
+          newForeach.userSchedule = Pipelined // lhs.getRawSchedule.getOrElse(Pipelined)
       }
     } else {
       // Outer Control / StreamPrimitive case
@@ -820,7 +821,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
         newForeach =>
           transferData(lhs, newForeach)
           newForeach.ctx = augmentCtx(lhs.ctx)
-          newForeach.userSchedule = Pipelined
+          newForeach.userSchedule = Sequenced
       }
     }
 
@@ -980,12 +981,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       dbgs(s"New Fully Banked Dims: ${newMem.fullyBankDims}")
       newMem.duplicates = mem.duplicates.map {
         case Memory(banking, depth, padding, accType) =>
-          val newBank = ModBanking(bufferAmount, 1, Seq(1), Seq(0), Seq(bufferAmount))
-          val oldBanks = banking.map {
-            case modBank: ModBanking =>
-              modBank.copy(axes = modBank.axes.map(_ + 1))
+          if (banking.size > 1) {
+            val newBank = ModBanking(bufferAmount, 1, Seq(1), Seq(0), Seq(bufferAmount))
+            val oldBanks = banking.map {
+              case modBank: ModBanking =>
+                modBank.copy(axes = modBank.axes.map(_ + 1))
+            }
+            Memory(Seq(newBank) ++ oldBanks, 1, Seq(0) ++ padding, accType)
+          } else {
+            // Everything was in a single bank, need to extend the scheme
+            val newBank = banking.head match {
+              case modBank: ModBanking =>
+                ModBanking(bufferAmount * modBank.N, modBank.B, Seq(modBank.alpha.product) ++ modBank.alpha, Seq(0) ++ modBank.axes.map(_+1), Seq(bufferAmount) ++ modBank.Ps)
+            }
+            Memory(Seq(newBank), 1, Seq(0) ++ padding, accType)
           }
-          Memory(Seq(newBank) ++ oldBanks, 1, Seq(0) ++ padding, accType)
       }
       dbgs(s"Old Banking: ${mem.duplicates}")
       dbgs(s"New Banking: ${newMem.duplicates}")

@@ -42,8 +42,6 @@ import spatial.util.modeling._
   */
 case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTransformer with AccelTraversal {
 
-  type IterFIFO = FIFO[PseudoIters[Vec[PseudoIter]]]
-
   private val commFIFOs = cm.Map[TokenComm, FIFO[_]]()
 
   private var accelHandle: BundleHandle = null
@@ -59,6 +57,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
       val bufferDepth = computeBufferDepth(key.mem)
       val newFIFO = FIFO[T](2 * bufferDepth)
       newFIFO.explicitName = s"CommFIFO_${key.mem}_${key.src.s.get}_${key.dst.s.get}"
+      newFIFO.conflictable
       commFIFOs(key) = newFIFO
       if (key.direction == Return) {
         newFIFO.fifoInits = Range(0, bufferDepth).map(I32(_))
@@ -148,7 +147,7 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val shouldWrite = tokenWithEns.map(_._2).reduceTree(_|_)
     val dequeuedValues = tokenWithEns.map {
       case (comm@TokenComm(_, _, _, Initialize(v), _, _), en) =>
-        v.asInstanceOf[T]
+        f(v).asInstanceOf[T]
       case (comm, en) =>
         getFIFO(comm).deq(en).asInstanceOf[T]
     }
@@ -210,7 +209,21 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
     val allCounters = allChains.flatMap(_.counters)
     val allIters = allCounters.flatMap(_.iter)
 
-    val fifoDepth = I32(128)
+    // The FIFODepth just needs to be able to accomodate bodyLatency, or two vectorized writes from the ctrlers.
+    val fifoDepth = {
+      val latencyEpsilon = 8
+      val bodyLatency = if (lhs.isStreamPrimitive) {
+        lhs.children.size + latencyEpsilon
+      } else { scala.math.ceil(lhs.bodyLatency.head).toInt + latencyEpsilon }
+      val ctrlerWritePar = 2 * allChains.last.counters.map(_.nIters match {
+        case Some(x) => x.toInt
+        case None => 1
+      }).product
+
+      val depth = scala.math.max(bodyLatency, ctrlerWritePar)
+      dbgs(s"FIFO Depth for $lhs = $depth")
+      I32(depth)
+    }
     val iterFIFO = {
       implicit def vecBitsEV: Bits[Vec[PseudoIter]] = Vec.bits[PseudoIter](allCounters.size)
       val iterFIFO: FIFO[PseudoIters[Vec[PseudoIter]]] = FIFO[PseudoIters[Vec[PseudoIter]]](fifoDepth)
@@ -580,7 +593,33 @@ case class FlattenToStream(IR: State)(implicit isl: poly.ISL) extends ForwardTra
   private def computeBufferDepth(mem: Sym[_]): Int = {
     // we need 2 copies in each user at the level of the mem.
 //    2 * mem.parent.children.count(ctrl => (ctrl.sym.effects.reads ++ ctrl.sym.effects.writes).contains(mem))
-    mem.duplicates.map(_.depth).max
+    // In order to fully saturate the memories:
+    val accessors = mem.accesses.groupBy(_.parent)
+    val primitiveAccessors = accessors.map {
+      case (parent, _) if parent.hasStreamPrimitiveAncestor =>
+        val primAncestor = parent.getStreamPrimitiveAncestor.get
+        // factor of 8 to account for overhead
+        parent -> primAncestor.children.size.toInt * 8
+      case (parent@Ctrl.Node(s, _), _) =>
+        dbgs(s"Parent: $parent -> $s")
+        parent -> scala.math.ceil(s.bodyLatency.head).toInt
+    }
+
+    val bufferDepth = primitiveAccessors.map({
+      case (Ctrl.Node(s, _), depth) =>
+        val ancestors = s.ancestors(mem.parent)
+        dbgs(s"Ancestors: $ancestors ($s -> $mem)")
+        val itersPerToken = s.ancestors(mem.parent).drop(1).flatMap(_.cchains).flatMap(_.counters).flatMap(_.nIters).map(_.toInt).product
+        dbgs(s"Depth: $depth")
+        dbgs(s"Iters: $itersPerToken")
+        scala.math.ceil(depth.toDouble / (itersPerToken * s.II)).toInt
+    }).sum
+
+    val previousDepth = mem.duplicates.map(_.depth).max
+
+    dbgs(s"Previously buffered $mem by $previousDepth, now buffering by $bufferDepth")
+
+    bufferDepth
   }
 
   private var accessIterSize: Int = -1

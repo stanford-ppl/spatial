@@ -28,6 +28,7 @@ case class UnitPipeToForeachTransformer(IR: State) extends MutateTransformer wit
         }, Seq(iter), stopWhen
       )){ lhs2 =>
         transferData(lhs, lhs2)
+        lhs2.userSchedule = Pipelined
       }
 
     case _ => super.transform(lhs,rhs)

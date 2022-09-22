@@ -958,6 +958,7 @@ import utils.io.files._
 
 
 @spatial class MD_KNN extends SpatialTest {
+  override def compileArgs = "--nostreamify"
 
  /*
   
@@ -1371,6 +1372,7 @@ import utils.io.files._
 
 
 @spatial class GEMM_NCubed extends SpatialTest {
+  override def compileArgs = "--nostreamify"
   type T = FixPt[TRUE,_16,_16]
 
   def main(args: Array[String]): Unit = {

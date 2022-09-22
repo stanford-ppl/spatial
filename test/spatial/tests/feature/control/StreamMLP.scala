@@ -15,7 +15,7 @@ class MLP_Variant_exp_nostream extends MLP_Variant_Base {
   override def compileArgs = "--nostreamify --vv"
 }
 
-class MLP_Variant_Batch_1 extends MLP_Variants(N=8192,batch=1,dims=List(4,4,4,4),ips=List(4,4,4),mps=List(1,1,1),ops=List(1,1,1))
+class MLP_Variant_Batch_1 extends MLP_Variants(N=2048,batch=1,dims=List(4,4,4,4),ips=List(4,4,4),mps=List(1,1,1),ops=List(1,1,1))
 class MLP_Variant_exp_b1_stream extends MLP_Variant_Batch_1 {
   override def compileArgs = "--streamify --vv"
 }
@@ -32,6 +32,13 @@ class MLP_Variant_Fast extends MLP_Variants(N=1024, batch=2, dims=List(16, 16), 
   override def compileArgs = "--max_cycles=3500000"
 }
 class MLP_Variant_Fast_nostream extends MLP_Variant_Fast {
+  override def compileArgs = "--nostreamify"
+}
+
+class MLP_Variant_Deep extends MLP_Variants(N=1024, batch=8, dims=List(32, 32), ips=List(16, 16), mps = List(1, 1), ops=List(1, 1)) {
+  override def compileArgs = "--max_cycles=2717208"
+}
+class MLP_Variant_Deep_nostream extends MLP_Variant_Deep {
   override def compileArgs = "--nostreamify"
 }
 

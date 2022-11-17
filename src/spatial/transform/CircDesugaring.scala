@@ -38,12 +38,13 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
   def getCircImpl[A:Bits,B:Bits](app: CircApply[A,B]): CircImpl[A,B] =
     circImpls(app.circ).asInstanceOf[CircImpl[A,B]]
 
-  def createCircImpl(lhs: Sym[_], rhs: CircNew[_,_]): Unit = {
+  def createCircImpl(lhs: Circ[_,_], rhs: CircNew[_,_]): Unit = {
     implicit val evA: Bits[rhs.A] = rhs.evA
     implicit val evB: Bits[rhs.B] = rhs.evB
 
-    val inputs = Array(FIFO[rhs.A](INPUT_DEPTH))
-    val outputs = Array(FIFO[rhs.B](OUTPUT_DEPTH))
+    val n = lhs.getNumApps
+    val inputs = Range(0,n).map(_ => FIFO[rhs.A](INPUT_DEPTH))
+    val outputs = Range(0,n).map(_ => FIFO[rhs.B](OUTPUT_DEPTH))
     val impl = CircImpl(inputs, outputs)
 
     circImpls += lhs -> impl
@@ -79,7 +80,7 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
 
       stms
         .filter(_.op.exists(_.isInstanceOf[CircNew[_,_]]))
-        .foreach(s => createCircImpl(s, s.op.get.asInstanceOf[CircNew[_,_]]))
+        .foreach(s => createCircImpl(s.asInstanceOf[Circ[_,_]], s.op.get.asInstanceOf[CircNew[_,_]]))
 
       val appSyms = stms.filter(_.op.exists(_.isInstanceOf[CircApply[_,_]])).toSet
       if (appSyms.isEmpty) {
@@ -110,14 +111,14 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
         Pipe {
           isolateSubst() {
             left.foreach(visit)
-            impl.inputs.head.enq(firstApp.arg)
+            impl.inputs(firstApp.id).enq(firstApp.arg)
           }
         }
 
         // Create dequeuing controller
         Pipe {
           isolateSubst() {
-            val res = impl.outputs.head.deq()
+            val res = impl.outputs(firstApp.id).deq()
             register(firstAppSym -> res)
 
             (appSyms - firstAppSym).foreach(visit)

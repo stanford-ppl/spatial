@@ -189,6 +189,12 @@ package object access {
       case _ => None
     }
 
+    @stateful def accessedMem: Option[Sym[_]] = a match {
+      case Op(d: Accessor[_, _]) => Some(d.mem)
+      case Op(d: UnrolledAccessor[_, _]) => Some(d.mem)
+      case _ => None
+    }
+
     /** Returns true if an execution of access a may occur before one of access b. */
     @stateful def mayPrecede(b: Sym[_]): Boolean = {
       val (ctrl,dist) = LCAWithDataflowDistance(b.parent, a.parent)

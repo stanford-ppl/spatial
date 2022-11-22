@@ -68,4 +68,23 @@ package object util {
       _.toList
     }).toList
   }
+
+  def assertUniqueAndTake[T](x: Set[T]): T = {
+    assert(x.size == 1)
+    x.head
+  }
+
+  /**
+    * Given the input, computes all pairs of elem, (everything but elem)
+    * @param x Input Sequence
+    * @tparam T Type of Sequence
+    * @return Pairs of (elem, x / elem)
+    */
+  def oneAndOthers[T](x: Seq[T]): Seq[(T, Seq[T])] = {
+    x.zipWithIndex.map {
+      case (elem, ind) =>
+        val others = x.take(ind) ++ x.drop(ind + 1)
+        (elem, others)
+    }
+  }
 }

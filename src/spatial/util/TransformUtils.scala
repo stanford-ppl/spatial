@@ -3,9 +3,10 @@ package spatial.util
 import argon.lang.implicits.castType
 import argon.lang.types.Bits
 import argon._
-import argon.transform.{ForwardTransformer, MutateTransformer}
+import argon.transform.{ForwardTransformer, MutateTransformer, TransformerInterface}
 import forge.tags.{api, stateful}
 import spatial.lang._
+import spatial.metadata.access.TimeStamp
 import spatial.node._
 import spatial.metadata.control._
 import spatial.traversal.AccelTraversal
@@ -35,10 +36,6 @@ object TransformUtils {
     isLast.scanRight(Bit(true)){_&_}.dropRight(1)
   }
 
-  @api def CreateVecEV[T: Bits](length: Int): Bits[Vec[T]] = {
-    Vec.fromSeq(Range(0, length) map {_ => implicitly[Bits[T]].zero})
-  }
-
   @api def makeIters(ctrs: Seq[Counter[_]]): Seq[Sym[_]] = {
     ctrs map(makeIter(_))
   }
@@ -50,18 +47,23 @@ object TransformUtils {
     n.asSym
   }
 
-  def makeSymOpPair(sym: Sym[_]): Option[(Sym[_], Op[_])] = {
-    sym.op match {
-      case Some(op) => Some((sym, op))
-      case None => None
-    }
-  }
-
   @api def counterToSeries(ctr: Counter[_]): Seq[Int] = {
     val start = ctr.start.c.get.asInstanceOf[emul.FixedPoint].toInt
     val end = ctr.end.c.get.asInstanceOf[emul.FixedPoint].toInt
     val step = ctr.step.c.get.asInstanceOf[emul.FixedPoint].toInt
     Range(start, end, step)
+  }
+
+  @api def willRun[T: Num](ctr: Counter[T], f: TransformerInterface): Bit = {
+    val direction: Bit = f(ctr.step.unbox.asInstanceOf[Num[T]]) > Num[T].zero
+    val start = f(ctr.start.unbox.asInstanceOf[Num[T]])
+    val end = f(ctr.end.unbox)
+    mux(direction, start <= end, start >= end)
+  }
+
+  @api def willRunUT(ctr: Counter[_], f: TransformerInterface): Bit = {
+    implicit def nEV: Num[ctr.CT] = ctr.CTeV.asInstanceOf[Num[ctr.CT]]
+    willRun(ctr.asInstanceOf[Counter[ctr.CT]], f)
   }
 
   @api def withPreviousCtx(previousCtx: SrcCtx*): SrcCtx = {
@@ -72,25 +74,44 @@ object TransformUtils {
     originalCtx.copy(previous = originalCtx.previous ++ Seq(implicitly[SrcCtx]))
   }
 
-  @api def persistentDequeue[T: Bits](fifo: FIFO[T], en: Set[Bit]): T = {
-    val v = stage(FIFODeq(fifo, en))
-    val reg = Reg[T]
-    stage(RegWrite(reg, v, en))
-    mux(en.toSeq.reduceTree {_ && _}, v, reg.value)
-  }
-
   @api def getOutermostCounter(ctrls: Seq[Ctrl]): Option[Counter[_]] = {
     ctrls.flatMap(_.s).flatMap(_.cchains).flatMap(_.counters).headOption
   }
 
-  @api def getOutermostIter(ctrls: Seq[Ctrl]): Option[Sym[_]] = {
-    getOutermostCounter(ctrls).flatMap(_.iter)
+  @api def getOutermostIter(ctrls: Seq[Ctrl]): Option[Sym[_ <: Num[_]]] = {
+    getOutermostCounter(ctrls).flatMap(_.iter).asInstanceOf[Option[Sym[_ <: Num[_]]]]
   }
 
   @api def pseudoUnitpipe(body: Block[Void]) = {
     val ctr = Counter(I32(0), I32(1), I32(1), I32(1))
     val cchain = CounterChain(Seq(ctr))
     stage(OpForeach(Set.empty, cchain, body, Seq(makeIter(ctr).unbox), None))
+  }
+
+  @api def isFirstIter(timestamp: TimeStamp, counters: Seq[Counter[_]]): Bit = {
+    if (counters.isEmpty) return Bit(true)
+    type CType = T forSome {type T <: Num[T]}
+    (counters.map {
+      case counter: Counter[CType] =>
+        val iter = counter.iter.get
+        implicit def nEV: Num[CType] = counter.CTeV.asInstanceOf[Num[CType]]
+        val currentTime = timestamp(iter)
+        counter.start.unbox === currentTime
+    }).reduceTree(_ & _)
+  }
+
+  @api def isLastIter(timestamp: TimeStamp, counters: Seq[Counter[_]]): Bit = {
+    if (counters.isEmpty) return Bit(true)
+    (counters.map {
+      counter =>
+        implicit def bEV: Bits[counter.CT] = counter.CTeV.asInstanceOf[Bits[counter.CT]]
+        implicit def nEV: Num[counter.CT] = counter.CTeV.asInstanceOf[Num[counter.CT]]
+        val castCtr: Counter[Num[counter.CT]] = counter.asInstanceOf[Counter[Num[counter.CT]]]
+        val iter = castCtr.iter.get
+        val currentTime = timestamp(iter.unbox.unbox.asSym)
+        val next = currentTime.asInstanceOf[Num[counter.CT]] + castCtr.step.unbox.asInstanceOf[counter.CT]
+        next.asInstanceOf[Num[counter.CT]] >= castCtr.end.unbox.asInstanceOf[counter.CT]
+    }).reduceTree(_ & _)
   }
 }
 

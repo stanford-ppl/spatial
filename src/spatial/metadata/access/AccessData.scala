@@ -1,6 +1,8 @@
 package spatial.metadata.access
 
 import argon._
+import argon.lang.{Bit, I32, Idx, Num}
+import forge.tags.stateful
 import spatial.metadata.control.Blk
 
 /** Flag marking unused accesses to memories which can be removed.
@@ -43,3 +45,25 @@ case class PriorityDeqGroup(grp: Int) extends Data[PriorityDeqGroup](SetBy.Analy
 case class DoesNotConflictWith(group: Set[Sym[_]]) extends Data[DoesNotConflictWith](Transfer.Mirror) {
   override def mirror(f: Tx): DoesNotConflictWith = DoesNotConflictWith(f(group))
 }
+
+// DependencyEdges are Access-to-Access dependencies
+// src syms should happen before dst syms.
+trait DependencyEdge {
+  def src: Set[Sym[_]]
+  def dst: Set[Sym[_]]
+  def srcSend(ts: TimeStamp)(implicit state: argon.State): Bit
+  def dstRecv(ts: TimeStamp)(implicit state: argon.State): Bit
+  def srcIterators: Set[Sym[Num[_]]]
+  def dstIterators: Set[Sym[Num[_]]]
+}
+
+trait CoherentEdge { this: DependencyEdge =>
+  def mem: Sym[_]
+}
+
+// Map from iterator to current iteration
+case class TimeStamp(timeMap: Map[Sym[Num[_]], Num[_]]) {
+  def apply[T: Num](s: Sym[T]): T = timeMap(s.asInstanceOf[Sym[Num[T]]]).asInstanceOf[T]
+}
+
+case class DependencyEdges(edges: Seq[DependencyEdge]) extends Data[DependencyEdges](Transfer.Mirror)

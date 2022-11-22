@@ -9,10 +9,10 @@ import spatial.metadata.memory._
   val outerIters = 16
   val innerIters = 4
 
-  override def compileArgs = "--max_cycles=1000 --vv"
+  override def compileArgs = "--max_cycles=1000"
 
   override def main(args: Array[String]) = {
-    implicitly[argon.State].config.setV(3)
+    implicitly[argon.State].config.setV(1)
     val output = ArgOut[I32]
     Accel {
       val reg = Reg[I32](0)

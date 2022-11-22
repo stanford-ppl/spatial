@@ -6,7 +6,7 @@ import spatial.node._
 import spatial.metadata.bounds.Expect
 import spatial.metadata.access._
 import spatial.metadata.control._
-import spatial.util.spatialConfig
+import spatial.util.{VecStructType, spatialConfig}
 import forge.tags.stateful
 
 package object memory {
@@ -379,7 +379,7 @@ package object memory {
     }
     def isDRAMAccel: Boolean = mem.op.exists{ case _: DRAMAccelNew[_,_] => true; case _ => false}
 
-    def explicitName: Option[String] = metadata[ExplicitName](mem).map(_.name).headOption
+    def explicitName: Option[String] = metadata[ExplicitName](mem).map(_.name)
     def explicitName_=(name: String): Unit = metadata.add(mem, ExplicitName(name))
 
     def isStreamIn: Boolean = mem.isInstanceOf[StreamIn[_]]
@@ -452,7 +452,10 @@ package object memory {
     def bufferIndex_=(index: I32): Unit = metadata.add(mem, StreamBufferIndex(index))
 
     def fifoInits: Option[Seq[Sym[_]]] = metadata[FifoInits](mem).map(_.values)
-    def fifoInits_=(values: Seq[Sym[_]]) = metadata.add(mem, FifoInits(values))
+    def fifoInits_=(values: Seq[Sym[_]]): Unit = metadata.add(mem, FifoInits(values))
+
+    def fifoType: Option[VecStructType[_]] = metadata[FIFOType](mem).map(_.tp)
+    def fifoType_=(tp: VecStructType[_]): Unit = metadata.add(mem, FIFOType(tp))
   }
 
 

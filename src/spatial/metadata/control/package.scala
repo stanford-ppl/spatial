@@ -1072,7 +1072,7 @@ package object control {
       }
     }
 
-    def iter: Option[Sym[_]] = metadata[IterInfo](x).map(_.iter)
+    def iter: Option[Sym[F]] = metadata[IterInfo](x).map(_.iter.asInstanceOf[Sym[F]])
   }
 
   implicit class IndexHelperOps[W](i: Ind[W]) {
@@ -1192,7 +1192,7 @@ package object control {
         // logs(s"  CtrlA: $topA ($idxA), CtrlB: $topB ($idxB)")
         // logs(s"  Dist = ${idxB - idxA}")
         if (idxA < 0 || idxB < 0) None
-        Some(idxB - idxA)
+        else Some(idxB - idxA)
       }
     }
   }

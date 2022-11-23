@@ -7,7 +7,7 @@ import spatial.lang._
 
 class VecStructMismatchException(msg: String) extends Exception(msg)
 
-case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Boolean = true)(implicit state: argon.State) {
+case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatch: Boolean = true)(implicit state: argon.State) {
 
   type DefaultType = PartialFunction[T, Bits[_]]
 
@@ -22,7 +22,7 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
     }
   }.toMap
 
-  private lazy val structMap = structFields.toMap
+  lazy val structKeys: Seq[T] = structFields.map(_._1)
 
   val bitWidth: Int = structFields.map(_._2.nbits).sum
 
@@ -30,7 +30,7 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
 
   implicit def bitsEV: Bits[Vec[Bit]] = Vec.bits[Bit](bitWidth)
 
-  def apply(entries: Map[T, Bits[_]], default: DefaultType = PartialFunction.empty): VecStruct = VecStruct.fromMap(entries, default)
+  def apply(entries: Map[T, Bits[_]], default: DefaultType = PartialFunction.empty)(implicit srcCtx: SrcCtx): VecStruct = VecStruct.fromMap(entries, default)
 
   override def toString: String = {
     s"$VecStructType($structFields)]<$fieldLoc>($bitWidth)"
@@ -63,16 +63,20 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
         case (name: T, bits: Bits[_]) =>
           entries.get(name) match {
             case Some(v) =>
-              assert(v.nbits == bits.nbits, s"Mismatched bits: Got $v of size ${v.nbits} for a field $bits of size ${bits.nbits}")
+              dbgs(s"Name: $name ${v.nbits}, ${bits.nbits}")
+              assert(v.nbits == bits.nbits, s"Mismatched bits: Got $v of size ${v.nbits} for a field $name of size ${bits.nbits} [${implicitly[argon.SrcCtx]}]")
               v.asBits
             case None =>
-              default.applyOrElse(name, {
+              val defaultResult = default.applyOrElse(name, {
                 _: T => if (errorOnMismatch) {
                   throw new VecStructMismatchException(s"Could not find field $name of type ${name.getClass} in $entries")
                 } else {
                   bits.zero.asInstanceOf[Bits[_]].asBits
                 }
-              }).asBits
+              })
+              dbgs(s"Result: $defaultResult[${defaultResult.nbits}]")
+              assert(defaultResult.nbits == bits.nbits, s"Mismatched Bits: Default ${defaultResult} of size ${defaultResult.nbits} for a field $name of size ${bits.nbits} [${implicitly[argon.SrcCtx]}]")
+              defaultResult.asBits
           }
       }
       VecStruct(Vec.concat(data))

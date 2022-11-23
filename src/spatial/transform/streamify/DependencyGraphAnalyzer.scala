@@ -19,7 +19,7 @@ case object Forward extends EdgeType
 case object Backward extends EdgeType
 case object Return extends EdgeType
 case object Inner extends EdgeType
-case class Initialize[T](v: T) extends EdgeType
+case object Initialize extends EdgeType
 
 object EdgeType {
   @stateful def apply(src: Sym[_], dst: Sym[_]): EdgeType = {
@@ -72,7 +72,7 @@ case class InferredDependencyEdge(src: Set[Sym[_]], dst: Set[Sym[_]], edgeType: 
 
   override lazy val srcIterators: Set[Sym[Num[_]]] = {
     (edgeType match {
-      case Forward => pathSrcIters
+      case Forward | Initialize => pathSrcIters
       case Backward => surroundingCounters.map(_.iter.get) ++ pathSrcIters
       case Inner => Set.empty
 //      case Return =>
@@ -82,7 +82,7 @@ case class InferredDependencyEdge(src: Set[Sym[_]], dst: Set[Sym[_]], edgeType: 
   lazy val pathDstIters = pathDst.drop(1).flatMap(_.cchains).flatMap(_.counters).map(_.iter.get)
   override lazy val dstIterators: Set[Sym[Num[_]]] = {
     (edgeType match {
-      case Forward => pathDstIters
+      case Forward | Initialize => pathDstIters
       case Backward => surroundingCounters.map(_.iter.get) ++ pathDstIters
       case Inner => Set.empty
 //      case Return =>
@@ -94,7 +94,7 @@ case class InferredDependencyEdge(src: Set[Sym[_]], dst: Set[Sym[_]], edgeType: 
     // Are we the first iteration of the LCA?
     lazy val isFirstIterInLCA = isFirstIter(ts, pathToLCA.flatMap(_.cchains).flatMap(_.counters))
     edgeType match {
-      case Forward => isFirstIterInLCA
+      case Forward | Initialize => isFirstIterInLCA
       case Backward =>
         if (surroundingCounters.nonEmpty) {
           isFirstIterInLCA & !isFirstIter(ts, surroundingCounters)
@@ -112,7 +112,7 @@ case class InferredDependencyEdge(src: Set[Sym[_]], dst: Set[Sym[_]], edgeType: 
   override def srcSend(ts: TimeStamp)(implicit state: argon.State): Bit = {
     lazy val isLastIterWithinLCA = isLastIter(ts, pathSrc.drop(1).flatMap(_.cchains).flatMap(_.counters))
     edgeType match {
-      case Forward => isLastIterWithinLCA
+      case Forward | Initialize => isLastIterWithinLCA
       case Backward =>
         // If we're a back-edge, There must be an outer loop. Find the outer loop where there isn't also another
         // access, and release as long as there isn't another access.
@@ -124,17 +124,8 @@ case class InferredDependencyEdge(src: Set[Sym[_]], dst: Set[Sym[_]], edgeType: 
   }
 
   override def toString: String = {
-    val srcOpString = src.map(_.op match {
-      case Some(op) => s" ($op)"
-      case None => ""
-    })
 
-    val dstOpString = dst.map(_.op match {
-      case Some(op) => s" ($op)"
-      case None => ""
-    })
-
-    s"CoherentEdge[$edgeType]($src$srcOpString -> $dst$dstOpString)"
+    s"CoherentEdge[$edgeType](${src.mkString(", ")} -> ${dst.mkString(", ")})"
   }
 }
 
@@ -161,9 +152,17 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
                 reachingMatrices.map(_.access)
               }
           }
-          preceding.groupBy(_.parent) map {
+          val groupedPreceding = preceding.groupBy(_.parent) map {
             case (otherParent, otherAccesses) =>
               InferredDependencyEdge(otherAccesses, accesses, EdgeType(otherAccesses.head, accesses.head))
+          }
+
+          val shouldInitialize = !groupedPreceding.exists(_.edgeType == Forward) && !mem.isGlobalMem
+
+          if (shouldInitialize) {
+            Seq(InferredDependencyEdge(Set(mem), accesses, Initialize)) ++ groupedPreceding
+          } else {
+            groupedPreceding
           }
       }
     }

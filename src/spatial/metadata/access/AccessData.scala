@@ -55,6 +55,8 @@ trait DependencyEdge {
   def dstRecv(ts: TimeStamp)(implicit state: argon.State): Bit
   def srcIterators: Set[Sym[Num[_]]]
   def dstIterators: Set[Sym[Num[_]]]
+
+  def accessedMems(implicit state: argon.State): Set[Sym[_]] = (src ++ dst).flatMap(_.accessedMem)
 }
 
 trait CoherentEdge { this: DependencyEdge =>

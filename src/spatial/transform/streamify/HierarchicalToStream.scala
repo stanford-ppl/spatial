@@ -21,28 +21,31 @@ import spatial.util._
 import scala.collection.{mutable => cm}
 
 trait TypeCarrier {
-  implicit def state: argon.State
   type T
   def bitsEV: Bits[this.T]
-  def zero: Bits[this.T]
+  @stateful def zero: Bits[this.T]
 }
 
 object TypeCarrier {
-  @forge.tags.api def apply(mem: Sym[_]): TypeCarrier = {
-    val IRState = implicitly[argon.State]
+  def apply(mem: Sym[_]): TypeCarrier = {
     mem match {
       case r: Reg[_] =>
         new TypeCarrier {
           override type T = r.RT
-          override implicit val state: State = IRState
           override val bitsEV: Bits[T] = r.A
-          override val zero: Bits[T] = r.A.zero.asInstanceOf[Bits[T]]
+          @stateful override def zero: Bits[T] = r.A.zero.asInstanceOf[Bits[T]]
         }
     }
   }
 }
 
-@struct case class TokenWithValid[T: Bits](value: T, valid: Bit)
+@struct case class TokenWithValid[TP: Bits](value: TP, valid: Bit) {
+  def typeInfo: TypeCarrier = new TypeCarrier {
+    override type T = TP
+    override val bitsEV: Bits[this.T] = implicitly[Bits[TP]]
+    @stateful override def zero: Bits[this.T] = bitsEV.zero
+  }
+}
 
 case class StreamBundle(pIterType: VecStructType[Sym[Num[_]]], intakeTokenType: VecStructType[Sym[_]], outputTokenType: VecStructType[Sym[_]], genToMainDepth: I32, genToReleaseDepth: I32, mainToReleaseDepth: I32)(implicit state: argon.State) {
   val genToMainIters = pIterType.VFIFO(genToMainDepth)
@@ -207,12 +210,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
             fifoBundle.source.enq(Bit(true))
 
-            val pIters = fifoBundle.pIterType((iteratorMap.map {
-              case (iter, value) =>
-                val counter: Counter[iter.R] = iter.unbox.counter.ctr.asInstanceOf[Counter[iter.R]]
-                type TP = counter.CT
-                iter -> value
-            }).toMap)
+            val pIters = fifoBundle.pIterType(iteratorMap)
             fifoBundle.genToMainIters.enq(pIters)
             fifoBundle.genToReleaseIters.enq(pIters)
 
@@ -234,18 +232,25 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
   }
 
   private def mainGen(ctrl: Sym[_], fifoBundle: StreamBundle): Unit = {
+    val Op(opForeach: OpForeach) = ctrl
     import fifoBundle._
     val mirroredRegs = (intakeTokenType.structFields.map {
-      case (key, tpProto) =>
-        type TP = tpProto.R
-        implicit def bEV: Bits[TP] = tpProto.asInstanceOf[Bits[TP]]
-        val holdReg = Reg[TP]
+      case (key, tpProto: TokenWithValid[_]) =>
+        val typeInfo: TypeCarrier = tpProto.typeInfo
+
+        implicit def bEV: Bits[typeInfo.T] = typeInfo.bitsEV
+        val holdReg = Reg[typeInfo.T]
 
         val regName = key.explicitName.getOrElse(key.toString)
 
         holdReg.explicitName = s"HoldReg_${ctrl}_${regName}"
-        key -> holdReg
-    }).toMap
+
+        val nonBufferReg = Reg[typeInfo.T]
+        nonBufferReg.nonbuffer
+        nonBufferReg.explicitName = s"NonBufferReg_${ctrl}_$regName"
+
+        key -> (holdReg, nonBufferReg)
+    }).toMap[Sym[_], (Reg[_], Reg[_])]
 
     val mirrorableChains = {
       val ancestralChains = ctrl.ancestors.flatMap(_.cchains).flatMap(_.counters)
@@ -274,11 +279,17 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           register(iter -> value)
       }
 
-//      tokens.unpack.map {
-//        case (mem, value) =>
-//          // stage a holding register for it.
-//          Unit
-//      }
+      tokens.unpack.foreach {
+        case (mem, value: TokenWithValid[_]) =>
+          // First, we buffer the value into an unbuffered hold register
+          val (reg, tmp) = mirroredRegs(mem)
+          tmp.asInstanceOf[Reg[tmp.RT]].write(value.value.asInstanceOf[tmp.RT], value.valid)
+          reg.asInstanceOf[Reg[reg.RT]].write(tmp.value.asInstanceOf[reg.RT])
+      }
+
+      opForeach.block.stms.foreach {
+        case stm => mirrorSym(stm)
+      }
     }, newIters, None)) {
       newForeach =>
 
@@ -305,10 +316,8 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
     // FIFO Typing
     val counters = inner.ancestors.flatMap(_.cchains).flatMap(_.counters)
     val pIterType = VecStructType[Sym[Num[_]]](counters.map {
-      counter => counter.iter.get.asInstanceOf[Sym[Num[_]]] -> proto(counter.CTeV).asInstanceOf[Bits[_]]
+      counter => counter.iter.get.asInstanceOf[Sym[Num[_]]] -> proto(counter.CTeV).asInstanceOf[Num[_]]
     })
-
-    val allAccessedMems = (inner.effects.reads ++ inner.effects.writes) intersect syncMems
 
     // We create an intake token for each edge which has a destination inside us.
     val intakeEdges = edges.collect {
@@ -323,7 +332,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
         val packed = TokenWithValid[carrier.T](carrier.zero.as[carrier.T], Bit(false))
 
-        coherent.mem -> packed
+        coherent.mem -> packed.asInstanceOf[Bits[_]]
     }.toSeq)
 
     val releaseEdges = edges.collect {
@@ -337,7 +346,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
         val packed = TokenWithValid[carrier.T](carrier.zero.as[carrier.T], Bit(false))
 
-        coherent.mem -> packed
+        coherent.mem -> packed.asInstanceOf[Bits[_]]
     }.toSeq)
 
     // TODO: change intakeTokenType to releaseTokenType
@@ -376,7 +385,10 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       // Create internal bundles
       val bundle = createInternalFIFOBundle(lhs)
       indent {
-        genCounterGen(lhs, bundle)
+        dbgs(s"Creating CounterGen")
+        indent { genCounterGen(lhs, bundle) }
+        dbgs(s"Creating Main")
+        indent { mainGen(lhs, bundle) }
       }
       super.transform(lhs, rhs)
     case _: CounterNew[_] | _: CounterChainNew => dbgs(s"Skipping ${stm(lhs)}"); lhs

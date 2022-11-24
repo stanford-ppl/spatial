@@ -43,7 +43,7 @@ case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatc
     val tp: VecStructType[T] = vecStructType
 
     assert(bitWidth == structData.nbits, s"Error creating a vector of size $bitWidth from $structData (${structData.nbits})")
-    @forge.tags.api def unpack: Map[T, Bits[_]] = {
+    @forge.tags.api def unpack: Map[T, _ <: Bits[_]] = {
       val tmpData = this.structData
 
       (structFields map {
@@ -52,8 +52,9 @@ case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatc
           val sliced = tmpData(start until stop)
 
           assert(sliced.nbits == bits.nbits, s"Trying to unpack ${bits.nbits} from ${sliced.nbits}")
-          name -> sliced
-      }).toMap
+          implicit def bEV: Bits[bits.R] = bits.asInstanceOf[Bits[bits.R]]
+          name -> sliced.as[bits.R].asInstanceOf[Bits[_]]
+      }).toMap[T, Bits[_]]
     }
   }
 

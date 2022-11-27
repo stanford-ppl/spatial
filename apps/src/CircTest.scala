@@ -7,7 +7,7 @@ import spatial.dsl._
 //    val out3 = ArgOut[Int]
     Accel {
       Pipe {
-        val circ = Circ((x: Int) => x)
+        val circ = Circ((x: Int) => x + 99)
 
         val y1 = circ(20)
         out1 := y1

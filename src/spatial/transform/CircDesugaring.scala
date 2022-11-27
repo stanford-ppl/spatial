@@ -1,134 +1,151 @@
 package spatial.transform
 
 import argon._
-import argon.node._
+import argon.tags.struct
 import argon.lang.Bit
-import spatial.libdsl.UInt8
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
-import spatial.metadata.control._
-import spatial.metadata.types._
-import spatial.util.spatialConfig
 import spatial.traversal.AccelTraversal
-import spatial.traversal.BlkTraversal
 
 import scala.collection.{mutable => mut}
-import spatial.metadata.PendingUses
-import spatial.metadata.access._
 
 // This pass removes everything `Circ` related from the IR by splitting up controllers containing `CircApply` nodes into
 // pairs of controllers which enqueue to/dequeue from a controller which implements the behavior of the applied `Circ`.
 // It must be run after `PipeInserter` because it assumes that `CircApply` results are scoped to an inner controller.
 
 case class CircDesugaring(IR: State) extends MutateTransformer with AccelTraversal {
-  private val KILL_CHANNEL_DEPTH = 8;
-  private val INPUT_DEPTH = 8;
-  private val OUTPUT_DEPTH = 8;
+  private val INPUT_FIFO_DEPTH = 8;
+  private val OUTPUT_FIFO_DEPTH = 8;
 
-  private val circImpls: mut.Map[Sym[_],CircImpl[_,_]] = mut.HashMap.empty
+  type Tag = I32
+  val Tag = I32
+  type Tagged[A] = Tup2[Tag, A]
+
+  def none[A:Bits]: Tagged[A] = Tup2(Tag(-1), Bits[A].zero)
+  def some[A:Bits](t: Tag, d: A): Tagged[A] = Tup2(t, d)
+  def tag[A:Bits](t: Tagged[A]): Tag = t._1
+  def data[A:Bits](t: Tagged[A]): A = t._2
 
   case class CircImpl[A:Bits,B:Bits](
-//     killChannel: FIFO[Boolean],
-     inputs: Seq[FIFO[A]],
+     kill: Reg[Bit],
+     inputs: Seq[FIFO[Tagged[A]]],
      outputs: Seq[FIFO[B]],
-//     processor: Block[Void]
   )
 
-  def getCircImpl[A:Bits,B:Bits](app: CircApply[A,B]): CircImpl[A,B] =
-    circImpls(app.circ).asInstanceOf[CircImpl[A,B]]
+  private val circImpls: mut.Map[Circ[_,_],CircImpl[_,_]] = mut.HashMap.empty
 
-  def createCircImpl(lhs: Circ[_,_], rhs: CircNew[_,_]): Unit = {
-    implicit val evA: Bits[rhs.A] = rhs.evA
-    implicit val evB: Bits[rhs.B] = rhs.evB
-
+  def declareCircImpl[A:Bits,B:Bits](lhs: Circ[A,B]): Unit = {
     val n = lhs.getNumApps
-    val inputs = Range(0,n).map(_ => FIFO[rhs.A](INPUT_DEPTH))
-    val outputs = Range(0,n).map(_ => FIFO[rhs.B](OUTPUT_DEPTH))
-    val impl = CircImpl(inputs, outputs)
+    val kill = Reg[Bit](Bit(false))
+    val inputs = Range(0,n).map(_ => FIFO[Tagged[A]](INPUT_FIFO_DEPTH))
+    val outputs = Range(0,n).map(_ => FIFO[B](OUTPUT_FIFO_DEPTH))
 
+    val impl: CircImpl[A,B] = CircImpl(kill,inputs,outputs)
     circImpls += lhs -> impl
   }
 
-//  def getCircImpl[A:Bits,B:Bits](app: CircApply[A,B])(implicit ctx: SrcCtx) = {
-//    circImpls.getOrElseUpdate(app.circ, {
-//      val n = app.circ.getNumApps
-//      val killChannel = FIFO[Bit](KILL_CHANNEL_DEPTH)
-//      val inputs = Range(0, n).map(_ => FIFO[A](INPUT_DEPTH)).toList
-//      val outputs = Range(0, n).map(_ => FIFO[B](OUTPUT_DEPTH)).toList
-//      val processor = {
-//        Pipe {
-//          val break = Reg[Bit](false)
-//          val count = Reg[UInt8](0)
-//          Sequential(breakWhen = break).Foreach(*) { _ =>
-//            val x = inputs.head.deq()
-//            val y = app.circ.func(x)
-//            outputs.head.enq(y)
-//          }
-//        }
-//      }
-//      CircImpl(inputs, outputs, processor)
-//    }).asInstanceOf[CircImpl[A, B]]
-//  }
+  def getCircImpl[A:Bits,B:Bits](circ: Circ[A,B]): CircImpl[A,B] =
+    circImpls(circ).asInstanceOf[CircImpl[A,B]]
+
+  def declareProcessor[A:Bits,B:Bits](circ: Circ[A,B], circNew: CircNew[A,B]): Unit = {
+    val impl = getCircImpl(circ)
+
+    val count = Reg[Tag](0)
+    Sequential(breakWhen = impl.kill).Foreach(*) { _ =>
+      val input = priorityDeq(impl.inputs: _*)
+
+      ifThenElse(tag(input) === -1,
+        () => {
+          count := count.value + Tag(1)
+          impl.kill := count === circ.getNumApps
+        },
+        () => {
+          val output = circNew.func(data(input))
+          impl.outputs.zipWithIndex foreach {
+            case (fifo, idx) =>
+              val writeEnable = Tag(idx) === tag(input)
+              fifo.enq(output, writeEnable)
+          }
+        }
+      )
+    }
+  }
+
+  def transformCtrl[A:Type](ctrl: Control[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = {
+    val allStms = ctrl.bodies.flatMap(_.blocks).flatMap(_._2.stms)
+    val newSyms = allStms.filter(_.op.exists(_.isInstanceOf[CircNew[_, _]])).toSet
+    val appSyms = allStms.filter(_.op.exists(_.isInstanceOf[CircApply[_, _]])).toSet
+
+    if (newSyms.isEmpty && appSyms.isEmpty) {
+      return super.transform(ctrl.asInstanceOf[Sym[A]], rhs)
+    }
+
+    val result = Stream {
+      for (s <- newSyms) {
+        val erased: CircNew[_, _] = s.op.get.asInstanceOf[CircNew[_, _]]
+        implicit val evA: Bits[erased.A] = erased.evA
+        implicit val evB: Bits[erased.B] = erased.evB
+        val circ: Circ[erased.A, erased.B] = s.asInstanceOf[Circ[erased.A, erased.B]]
+
+        // EFFECTFUL: Stage allocation of circ structures
+        declareCircImpl(circ)
+      }
+
+      for (s <- newSyms) {
+        val erased: CircNew[_, _] = s.op.get.asInstanceOf[CircNew[_, _]]
+        implicit val evA: Bits[erased.A] = erased.evA
+        implicit val evB: Bits[erased.B] = erased.evB
+        val circ: Circ[erased.A, erased.B] = s.asInstanceOf[Circ[erased.A, erased.B]]
+        val circNew: CircNew[erased.A,erased.B] = erased.asInstanceOf[CircNew[erased.A,erased.B]]
+
+        // EFFECTFUL: Stage processor
+        declareProcessor(circ, circNew)
+      }
+
+      // Find the index of the first statement to use the result of a `CircApply` and the corresponding `CircApply`
+      val readers: Seq[(Option[Sym[_]], Int)] = allStms.map(_.inputs.find(appSyms(_))).zipWithIndex
+      val (appSym, readerIdx) = readers.collectFirst { case (Some(s), i) => (s, i) }.get
+
+      val (left, right) = allStms.splitAt(readerIdx)
+      val filteredLeft = left.filter(s => !appSyms(s) && !newSyms(s))
+      val filteredRight = right.filter(s => !newSyms(s))
+      val displacedAppSyms = (appSyms - appSym) -- right
+
+      val erasedApp: CircApply[_, _] = appSym.op.get.asInstanceOf[CircApply[_, _]]
+      implicit val evA: Bits[erasedApp.A] = erasedApp.evA
+      implicit val evB: Bits[erasedApp.B] = erasedApp.evB
+      val app: CircApply[erasedApp.A, erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A, erasedApp.B]]
+      val impl = getCircImpl(app.circ)
+
+      // EFFECTFUL: Stage enqueuing controller
+      Pipe {
+        isolateSubst() {
+          filteredLeft.foreach(visit)
+          impl.inputs(app.id).enq(some(app.id,app.arg))
+          impl.inputs(app.id).enq(none)
+        }
+      }
+
+      // EFFECTFUL: Stage dequeuing controller
+      Pipe {
+        isolateSubst() {
+          val res = impl.outputs(app.id).deq()
+          register(appSym -> res)
+
+          displacedAppSyms.foreach(visit)
+          filteredRight.foreach(visit)
+        }
+      }
+    }
+
+    result.asInstanceOf[Sym[A]]
+  }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
     case AccelScope(_) => inAccel { super.transform(lhs,rhs) }
     case _: BlackboxImpl[_,_,_] => inBox { super.transform(lhs,rhs) }
-
-    case ctrl: Control[_] =>
-      val stms = ctrl.bodies.flatMap(_.blocks).flatMap(_._2.stms)
-
-      stms
-        .filter(_.op.exists(_.isInstanceOf[CircNew[_,_]]))
-        .foreach(s => createCircImpl(s.asInstanceOf[Circ[_,_]], s.op.get.asInstanceOf[CircNew[_,_]]))
-
-      val appSyms = stms.filter(_.op.exists(_.isInstanceOf[CircApply[_,_]])).toSet
-      if (appSyms.isEmpty) {
-        return super.transform(lhs,rhs)
-      }
-
-      type TestA = argon.lang.Fix[TRUE,_32,_0]
-      type TestB = argon.lang.Fix[TRUE,_32,_0]
-
-      // Find the index of the first statement to use the result of a `CircApply` and the corresponding `CircApply`
-      val (firstAppSym, firstIdx) = stms
-        .map(_.inputs.find(appSyms(_)))
-        .zipWithIndex
-        .collectFirst{ case (Some(s), i) => (s, i) }
-        .get
-
-      val _firstApp =  firstAppSym.op.get.asInstanceOf[CircApply[_,_]]
-//      implicit val evA: Bits[_firstApp.A] = _firstApp.evA
-//      implicit val evB: Bits[_firstApp.B] = _firstApp.evB
-      val firstApp = _firstApp.asInstanceOf[CircApply[TestA,TestB]]
-      val impl = getCircImpl(firstApp)
-      val (_left, _right) = stms.splitAt(firstIdx)
-      val left = _left.filter(s => !appSyms(s) && !s.op.exists(_.isInstanceOf[CircNew[_,_]]))
-      val right = _right.filter(s => !appSyms(s) && !s.op.exists(_.isInstanceOf[CircNew[_,_]]))
-
-      val res = Stream {
-        // Create enqueuing controller
-        Pipe {
-          isolateSubst() {
-            left.foreach(visit)
-            impl.inputs(firstApp.id).enq(firstApp.arg)
-          }
-        }
-
-        // Create dequeuing controller
-        Pipe {
-          isolateSubst() {
-            val res = impl.outputs(firstApp.id).deq()
-            register(firstAppSym -> res)
-
-            (appSyms - firstAppSym).foreach(visit)
-            right.foreach(visit)
-          }
-        }
-      }
-
-      res.asInstanceOf[Sym[A]]
-
+    case ctrl: Control[A] => transformCtrl(ctrl, rhs)
     case _ => super.transform(lhs,rhs)
   }
 }

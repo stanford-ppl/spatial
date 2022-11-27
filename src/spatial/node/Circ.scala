@@ -5,7 +5,7 @@ import argon.node._
 import forge.tags._
 import spatial.lang._
 
-@op case class CircNew[_A:Bits,_B:Bits](func: Lambda1[_A,_B]) extends Alloc[Circ[_A,_B]] {
+@op case class CircNew[_A:Bits,_B:Bits](func: _A => _B) extends Alloc[Circ[_A,_B]] {
   type A = _A
   type B = _B
   val evA: Bits[A] = implicitly[Bits[A]]

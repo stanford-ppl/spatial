@@ -21,8 +21,6 @@ import spatial.node._
 
 object Circ {
   @api def apply[A:Bits,B:Bits](func: A => B): Circ[A,B] = {
-    val arg = boundVar[A]
-    val blk = stageLambda1(arg){ func(arg) }
-    stage(CircNew(blk))
+    stage(CircNew(func))
   }
 }

@@ -154,12 +154,13 @@ trait Spatial extends Compiler with ParamLoader {
         ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer)   ==>  printer ==>
         /** Control insertion */
         pipeInserter        ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
+        useAnalyzer         ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
         circDesugaring ==> printer
-//        /** CSE on regs */
-//        regReadCSE          ==>
-//        /** Dead code elimination */
-//        useAnalyzer         ==>
-//        transientCleanup    ==> printer ==> transformerChecks ==>
+//        /** Stream controller rewrites */
 //        /** Stream controller rewrites */
 //        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
 //        /** Memory analysis */

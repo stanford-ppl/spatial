@@ -59,7 +59,7 @@ case class PriorityCircExecutorFactory(IR: State) extends CircExecutorFactory {
     val executor = PriorityCircExecutor(kill, inputs, outputs)
 
     Sequential(breakWhen = kill).Foreach(*) { _ =>
-      val input = priorityDeq(inputs: _*)
+      val input = priorityDeq(inputs:_*)
       ifThenElse(id(input) === -1,
         () => {
           count := count.value + Id(1)
@@ -103,37 +103,29 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
   private def isNew(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircNew[_,_]])
   private def isApp(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircApply[_,_]])
 
-  private def transformCtrlWithNewSyms(syms: Seq[Sym[_]], newSyms: mut.Set[Sym[_]]): Void = {
-    Stream {
-      for (s <- newSyms) {
-        val erased: CircNew[_,_] = s.op.get.asInstanceOf[CircNew[_,_]]
-        implicit val evA: Bits[erased.A] = erased.evA
-        implicit val evB: Bits[erased.B] = erased.evB
+  private def stageExecutors(newSyms: mut.Set[Sym[_]]): Void = {
+    for (s <- newSyms) {
+      val erased: CircNew[_,_] = s.op.get.asInstanceOf[CircNew[_,_]]
+      implicit val evA: Bits[erased.A] = erased.evA
+      implicit val evB: Bits[erased.B] = erased.evB
 
-        val circ: Circ[erased.A,erased.B] = s.asInstanceOf[Circ[erased.A,erased.B]]
-        val circNew: CircNew[erased.A,erased.B] = erased.asInstanceOf[CircNew[erased.A, erased.B]]
+      val circ: Circ[erased.A,erased.B] = s.asInstanceOf[Circ[erased.A,erased.B]]
+      val circNew: CircNew[erased.A,erased.B] = erased.asInstanceOf[CircNew[erased.A, erased.B]]
 
-        // EFFECTFUL!
-        val executor = factory.stageExecutor(circ.getNumApps, circNew.func)
-        executors += circ -> executor
-      }
-
-      Pipe {
-        isolateSubst() {
-          // EFFECTFUL!
-          syms.filter(!isNew(_)) foreach visit
-        }
-      }
+      // EFFECTFUL!
+      val executor = factory.stageExecutor(circ.getNumApps, circNew.func)
+      executors += circ -> executor
     }
   }
 
-  private def transformCtrlWithAppSyms(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): Void = {
+  private def stageSymsInGroups(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): Void = {
     // We split off a new group everytime we see the first use of a `CircApply`
     val groups: ArrayBuffer[(ArrayBuffer[Sym[_]], mut.Set[Sym[_]], mut.Set[Sym[_]])] =
       ArrayBuffer((ArrayBuffer(), mut.Set(), mut.Set()))
 
+    // We ignore `CircNew` nodes when constructing groups; they are handled by `stageExecutors`
     // CAUTION: We destroy `appSyms` as we iterate
-    for (s <- syms) {
+    for (s <- syms.filter(!isNew(_))) {
       val appSymInputs = s.inputs.filter(appSyms.contains)
       if (appSymInputs.nonEmpty) {
         groups += ((ArrayBuffer(), mut.Set(), appSymInputs.to[mut.Set]))
@@ -146,37 +138,35 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
       }
     }
 
-    Stream {
-      isolateSubst() {
-        for ((groupSyms, groupEnqs, groupDeqs) <- groups) {
-          Pipe {
-            for (appSym <- groupDeqs) {
-              val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
-              implicit val evA: Bits[erasedApp.A] = erasedApp.evA
-              implicit val evB: Bits[erasedApp.B] = erasedApp.evB
+    isolateSubst() {
+      for ((groupSyms, groupEnqs, groupDeqs) <- groups) {
+        Pipe {
+          for (appSym <- groupDeqs) {
+            val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
+            implicit val evA: Bits[erasedApp.A] = erasedApp.evA
+            implicit val evB: Bits[erasedApp.B] = erasedApp.evB
 
-              val app: CircApply[erasedApp.A,erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A,erasedApp.B]]
-              val executor = executors(app.circ)
+            val app: CircApply[erasedApp.A,erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A,erasedApp.B]]
+            val executor = executors(app.circ)
 
-              // EFFECTFUL!
-              val output = executor.stageDeq(app.id)
-              register(appSym -> output)
-            }
+            // EFFECTFUL!
+            val output = executor.stageDeq(app.id)
+            register(appSym -> output)
+          }
 
-            // EFFECTFUL: Visiting a `CircApply` will replace it via `executor.stageEnq` (see `transformApp`)
-            groupSyms.foreach(visit)
+          // EFFECTFUL: Visiting a `CircApply` will replace it with an `executor.stageEnq` (see `transformApp`)
+          groupSyms.foreach(visit)
 
-            for (appSym <- groupEnqs) {
-              val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
-              implicit val evA: Bits[erasedApp.A] = erasedApp.evA
-              implicit val evB: Bits[erasedApp.B] = erasedApp.evB
+          for (appSym <- groupEnqs) {
+            val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
+            implicit val evA: Bits[erasedApp.A] = erasedApp.evA
+            implicit val evB: Bits[erasedApp.B] = erasedApp.evB
 
-              val app: CircApply[erasedApp.A,erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A,erasedApp.B]]
-              val executor = executors(app.circ)
+            val app: CircApply[erasedApp.A,erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A,erasedApp.B]]
+            val executor = executors(app.circ)
 
-              // EFFECTFUL!
-              executor.stageDone(app.id)
-            }
+            // EFFECTFUL!
+            executor.stageDone(app.id)
           }
         }
       }
@@ -192,13 +182,9 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
       return super.transform(lhs, ctrl)
     }
 
-    val result = if (newSyms.nonEmpty) {
-      // `CircApply` is `Primitive` but `CircNew` is not, so the two never coexist
-      assert(appSyms.isEmpty)
-      transformCtrlWithNewSyms(syms, newSyms)
-    } else {
-      assert(appSyms.nonEmpty)
-      transformCtrlWithAppSyms(syms, appSyms)
+    val result = Stream {
+      stageExecutors(newSyms)
+      stageSymsInGroups(syms, appSyms)
     }
 
     result.asInstanceOf[Sym[A]]

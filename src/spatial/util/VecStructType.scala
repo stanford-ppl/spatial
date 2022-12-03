@@ -22,13 +22,12 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
     }
   }.toMap
 
-  lazy val structKeys: Seq[T] = structFields.map(_._1)
-
   val bitWidth: Int = structFields.map(_._2.nbits).sum
 
-  lazy val isEmpty: Boolean = bitWidth == 0
+  lazy val isEmpty: Boolean = structFields.isEmpty
 
-  implicit def bitsEV: Bits[Vec[Bit]] = Vec.bits[Bit](bitWidth)
+  // if it's empty, then we use two bits as a placeholder.
+  implicit def bitsEV: Bits[Vec[Bit]] = Vec.bits[Bit](scala.math.max(bitWidth, 2))
 
   def apply(entries: Map[T, _ <: Bits[_]], default: DefaultType = PartialFunction.empty)(implicit srcCtx: SrcCtx): VecStruct = VecStruct.fromMap(entries, default)
 
@@ -59,7 +58,15 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
   }
 
   object VecStruct {
-    @forge.tags.api def fromMap(entries: Map[T, _ <: Bits[_]], default: DefaultType): VecStruct = {
+
+    // This keeps us from accidentally making an empty vec, which causes issues.
+    @forge.tags.api private def emptyMap: VecStruct = {
+      VecStruct(Vec.fromSeq(Seq(Bit(false), Bit(false))))
+    }
+
+    @forge.tags.api def fromMap(entries: Map[T, _ <: Bits[_]], default: DefaultType): VecStruct = if (structFields.isEmpty) {
+      emptyMap
+    } else {
       val data = structFields.map {
         case (name, bits) =>
           entries.get(name) match {

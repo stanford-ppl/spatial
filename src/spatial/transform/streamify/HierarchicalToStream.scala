@@ -107,7 +107,7 @@ class DependencyFIFOManager(implicit state: argon.State) {
       targets foreach {
         inner =>
           val newFIFO = FIFO[tCarrier.T](I32(computeDepth(coherent)))
-          newFIFO.explicitName = s"FIFO_${edge.src}_${inner}_${coherent.mem}"
+          newFIFO.explicitName = s"FIFO_${edge.src.s.get}_${inner.s.get}_${coherent.mem}"
           fifoRegistry.add(RegistryEntry(edge.src, inner, edge, newFIFO))
       }
   }
@@ -137,7 +137,6 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
   private lazy val edges: Set[DependencyEdge] = globals[DependencyEdges].get.edges.toSet
 
-  type IMap = Map[Sym[Num[_]], Num[_]]
   class DependencyManager(ctrl: Ctrl, var fetchedEdges: Set[(DependencyEdge, FIFO[_])] = Set.empty, var currentValues: Map[Sym[_], Reg[_]] = Map.empty) {
 
     def fetchedCoherentEdges: Set[CoherentEdge] = fetchedEdges.collect {
@@ -154,36 +153,36 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 //      val remainingEdges = (edges -- fetchedEdges).filter(_.dstIterators.subsetOf(iteratorMap.keySet))
       val remainingEdges = fetchable.filterNot(fetchedEdges.contains)
       fetchedEdges ++= remainingEdges
-      val triplets = remainingEdges.toSeq.flatMap {
+      val triplets = remainingEdges.toSeq.map {
         case (edge: CoherentEdge, fifo) =>
           dbgs(s"Iterator Map: $timeStamp")
           dbgs(s"Required Iterators: ${edge}: ${edge.dstIterators}")
           val enabled = edge.dstRecv(timeStamp)
           val value = fifo.deq(enabled)
-          Seq((edge.mem, enabled, value))
+          (edge.mem, enabled, value)
       }
       triplets.groupBy(_._1).foreach {
         case (mem, valsAndEns) =>
           val newEns = valsAndEns.map(_._2)
-          val firstValue = valsAndEns.head._3.asInstanceOf[Bits[_]]
-          type VT = Bits[firstValue.R]
-          implicit def bEV: Bits[VT] = firstValue.asInstanceOf[Bits[VT]]
-          val newValues = valsAndEns.map(_._3).map {
-            v => v.asInstanceOf[VT]
+          val newValues = valsAndEns.map(_._3)
+          val tInfo: BitsCarrier = CoherentUtils.MemToBitsCarrier(mem)
+          val castedValues = newValues.map {
+            case x: tInfo.T => x
           }
-          val result = oneHotMux(newEns, newValues)
+          implicit def bEV: Bits[tInfo.T] = tInfo.bitsEV
+          val result = oneHotMux(newEns, castedValues)
           val isEnabled = newEns.reduceTree(_ & _)
           val newValue = currentValues.get(mem) match {
-            case Some(reg: Reg[VT]) =>
+            case Some(reg: Reg[tInfo.T]) =>
               mux(isEnabled, result, reg.value)
             case None => result
           }
           // Create a register to hold this value
-          val valueRegIntake = Reg[VT]
-          valueRegIntake.write(newValue.asInstanceOf[VT], isEnabled)
+          val valueRegIntake = Reg[tInfo.T]
+          valueRegIntake.write(newValue, isEnabled)
           valueRegIntake.nonbuffer
 
-          val valueRegBuf = Reg[VT]
+          val valueRegBuf = Reg[tInfo.T]
           valueRegBuf := valueRegIntake.value
           dbgs(s"Updating Current Values: $mem -> $valueRegBuf")
           currentValues += mem -> valueRegBuf
@@ -234,6 +233,9 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               val newIters = makeIters(newChains).map(_.unbox.asInstanceOf[I32])
               val newCChain = CounterChain(newChains)
               val newEns = ens.map(dependencyManager.mirrorRecursive(_, cache)._1)
+              register(iters -> newIters)
+              register(cchain -> newCChain)
+              register(cchain.counters -> newChains)
               stageWithFlow(OpForeach(newEns.map(_.unbox), newCChain, stageBlock {
                 val newFirsts = isFirstIters(newIters)
                 val newLasts = isLastIters(newIters)
@@ -305,14 +307,15 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
             val isFirsts = isFirstIters(newIters.map(_.unbox.asInstanceOf[Num[_]]))
             val isLasts = isLastIters(newIters.map(_.unbox.asInstanceOf[Num[_]]))
 
-            val pIterMap = newIters.zip(isFirsts zip isLasts).map {
-              case (iter: Sym[Num[_]], (first, last)) =>
+            val pIterMap = allIters.zip(newIters.zip(isFirsts zip isLasts)).map {
+              case (oldIter: Sym[Num[_]], (iter: Sym[Num[_]], (first, last))) =>
                 val unboxed: Num[_] = iter.unbox
                 type NT = unboxed.R
                 implicit def bEV: Bits[NT] = unboxed.asInstanceOf[Bits[NT]]
-                iter -> PseudoIter(unboxed.asInstanceOf[NT], first, last)
+                oldIter -> PseudoIter(unboxed.asInstanceOf[NT], first, last)
             }
 
+            dbgs(s"Encoding PIters: $pIterMap")
             val pIters = fifoBundle.pIterType(pIterMap.toMap)
             fifoBundle.genToMainIters.enq(pIters)
             fifoBundle.genToReleaseIters.enq(pIters)
@@ -326,6 +329,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
                 implicit def bitsEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
                 mem -> TokenWithValid(value.asInstanceOf[typeCarrier.T], isEnabled).asInstanceOf[Bits[_]]
             }).toMap[Sym[_], Bits[_]]
+            dbgs(s"Fetched Values: $fetchedValues")
             fifoBundle.genToMainTokens.enq(fifoBundle.intakeTokenType(fetchedValues))
           }
       }
@@ -448,8 +452,16 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
             val shouldSend = edge.srcSend(tMap)
             val token = tokens(edge.mem)
             fifos.foreach {
-              fifo => fifo.asInstanceOf[FIFO[fifo.A.R]].enq(token.asInstanceOf[fifo.A.R], shouldSend)
+              fifo => fifo.asInstanceOf[FIFO[fifo.A.R]].enq(token.value.asInstanceOf[fifo.A.R], shouldSend)
             }
+        }
+
+        retimeGate()
+
+        tMap.triplets.headOption match {
+          case None => stopWhen.write(Bit(true))
+          case Some((_, TimeTriplet(_, _, isLast))) =>
+            stopWhen.write(isLast, isLast)
         }
     }
   }
@@ -525,17 +537,22 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
     mutualLCA.isInnerControl || mutualLCA.hasStreamPrimitiveAncestor
   }
 
-  private var syncMems: Set[Sym[_]] = _
+  private var syncMems: Set[Sym[_]] = Set.empty
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _: AccelScope if lhs.isInnerControl => lhs
     case accel: AccelScope => inAccel {
-      syncMems = (accel.block.nestedStms.filter{ x => x.isMem && !isInternalMem(x)}).toSet
-      dbgs(s"Synchronizing: $syncMems")
-      dbgs(s"Creating FIFOs:")
-      indent { createFIFOs() }
-      val result = super.transform(lhs, rhs)
-      result
+      stage(AccelScope(stageBlock {
+        syncMems = (accel.block.nestedStms.filter { x => x.isMem && !isInternalMem(x) }).toSet
+        dbgs(s"Synchronizing: $syncMems")
+        dbgs(s"Creating FIFOs:")
+        indent {
+          createFIFOs()
+        }
+        Stream {
+          inlineBlock(accel.block)
+        }
+      }))
     }
     case _ if lhs.isInnerControl =>
       dbgs(s"Processing: Inner Controller ${stm(lhs)}")
@@ -572,12 +589,27 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
       }
     case _: CounterNew[_] | _: CounterChainNew => dbgs(s"Skipping ${stm(lhs)}"); lhs
+
+    case ctrlOp: Control[_] if inHw && lhs.isOuterControl =>
+      dbgs(s"Skipping Control: $lhs = $ctrlOp")
+      stageWithFlow(UnitPipe(Set.empty, stageBlock {
+        ctrlOp.blocks.foreach(inlineBlock(_))
+        spatial.lang.void
+      }, None)) {
+        lhs2 =>
+          transferDataIfNew(lhs, lhs2)
+          lhs2.userSchedule = Streaming
+      }
+
+    case _ if syncMems contains lhs =>
+      dbgs(s"Skipping $lhs since it's in syncMems")
+      lhs
+
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 
   override def postprocess[R](block: Block[R]): Block[R] = {
     val blk = super.postprocess(block)
-//    throw new Exception("Stop here for now")
     blk
   }
 }

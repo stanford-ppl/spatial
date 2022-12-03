@@ -3,7 +3,7 @@ package spatial.metadata.access
 import argon._
 import argon.lang.{Bit, I32, Idx, Num}
 import forge.tags.stateful
-import spatial.metadata.control.Blk
+import spatial.metadata.control.{Blk, Ctrl}
 
 /** Flag marking unused accesses to memories which can be removed.
   *
@@ -46,26 +46,34 @@ case class DoesNotConflictWith(group: Set[Sym[_]]) extends Data[DoesNotConflictW
   override def mirror(f: Tx): DoesNotConflictWith = DoesNotConflictWith(f(group))
 }
 
-// DependencyEdges are Access-to-Access dependencies
+// DependencyEdges are control-control dependencies
 // src syms should happen before dst syms.
 trait DependencyEdge {
-  def src: Set[Sym[_]]
-  def dst: Set[Sym[_]]
+  def src: Ctrl
+  def dst: Ctrl
   def srcSend(ts: TimeStamp)(implicit state: argon.State): Bit
   def dstRecv(ts: TimeStamp)(implicit state: argon.State): Bit
   def srcIterators: Set[Sym[Num[_]]]
   def dstIterators: Set[Sym[Num[_]]]
-
-  def accessedMems(implicit state: argon.State): Set[Sym[_]] = (src ++ dst).flatMap(_.accessedMem)
 }
 
 trait CoherentEdge { this: DependencyEdge =>
   def mem: Sym[_]
 }
 
-// Map from iterator to current iteration
-case class TimeStamp(timeMap: Map[Sym[Num[_]], Num[_]]) {
-  def apply[T: Num](s: Sym[T]): T = timeMap(s.asInstanceOf[Sym[Num[T]]]).asInstanceOf[T]
+trait TimeStamp {
+  // The current value of this symbol
+  def apply[T: Num](s: Sym[T]): T
+
+  // If the iterator is on its first iteration
+  def isFirst(s: Sym[_]): Bit
+  final def isFirst(s: Option[Sym[_]]): Option[Bit] = s.map(isFirst)
+
+  // If the iterator is on its last iteration
+  def isLast(s: Sym[_]): Bit
+  final def isLast(s: Option[Sym[_]]): Option[Bit] = s.map(isLast)
+
+  def support: Set[Sym[Num[_]]]
 }
 
 case class DependencyEdges(edges: Seq[DependencyEdge]) extends Data[DependencyEdges](Transfer.Mirror)

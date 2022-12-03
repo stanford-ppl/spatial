@@ -13,26 +13,28 @@ import spatial.traversal.AccelTraversal
 
 object TransformUtils {
 
-  @api def isFirstIter[T: Num](iter: Num[T]): Bit = {
+  @api def isFirstIter(iter: Num[_]): Bit = {
+    type T = iter.R
     val ctr = iter.counter.ctr.asInstanceOf[Counter[Num[T]]]
-    implicit def castEV: Cast[I32, T] = argon.lang.implicits.numericCast[I32, T]
+//    implicit def castEV: Cast[I32, T] = argon.lang.implicits.numericCast[I32, T]
 //    iter < (ctr.start.unbox + (ctr.step.unbox * ctr.ctrPar.to[T]))
     iter === ctr.start.unbox
   }
 
-  @api def isFirstIters[T: Num](iters: Num[T]*): Seq[Bit] = {
-    val isFirst = iters.map(isFirstIter(_))
+  @api def isFirstIters(iters: Seq[_ <: Num[_]]): Seq[Bit] = {
+    val isFirst = iters.map(isFirstIter)
     isFirst.scanRight(Bit(true)){_&_}.dropRight(1)
   }
 
-  @api def isLastIter[T: Num](iter: Num[T]): Bit = {
+  @api def isLastIter(iter: Num[_]): Bit = {
+    type T = iter.R
     val ctr = iter.counter.ctr.asInstanceOf[Counter[T]]
-    val nextIter = iter + ctr.step.unbox
+    val nextIter = iter.asInstanceOf[Num[T]] + ctr.step
     ctr.end.unbox.asInstanceOf[Num[T]] <= nextIter
   }
 
-  @api def isLastIters[T: Num](iters: Num[T]*): Seq[Bit] = {
-    val isLast = iters.map(isLastIter(_))
+  @api def isLastIters(iters: Seq[_ <: Num[_]]): Seq[Bit] = {
+    val isLast = iters.map(isLastIter)
     isLast.scanRight(Bit(true)){_&_}.dropRight(1)
   }
 
@@ -82,36 +84,10 @@ object TransformUtils {
     getOutermostCounter(ctrls).flatMap(_.iter).asInstanceOf[Option[Sym[_ <: Num[_]]]]
   }
 
-  @api def pseudoUnitpipe(body: Block[Void]) = {
+  @api def pseudoUnitpipe(body: Block[Void]): Void = {
     val ctr = Counter(I32(0), I32(1), I32(1), I32(1))
     val cchain = CounterChain(Seq(ctr))
     stage(OpForeach(Set.empty, cchain, body, Seq(makeIter(ctr).unbox), None))
-  }
-
-  @api def isFirstIter(timestamp: TimeStamp, counters: Seq[Counter[_]]): Bit = {
-    if (counters.isEmpty) return Bit(true)
-    type CType = T forSome {type T <: Num[T]}
-    (counters.map {
-      case counter: Counter[CType] =>
-        val iter = counter.iter.get
-        implicit def nEV: Num[CType] = counter.CTeV.asInstanceOf[Num[CType]]
-        val currentTime = timestamp(iter)
-        counter.start.unbox === currentTime
-    }).reduceTree(_ & _)
-  }
-
-  @api def isLastIter(timestamp: TimeStamp, counters: Seq[Counter[_]]): Bit = {
-    if (counters.isEmpty) return Bit(true)
-    (counters.map {
-      counter =>
-        implicit def bEV: Bits[counter.CT] = counter.CTeV.asInstanceOf[Bits[counter.CT]]
-        implicit def nEV: Num[counter.CT] = counter.CTeV.asInstanceOf[Num[counter.CT]]
-        val castCtr: Counter[Num[counter.CT]] = counter.asInstanceOf[Counter[Num[counter.CT]]]
-        val iter = castCtr.iter.get
-        val currentTime = timestamp(iter.unbox.unbox.asSym)
-        val next = currentTime.asInstanceOf[Num[counter.CT]] + castCtr.step.unbox.asInstanceOf[counter.CT]
-        next.asInstanceOf[Num[counter.CT]] >= castCtr.end.unbox.asInstanceOf[counter.CT]
-    }).reduceTree(_ & _)
   }
 }
 

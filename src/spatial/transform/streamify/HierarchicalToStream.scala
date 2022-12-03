@@ -15,24 +15,43 @@ import spatial.metadata.memory._
 import spatial.metadata.access._
 import spatial.metadata.transform._
 import spatial.node._
-import spatial.util.TransformUtils.{isFirstIter, isLastIter, makeIter, makeIters, willRunUT}
+import spatial.util.TransformUtils.{isFirstIter, isFirstIters, isLastIter, isLastIters, makeIter, makeIters, willRunUT}
 import spatial.util._
 
 import scala.collection.{mutable => cm}
+import scala.reflect.runtime.universe.typeOf
 
-trait TypeCarrier {
+trait BitsCarrier {
   type T
   def bitsEV: Bits[this.T]
   @stateful def zero: Bits[this.T]
+
+  override def toString: String = {
+    val typeString = bitsEV.typeName
+    s"TypeCarrier { type T = ${typeString}, def bitsEV: $bitsEV}"
+  }
 }
 
-object TypeCarrier {
-  def apply(mem: Sym[_]): TypeCarrier = {
+object BitsCarrier {
+  def from[TP: Bits]: BitsCarrier = {
+    val bEV: Bits[TP] = implicitly[Bits[TP]]
+
+    new BitsCarrier {
+      override type T = TP
+      override val bitsEV: Bits[this.T] = bEV
+      @stateful override def zero: Bits[this.T] = bitsEV.zero
+    }
+  }
+}
+
+object CoherentUtils {
+  def MemToBitsCarrier(mem: Sym[_]): BitsCarrier = {
     mem match {
       case r: Reg[_] =>
-        new TypeCarrier {
+        new BitsCarrier {
           override type T = r.RT
           override val bitsEV: Bits[T] = r.A
+
           @stateful override def zero: Bits[T] = r.A.zero.asInstanceOf[Bits[T]]
         }
     }
@@ -40,10 +59,19 @@ object TypeCarrier {
 }
 
 @struct case class TokenWithValid[TP: Bits](value: TP, valid: Bit) {
-  def typeInfo: TypeCarrier = new TypeCarrier {
+  def typeInfo: BitsCarrier = BitsCarrier.from[TP]
+}
+
+@struct case class PseudoIter[TP: Bits](iter: TP, isFirst: Bit, isLast: Bit) {
+  def typeInfo: BitsCarrier = new BitsCarrier {
     override type T = TP
     override val bitsEV: Bits[this.T] = implicitly[Bits[TP]]
+
     @stateful override def zero: Bits[this.T] = bitsEV.zero
+  }
+
+  @stateful def toTimeTriplet: TimeTriplet = {
+    TimeTriplet(iter.asInstanceOf[Num[_]], isFirst, isLast)
   }
 }
 
@@ -52,34 +80,86 @@ case class StreamBundle(pIterType: VecStructType[Sym[Num[_]]], intakeTokenType: 
   val genToMainTokens = intakeTokenType.VFIFO(genToMainDepth)
 
   val genToReleaseIters = pIterType.VFIFO(genToReleaseDepth)
-  val genToReleaseTokens = intakeTokenType.VFIFO(genToReleaseDepth)
+  val genToReleaseTokens = outputTokenType.VFIFO(genToReleaseDepth)
 
   val mainToReleaseTokens = outputTokenType.VFIFO(mainToReleaseDepth)
   val source = FIFO[Bit](genToReleaseDepth)
 }
 
+class DependencyFIFOManager(implicit state: argon.State) {
+  case class RegistryEntry(src: Ctrl, dst: Ctrl, edge: DependencyEdge, fifo: FIFO[_])
+  private val fifoRegistry = cm.Set[RegistryEntry]()
+
+  def addEdge(edge: DependencyEdge): Unit = edge match {
+    case coherent: CoherentEdge =>
+      val tCarrier = CoherentUtils.MemToBitsCarrier(coherent.mem)
+      implicit def beV: Bits[tCarrier.T] = tCarrier.bitsEV
+
+      dbgs(s"Adding FIFOs for $edge")
+
+      val targets = if (edge.dst.isInnerControl) {
+        Seq(edge.dst)
+      } else {
+        edge.dst.nestedChildren.filter(_.isInnerControl)
+      }
+      dbgs(s"Targets: $targets")
+
+      targets foreach {
+        inner =>
+          val newFIFO = FIFO[tCarrier.T](I32(computeDepth(coherent)))
+          newFIFO.explicitName = s"FIFO_${edge.src}_${inner}_${coherent.mem}"
+          fifoRegistry.add(RegistryEntry(edge.src, inner, edge, newFIFO))
+      }
+  }
+
+  def computeDepth(edge: DependencyEdge): Int = 8
+
+  def getIntakeFIFOs(ctrl: Ctrl): Map[DependencyEdge, FIFO[_]] = (fifoRegistry.collect {
+    case RegistryEntry(src, dst, edge, fifo) if dst == ctrl => edge -> fifo
+  }).toMap
+
+  def getOutputFIFOs(ctrl: Ctrl): Map[DependencyEdge, Set[FIFO[_]]] = {
+    fifoRegistry.filter(_.src == ctrl).groupBy(_.edge).mapValues(_.toSet.map{x: RegistryEntry => x.fifo})
+  }
+
+  def printEdges(): Unit = {
+    fifoRegistry.foreach {
+      case RegistryEntry(src, dst, edge, fifo) =>
+        dbgs(s"$edge -> ${stm(fifo)}")
+    }
+  }
+}
+
 case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with AccelTraversal {
 
-  private var edgeFIFOMap: Map[DependencyEdge, FIFO[_]] = Map.empty
+//  private var edgeFIFOMap: Map[(DependencyEdge, Ctrl), FIFO[_]] = Map.empty
+  private var fifoManager = new DependencyFIFOManager()
 
   private lazy val edges: Set[DependencyEdge] = globals[DependencyEdges].get.edges.toSet
 
   type IMap = Map[Sym[Num[_]], Num[_]]
-  class DependencyManager(var fetchedEdges: Set[DependencyEdge] = Set.empty, var currentValues: Map[Sym[_], Reg[_]] = Map.empty) {
+  class DependencyManager(ctrl: Ctrl, var fetchedEdges: Set[(DependencyEdge, FIFO[_])] = Set.empty, var currentValues: Map[Sym[_], Reg[_]] = Map.empty) {
+
     def fetchedCoherentEdges: Set[CoherentEdge] = fetchedEdges.collect {
-      case x: CoherentEdge => x
+      case (edge: CoherentEdge, _) => edge
     }
 
-    def updateValues(iteratorMap: IMap): Unit = {
+    def updateValues(timeStamp: TimeStamp): Unit = {
       // Fetch all of the edges that the iterator map permits
-      val remainingEdges = (edges -- fetchedEdges).filter(_.dstIterators.subsetOf(iteratorMap.keySet))
+      val fetchable = fifoManager.getIntakeFIFOs(ctrl).filter {
+        case (edge, _) => edge.dstIterators.subsetOf(timeStamp.support)
+      }
+
+      dbgs(s"Fetchable: $fetchable")
+//      val remainingEdges = (edges -- fetchedEdges).filter(_.dstIterators.subsetOf(iteratorMap.keySet))
+      val remainingEdges = fetchable.filterNot(fetchedEdges.contains)
       fetchedEdges ++= remainingEdges
       val triplets = remainingEdges.toSeq.flatMap {
-        case edge: CoherentEdge =>
-          dbgs(s"Iterator Map: $iteratorMap")
+        case (edge: CoherentEdge, fifo) =>
+          dbgs(s"Iterator Map: $timeStamp")
           dbgs(s"Required Iterators: ${edge}: ${edge.dstIterators}")
-          val enabled = edge.dstRecv(TimeStamp(iteratorMap))
-          val value = edgeFIFOMap(edge).deq(enabled)
+          val enabled = edge.dstRecv(timeStamp)
+          val value = fifo.deq(enabled)
           Seq((edge.mem, enabled, value))
       }
       triplets.groupBy(_._1).foreach {
@@ -124,25 +204,25 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       }
     }
 
-    def copy(): DependencyManager = new DependencyManager(fetchedEdges, currentValues)
+    def copy(): DependencyManager = new DependencyManager(ctrl, fetchedEdges, currentValues)
   }
 
-  private def genCounterGen(ctrl: Sym[_], fifoBundle: StreamBundle) = {
+  private def counterGen(ctrl: Sym[_], fifoBundle: StreamBundle) = {
     dbgs(s"Ancestors of $ctrl = ${ctrl.ancestors}")
-    def recurse(currentAncestors: List[Ctrl], iteratorMap : IMap, dependencyManager: DependencyManager): Unit = {
+    def recurse(currentAncestors: List[Ctrl], timeMap : TimeMap, dependencyManager: DependencyManager): Unit = {
       currentAncestors match {
         case Ctrl.Host :: Nil =>
           throw new UnsupportedOperationException(s"AccelScope was an inner controller, we shouldn't have done anything.")
         case Ctrl.Host :: remaining =>
           dbgs(s"Ignoring Host because there are inner controllers.")
-          recurse(remaining, iteratorMap, dependencyManager)
+          recurse(remaining, timeMap, dependencyManager)
         case Ctrl.Node(Op(AccelScope(_)), _) :: remaining =>
           dbgs(s"Peeling Accel Scope")
-          recurse(remaining, iteratorMap, dependencyManager)
+          recurse(remaining, timeMap, dependencyManager)
         case Ctrl.Node(outer@Op(UnitPipe(ens, block, None)), stage) :: remaining if ens.isEmpty =>
           // Controller
           dbgs(s"Peeling: $outer = UnitPipe(Set.empty, $block, None)")
-          recurse(remaining, iteratorMap, dependencyManager)
+          recurse(remaining, timeMap, dependencyManager)
 
         case Ctrl.Node(loop@Op(OpForeach(ens, cchain, block, iters, None)), stage) :: remaining =>
           dbgs(s"Peeling Foreach Loop: ${stm(loop)}")
@@ -155,8 +235,13 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               val newCChain = CounterChain(newChains)
               val newEns = ens.map(dependencyManager.mirrorRecursive(_, cache)._1)
               stageWithFlow(OpForeach(newEns.map(_.unbox), newCChain, stageBlock {
-                val newIMap = iters.map(_.asSym).zip(newIters)
-                recurse(remaining, iteratorMap ++ newIMap, newDependencyManager)
+                val newFirsts = isFirstIters(newIters)
+                val newLasts = isLastIters(newIters)
+                val newMap = TimeMap(iters.map(_.asSym).zip(newIters).zip(newFirsts).zip(newLasts).map {
+                  case (((oldIter, newIter), newFirst), newLast) =>
+                    oldIter -> TimeTriplet(newIter, newFirst, newLast)
+                })
+                recurse(remaining, timeMap ++ newMap, newDependencyManager)
               }, newIters, None)) {
                 lhs2 =>
                   dbgs(s"CounterGen: $loop -> $lhs2")
@@ -168,10 +253,14 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
             dbgs(s"Static Chain and empty Ens, continuing")
             stageRunBranch()
           } else {
-            val tempIters = iters.map {
-              iter => iter.asSym -> iter.counter.ctr.start.asInstanceOf[I32]
-            }
-            dependencyManager.updateValues(iteratorMap ++ tempIters)
+
+
+            val tempMap = TimeMap(iters.map {
+                iter =>
+                  iter.asSym -> TimeTriplet(iter.counter.ctr.start.asInstanceOf[I32], Bit(true), Bit(false))
+            })
+
+            dependencyManager.updateValues(timeMap ++ tempMap)
             // Do a deep mirroring of the dependencies
             val willRun =
               isolateSubst() {
@@ -203,23 +292,37 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           // Done
           dbgs(s"Handling Inner")
           indent {
-            dbgs(s"Acquired Iterators: $iteratorMap")
-            dependencyManager.updateValues(iteratorMap)
+            dbgs(s"Acquired Iterators: $timeMap")
+            dependencyManager.updateValues(timeMap)
             dbgs(s"Values: ${dependencyManager.currentValues}")
             dbgs(s"Fetched: ${dependencyManager.fetchedEdges}")
 
             fifoBundle.source.enq(Bit(true))
 
-            val pIters = fifoBundle.pIterType(iteratorMap)
+            // compute isFirst and isLast for each iter in order
+            val allIters = ctrl.ancestors.flatMap(_.cchains).flatMap(_.counters).flatMap(_.iter)
+            val newIters = f(allIters)
+            val isFirsts = isFirstIters(newIters.map(_.unbox.asInstanceOf[Num[_]]))
+            val isLasts = isLastIters(newIters.map(_.unbox.asInstanceOf[Num[_]]))
+
+            val pIterMap = newIters.zip(isFirsts zip isLasts).map {
+              case (iter: Sym[Num[_]], (first, last)) =>
+                val unboxed: Num[_] = iter.unbox
+                type NT = unboxed.R
+                implicit def bEV: Bits[NT] = unboxed.asInstanceOf[Bits[NT]]
+                iter -> PseudoIter(unboxed.asInstanceOf[NT], first, last)
+            }
+
+            val pIters = fifoBundle.pIterType(pIterMap.toMap)
             fifoBundle.genToMainIters.enq(pIters)
             fifoBundle.genToReleaseIters.enq(pIters)
 
             val fetchedValues = (dependencyManager.currentValues.mapValues(_.value).map {
               case (mem, value) =>
                 val isEnabled = (dependencyManager.fetchedCoherentEdges.filter(_.mem == mem).map {
-                  case edge: DependencyEdge => edge.dstRecv(TimeStamp(iteratorMap))
+                  case edge: DependencyEdge => edge.dstRecv(timeMap)
                 }).toSeq.reduceTree(_ | _)
-                val typeCarrier = TypeCarrier(mem)
+                val typeCarrier = CoherentUtils.MemToBitsCarrier(mem)
                 implicit def bitsEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
                 mem -> TokenWithValid(value.asInstanceOf[typeCarrier.T], isEnabled).asInstanceOf[Bits[_]]
             }).toMap[Sym[_], Bits[_]]
@@ -228,15 +331,14 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       }
     }
 
-    recurse(ctrl.ancestors.toList, Map.empty, new DependencyManager())
+    recurse(ctrl.ancestors.toList, TimeMap.empty, new DependencyManager(ctrl.toCtrl))
   }
 
   private def mainGen(ctrl: Sym[_], fifoBundle: StreamBundle): Unit = {
-    val Op(opForeach: OpForeach) = ctrl
     import fifoBundle._
     val mirroredRegs = (intakeTokenType.structFields.map {
       case (key, tpProto: TokenWithValid[_]) =>
-        val typeInfo: TypeCarrier = tpProto.typeInfo
+        val typeInfo: BitsCarrier = tpProto.typeInfo
 
         implicit def bEV: Bits[typeInfo.T] = typeInfo.bitsEV
         val holdReg = Reg[typeInfo.T]
@@ -272,11 +374,11 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       val tokens = fifoBundle.genToMainTokens.deq()
 
       pIters.unpack.foreach {
-        case (iter, value) if oldIters contains iter =>
+        case (iter, value: PseudoIter[_]) if oldIters contains iter =>
           dbgs(s"Iter: $iter -> $value [Ignored as it was mirrored already]")
-        case (iter, value) =>
+        case (iter, value: PseudoIter[_]) =>
           dbgs(s"Iter: $iter -> $value")
-          register(iter -> value)
+          register(iter -> value.iter)
       }
 
       tokens.unpack.foreach {
@@ -285,28 +387,81 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           val (reg, tmp) = mirroredRegs(mem)
           tmp.asInstanceOf[Reg[tmp.RT]].write(value.value.asInstanceOf[tmp.RT], value.valid)
           reg.asInstanceOf[Reg[reg.RT]].write(tmp.value.asInstanceOf[reg.RT])
+
+          mem match {
+            case _:Reg[_] => register(mem -> reg)
+            case _ =>
+          }
+
+          dbgs(s"Loading memory $mem [${value.typeInfo}]")
       }
 
-      opForeach.block.stms.foreach {
-        case stm => mirrorSym(stm)
+      ctrl.blocks.flatMap(_.stms).foreach {
+        case stm => register(stm -> mirrorSym(stm))
       }
+
+      retimeGate()
+
+      // write tokens out
+      {
+        val outputTokens = outputTokenType((outputTokenType.structFields.map {
+          case (field, tp: TokenWithValid[_]) =>
+            val currentValue = mirroredRegs(field)._1.value
+            val typeCarrier: BitsCarrier = tp.typeInfo
+            implicit def bEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
+            field -> TokenWithValid(currentValue.asInstanceOf[typeCarrier.T], Bit(true))
+        }).toMap)
+        mainToReleaseTokens.enq(outputTokens)
+      }
+
     }, newIters, None)) {
       newForeach =>
-
+        newForeach.name = Some(s"Main_$ctrl")
     }
   }
 
-  private def computeDepth(edge: DependencyEdge): Int = 8
+  def releaseGen(lhs: Sym[_], fifoBundle: StreamBundle, stopWhen: Reg[Bit]): Unit = {
+    import fifoBundle._
+
+    Foreach(*) {
+      ignore =>
+        val tMap = TimeMap(genToReleaseIters.deq().unpack.map {
+          case (iter, pIter: PseudoIter[_]) =>
+          iter -> pIter.toTimeTriplet
+        })
+        dbgs(s"Recieved tMap: $tMap")
+
+        val tokenSource = source.deq()
+
+        val tokens: Map[Sym[_], TokenWithValid[_]] = {
+          val mtr = mainToReleaseTokens.deq(tokenSource)
+          val gtr = genToReleaseTokens.deq(!tokenSource)
+          val recv: outputTokenType.VecStruct = mux[outputTokenType.VecStruct](tokenSource, mtr, gtr)
+          recv.unpack.toMap.mapValues {
+            case t: TokenWithValid[_] => t
+          }
+        }
+        dbgs(s"Tokens: $tokens")
+
+        fifoManager.getOutputFIFOs(lhs.toCtrl).foreach {
+          case (edge: CoherentEdge, fifos) =>
+            val shouldSend = edge.srcSend(tMap)
+            val token = tokens(edge.mem)
+            fifos.foreach {
+              fifo => fifo.asInstanceOf[FIFO[fifo.A.R]].enq(token.asInstanceOf[fifo.A.R], shouldSend)
+            }
+        }
+    }
+  }
 
   private def createFIFOs(): Unit = {
-    edges.foreach {
-      case IDE@InferredDependencyEdge(src, dst, edgeType) =>
-        val tCarrier = TypeCarrier(IDE.mem)
-        implicit def bEV = tCarrier.bitsEV
-        edgeFIFOMap += IDE -> FIFO[tCarrier.T](I32(computeDepth(IDE)))
-        dbgs(s"Creating FIFO: $IDE -> ${stm(edgeFIFOMap(IDE))}")
-    }
+    dbgs("=" * 10 + s"Adding FIFO Edges" + "=" * 10)
+    edges.foreach(fifoManager.addEdge(_))
+    fifoManager.printEdges()
+    dbgs("="*30)
   }
+
+  private var streamBundleRegistry = Map.empty[Ctrl, StreamBundle]
 
   private def createInternalFIFOBundle(inner: Sym[_]): StreamBundle = {
     val genToMain = I32(8)
@@ -316,17 +471,19 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
     // FIFO Typing
     val counters = inner.ancestors.flatMap(_.cchains).flatMap(_.counters)
     val pIterType = VecStructType[Sym[Num[_]]](counters.map {
-      counter => counter.iter.get.asInstanceOf[Sym[Num[_]]] -> proto(counter.CTeV).asInstanceOf[Num[_]]
+      counter =>
+        val iterSym = counter.iter.get.asInstanceOf[Sym[Num[_]]]
+        implicit def bEV: Bits[counter.CT] = counter.CTeV.asInstanceOf[Bits[counter.CT]]
+        iterSym -> proto(PseudoIter[counter.CT](counter.CTeV.zero.asInstanceOf[counter.CT], Bit(false), Bit(false)))
     })
 
     // We create an intake token for each edge which has a destination inside us.
     val intakeEdges = edges.collect {
-      case edge: CoherentEdge if edge.dst.exists(_.parent == inner.toCtrl) =>
-        edge
+      case edge: CoherentEdge if edge.dst == inner.toCtrl => edge
     }
     val intakeTokenType = VecStructType[Sym[_]](intakeEdges.map {
       coherent: CoherentEdge =>
-        val carrier: TypeCarrier = TypeCarrier(coherent.mem)
+        val carrier: BitsCarrier = CoherentUtils.MemToBitsCarrier(coherent.mem)
 
         implicit def bEV: Bits[carrier.T] = carrier.bitsEV
 
@@ -336,11 +493,11 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
     }.toSeq)
 
     val releaseEdges = edges.collect {
-      case edge: CoherentEdge if edge.src.exists(_.parent == inner.toCtrl) => edge
+      case edge: CoherentEdge if edge.src == inner.toCtrl => edge
     }
     val releaseTokenType = VecStructType[Sym[_]](releaseEdges.map {
       coherent: CoherentEdge =>
-        val carrier: TypeCarrier = TypeCarrier(coherent.mem)
+        val carrier: BitsCarrier = CoherentUtils.MemToBitsCarrier(coherent.mem)
 
         implicit def bEV: Bits[carrier.T] = carrier.bitsEV
 
@@ -349,8 +506,9 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
         coherent.mem -> packed.asInstanceOf[Bits[_]]
     }.toSeq)
 
-    // TODO: change intakeTokenType to releaseTokenType
-    StreamBundle(pIterType, intakeTokenType, releaseTokenType, genToMain, genToRelease, mainToRelease)
+    val streamBundle = StreamBundle(pIterType, intakeTokenType, releaseTokenType, genToMain, genToRelease, mainToRelease)
+    streamBundleRegistry += inner.toCtrl -> streamBundle
+    streamBundle
   }
 
   def isInternalMem(mem: Sym[_]): Boolean = {
@@ -377,21 +535,49 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       dbgs(s"Creating FIFOs:")
       indent { createFIFOs() }
       val result = super.transform(lhs, rhs)
-      throw new Exception("Stop here for now")
       result
     }
     case _ if lhs.isInnerControl =>
       dbgs(s"Processing: Inner Controller ${stm(lhs)}")
       // Create internal bundles
-      val bundle = createInternalFIFOBundle(lhs)
-      indent {
-        dbgs(s"Creating CounterGen")
-        indent { genCounterGen(lhs, bundle) }
-        dbgs(s"Creating Main")
-        indent { mainGen(lhs, bundle) }
+
+      val stopWhen = Reg[Bit]
+      stopWhen.explicitName = s"${lhs}_stop"
+
+      stageWithFlow(UnitPipe(Set.empty, stageBlock {
+        val bundle = createInternalFIFOBundle(lhs)
+        indent {
+          dbgs(s"Creating CounterGen")
+          isolateSubst() {
+            indent {
+              counterGen(lhs, bundle)
+            }
+          }
+          dbgs(s"Creating Main")
+          isolateSubst() {
+            indent {
+              mainGen(lhs, bundle)
+            }
+          }
+
+          dbgs(s"Creating Release")
+          isolateSubst() {
+            indent {
+              releaseGen(lhs, bundle, stopWhen)
+            }
+          }
+        }
+      }, Some(stopWhen))) {
+        lhs2 =>
+
       }
-      super.transform(lhs, rhs)
     case _: CounterNew[_] | _: CounterChainNew => dbgs(s"Skipping ${stm(lhs)}"); lhs
     case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
+
+  override def postprocess[R](block: Block[R]): Block[R] = {
+    val blk = super.postprocess(block)
+//    throw new Exception("Stop here for now")
+    blk
+  }
 }

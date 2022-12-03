@@ -7,7 +7,7 @@ import spatial.lang._
 
 class VecStructMismatchException(msg: String) extends Exception(msg)
 
-case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatch: Boolean = true)(implicit state: argon.State) {
+case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Boolean = true)(implicit state: argon.State) {
 
   type DefaultType = PartialFunction[T, Bits[_]]
 
@@ -30,7 +30,7 @@ case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatc
 
   implicit def bitsEV: Bits[Vec[Bit]] = Vec.bits[Bit](bitWidth)
 
-  def apply(entries: Map[T, Bits[_]], default: DefaultType = PartialFunction.empty)(implicit srcCtx: SrcCtx): VecStruct = VecStruct.fromMap(entries, default)
+  def apply(entries: Map[T, _ <: Bits[_]], default: DefaultType = PartialFunction.empty)(implicit srcCtx: SrcCtx): VecStruct = VecStruct.fromMap(entries, default)
 
   override def toString: String = {
     s"$VecStructType($structFields)]<$fieldLoc>($bitWidth)"
@@ -43,7 +43,7 @@ case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatc
     val tp: VecStructType[T] = vecStructType
 
     assert(bitWidth == structData.nbits, s"Error creating a vector of size $bitWidth from $structData (${structData.nbits})")
-    @forge.tags.api def unpack: Map[T, _ <: Bits[_]] = {
+    @forge.tags.api def unpack: Seq[(T, Bits[_])] = {
       val tmpData = this.structData
 
       (structFields map {
@@ -54,14 +54,14 @@ case class VecStructType[T](structFields: Seq[(T, _ <: Bits[_])], errorOnMismatc
           assert(sliced.nbits == bits.nbits, s"Trying to unpack ${bits.nbits} from ${sliced.nbits}")
           implicit def bEV: Bits[bits.R] = bits.asInstanceOf[Bits[bits.R]]
           name -> sliced.as[bits.R].asInstanceOf[Bits[_]]
-      }).toMap[T, Bits[_]]
+      })
     }
   }
 
   object VecStruct {
-    @forge.tags.api def fromMap(entries: Map[T, Bits[_]], default: DefaultType): VecStruct = {
+    @forge.tags.api def fromMap(entries: Map[T, _ <: Bits[_]], default: DefaultType): VecStruct = {
       val data = structFields.map {
-        case (name: T, bits: Bits[_]) =>
+        case (name, bits) =>
           entries.get(name) match {
             case Some(v) =>
               dbgs(s"Name: $name ${v.nbits}, ${bits.nbits}")

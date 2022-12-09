@@ -6,13 +6,13 @@ import spatial.dsl._
 import spatial.metadata.memory._
 
 @spatial class RegBuffering extends SpatialTest {
-  val outerIters = 16
-  val innerIters = 4
+  val outerIters = 4
+  val innerIters = 2
 
   override def compileArgs = "--max_cycles=1000"
 
   override def main(args: Array[String]) = {
-    implicitly[argon.State].config.setV(1)
+//    implicitly[argon.State].config.setV(3)
     val output = ArgOut[I32]
     Accel {
       val reg = Reg[I32](0)
@@ -26,7 +26,7 @@ import spatial.metadata.memory._
           }
           'Consumer.Foreach(0 until innerIters) {
             inner =>
-              output.write(reg.value + inner, inner == 0)
+              output.write(reg.value + inner)
               reg := 0
           }
       }
@@ -38,6 +38,29 @@ import spatial.metadata.memory._
 
 class RegBufferingNoStream extends RegBuffering {
   override def compileArgs = "--nostreamify"
+}
+
+@spatial class RegSimple extends SpatialTest {
+
+  override def compileArgs = "--max_cycles=1000"
+
+  override def main(args: Array[String]) = {
+    //    implicitly[argon.State].config.setV(3)
+    val output = ArgOut[I32]
+    Accel {
+      val reg = Reg[I32](0)
+      reg.buffer
+      Pipe {
+        reg := 3
+      }
+
+      Pipe {
+        output := reg.value
+      }
+    }
+    println(r"Recv: ${output.value}")
+    assert(output.value == 3, r"Expected 90, received ${output.value}")
+  }
 }
 
 @spatial class DataDependentControl extends SpatialTest {

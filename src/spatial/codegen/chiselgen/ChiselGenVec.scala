@@ -19,6 +19,7 @@ trait ChiselGenVec extends ChiselGenCommon {
       emit(src"${lhs}.zip($raws).foreach{case (a,b) => a.r := b.r}")
 
     case VecApply(vec, id) =>
+      emit(s"// $lhs = $rhs")
       emit(createWire(quote(lhs),remap(lhs.tp)))
       emit(src"$lhs.r := $vec($id).r")
 

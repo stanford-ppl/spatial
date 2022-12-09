@@ -1,6 +1,7 @@
 package spatial.traversal
 
 import argon._
+import argon.node._
 import spatial.lang._
 import spatial.node._
 import spatial.util.spatialConfig
@@ -64,6 +65,50 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
           }
         }
 
+
+      case dab@DataAsBits(data) =>
+        if (data.nbits != dab.tV.nbits) {
+          error(lhs.ctx, s"DataAsBits($data) has size ${data.nbits}, but was provided evidence of size ${dab.tV.nbits}")
+        }
+
+      case bad@BitsAsData(v, bA) =>
+        if (bA.nbits != v.nbits) {
+          error(lhs.ctx, s"Cannot interpret $v of size ${v.size} as type $bA with size ${bA.nbits}")
+        }
+      case FIFODeq(_, _) | FIFOBankedDeq(_, _) =>
+        val inputDelays = rhs.inputs.map(_.fullDelay)
+        if (inputDelays.exists(_ > 1.0)) {
+          val dbgDelays = (rhs.inputs zip inputDelays) map { case (i, d) => s"$i ($d)" }
+          error(lhs.ctx, s"Found a banked dequeue ${lhs} with input delays ${dbgDelays.mkString(", ")}")
+        }
+      case SRAMRead(mem, addr, _) =>
+        if (mem.rank != addr.size) {
+          error(lhs.ctx, s"Found an SRAM Read $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
+        }
+      case SRAMWrite(mem, _, addr, _) =>
+        if (mem.rank != addr.size) {
+          error(lhs.ctx, s"Found an SRAM Write $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
+        }
+      case FIFOEnq(mem, data, _) =>
+        if (mem.A.nbits != data.nbits) {
+          error(lhs.ctx, s"Expected a write of size ${mem.A.nbits} but got $data of size ${data.nbits}")
+        }
+      case FIFOVecEnq(mem, data, _, _) =>
+        mem match {
+          case Op(FIFONew(size)) =>
+            val intSize = size.c.get.toInt
+            if (intSize < data.width) {
+              error(lhs.ctx, s"Attempting a write of size ${data.width} to a FIFO of depth ${intSize}. This doesn't fit!")
+            }
+        }
+      case FIFOVecDeq(mem, addr, _) =>
+        mem match {
+          case Op(FIFONew(size)) =>
+            val intSize = size.c.get.toInt
+            if (intSize < addr.size) {
+              error(lhs.ctx, s"Attempting a dequeue of size ${addr.size} from a FIFO of depth ${intSize}. This will always stall!")
+            }
+        }
       case _ => // Nothing
     }
 
@@ -130,40 +175,6 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
       case SpatialCtrlBlackboxImpl(block) =>
         if (lhs.parent match { case Ctrl.Host => false; case _ => true }) error(ctx, s"Please declare Blackbox implementation outside of Accel!")
         inBox { check(lhs,rhs); super.visit(lhs, rhs) }
-      case FIFODeq(_, _) | FIFOBankedDeq(_, _) =>
-        val inputDelays = rhs.inputs.map(_.fullDelay)
-        if (inputDelays.exists(_ > 1.0)) {
-          val dbgDelays = (rhs.inputs zip inputDelays) map { case (i, d) => s"$i ($d)"}
-          error(lhs.ctx, s"Found a banked dequeue ${lhs} with input delays ${dbgDelays.mkString(", ")}")
-        }
-      case SRAMRead(mem, addr, _) =>
-        if (mem.rank != addr.size) {
-          error(lhs.ctx, s"Found an SRAM Read $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
-        }
-      case SRAMWrite(mem, _, addr, _) =>
-        if (mem.rank != addr.size) {
-          error(lhs.ctx, s"Found an SRAM Write $lhs = $rhs at ${lhs.ctx} with rank ${mem.rank} but had an address ${addr} of size ${addr.size}")
-        }
-      case FIFOEnq(mem, data, _) =>
-        if (mem.A.nbits != data.nbits) {
-          error(lhs.ctx, s"Expected a write of size ${mem.A.nbits} but got $data of size ${data.nbits}")
-        }
-      case FIFOVecEnq(mem, data, _, _) =>
-        mem match {
-          case Op(FIFONew(size)) =>
-            val intSize = size.c.get.toInt
-            if (intSize < data.width) {
-              error(lhs.ctx, s"Attempting a write of size ${data.width} to a FIFO of depth ${intSize}. This doesn't fit!")
-            }
-        }
-      case FIFOVecDeq(mem, addr, _) =>
-        mem match {
-          case Op(FIFONew(size)) =>
-            val intSize = size.c.get.toInt
-            if (intSize < addr.size) {
-              error(lhs.ctx, s"Attempting a dequeue of size ${addr.size} from a FIFO of depth ${intSize}. This will always stall!")
-            }
-        }
 
       case _ =>
         check(lhs, rhs)

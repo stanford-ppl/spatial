@@ -78,7 +78,7 @@ trait Bits[A] extends Top[A] with Ref[Any,A] {
       }
       else {
         val fields = struct.fieldMap.collect{case (_, sym: Bits[_]) => sym.asBits }
-        Vec.concat(fields)
+        Vec.concat(fields.reverse)
       }
     case _ =>
       implicit val tV: Vec[Bit] = Vec.bits[Bit](Bits[A].nbits)

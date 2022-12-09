@@ -74,7 +74,7 @@ trait ChiselGenMem extends ChiselGenCommon {
     if (lhs.segmentMapping.values.exists(_>0)) appPropertyStats += HasAccumSegmentation
     
     lhs.tp match {
-      case _: Vec[_] => emit(createWire(src"$lhs",src"Vec(${ens.length}, ${remap(mem.tp.typeArgs.head)})"))
+      case vtype: Vec[_] => emit(createWire(src"$lhs",src"Vec(${vtype.size}, ${remap(vtype.typeArgs.head)})"))
       case _ => emit(createWire(quote(lhs), src"${mem.tp.typeArgs.head}"))
     }
 
@@ -86,8 +86,9 @@ trait ChiselGenMem extends ChiselGenCommon {
     splitAndCreate(lhs, mem, src"${lhs}_en", "Bool", enslist)
     val nonlut_mask = if (mem.isLUT) "true.B" else DL(src"$forwardpressure", lhs.fullDelay, true)
     emit(src"""val ${lhs}_shared_en = ($nonlut_mask && ${implicitEnableRead(lhs, mem)} && ${and(commonEns)} $enString).suggestName("${lhs}_shared_en")""")
-    val connectRPortCall = src"$mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${lhs}_shared_en), ${!mem.broadcastsAnyRead})"
-    emit(src"""$lhs.toSeq.zip($connectRPortCall).foreach{case (a,b) => a.r := b.r}""")
+    emit(src"val ${lhs}_rportCall = $mem.connectRPort(${lhs.hashCode}, ${lhs}_banks, ${lhs}_ofs, $backpressure, ${lhs}_en.map(_ && ${lhs}_shared_en), ${!mem.broadcastsAnyRead})")
+//    emit(src"""$lhs.toSeq.zip(${lhs}_rportCall).foreach{case (a,b) => a.r := b.r}""")
+    emit(src"""$lhs.r := Cat(${lhs}_rportCall)""")
   }
 
   private def emitWrite(lhs: Sym[_], mem: Sym[_], data: Seq[Sym[_]], bank: Seq[Seq[Sym[_]]], ofs: Seq[Sym[_]], ens: Seq[Set[Bit]], shiftAxis: Option[Int] = None): Unit = {

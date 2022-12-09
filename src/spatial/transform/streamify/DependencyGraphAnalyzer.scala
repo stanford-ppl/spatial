@@ -34,6 +34,11 @@ object EdgeType {
 
 case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: EdgeType)(implicit state: argon.State) extends DependencyEdge with CoherentEdge {
 
+  override def isPseudoEdge: Boolean = edgeType match {
+    case Initialize => true
+    case _ => false
+  }
+
   lazy val (lca, pathSrc, pathDst) = LCAWithPaths(src, dst)
   // Order of loops from outside in
   private lazy val surroundingLoops = {

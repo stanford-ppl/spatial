@@ -1,13 +1,14 @@
 package spatial.util
 
 import argon._
+import argon.lang.types.Bits.recast
 import argon.tags.struct
 import forge.tags.api
 import spatial.lang._
 
 class VecStructMismatchException(msg: String) extends Exception(msg)
 
-case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Boolean = true)(implicit state: argon.State) {
+case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Boolean = true, typeName: Option[String] = None)(implicit state: argon.State) {
 
   type DefaultType = PartialFunction[T, Bits[_]]
 
@@ -31,8 +32,10 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
 
   def apply(entries: Map[T, _ <: Bits[_]], default: DefaultType = PartialFunction.empty)(implicit srcCtx: SrcCtx): VecStruct = VecStruct.fromMap(entries, default)
 
+  lazy val typeString = typeName.getOrElse("Unnamed")
+
   override def toString: String = {
-    s"$VecStructType($structFields)]<$fieldLoc>($bitWidth)"
+    s"${typeString}: VecStructType($structFields)($fieldLoc)"
   }
 
   // Capture the type for use inside the VecStruct
@@ -43,17 +46,26 @@ case class VecStructType[T](structFields: Seq[(T, Bits[_])], errorOnMismatch: Bo
 
     assert(bitWidth == structData.nbits, s"Error creating a vector of size $bitWidth from $structData (${structData.nbits})")
     @forge.tags.api def unpack: Seq[(T, Bits[_])] = {
-      val tmpData = this.structData
+      if (structFields.isEmpty) {
+        Seq.empty
+      } else {
+        val tmpData = this.structData
 
-      (structFields map {
-        case (name: T, bits: Bits[_]) =>
-          val (start, stop) = fieldLoc(name)
-          val sliced = tmpData(start until stop)
+        (structFields map {
+          case (name: T, bits: Bits[_]) =>
+            val (start, stop) = fieldLoc(name)
+            val sliced = tmpData(start until stop)
 
-          assert(sliced.nbits == bits.nbits, s"Trying to unpack ${bits.nbits} from ${sliced.nbits}")
-          implicit def bEV: Bits[bits.R] = bits.asInstanceOf[Bits[bits.R]]
-          name -> sliced.as[bits.R].asInstanceOf[Bits[_]]
-      })
+            assert(sliced.nbits == bits.nbits, s"Trying to unpack ${bits.nbits} from ${sliced.nbits}")
+
+            implicit def bEV: Bits[bits.R] = bits.asInstanceOf[Bits[bits.R]]
+
+            val result = recast[bits.R](sliced)
+            debug.tagValue(result, s"${typeString}_unpack_${structData.asSym}_$name")
+
+            name -> result.asInstanceOf[Bits[_]]
+        })
+      }
     }
   }
 

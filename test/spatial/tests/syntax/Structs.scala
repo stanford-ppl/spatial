@@ -42,3 +42,37 @@ import spatial.dsl._
     assert(x.z + y.z == z.z)
   }
 }
+
+@spatial class StructRoundTripTest extends SpatialTest {
+  override def compileArgs = "--vv --nostreamify"
+
+  def main(args: Array[String]): Void = {
+    val oa = ArgOut[I32]
+    val ob = ArgOut[I32]
+    val oc = ArgOut[I32]
+
+    Accel {
+      implicit def bEV: Bits[Vec[Bit]] = Vec.bits(MyStruct(I32(0), I32(0), I32(0)).nbits)
+      val reg = Reg[Vec[Bit]]
+      reg.nonbuffer
+
+      Pipe {
+        val testStruct = MyStruct(I32(0), I32(1), I32(2))
+        reg := testStruct.asBits
+      }
+
+      Pipe {
+        val read = reg.value.as[MyStruct]
+        oa := read.x
+        ob := read.y
+        oc := read.z
+      }
+    }
+
+    println(r"x: ${oa.value}, y: ${ob.value}, z: ${oc.value}")
+
+    assert(oa.value == I32(0))
+    assert(ob.value == I32(1))
+    assert(oc.value == I32(2))
+  }
+}

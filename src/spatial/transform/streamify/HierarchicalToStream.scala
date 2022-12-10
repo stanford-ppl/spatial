@@ -357,6 +357,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
                 }).toSeq.reduceTree(_ | _)
                 val typeCarrier = CoherentUtils.MemToBitsCarrier(mem)
                 implicit def bitsEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
+                dbgs(s"Fetching: $mem -> value = ${stm(value.asInstanceOf[Sym[_]])} [isEnabled = ${stm(isEnabled)}]")
                 mem -> TokenWithValid(value.asInstanceOf[typeCarrier.T], isEnabled).asInstanceOf[Bits[_]]
             }).toMap[Sym[_], Bits[_]]
             dbgs(s"Fetched Values: $fetchedValues")
@@ -372,23 +373,6 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
   private def mainGen(ctrl: Sym[_], fifoBundle: StreamBundle): Unit = {
     import fifoBundle._
-    val mirroredRegs = (intakeTokenType.structFields.map {
-      case (key, tpProto: TokenWithValid[_]) =>
-        val typeInfo: BitsCarrier = tpProto.typeInfo
-
-        implicit def bEV: Bits[typeInfo.T] = typeInfo.bitsEV
-        val holdReg = Reg[typeInfo.T]
-
-        val regName = key.explicitName.getOrElse(key.toString)
-
-        holdReg.explicitName = s"HoldReg_${ctrl}_${regName}"
-
-        val nonBufferReg = Reg[typeInfo.T]
-        nonBufferReg.nonbuffer
-        nonBufferReg.explicitName = s"NonBufferReg_${ctrl}_$regName"
-
-        key -> (holdReg, nonBufferReg)
-    }).toMap[Sym[_], (Reg[_], Reg[_])]
     val ancestralChains = ctrl.ancestors.flatMap(_.cchains).flatMap(_.counters)
     val mirrorableChains = ancestralChains.reverse.takeWhile(_.isStatic).reverse
 
@@ -412,6 +396,8 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       (newIters, newCChain)
     }
 
+    val escapeScope = state.getCurrentHandle()
+
     stageWithFlow(OpForeach(Set.empty, newCChain, stageBlock {
       val pIters = fifoBundle.genToMainIters.deq()
 
@@ -425,22 +411,59 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           register(iter -> value.iter)
       }
 
+      val tokenValues = cm.Map[Sym[_], Sym[_]]()
       tokens.unpack.foreach {
-        case (mem, value: TokenWithValid[_]) =>
-          // First, we buffer the value into an unbuffered hold register
-          val (reg, tmp) = mirroredRegs(mem)
-          tmp.asInstanceOf[Reg[tmp.RT]].write(value.value.asInstanceOf[tmp.RT], value.valid)
-          reg.asInstanceOf[Reg[reg.RT]].write(tmp.value.asInstanceOf[reg.RT])
+        case (mem: Reg[_], value: TokenWithValid[_]) =>
 
-          mem match {
-            case _:Reg[_] => register(mem -> reg)
-            case _ =>
+          // create an unbuffered register and immediately read it.
+          val typeInfo: BitsCarrier = value.typeInfo
+
+          implicit def bEV: Bits[typeInfo.T] = typeInfo.bitsEV
+          val regName = mem.explicitName.getOrElse(mem.toString)
+
+          val nonBufferReg = state.withScope(escapeScope) {
+            val nonBufferReg = Reg[typeInfo.T]
+            nonBufferReg.nonbuffer
+            nonBufferReg.explicitName = s"NonBufferReg_${ctrl}_$regName"
+            nonBufferReg
           }
 
+          nonBufferReg.write(value.value.asInstanceOf[typeInfo.T], value.valid)
+
+          val writesToReg = ctrl.writtenMems.contains(mem)
+          dbgs(s"$ctrl writes to $mem: $writesToReg")
+          if (writesToReg) {
+            // If we write to the reg, then we have to mirror the reg
+            val mirroredReg = state.withScope(escapeScope) {Reg[typeInfo.T]}
+            mirroredReg.explicitName = s"MirroredReg_${ctrl}_$regName"
+
+            val oldValue = mirroredReg.value
+            tokenValues(mem) = mux[typeInfo.T](value.valid, nonBufferReg.value, oldValue)
+
+            register(mem -> mirroredReg)
+          } else {
+            tokenValues(mem) = nonBufferReg.value.asSym
+          }
           dbgs(s"Loading memory $mem [${value.typeInfo}]")
       }
 
       ctrl.blocks.flatMap(_.stms).foreach {
+        case stmt@Op(RegRead(mem)) if tokenValues contains mem =>
+          dbgs(s"Eliding RegRead($mem) with token value ${tokenValues(mem)}")
+          register(stmt -> tokenValues(mem))
+        case stmt@Op(RegWrite(mem, data, ens)) if tokenValues contains mem =>
+          val alwaysEnabled = (ens.forall {
+            case Const(c) => c.value
+            case _ => false
+          })
+          if (alwaysEnabled) {
+            tokenValues(mem) = f(data)
+          } else {
+            tokenValues(mem) = mux(f(ens).toSeq.reduceTree(_ & _), f(data).asInstanceOf[Bits[mem.RT]], tokenValues(mem).asInstanceOf[Bits[mem.RT]]).asInstanceOf[Sym[mem.RT]]
+          }
+          dbgs(s"Updating $mem <- ${stm(tokenValues(mem))}")
+          // We still need to stage the write anyways
+          visit(stmt)
         case stmt =>
           val newStm = mirrorSym(stmt)
           dbgs(s"Mirroring: ${stm(stmt)} -> ${stm(newStm)}")
@@ -452,11 +475,11 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       // write tokens out
       {
         val outputTokens = outputTokenType((outputTokenType.structFields.map {
-          case (field, tp: TokenWithValid[_]) =>
-            val currentValue = mirroredRegs(field)._1.value
+          case (reg: Reg[_], tp: TokenWithValid[_]) =>
+            val currentValue = tokenValues(reg)
             val typeCarrier: BitsCarrier = tp.typeInfo
             implicit def bEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
-            field -> TokenWithValid(currentValue.asInstanceOf[typeCarrier.T], Bit(true))
+            reg -> TokenWithValid(currentValue.asInstanceOf[typeCarrier.T], Bit(true))
         }).toMap)
         mainToReleaseTokens.enq(outputTokens)
       }

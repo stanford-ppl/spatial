@@ -6,8 +6,8 @@ import spatial.dsl._
 import spatial.metadata.memory._
 
 @spatial class RegBuffering extends SpatialTest {
-  val outerIters = 4
-  val innerIters = 2
+  val outerIters = 16
+  val innerIters = 4
 
   override def compileArgs = "--max_cycles=1000"
 
@@ -26,13 +26,14 @@ import spatial.metadata.memory._
           }
           'Consumer.Foreach(0 until innerIters) {
             inner =>
-              output.write(reg.value + inner)
+              output.write(reg.value + inner, inner == I32(0))
               reg := 0
           }
       }
     }
     println(r"Recv: ${output.value}")
-    assert(output.value == 90, r"Expected 90, received ${output.value}")
+    val gold = (0 to innerIters - 1).map(_ * (outerIters - 1)).sum
+    assert(output.value == I32(gold), r"Expected $gold, received ${output.value}")
   }
 }
 

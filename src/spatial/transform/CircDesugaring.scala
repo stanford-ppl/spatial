@@ -7,6 +7,8 @@ import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
 import spatial.traversal.AccelTraversal
+import spatial.metadata.types._
+import spatial.metadata.memory._
 
 import scala.collection.immutable.{Stream => ScalaStream}
 import scala.collection.{mutable => mut}
@@ -90,14 +92,14 @@ case class ExecutorMap() {
 }
 
 case class CircDesugaring(IR: State) extends MutateTransformer with AccelTraversal {
-  private val SEND_FIFO_DEPTH = 2
-  private val RECV_FIFO_DEPTH = 2
-
   private val factory: CircExecutorFactory = PriorityCircExecutorFactory(IR)
   private val executors: ExecutorMap = ExecutorMap()
 
   private def isNew(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircNew[_,_]])
   private def isApp(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircApply[_,_]])
+
+  // https://github.com/scala/bug/issues/12463
+  private def shouldLift(s: Sym[_]): Boolean = s.isReg || s.isRegFile || s.isFIFO || s.isLIFO || s.isLUT
 
   private def stageExecutors(newSyms: mut.Set[Sym[_]]): Void = {
     for (s <- newSyms) {
@@ -124,35 +126,30 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
 
   private def stageSymsInGroups(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): Void = {
     val groups = ArrayBuffer(Group(ArrayBuffer(), mut.Set(), mut.Set(), mut.Map(), mut.Set()))
+    val liftedSyms: ArrayBuffer[Sym[_]] = syms.filter(shouldLift).to[ArrayBuffer]
 
-    // Map from `Sym`s seen so far index of last group where each `Sym` appeared; updated during loop below
+    // Map from `Sym`s seen so far to index of last group where each `Sym` appeared; updated during loop below
     val prevSyms: mut.Map[Sym[_], Int] = mut.Map()
     var groupIdx: Int = 0
     val unusedAppSyms = appSyms.clone
 
-    // We ignore `CircNew` nodes when constructing groups; they are handled by `stageExecutors`
-    for (s <- syms.filter(!isNew(_))) {
+    // We ignore `CircNew` nodes when constructing groups; they are handled by `stageExecutors` in `transformCtrl`
+    for (s <- syms.filter(s => !isNew(s) && !shouldLift(s))) {
       val execDeqs = s.inputs.filter(unusedAppSyms.contains)
+
       // Split off a new group everytime we see the first use of a `CircApply`
       if (execDeqs.nonEmpty) {
         unusedAppSyms --= execDeqs
         val group = groups.last
 
-        // Record the group which needs to send us each variable
-        for (s <- group.recvVars) {
-          val sender = groups(prevSyms(s))
-          assert(!sender.sendVars.contains(s))
-          sender.sendVars += s -> groupIdx
-        }
-
         // We will need to forward each variable that was forwarded to us to the next user
         for (s <- group.recvVars) {
-          // The above filter can give us the same `Sym` multiple times.
-          // The following should be idempotent:
           prevSyms(s) = groupIdx
         }
-
-        // Record our `Sym`s in `prevSyms`
+        for (s <- group.execDeqs) {
+          prevSyms(s) = groupIdx
+        }
+        // We will also need to forward any variables created in our scope
         prevSyms ++= group.syms.zip(ScalaStream.continually(groupIdx))
 
         groups += Group(ArrayBuffer(), mut.Set(), execDeqs.to[mut.Set], mut.Map(), mut.Set())
@@ -166,20 +163,39 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
         group.execEnqs += s
       }
 
-      group.recvVars ++= s.inputs.filter(prevSyms.contains)
+      val recvVars = s.inputs.filter(s => prevSyms.contains(s) && !group.execDeqs.contains(s))
+      group.recvVars ++= recvVars
+      for (s <- recvVars) {
+        val sender = groups(prevSyms(s))
+        assert(!sender.sendVars.contains(s))
+        sender.sendVars += s -> groupIdx
+      }
     }
 
-    dbgs(s"GROUPS: $groups")
+    dbgs(s"Lifting: $liftedSyms")
+    dbgs(s"Groups: $groups")
 
     isolateSubst() {
-      // For every group for every free variable, we need a queue to transport that variable to the next group
+      // EFFECTFUL!
+      liftedSyms.foreach(visit)
+
       val sendVarFifos: ArrayBuffer[Map[Sym[_], FIFO[_]]] = ArrayBuffer.fill(groups.length)(Map.empty)
       val recvVarFifos: ArrayBuffer[Map[Sym[_], FIFO[_]]] = ArrayBuffer.fill(groups.length)(Map.empty)
 
+      // Create FIFOs for intermedates
       for ((group, i) <- groups.zipWithIndex) {
         for ((s, j) <- group.sendVars) {
+          if (!s.op.exists(_.R.isBits)) {
+            throw new Exception(
+              """Only memory allocations and types satisfying `Bits` may be created in the same scope as a `Circ`
+                |application and referenced after any reference to the result of that application""".stripMargin
+            )
+          }
+
+          implicit val sBits: Bits[s.MySpecialType] = s.asInstanceOf[Bits[s.MySpecialType]]
+
           // EFFECTFUL!
-          val fifo = FIFO[](SEND_FIFO_DEPTH)
+          val fifo = FIFO[s.MySpecialType](1)
           sendVarFifos(i) += s -> fifo
           assert(groups(j).recvVars.contains(s))
           recvVarFifos(j) += s -> fifo
@@ -201,15 +217,21 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
             register(appSym -> output)
           }
 
-          for (sym <- recvVars) {
-
+          for (s <- recvVars) {
+            // EFFECTFUL!
+            val output = recvVarFifos(i)(s).deq()
+            register(s -> output)
           }
 
           // EFFECTFUL: Visiting a `CircApply` will replace it with an `executor.stageEnq` (see `transformApp`)
           groupSyms.foreach(visit)
 
-          for (sym <- sendVars) {
+          for ((s, _) <- sendVars) {
+            implicit val sBits: Bits[s.MySpecialType] = s.asInstanceOf[Bits[s.MySpecialType]]
+            val fifo: FIFO[s.MySpecialType] = sendVarFifos(i)(s).asInstanceOf[FIFO[s.MySpecialType]]
 
+            // EFFECTFUL!
+            fifo.enq(f(s).asInstanceOf[s.MySpecialType])
           }
 
           for (appSym <- execEnqs) {
@@ -237,6 +259,10 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
       return super.transform(lhs, ctrl)
     }
 
+    dbgs(s"In ctrl $lhs:")
+    dbgs(s"\tFound `CircNew`s: $newSyms")
+    dbgs(s"\tFound `CircApp`s: $appSyms")
+
     val result = Stream {
       stageExecutors(newSyms)
       stageSymsInGroups(syms, appSyms)
@@ -250,7 +276,7 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
     implicit val evB: Bits[erasedApp.B] = erasedApp.evB
     val app: CircApply[erasedApp.A, erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A, erasedApp.B]]
 
-    // We create an executor when we see `CircNew`, so the right executor must exist by the time we see the
+    // We create an executor when we see a `CircNew`, so the right executor must exist by the time we see the
     // corresponding `CircApply`
     val executor = executors(app.circ)
     executor.stageEnq(app.id,app.arg)

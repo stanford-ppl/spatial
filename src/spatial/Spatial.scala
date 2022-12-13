@@ -130,6 +130,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val dotHierGen    = DotHierarchicalGenSpatial(state)
 
     val result = {
+
         block ==> printer     ==>
         cliNaming           ==>
         (friendlyTransformer) ==> printer ==> transformerChecks ==>
@@ -141,12 +142,12 @@ trait Spatial extends Compiler with ParamLoader {
         /** More black box lowering */
         (blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
-        ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
+        ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==>
         /** Optional scala model generator */
         ((spatialConfig.enableRuntimeModel) ? retimingAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? initiationAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? dseRuntimeModelGen) ==>
-        (spatialConfig.enableArchDSE ? dsePass) ==> 
+        (spatialConfig.enableArchDSE ? dsePass) ==>
         //blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
@@ -159,61 +160,74 @@ trait Spatial extends Compiler with ParamLoader {
         /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
-        circDesugaring ==> printer
-//        /** Stream controller rewrites */
-//        /** Stream controller rewrites */
-//        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
-//        /** Memory analysis */
-//        retimingAnalyzer    ==>
-//        accessAnalyzer      ==>
-//        iterationDiffAnalyzer   ==>
-//        memoryAnalyzer      ==>
-//        memoryAllocator     ==> printer ==>
-//        /** Unrolling */
-//        unrollTransformer   ==> printer ==> transformerChecks ==>
-//        /** CSE on regs */
-//        regReadCSE          ==>
-//        /** Dead code elimination */
-//        useAnalyzer         ==>
-//        transientCleanup    ==> printer ==> transformerChecks ==>
-//        /** Hardware Rewrites **/
-//        rewriteAnalyzer     ==>
-//        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
-//        rewriteTransformer  ==> printer ==> transformerChecks ==>
-//        memoryCleanup  ==> printer ==> transformerChecks ==>
-//        /** Pipe Flattening */
-//        flatteningTransformer ==> bindingTransformer ==>
-//        /** Update buffer depths */
-//        bufferRecompute     ==> printer ==> transformerChecks ==>
-//        /** Accumulation Specialization **/
-//        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
-//        (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
-//        /** Retiming */
-//        retimingAnalyzer    ==> printer ==>
-//        retiming            ==> printer ==> transformerChecks ==>
-//        retimeReporter      ==>
-//        /** Broadcast cleanup */
-//        broadcastCleanup    ==> printer ==>
-//        /** Schedule finalization */
-//        initiationAnalyzer  ==>
-//        /** final model generation */
-//        ((spatialConfig.enableRuntimeModel) ? finalRuntimeModelGen) ==>
-//        /** Reports */
-//        memoryReporter      ==>
-//        finalIRPrinter      ==>
-//        finalSanityChecks   ==>
-//        /** Code generation */
-//        treeCodegen         ==>
-//        irCodegen           ==>
-//        //(spatialConfig.enableDot ? dotFlatGen)      ==>
-//        (spatialConfig.enableDot ? dotHierGen)      ==>
-//        (spatialConfig.enableSim   ? scalaCodegen)  ==>
-//        (spatialConfig.enableSynth ? chiselCodegen) ==>
-//        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
-//        ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
-//        (spatialConfig.reportArea ? resourceReporter) ==>
-//        (spatialConfig.enablePIR ? pirCodegen) ==>
-//        (spatialConfig.enableTsth ? tsthCodegen)
+        /** #################################################################### */
+        /** FIXME: Desugaring */
+        circDesugaring      ==> printer ==> transformerChecks ==>
+        switchTransformer ==> printer ==> transformerChecks ==>
+        switchOptimizer ==> printer ==> transformerChecks ==>
+        memoryDealiasing ==> printer ==> transformerChecks ==>
+        ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer) ==> printer ==>
+        /** Control insertion */
+        pipeInserter ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE ==>
+        /** Dead code elimination */
+        useAnalyzer ==>
+        transientCleanup ==> printer ==> transformerChecks ==>
+        /** #################################################################### */
+        /** Stream controller rewrites */
+        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
+        /** Memory analysis */
+        retimingAnalyzer    ==>
+        accessAnalyzer      ==>
+        iterationDiffAnalyzer   ==>
+        memoryAnalyzer      ==>
+        memoryAllocator     ==> printer ==>
+        /** Unrolling */
+        unrollTransformer   ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE          ==>
+        /** Dead code elimination */
+        useAnalyzer         ==>
+        transientCleanup    ==> printer ==> transformerChecks ==>
+        /** Hardware Rewrites **/
+        rewriteAnalyzer     ==>
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
+        rewriteTransformer  ==> printer ==> transformerChecks ==>
+        memoryCleanup  ==> printer ==> transformerChecks ==>
+        /** Pipe Flattening */
+        flatteningTransformer ==> bindingTransformer ==>
+        /** Update buffer depths */
+        bufferRecompute     ==> printer ==> transformerChecks ==>
+        /** Accumulation Specialization **/
+        (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
+        (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
+        /** Retiming */
+        retimingAnalyzer    ==> printer ==>
+        retiming            ==> printer ==> transformerChecks ==>
+        retimeReporter      ==>
+        /** Broadcast cleanup */
+        broadcastCleanup    ==> printer ==>
+        /** Schedule finalization */
+        initiationAnalyzer  ==>
+        /** final model generation */
+        ((spatialConfig.enableRuntimeModel) ? finalRuntimeModelGen) ==>
+        /** Reports */
+        memoryReporter      ==>
+        finalIRPrinter      ==>
+        finalSanityChecks   ==>
+        /** Code generation */
+        treeCodegen         ==>
+        irCodegen           ==>
+        //(spatialConfig.enableDot ? dotFlatGen)      ==>
+        (spatialConfig.enableDot ? dotHierGen)      ==>
+        (spatialConfig.enableSim   ? scalaCodegen)  ==>
+        (spatialConfig.enableSynth ? chiselCodegen) ==>
+        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
+        ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
+        (spatialConfig.reportArea ? resourceReporter) ==>
+        (spatialConfig.enablePIR ? pirCodegen) ==>
+        (spatialConfig.enableTsth ? tsthCodegen)
     }
 
     isl.shutdown(100)

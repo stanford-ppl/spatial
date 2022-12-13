@@ -2,6 +2,7 @@ package spatial.transform
 
 import argon._
 import argon.lang.Bit
+import argon.node._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
@@ -59,21 +60,17 @@ case class PriorityCircExecutorFactory(IR: State) extends CircExecutorFactory {
     val executor = PriorityCircExecutor(kill, inputs, outputs)
 
     Sequential(breakWhen = kill).Foreach(*) { _ =>
-      val input = priorityDeq(inputs:_*)
-      ifThenElse(id(input) === -1,
-        () => {
-          count := count.value + Id(1)
-          kill := count === nApps
-        },
-        () => {
-          val output = func(data(input))
-          outputs.zipWithIndex foreach {
-            case (fifo, idx) =>
-              val writeEnable = Id(idx) === id(input)
-              fifo.enq(output, writeEnable)
-          }
-        }
-      )
+      val input = priorityDeq(inputs: _*)
+      val output = func(data(input))
+      outputs.zipWithIndex foreach {
+        case (fifo, idx) =>
+          val writeEnable = Id(idx) === id(input)
+          fifo.enq(output, writeEnable)
+      }
+      retimeGate()
+      val newCount = count.value + mux(id(input) === Id(-1), Id(1), Id(0))
+      count.write(newCount)
+      kill.write(true, newCount === Id(nApps))
     }
 
     executor
@@ -138,6 +135,8 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
       }
     }
 
+    dbgs(s"GROUPS: $groups")
+
     isolateSubst() {
       for ((groupSyms, groupEnqs, groupDeqs) <- groups) {
         Pipe {
@@ -198,6 +197,7 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
     // We create an executor when we see `CircNew`, so the right executor must exist by the time we see the
     // corresponding `CircApply`
     val executor = executors(app.circ)
+    dbgs(s"ENQUEUING WITH ID ${app.id}")
     executor.stageEnq(app.id,app.arg)
   }
 

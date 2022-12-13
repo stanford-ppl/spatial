@@ -8,6 +8,7 @@ import spatial.lang._
 import spatial.node._
 import spatial.traversal.AccelTraversal
 
+import scala.collection.immutable.{Stream => ScalaStream}
 import scala.collection.{mutable => mut}
 import scala.collection.mutable.ArrayBuffer
 
@@ -28,8 +29,8 @@ abstract class CircExecutor[A:Bits,B:Bits] {
 
 case class PriorityCircExecutorFactory(IR: State) extends CircExecutorFactory {
   final implicit def __IR: State = IR
-  private val INPUT_FIFO_DEPTH = 8;
-  private val OUTPUT_FIFO_DEPTH = 8;
+  private val INPUT_FIFO_DEPTH = 8
+  private val OUTPUT_FIFO_DEPTH = 8
 
   type Id = I32
   type Input[A] = Tup2[Id, A]
@@ -89,13 +90,11 @@ case class ExecutorMap() {
 }
 
 case class CircDesugaring(IR: State) extends MutateTransformer with AccelTraversal {
+  private val SEND_FIFO_DEPTH = 2
+  private val RECV_FIFO_DEPTH = 2
+
   private val factory: CircExecutorFactory = PriorityCircExecutorFactory(IR)
   private val executors: ExecutorMap = ExecutorMap()
-
-  private def mirrorWithBody(ctrl: Control[_], producesResult: Boolean)(body: => Any): Void = ctrl match {
-    case UnitPipe(ens,_,stopWhen) => stage(UnitPipe(Set.empty, stageBlock{ body; void }, None))
-    case _ => throw new Exception("`CircApply` used in unsupported control context")
-  }
 
   private def isNew(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircNew[_,_]])
   private def isApp(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircApply[_,_]])
@@ -115,32 +114,81 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
     }
   }
 
+  case class Group(
+    syms: ArrayBuffer[Sym[_]],
+    execEnqs: mut.Set[Sym[_]],
+    execDeqs: mut.Set[Sym[_]],
+    sendVars: mut.Map[Sym[_] /* var */, Int /* receiver */],
+    recvVars: mut.Set[Sym[_]],
+  )
+
   private def stageSymsInGroups(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): Void = {
-    // We split off a new group everytime we see the first use of a `CircApply`
-    val groups: ArrayBuffer[(ArrayBuffer[Sym[_]], mut.Set[Sym[_]], mut.Set[Sym[_]])] =
-      ArrayBuffer((ArrayBuffer(), mut.Set(), mut.Set()))
+    val groups = ArrayBuffer(Group(ArrayBuffer(), mut.Set(), mut.Set(), mut.Map(), mut.Set()))
+
+    // Map from `Sym`s seen so far index of last group where each `Sym` appeared; updated during loop below
+    val prevSyms: mut.Map[Sym[_], Int] = mut.Map()
+    var groupIdx: Int = 0
+    val unusedAppSyms = appSyms.clone
 
     // We ignore `CircNew` nodes when constructing groups; they are handled by `stageExecutors`
-    // CAUTION: We destroy `appSyms` as we iterate
     for (s <- syms.filter(!isNew(_))) {
-      val appSymInputs = s.inputs.filter(appSyms.contains)
-      if (appSymInputs.nonEmpty) {
-        groups += ((ArrayBuffer(), mut.Set(), appSymInputs.to[mut.Set]))
-        appSyms --= appSymInputs
+      val execDeqs = s.inputs.filter(unusedAppSyms.contains)
+      // Split off a new group everytime we see the first use of a `CircApply`
+      if (execDeqs.nonEmpty) {
+        unusedAppSyms --= execDeqs
+        val group = groups.last
+
+        // Record the group which needs to send us each variable
+        for (s <- group.recvVars) {
+          val sender = groups(prevSyms(s))
+          assert(!sender.sendVars.contains(s))
+          sender.sendVars += s -> groupIdx
+        }
+
+        // We will need to forward each variable that was forwarded to us to the next user
+        for (s <- group.recvVars) {
+          // The above filter can give us the same `Sym` multiple times.
+          // The following should be idempotent:
+          prevSyms(s) = groupIdx
+        }
+
+        // Record our `Sym`s in `prevSyms`
+        prevSyms ++= group.syms.zip(ScalaStream.continually(groupIdx))
+
+        groups += Group(ArrayBuffer(), mut.Set(), execDeqs.to[mut.Set], mut.Map(), mut.Set())
+        groupIdx += 1
       }
 
-      groups.last._1 += s
+      val group = groups.last
+      group.syms += s
+
       if (isApp(s)) {
-        groups.last._2 += s
+        group.execEnqs += s
       }
+
+      group.recvVars ++= s.inputs.filter(prevSyms.contains)
     }
 
     dbgs(s"GROUPS: $groups")
 
     isolateSubst() {
-      for ((groupSyms, groupEnqs, groupDeqs) <- groups) {
+      // For every group for every free variable, we need a queue to transport that variable to the next group
+      val sendVarFifos: ArrayBuffer[Map[Sym[_], FIFO[_]]] = ArrayBuffer.fill(groups.length)(Map.empty)
+      val recvVarFifos: ArrayBuffer[Map[Sym[_], FIFO[_]]] = ArrayBuffer.fill(groups.length)(Map.empty)
+
+      for ((group, i) <- groups.zipWithIndex) {
+        for ((s, j) <- group.sendVars) {
+          // EFFECTFUL!
+          val fifo = FIFO[](SEND_FIFO_DEPTH)
+          sendVarFifos(i) += s -> fifo
+          assert(groups(j).recvVars.contains(s))
+          recvVarFifos(j) += s -> fifo
+        }
+      }
+
+      for ((Group(groupSyms, execEnqs, execDeqs, sendVars, recvVars), i) <- groups.zipWithIndex) {
         Pipe {
-          for (appSym <- groupDeqs) {
+          for (appSym <- execDeqs) {
             val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
             implicit val evA: Bits[erasedApp.A] = erasedApp.evA
             implicit val evB: Bits[erasedApp.B] = erasedApp.evB
@@ -153,10 +201,18 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
             register(appSym -> output)
           }
 
+          for (sym <- recvVars) {
+
+          }
+
           // EFFECTFUL: Visiting a `CircApply` will replace it with an `executor.stageEnq` (see `transformApp`)
           groupSyms.foreach(visit)
 
-          for (appSym <- groupEnqs) {
+          for (sym <- sendVars) {
+
+          }
+
+          for (appSym <- execEnqs) {
             val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
             implicit val evA: Bits[erasedApp.A] = erasedApp.evA
             implicit val evB: Bits[erasedApp.B] = erasedApp.evB
@@ -197,7 +253,6 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
     // We create an executor when we see `CircNew`, so the right executor must exist by the time we see the
     // corresponding `CircApply`
     val executor = executors(app.circ)
-    dbgs(s"ENQUEUING WITH ID ${app.id}")
     executor.stageEnq(app.id,app.arg)
   }
 

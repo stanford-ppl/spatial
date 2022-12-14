@@ -97,9 +97,7 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
 
   private def isNew(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircNew[_,_]])
   private def isApp(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircApply[_,_]])
-
-  // https://github.com/scala/bug/issues/12463
-  private def shouldLift(s: Sym[_]): Boolean = s.isReg || s.isRegFile || s.isFIFO || s.isLIFO || s.isLUT
+  private def shouldLift(s: Sym[_]): Boolean = s.isMem
 
   private def stageExecutors(newSyms: mut.Set[Sym[_]]): Void = {
     for (s <- newSyms) {
@@ -192,10 +190,13 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
             )
           }
 
-          implicit val sBits: Bits[s.MySpecialType] = s.asInstanceOf[Bits[s.MySpecialType]]
+          val b: Bits[_] = s.tp match {
+            case Bits(b) => b
+          }
+          implicit def ev: Bits[b.R] = b.asInstanceOf[Bits[b.R]]
 
           // EFFECTFUL!
-          val fifo = FIFO[s.MySpecialType](1)
+          val fifo = FIFO[b.R](2) // danger abounds! this cannot be 1
           sendVarFifos(i) += s -> fifo
           assert(groups(j).recvVars.contains(s))
           recvVarFifos(j) += s -> fifo
@@ -227,11 +228,15 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
           groupSyms.foreach(visit)
 
           for ((s, _) <- sendVars) {
-            implicit val sBits: Bits[s.MySpecialType] = s.asInstanceOf[Bits[s.MySpecialType]]
-            val fifo: FIFO[s.MySpecialType] = sendVarFifos(i)(s).asInstanceOf[FIFO[s.MySpecialType]]
+            val b: Bits[_] = s.tp match {
+              case Bits(b) => b
+            }
+
+            implicit def ev: Bits[b.R] = b.asInstanceOf[Bits[b.R]]
+            val fifo: FIFO[b.R] = sendVarFifos(i)(s).asInstanceOf[FIFO[b.R]]
 
             // EFFECTFUL!
-            fifo.enq(f(s).asInstanceOf[s.MySpecialType])
+            fifo.enq(f(s).asInstanceOf[b.R])
           }
 
           for (appSym <- execEnqs) {

@@ -115,6 +115,7 @@ abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:<
   *   4. The result of an operation of type S (has a defining node)
   */
 sealed trait Exp[+C,+A] extends Equals { self =>
+  type R = A@uV
   type L = C@uV
 
   private[argon] var _tp: ExpType[C@uV,A@uV] = _

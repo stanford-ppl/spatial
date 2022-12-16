@@ -138,6 +138,9 @@ trait ExternalAliases extends InternalAliases {
 
   // --- Primitives
 
+  type Circ[A,B] = spatial.lang.Circ[A,B]
+  lazy val Circ = spatial.lang.Circ
+
   type Counter[F] = spatial.lang.Counter[F]
   lazy val Counter = spatial.lang.Counter
 

@@ -64,6 +64,9 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val printer = IRPrinter(state, enable = config.enDbg)
     lazy val finalIRPrinter = IRPrinter(state, enable = true)
 
+    // --- Desugaring
+    lazy val circDesugaring = CircDesugaring(state)
+
     // --- Checking
     lazy val userSanityChecks  = UserSanityChecks(state, enable = !spatialConfig.allowInsanity)
     lazy val transformerChecks = CompilerSanityChecks(state, enable = spatialConfig.enLog && !spatialConfig.allowInsanity)
@@ -139,12 +142,12 @@ trait Spatial extends Compiler with ParamLoader {
         /** More black box lowering */
         (blackboxLowering2)   ==> printer ==> transformerChecks ==>
         /** DSE */
-        ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==> 
+        ((spatialConfig.enableArchDSE) ? paramAnalyzer) ==>
         /** Optional scala model generator */
         ((spatialConfig.enableRuntimeModel) ? retimingAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? initiationAnalyzer) ==>
         ((spatialConfig.enableRuntimeModel) ? dseRuntimeModelGen) ==>
-        (spatialConfig.enableArchDSE ? dsePass) ==> 
+        (spatialConfig.enableArchDSE ? dsePass) ==>
         //blackboxLowering    ==> printer ==> transformerChecks ==>
         switchTransformer   ==> printer ==> transformerChecks ==>
         switchOptimizer     ==> printer ==> transformerChecks ==>
@@ -157,8 +160,23 @@ trait Spatial extends Compiler with ParamLoader {
         /** Dead code elimination */
         useAnalyzer         ==>
         transientCleanup    ==> printer ==> transformerChecks ==>
+        /** #################################################################### */
+        /** FIXME: Desugaring */
+        circDesugaring      ==> printer ==> transformerChecks ==>
+        switchTransformer ==> printer ==> transformerChecks ==>
+        switchOptimizer ==> printer ==> transformerChecks ==>
+        memoryDealiasing ==> printer ==> transformerChecks ==>
+        ((!spatialConfig.vecInnerLoop) ? laneStaticTransformer) ==> printer ==>
+        /** Control insertion */
+        pipeInserter ==> printer ==> transformerChecks ==>
+        /** CSE on regs */
+        regReadCSE ==>
+        /** Dead code elimination */
+        useAnalyzer ==>
+        transientCleanup ==> printer ==> transformerChecks ==>
+        /** #################################################################### */
         /** Stream controller rewrites */
-        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==> 
+        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         /** Memory analysis */
         retimingAnalyzer    ==>
         accessAnalyzer      ==>

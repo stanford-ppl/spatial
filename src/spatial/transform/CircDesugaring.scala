@@ -255,7 +255,7 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
   }
 
   override def transform[A:Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = rhs match {
-    case AccelScope(_) => inAccel { super.transform(lhs,rhs) }
+    case accel: AccelScope => inAccel { transformCtrl(lhs, accel) }
     case _: BlackboxImpl[_,_,_] => inBox { super.transform(lhs,rhs) }
     case ctrl: Control[A] => transformCtrl(lhs, ctrl)
     case app: CircApply[_,_] => transformApp(app).asInstanceOf[Sym[A]]

@@ -1,14 +1,13 @@
 package spatial.transform
 
 import argon._
-import argon.lang.Bit
-import argon.node._
 import argon.transform.MutateTransformer
 import spatial.lang._
 import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.metadata.types._
 import spatial.metadata.memory._
+import spatial.metadata.control._
 
 import scala.collection.immutable.{Stream => ScalaStream}
 import scala.collection.{mutable => mut}
@@ -17,68 +16,6 @@ import scala.collection.mutable.ArrayBuffer
 // This pass removes everything `Circ` related from the IR by splitting up controllers containing `CircApply` nodes into
 // pairs of controllers which enqueue to/dequeue from a controller which implements the behavior of the applied `Circ`.
 // It must be run after `PipeInserter` because it assumes that `CircApply` results are scoped to an inner controller.
-
-abstract class CircExecutorFactory {
-  type Executor[A,B] <: CircExecutor[A,B]
-  def stageExecutor[A:Bits,B:Bits](nApps: Int, func: A => B): Executor[A,B]
-}
-
-abstract class CircExecutor[A:Bits,B:Bits] {
-  def stageDone(appId: Int): Void
-  def stageEnq(appId: Int, data: A): Void
-  def stageDeq(appId: Int): B
-}
-
-case class PriorityCircExecutorFactory(IR: State) extends CircExecutorFactory {
-  final implicit def __IR: State = IR
-  private val INPUT_FIFO_DEPTH = 8
-  private val OUTPUT_FIFO_DEPTH = 8
-
-  type Id = I32
-  type Input[A] = Tup2[Id, A]
-
-  val Id = I32
-  def none[A:Bits]: Input[A] = Tup2(Id(-1), Bits[A].zero)
-  def some[A:Bits](i: Id, a: A): Input[A] = Tup2(i, a)
-  def id[A:Bits](i: Input[A]): Id = i._1
-  def data[A:Bits](i: Input[A]): A = i._2
-
-  case class PriorityCircExecutor[A:Bits,B:Bits](
-    kill: Reg[Bit],
-    inputs: Seq[FIFO[Input[A]]],
-    outputs: Seq[FIFO[B]]
-  ) extends CircExecutor[A, B] {
-    override def stageDone(appId: Int): Void = inputs(appId).enq(none)
-    override def stageEnq(appId: Int, data: A): Void = inputs(appId).enq(some(Id(appId), data))
-    override def stageDeq(appId: Int): B = outputs(appId).deq()
-  }
-
-  override type Executor[A,B] = PriorityCircExecutor[A,B]
-
-  override def stageExecutor[A:Bits,B:Bits](nApps: Int, func: A => B): Executor[A,B] = {
-    val kill = Reg[Bit](Bit(false))
-    val inputs = Range(0, nApps).map(_ => FIFO[Input[A]](INPUT_FIFO_DEPTH))
-    val outputs = Range(0, nApps).map(_ => FIFO[B](OUTPUT_FIFO_DEPTH))
-    val count = Reg[Id](0)
-    val executor = PriorityCircExecutor(kill, inputs, outputs)
-
-    Sequential(breakWhen = kill).Foreach(*) { _ =>
-      val input = priorityDeq(inputs: _*)
-      val output = func(data(input))
-      outputs.zipWithIndex foreach {
-        case (fifo, idx) =>
-          val writeEnable = Id(idx) === id(input)
-          fifo.enq(output, writeEnable)
-      }
-      retimeGate()
-      val newCount = count.value + mux(id(input) === Id(-1), Id(1), Id(0))
-      count.write(newCount)
-      kill.write(true, newCount === Id(nApps))
-    }
-
-    executor
-  }
-}
 
 // Type-safe wrapper around `mut.Map[Circ[_,_], CircExecutor[_,_]]`
 case class ExecutorMap() {
@@ -92,41 +29,24 @@ case class ExecutorMap() {
 }
 
 case class CircDesugaring(IR: State) extends MutateTransformer with AccelTraversal {
-  private val factory: CircExecutorFactory = PriorityCircExecutorFactory(IR)
   private val executors: ExecutorMap = ExecutorMap()
 
   private def isNew(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircNew[_,_]])
   private def isApp(s: Sym[_]): Boolean = s.op.exists(_.isInstanceOf[CircApply[_,_]])
   private def shouldLift(s: Sym[_]): Boolean = s.isMem
 
-  private def stageExecutors(newSyms: mut.Set[Sym[_]]): Void = {
-    for (s <- newSyms) {
-      val erased: CircNew[_,_] = s.op.get.asInstanceOf[CircNew[_,_]]
-      implicit val evA: Bits[erased.A] = erased.evA
-      implicit val evB: Bits[erased.B] = erased.evB
-
-      val circ: Circ[erased.A,erased.B] = s.asInstanceOf[Circ[erased.A,erased.B]]
-      val circNew: CircNew[erased.A,erased.B] = erased.asInstanceOf[CircNew[erased.A, erased.B]]
-
-      // EFFECTFUL!
-      val executor = factory.stageExecutor(circ.getNumApps, circNew.func)
-      executors += circ -> executor
-    }
-  }
-
   case class Group(
     syms: ArrayBuffer[Sym[_]],
-    execEnqs: mut.Set[Sym[_]],
     execDeqs: mut.Set[Sym[_]],
     sendVars: mut.Map[Sym[_] /* var */, Int /* receiver */],
     recvVars: mut.Set[Sym[_]],
   )
 
-  private def stageSymsInGroups(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): Void = {
-    val groups = ArrayBuffer(Group(ArrayBuffer(), mut.Set(), mut.Set(), mut.Map(), mut.Set()))
-    val liftedSyms: ArrayBuffer[Sym[_]] = syms.filter(shouldLift).to[ArrayBuffer]
+  // Group `syms` ignoring any sym which is a `CircNew` or where `shouldLift` is `true`
+  private def computeSymGroups(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): ArrayBuffer[Group] = {
+    val groups = ArrayBuffer(Group(ArrayBuffer(), mut.Set(), mut.Map(), mut.Set()))
 
-    // Map from `Sym`s seen so far to index of last group where each `Sym` appeared; updated during loop below
+    // Map from syms seen so far to index of last group where each sym appeared; updated during loop below
     val prevSyms: mut.Map[Sym[_], Int] = mut.Map()
     var groupIdx: Int = 0
     val unusedAppSyms = appSyms.clone
@@ -147,22 +67,20 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
         for (s <- group.execDeqs) {
           prevSyms(s) = groupIdx
         }
+
         // We will also need to forward any variables created in our scope
         prevSyms ++= group.syms.zip(ScalaStream.continually(groupIdx))
 
-        groups += Group(ArrayBuffer(), mut.Set(), execDeqs.to[mut.Set], mut.Map(), mut.Set())
+        groups += Group(ArrayBuffer(), execDeqs.to[mut.Set], mut.Map(), mut.Set())
         groupIdx += 1
       }
 
       val group = groups.last
       group.syms += s
 
-      if (isApp(s)) {
-        group.execEnqs += s
-      }
-
       val recvVars = s.inputs.filter(s => prevSyms.contains(s) && !group.execDeqs.contains(s))
       group.recvVars ++= recvVars
+
       for (s <- recvVars) {
         val sender = groups(prevSyms(s))
         assert(!sender.sendVars.contains(s))
@@ -170,7 +88,14 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
       }
     }
 
-    dbgs(s"Lifting: $liftedSyms")
+    groups
+  }
+
+  private def stageSymsInGroups(syms: Seq[Sym[_]], appSyms: mut.Set[Sym[_]]): Void = {
+    val liftedSyms: ArrayBuffer[Sym[_]] = syms.filter(shouldLift).to[ArrayBuffer]
+    val groups = computeSymGroups(syms, appSyms)
+
+    dbgs(s"Lifted: $liftedSyms")
     dbgs(s"Groups: $groups")
 
     isolateSubst() {
@@ -193,17 +118,19 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
           val b: Bits[_] = s.tp match {
             case Bits(b) => b
           }
+
           implicit def ev: Bits[b.R] = b.asInstanceOf[Bits[b.R]]
 
+          // CAUTION: `depth` CANNOT be 1 or deadlock can occur when there are multiple FIFOs in the same controller
           // EFFECTFUL!
-          val fifo = FIFO[b.R](2) // danger abounds! this cannot be 1
+          val fifo = FIFO[b.R](2)
           sendVarFifos(i) += s -> fifo
           assert(groups(j).recvVars.contains(s))
           recvVarFifos(j) += s -> fifo
         }
       }
 
-      for ((Group(groupSyms, execEnqs, execDeqs, sendVars, recvVars), i) <- groups.zipWithIndex) {
+      for ((Group(groupSyms, execDeqs, sendVars, recvVars), i) <- groups.zipWithIndex) {
         Pipe {
           for (appSym <- execDeqs) {
             val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
@@ -238,18 +165,47 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
             // EFFECTFUL!
             fifo.enq(f(s).asInstanceOf[b.R])
           }
+        }
+      }
+    }
+  }
 
-          for (appSym <- execEnqs) {
-            val erasedApp: CircApply[_,_] = appSym.op.get.asInstanceOf[CircApply[_,_]]
-            implicit val evA: Bits[erasedApp.A] = erasedApp.evA
-            implicit val evB: Bits[erasedApp.B] = erasedApp.evB
+  private def transformInAccel(origSym: Sym[_], newSym: => Sym[_]): Sym[_] = {
+    if (origSym.isAccel) {
+      Accel { newSym }
+    } else {
+      newSym
+    }
+  }
 
-            val app: CircApply[erasedApp.A,erasedApp.B] = erasedApp.asInstanceOf[CircApply[erasedApp.A,erasedApp.B]]
-            val executor = executors(app.circ)
+  private def stageExecutors(newSyms: mut.Set[Sym[_]]): Void = {
+    for (s <- newSyms) {
+      val erased: CircNew[_, _] = s.op.get.asInstanceOf[CircNew[_, _]]
+      implicit val evA: Bits[erased.A] = erased.evA
+      implicit val evB: Bits[erased.B] = erased.evB
 
-            // EFFECTFUL!
-            executor.stageDone(app.id)
-          }
+      val circ: Circ[erased.A, erased.B] = s.asInstanceOf[Circ[erased.A, erased.B]]
+      val circNew: CircNew[erased.A, erased.B] = erased.asInstanceOf[CircNew[erased.A, erased.B]]
+
+      // EFFECTFUL!
+      val executor = circNew.factory.stageExecutor(circ.getNumApps, circNew.func)
+      executors += circ -> executor
+    }
+  }
+
+  private def stageExecutorKills(newSyms: mut.Set[Sym[_]]): Void = {
+    Pipe {
+      for (s <- newSyms) {
+        val erased: CircNew[_, _] = s.op.get.asInstanceOf[CircNew[_, _]]
+        implicit val evA: Bits[erased.A] = erased.evA
+        implicit val evB: Bits[erased.B] = erased.evB
+
+        val circ: Circ[erased.A, erased.B] = s.asInstanceOf[Circ[erased.A, erased.B]]
+        val executor = executors(circ)
+
+        for (i <- Range(0, circ.getNumApps)) {
+          // EFFECTFUL!
+          executor.stageDone(i)
         }
       }
     }
@@ -268,10 +224,21 @@ case class CircDesugaring(IR: State) extends MutateTransformer with AccelTravers
     dbgs(s"\tFound `CircNew`s: $newSyms")
     dbgs(s"\tFound `CircApp`s: $appSyms")
 
-    val result = Stream {
-      stageExecutors(newSyms)
+    val result = transformInAccel(lhs, if (newSyms.isEmpty) {
       stageSymsInGroups(syms, appSyms)
-    }
+    } else {
+      Stream {
+        stageExecutors(newSyms)
+        Pipe {
+          if (appSyms.isEmpty) {
+            syms.foreach(visit)
+          } else {
+            stageSymsInGroups(syms, appSyms)
+          }
+          stageExecutorKills(newSyms)
+        }
+      }
+    })
 
     result.asInstanceOf[Sym[A]]
   }

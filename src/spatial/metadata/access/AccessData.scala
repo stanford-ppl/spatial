@@ -63,6 +63,11 @@ trait CoherentEdge { this: DependencyEdge =>
   def mem: Sym[_]
 }
 
+trait StartEndEdge { this: DependencyEdge =>
+  // This is just a mixin that asserts that recv only depends on isFirst(dstIterators) and sending only depends on
+  // isLast(srcIterators)
+}
+
 trait TimeStamp {
   // The current value of this symbol
   def apply[T: Num](s: Sym[T]): T

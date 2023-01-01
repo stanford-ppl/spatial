@@ -10,6 +10,12 @@ case class SrcCtx(dir: String, file: String, line: Int, column: Int, content: Op
     }
     s"$file:$line:$column$previousCtx"
   }
+
+  def +(additional: Seq[SrcCtx]): SrcCtx = {
+    this.copy(previous = previous ++ additional)
+  }
+
+  def +(additional: SrcCtx): SrcCtx = this + Seq(additional)
 }
 
 object SrcCtx {

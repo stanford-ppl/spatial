@@ -67,6 +67,7 @@ class RegBufferingNoStream extends RegBuffering {
 @spatial class DataDependentControl extends SpatialTest {
   override def compileArgs = "--max_cycles=10000 --vv"
   override def main(args: Array[String]) = {
+    implicitly[argon.State].config.setV(3)
     val output = ArgOut[I32]
     val output2 = ArgOut[I32]
     Accel {

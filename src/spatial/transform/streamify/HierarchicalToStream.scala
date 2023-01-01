@@ -156,6 +156,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
   private lazy val edges: Set[DependencyEdge] = globals[DependencyEdges].get.edges.toSet
 
   class DependencyManager(ctrl: Ctrl, var fetchedEdges: Set[DependencyEdge] = Set.empty, var currentValues: Map[Sym[_], Reg[_]] = Map.empty) {
+    def copy(): DependencyManager = new DependencyManager(ctrl, fetchedEdges, currentValues)
 
     def fetchedCoherentEdges: Set[CoherentEdge] = fetchedEdges.collect {
       case edge: CoherentEdge => edge
@@ -169,7 +170,6 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
       val pseudoEdges = (fifoManager.getPseudoIntakes(ctrl) -- fetchedEdges).filter(_.dstIterators.subsetOf(timeStamp.support))
 
-//      val remainingEdges = (edges -- fetchedEdges).filter(_.dstIterators.subsetOf(iteratorMap.keySet))
       val remainingEdges = fetchable.filterNot(x => fetchedEdges.contains(x._1))
       fetchedEdges ++= remainingEdges.keys
       fetchedEdges ++= pseudoEdges
@@ -217,27 +217,131 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           currentValues += mem -> valueRegBuf
       }
     }
-    def mirrorRecursive[T](s: Sym[T], cache: cm.Map[Sym[_], Sym[_]] = cm.Map.empty): (Sym[T], cm.Map[Sym[_], Sym[_]]) = {
+    def mirrorRecursive[T](s: Sym[T], cache: cm.Map[Sym[_], Sym[_]] = cm.Map.empty)(implicit ctx: argon.SrcCtx): (Sym[T], cm.Map[Sym[_], Sym[_]]) = {
       s match {
         case Op(RegRead(mem)) if currentValues contains mem =>
           // Don't cache reg reads
+          dbgs(s"Fetching read from currentValues: ${stm(s)}")
           (currentValues(mem).value.asInstanceOf[Sym[T]], cache)
-        case _ if cache contains s => (cache(s).asInstanceOf[Sym[T]], cache)
-        case ctr: Idx if ctr.getCounter.nonEmpty => (f(ctr), cache)
+        case _ if cache contains s =>
+          dbgs(s"Fetching from cache: ${stm(s)}")
+          (cache(s).asInstanceOf[Sym[T]], cache)
+        case iter: Idx if iter.getCounter.nonEmpty =>
+          dbgs(s"Fetching iterator ${stm(iter)}")
+          (f(iter), cache)
         case _ =>
-          s.inputs.foreach(mirrorRecursive(_, cache))
-          val mirrored = mirrorSym(s)
+          dbgs(s"Recursively fetching inputs for ${stm(s)}: ${s.inputs}")
+          val newInputs = s.inputs.map(mirrorRecursive(_, cache)._1)
+          val mirrored = isolateSubst() {
+            register(s.inputs, newInputs)
+            mirrorSym(s)
+          }
+          mirrored.ctx += ctx
           cache += s -> mirrored
           (mirrored, cache)
       }
     }
 
-    def copy(): DependencyManager = new DependencyManager(ctrl, fetchedEdges, currentValues)
+    def getTokens(currentTime: TimeStamp): Map[Sym[_], Bits[_]] = {
+      (currentValues.mapValues(_.value).map {
+        case (mem, value) =>
+          dbgs(s"Computing Values For: ${currentValues}")
+          val isEnabled = (fetchedCoherentEdges.filter(_.mem == mem).map {
+            case edge: DependencyEdge => edge.dstRecv(currentTime)
+          }).toSeq.reduceTree(_ | _)
+          val typeCarrier = CoherentUtils.MemToBitsCarrier(mem)
+
+          implicit def bitsEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
+
+          dbgs(s"Fetching: $mem -> value = ${stm(value.asInstanceOf[Sym[_]])} [isEnabled = ${stm(isEnabled)}]")
+          mem -> TokenWithValid(value.asInstanceOf[typeCarrier.T], isEnabled).asInstanceOf[Bits[_]]
+      }).toMap[Sym[_], Bits[_]]
+    }
   }
 
   private def counterGen(ctrl: Sym[_], fifoBundle: StreamBundle): Unit = {
     dbgs(s"Ancestors of $ctrl = ${ctrl.ancestors}")
+
     def recurse(currentAncestors: List[Ctrl], timeMap : TimeMap, dependencyManager: DependencyManager): Unit = {
+      // This is called when the loop will not run -- branch not taken, not enabled, etc.
+
+      def terminate(dependencyManager: DependencyManager): Unit = {
+        val remainingCounters = currentAncestors.flatMap(_.cchains).flatMap(_.counters)
+        dbgs(s"Remaining Counters: $remainingCounters")
+        // In order to "skip" iterations, we need to first get all of the iterators that are needed by the remaining edges
+        val remainingEdges =  fifoManager.getIntakeFIFOs(ctrl.toCtrl).keySet -- dependencyManager.fetchedEdges
+
+        dbgs(s"Remaining Edges: $remainingEdges")
+
+        val (startEndEdges, generalEdges) = remainingEdges.partition {
+          case _: StartEndEdge => true
+          case _ => false
+        }
+
+        if (generalEdges.nonEmpty) {
+          throw new NotImplementedError(s"Expected to not have remaining general edges, instead had: $generalEdges")
+        }
+
+        val support = startEndEdges.flatMap(_.dstIterators)
+
+        dbgs(s"Support Iterators: $support")
+        // If the source of the edge and ourselves are both inside the disabled LCA, then the source enqueued once, and we dequeue once.
+        // If the source of the edge is *outside* the disabled LCA, then we need to dequeue as-normal (which will happen by default).
+
+        // Tell the release to dequeue from bypass
+        fifoBundle.source.enq(Bit(false))
+
+        val cache = cm.Map.empty[Sym[_], Sym[_]]
+        isolateSubst () {
+          // Map all counters to their first iter in order to get all of the remaining edges
+
+          remainingCounters.foreach {
+            ctr =>
+              val iter = ctr.iter.get
+              register(iter -> dependencyManager.mirrorRecursive(ctr.start, cache)._1)
+          }
+
+          val triplets = remainingCounters.flatMap(_.iter).map(_.unbox).map {
+            case iter: Num[_] => iter -> TimeTriplet(f(iter), Bit(true), Bit(true))
+          }
+
+          val newTime = timeMap ++ TimeMap(triplets)
+          val tokens = (fifoManager.getIntakeFIFOs(ctrl.toCtrl).collect {
+            case (edge: CoherentEdge with StartEndEdge, fifo) =>
+              type TP = fifo.A.R
+              implicit val tpEV: Bits[TP] = fifo.A.asInstanceOf[Bits[TP]]
+              val tokenWithValid = TokenWithValid[TP](fifo.deq().asInstanceOf[TP], Bit(true))
+              edge.mem -> tokenWithValid.asInstanceOf[Bits[_]]
+          }).toMap[Sym[_], Bits[_]]
+
+          val fetchedValues = dependencyManager.getTokens(newTime)
+
+          val encodedTokens = fifoBundle.outputTokenType(tokens ++ fetchedValues)
+          fifoBundle.genToReleaseTokens.enq(encodedTokens)
+        }
+
+        // Map all counters to their last iter in order to release the tokens as well
+        isolateSubst() {
+          val cache = cm.Map.empty[Sym[_], Sym[_]]
+          remainingCounters.foreach {
+            ctr =>
+              register(ctr.iter.get -> dependencyManager.mirrorRecursive(ctr.end, cache)._1)
+          }
+          val triplets = remainingCounters.flatMap(_.iter).map(_.unbox).map {
+            case iter: Num[_] => iter -> TimeTriplet(f(iter), Bit(true), Bit(true))
+          }
+
+          val newTime = timeMap ++ TimeMap(triplets)
+          val pIters = fifoBundle.pIterType((newTime.triplets.map {
+            case (iter: Sym[Num[_]], TimeTriplet(current: Bits[_], isFirst, isLast)) =>
+              type CT = current.R
+              implicit def bEV: Bits[CT] = current.asInstanceOf[Bits[CT]]
+              iter -> PseudoIter(current.asInstanceOf[CT], isFirst, isLast)
+          }).toMap)
+          fifoBundle.genToReleaseIters.enq(pIters)
+        }
+      }
+
       currentAncestors match {
         case Ctrl.Host :: Nil =>
           throw new UnsupportedOperationException(s"AccelScope was an inner controller, we shouldn't have done anything.")
@@ -297,8 +401,10 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               isolateSubst() {
                 val tempCache = cm.Map.empty[Sym[_], Sym[_]]
                 val newEns = ens.map(dependencyManager.mirrorRecursive(_, tempCache)._1)
-                val cchainDeps = cchain.counters.flatMap(_.inputs).map(dependencyManager.mirrorRecursive(_, tempCache)._1)
+                val allInputs = cchain.counters.flatMap(_.inputs)
+                val cchainDeps = allInputs.map(dependencyManager.mirrorRecursive(_, tempCache)._1)
                 register(tempCache.toSeq)
+                register(allInputs, cchainDeps)
                 val cchainWillRun = cchain.counters.map(willRunUT(_, this))
                 val newEnsUnboxed = newEns.map(_.unbox).toSeq
                 (cchainWillRun ++ newEnsUnboxed).reduceTree(_ & _)
@@ -312,7 +418,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               isolateSubst() {
                 val newDependencyManager = dependencyManager.copy()
                 val cache = cm.Map.empty[Sym[_], Sym[_]]
-                throw new UnsupportedOperationException(s"Haven't implemented the false branch yet")
+                terminate(newDependencyManager)
               }
             })) {
               ite =>
@@ -466,6 +572,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           visit(stmt)
         case stmt =>
           val newStm = mirrorSym(stmt)
+          newStm.ctx += implicitly[argon.SrcCtx]
           dbgs(s"Mirroring: ${stm(stmt)} -> ${stm(newStm)}")
           register(stmt -> newStm)
       }
@@ -658,6 +765,14 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
         }
       }))
     }
+
+    case acc: Accessor[_, _] if syncMems contains acc.mem =>
+      dbgs(s"Skipping: $lhs = $rhs since ${acc.mem} is in syncMems")
+      lhs
+
+    case acc: Accessor[_, _] =>
+      dbgs(s"Not skipping $lhs = $rhs since ${acc.mem} is not in $syncMems")
+      super.transform(lhs, rhs)
 
     case _ if lhs.isInnerControl && inHw =>
       dbgs(s"Processing: Inner Controller ${stm(lhs)}")

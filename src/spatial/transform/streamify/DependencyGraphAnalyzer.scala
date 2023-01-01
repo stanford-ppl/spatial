@@ -32,7 +32,7 @@ object EdgeType {
   }
 }
 
-case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: EdgeType)(implicit state: argon.State) extends DependencyEdge with CoherentEdge {
+case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: EdgeType)(implicit state: argon.State) extends DependencyEdge with CoherentEdge with StartEndEdge {
 
   override def isPseudoEdge: Boolean = edgeType match {
     case Initialize => true

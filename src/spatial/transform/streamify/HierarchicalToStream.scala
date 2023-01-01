@@ -557,7 +557,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
         case stmt@Op(RegRead(mem)) if tokenValues contains mem =>
           dbgs(s"Eliding RegRead($mem) with token value ${tokenValues(mem)}")
           register(stmt -> tokenValues(mem))
-        case stmt@Op(RegWrite(mem, data, ens)) if tokenValues contains mem =>
+        case stmt@Op(RegWrite(mem: Reg[_], data, ens)) if tokenValues contains mem =>
           val alwaysEnabled = (ens.forall {
             case Const(c) => c.value
             case _ => false
@@ -569,7 +569,8 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           }
           dbgs(s"Updating $mem <- ${stm(tokenValues(mem))}")
           // We still need to stage the write anyways
-          visit(stmt)
+          val mirrored = f(mem).asInstanceOf[Reg[mem.RT]]
+          mirrored.write(f(data).asInstanceOf[mem.RT], f(ens).toSeq:_*)
         case stmt =>
           val newStm = mirrorSym(stmt)
           newStm.ctx += implicitly[argon.SrcCtx]

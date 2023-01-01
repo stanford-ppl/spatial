@@ -18,7 +18,7 @@ import spatial.metadata.memory._
       val reg = Reg[I32](0)
       reg.buffer
       reg := 3
-      Pipe.Foreach(0 until outerIters by 1) {
+      Foreach(0 until outerIters by 1) {
         outer =>
           'Producer.Foreach(0 until innerIters) {
             i =>

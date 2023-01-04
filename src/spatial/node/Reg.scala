@@ -4,11 +4,15 @@ import argon._
 import forge.tags._
 import spatial.lang._
 
-@op case class RegNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
-@op case class FIFORegNew[A:Bits](init: Bits[A]) extends MemAlloc[A,FIFOReg] { def dims = Nil }
-@op case class ArgInNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
-@op case class ArgOutNew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
-@op case class HostIONew[A:Bits](init: Bits[A]) extends MemAlloc[A,Reg] { def dims = Nil }
+abstract class RegAlloc[A: Bits, C[T]](implicit C: Type[C[A]]) extends MemAlloc[A, C] {
+  def init: Bits[A]
+}
+
+@op case class RegNew[A:Bits](init: Bits[A]) extends RegAlloc[A,Reg] { def dims = Nil }
+@op case class FIFORegNew[A:Bits](init: Bits[A]) extends RegAlloc[A,FIFOReg] { def dims = Nil }
+@op case class ArgInNew[A:Bits](init: Bits[A]) extends RegAlloc[A,Reg] { def dims = Nil }
+@op case class ArgOutNew[A:Bits](init: Bits[A]) extends RegAlloc[A,Reg] { def dims = Nil }
+@op case class HostIONew[A:Bits](init: Bits[A]) extends RegAlloc[A,Reg] { def dims = Nil }
 
 @op case class RegWrite[A:Bits](
     mem:  Reg[A],

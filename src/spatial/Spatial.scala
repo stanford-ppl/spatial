@@ -18,6 +18,7 @@ import spatial.node.InputArguments
 import spatial.metadata.access._
 import spatial.targets.HardwareTarget
 import spatial.dse._
+import spatial.executor.scala.ExecutorPass
 import spatial.transform._
 import spatial.traversal._
 import spatial.model.RuntimeModelGenerator
@@ -124,6 +125,8 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val forceHierarchical     = ForceHierarchical(state)
     lazy val dependencyGraphAnalyzer = DependencyGraphAnalyzer(state)
 
+    lazy val executor = ExecutorPass(state)
+
     import Stripper.S
     lazy val bankStrippers = MetadataStripper(state,
       S[Duplicates], S[Dispatch], S[spatial.metadata.memory.Ports],
@@ -197,6 +200,7 @@ trait Spatial extends Compiler with ParamLoader {
         spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
         bankingAnalysis ==> createDump("PreUnroll") ==>
+        executor ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */

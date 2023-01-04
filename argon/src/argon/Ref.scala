@@ -17,6 +17,8 @@ import scala.reflect.{ClassTag,classTag}
 abstract class ExpType[+C:ClassTag,A](implicit protected[argon] val evRef: A <:< Ref[C,A]) extends Equals {
   type L = C@uV
 
+  val tag: ClassTag[C@uV] = implicitly[ClassTag[C]]
+
   protected def me: A = this.asInstanceOf[A]
 
 

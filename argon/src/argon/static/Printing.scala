@@ -23,6 +23,13 @@ trait Printing {
   @stateful def close(x: => Any): Unit = { close(); emit(x) }
   @stateful def closeopen(x: => Any): Unit = { close(); emit(x); open() }
 
+  @stateful def indentGen[T](thunk: => T): T = {
+    open()
+    val result = thunk
+    close()
+    result
+  }
+
   /** Compiler Info Messages */
   @stateful def info(x: => Any): Unit = if (config.enInfo) state.out.info(x)
   @stateful def info(ctx: SrcCtx): Unit = info(ctx, showCaret = true)

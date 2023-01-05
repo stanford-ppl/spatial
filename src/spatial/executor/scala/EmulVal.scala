@@ -4,9 +4,8 @@ import argon.Sym
 
 import scala.reflect.ClassTag
 
-trait EmulResult {
-  def sym: Sym[_]
-}
+trait EmulResult
+case class SymWithResult(sym: Sym[_], value: EmulResult)
 
 abstract class EmulVal[VT] extends EmulResult {
   def value: VT
@@ -14,8 +13,8 @@ abstract class EmulVal[VT] extends EmulResult {
   val valid: Boolean = true
 }
 
-case class SimpleEmulVal[VT](sym: Sym[_], value: VT, override val valid: Boolean = true) extends EmulVal[VT] {
-  override lazy val tag: ClassTag[VT] = sym.tp.tag.asInstanceOf[ClassTag[VT]]
+case class SimpleEmulVal[VT: ClassTag](value: VT, override val valid: Boolean = true) extends EmulVal[VT] {
+  override lazy val tag: ClassTag[VT] = implicitly[ClassTag[VT]]
 }
 
 case class EmulUnit(sym: Sym[_]) extends EmulVal[Unit] {

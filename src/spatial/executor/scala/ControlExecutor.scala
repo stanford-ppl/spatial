@@ -168,7 +168,7 @@ class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
         if (isEnabled) {
           val newState = execState.copy()
           iterShifts.foreach {
-            case (iter, shift) => newState.register(SimpleEmulVal(iter, nextIter(iter) + shift))
+            case (iter, shift) => newState.register(iter, SimpleEmulVal(nextIter(iter) + shift))
           }
           val pipelineKey = iterShifts.map(_._2).toList
           emit(s"Pushing into pipeline: $pipelineKey (${pipelines(pipelineKey)})")
@@ -228,7 +228,7 @@ class OuterForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
         if (isEnabled) {
           val newState = execState.copy()
           iterShifts.foreach {
-            case (iter, shift) => newState.register(SimpleEmulVal(iter, nextIter(iter) + shift))
+            case (iter, shift) => newState.register(iter, SimpleEmulVal(nextIter(iter) + shift))
           }
           pipelines(iterShifts.map(_._2).toList).pushState(newState)
         }

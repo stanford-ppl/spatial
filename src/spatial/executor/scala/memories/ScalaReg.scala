@@ -5,7 +5,7 @@ import spatial.executor.scala.{EmulMem, EmulVal}
 
 import scala.reflect.ClassTag
 
-class ScalaReg[TP](val sym: Sym[_], init: TP, var curVal: TP)(implicit ct: ClassTag[TP]) extends EmulMem[TP] {
+class ScalaReg[TP](init: TP, var curVal: TP)(implicit ct: ClassTag[TP]) extends EmulMem[TP] {
   type ET = TP
 
   def reset(): Unit = {curVal = init}
@@ -13,6 +13,6 @@ class ScalaReg[TP](val sym: Sym[_], init: TP, var curVal: TP)(implicit ct: Class
   override lazy val tag: ClassTag[TP] = ct
 
   override def toString: String = {
-    s"ScalaReg[${tag.toString}]($sym, init = $init, curVal = $curVal)"
+    s"ScalaReg[${tag.toString}](init = $init, curVal = $curVal)"
   }
 }

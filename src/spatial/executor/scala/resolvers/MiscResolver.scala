@@ -10,10 +10,10 @@ trait MiscResolver extends OpResolverBase {
 
     case Op(ftt: FixToText[_, _, _]) =>
       val a = execState.getValue[FixedPoint](ftt.a.asSym)
-      SimpleEmulVal(sym, a.toString)
+      SimpleEmulVal(a.toString)
 
     case Op(TextConcat(parts)) =>
-      SimpleEmulVal(sym, parts.map(execState.getValue[String](_)).mkString(""))
+      SimpleEmulVal(parts.map(execState.getValue[String](_)).mkString(""))
 
     case Op(PrintIf(ens, text)) =>
       if (ens.forall(execState.getValue[Boolean](_))) {

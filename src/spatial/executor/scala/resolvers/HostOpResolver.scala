@@ -23,9 +23,8 @@ trait HostOpResolver extends OpResolverBase {
         i =>
           // register the inputs to the block
           val tmpExecState = execState.copy()
-          val copiedArr = new ScalaTensor[InputET](applyF.inputA, arr.shape, Some(arr.values))
-          tmpExecState.register(copiedArr)
-          tmpExecState.register(SimpleEmulVal(applyF.inputB, FixedPoint.fromInt(i)))
+          tmpExecState.register(applyF.inputA, arr)
+          tmpExecState.register(applyF.inputB, SimpleEmulVal(FixedPoint.fromInt(i)))
           applyF.stms.foreach(tmpExecState.runAndRegister(_))
           tmpExecState.getValue[InputET](applyF.result)
       }
@@ -34,26 +33,39 @@ trait HostOpResolver extends OpResolverBase {
       val outputValues = tmpValues.map {
         value =>
           val tmpExecState = execState.copy()
-          tmpExecState.register(SimpleEmulVal(func.input, value))
+          tmpExecState.register(func.input, SimpleEmulVal(value))
           func.stms.foreach(tmpExecState.runAndRegister(_))
           tmpExecState.getValue[OutputET](func.result)
       }
 
-      new ScalaTensor[OutputET](sym, arr.shape, Some(outputValues.map(Some(_))))(amap.B.tag)
+      new ScalaTensor[OutputET](arr.shape, Some(outputValues.map(Some(_))))(amap.B.tag)
 
     case Op(ArrayApply(coll, i)) =>
       val arr = execState.getTensor[coll.A.L](coll)
       val index = execState.getValue[FixedPoint](i).toInt
       val result = arr.read(Seq(index), true)
-      SimpleEmulVal(sym, result.get, result.nonEmpty)
+      SimpleEmulVal(result.get, result.nonEmpty)
+
+    case Op(mi@MapIndices(s, func)) =>
+      val size = execState.getValue[FixedPoint](s).toInt
+      type ET = mi.R.L
+      val mapped = Seq.tabulate(size) {
+        i =>
+          val tmpState = execState.copy()
+          tmpState.register(func.input, SimpleEmulVal(FixedPoint.fromInt(i)))
+          func.stms.foreach(tmpState.runAndRegister(_))
+          tmpState.getValue[ET](func.result)
+      }
+      new ScalaTensor[ET](Seq(size), Some(mapped.map(Some(_))))
+
 
     case Op(ArrayLength(array)) =>
       val arr = execState.getTensor(array)
-      SimpleEmulVal(sym, FixedPoint.fromInt(arr.size))
+      SimpleEmulVal(FixedPoint.fromInt(arr.size))
 
     case Op(TextToFix(t, fmt)) =>
       val text = execState.getValue[String](t)
-      SimpleEmulVal(sym, FixedPoint(text, fmt.toEmul))
+      SimpleEmulVal(FixedPoint(text, fmt.toEmul))
 
     case _ => super.run(sym, execState)
   }

@@ -8,7 +8,7 @@ import scala.reflect.ClassTag
 
 
 // Shape is from largest stride to smallest stride
-class ScalaTensor[TP: ClassTag](val sym: Sym[_], val shape: Seq[Int], initValues: Option[Seq[Option[TP]]] = None) extends EmulMem[TP] {
+class ScalaTensor[TP: ClassTag](val shape: Seq[Int], initValues: Option[Seq[Option[TP]]] = None) extends EmulMem[TP] {
   type ET = TP
 
   val size = shape.product

@@ -20,7 +20,7 @@ trait MemoryResolver extends OpResolverBase {
 
         val initVal = execState.getValue[VT](ao.init)
         implicit val ct: ClassTag[VT] = tp.tag.asInstanceOf[ClassTag[VT]]
-        new ScalaReg[VT](sym, initVal, initVal)
+        new ScalaReg[VT](initVal, initVal)
 
       case Op(RegWrite(mem, data, ens)) =>
         val tmp = execState(mem) match { case sr:ScalaReg[_] => sr }
@@ -39,7 +39,7 @@ trait MemoryResolver extends OpResolverBase {
         }
         type ET = tmp.ET
         val reg = tmp.asInstanceOf[ScalaReg[ET]]
-        SimpleEmulVal(sym, reg.curVal)
+        SimpleEmulVal(reg.curVal)
 
       case Op(GetReg(mem)) =>
         val tmp = execState(mem) match {
@@ -47,7 +47,7 @@ trait MemoryResolver extends OpResolverBase {
         }
         type ET = tmp.ET
         val reg = tmp.asInstanceOf[ScalaReg[ET]]
-        SimpleEmulVal(sym, reg.curVal)
+        SimpleEmulVal(reg.curVal)
 
       case Op(SetReg(mem, data)) =>
         val tmp = execState(mem) match {
@@ -64,7 +64,7 @@ trait MemoryResolver extends OpResolverBase {
         val elType: ExpType[_, _] = malloc.A.tp
         type ET = elType.L
         implicit val ct: ClassTag[ET] = elType.tag.asInstanceOf[ClassTag[ET]]
-        new ScalaTensor[ET](sym, malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt))
+        new ScalaTensor[ET](malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt))
 
       case Op(sm@SetMem(dram, data)) =>
         val elType: ExpType[_, _] = sm.A.tp

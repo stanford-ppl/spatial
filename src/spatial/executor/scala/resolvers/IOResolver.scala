@@ -6,25 +6,26 @@ import spatial.node._
 
 import scala.io.Source
 
-case class EmulFile(sym: Sym[_], handle: Source) extends EmulResult
+case class EmulFile(handle: Source) extends EmulResult {
+  def close(): Unit = handle.close()
+}
 
 trait IOResolver extends OpResolverBase {
   override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
     case Op(OpenCSVFile(fname, write)) =>
       val name = execState.getValue[String](fname)
       execState.log(s"Opening CSV: $fname [write = $write]")
-      EmulFile(sym, scala.io.Source.fromFile(name))
+      EmulFile(scala.io.Source.fromFile(name))
 
     case Op(ReadTokens(file, delim)) =>
-      val handle = execState(file) match {case EmulFile(_, handle) => handle }
+      val handle = execState(file) match {case EmulFile(handle) => handle }
       val delimiter = execState.getValue[String](delim)
 
       val values = handle.getLines().flatMap(_.split(delimiter)).toList
-      new ScalaTensor[String](sym, Seq(values.size), Some(values.map(Some(_))))
+      new ScalaTensor[String](Seq(values.size), Some(values.map(Some(_))))
 
     case Op(CloseCSVFile(file)) =>
-      val handle = execState(file) match {case EmulFile(_, handle) => handle }
-      handle.close()
+      execState(file) match {case ef:EmulFile => ef.close() }
       EmulUnit(sym)
 
     case _ => super.run(sym, execState)

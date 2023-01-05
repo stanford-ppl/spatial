@@ -1,17 +1,17 @@
 package spatial.executor.scala
 
-import argon.{Const, Exp, Sym, stm}
+import argon.{Const, Exp, Param, Sym, Value, stm}
 import spatial.executor.scala.memories.ScalaTensor
 import spatial.executor.scala.resolvers.OpResolver
 
 import scala.reflect.ClassTag
 
-class ExecutionState(var values: Map[Sym[_], EmulResult], val log: String => Any, val error: String => Any) {
+class ExecutionState(var values: Map[Exp[_, _], EmulResult], val log: String => Any, val error: String => Any) {
   def apply[U, V](s: Exp[U, V]): EmulResult = s match {
-    case Const(result) =>
+    case Value(result) =>
       implicit def ct: ClassTag[U] = s.tp.tag
-      SimpleEmulVal(s, result)
-    case _ => values(s.asInstanceOf[Sym[_]])
+      SimpleEmulVal(result)
+    case _ => values(s)
   }
 
   def getValue[T](s: Exp[_, _]): T = {
@@ -28,15 +28,15 @@ class ExecutionState(var values: Map[Sym[_], EmulResult], val log: String => Any
     }
   }
 
-  def register(v: EmulResult): Unit = {
-    values += (v.sym -> v)
+  def register(sym: Sym[_], v: EmulResult): Unit = {
+    values += (sym -> v)
   }
 
   def copy(): ExecutionState = new ExecutionState(values, log, error)
 
   def runAndRegister[U, V](s: Exp[U, V]): EmulResult = {
     val result = OpResolver.run(s, this)
-    register(result)
+    register(s, result)
     result
   }
 

@@ -1,13 +1,13 @@
 package spatial.executor.scala
 
-import argon.{Block, Op, emit, inGen}
+import argon.{Block, Op, emit, error, inGen}
 import spatial.node.AccelScope
 import spatial.traversal.AccelTraversal
 
 case class ExecutorPass(IR: argon.State) extends AccelTraversal {
   override protected def process[R](block: Block[R]): Block[R] = {
-    inGen(IR.config.genDir, s"SimulatedExecutionLog_${IR.paddedPass(4)}") {
-      val executionState = new ExecutionState(Map.empty, emit(_))
+    inGen(IR.config.genDir, s"SimulatedExecutionLog_${IR.paddedPass}") {
+      val executionState = new ExecutionState(Map.empty, emit(_), error(_))
       var cycles = 0
       block.stms.foreach {
         case accelScope@Op(_: AccelScope) =>

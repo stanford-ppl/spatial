@@ -1,12 +1,12 @@
 package spatial.transform
 
 import argon._
-import argon.transform.ForwardTransformer
+import argon.transform.MutateTransformer
 import spatial.traversal.AccelTraversal
 import spatial.node._
 import spatial.metadata.control._
 
-case class DuplicateRetimeStripper(IR: State) extends ForwardTransformer with AccelTraversal {
+case class DuplicateRetimeStripper(IR: State) extends MutateTransformer with AccelTraversal {
   def stripDuplicateRetimes(block: Block[_]): Block[_] = {
     stageScope(f(block.inputs), block.options) {
       var previousWasRetime = false

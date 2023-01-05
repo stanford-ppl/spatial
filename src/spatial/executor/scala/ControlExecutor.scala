@@ -125,6 +125,7 @@ abstract class ForeachExecutorBase(ctrl: Sym[_], override val execState: Executi
   protected val bounds = (iters.map {
     iter =>
       val ctr = iter.counter.ctr
+      dbgs(s"Getting iter: $iter (${stm(ctr)}")
       iter -> (execState.getValue[FixedPoint](ctr.start), execState.getValue[FixedPoint](ctr.end))
   }).toMap
 }

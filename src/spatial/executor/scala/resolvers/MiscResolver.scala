@@ -3,6 +3,7 @@ import argon.{Exp, Op}
 import argon.node.{AssertIf, FixToText, PrintIf, TextConcat}
 import emul.FixedPoint
 import spatial.executor.scala.{EmulResult, EmulUnit, ExecutionState, SimpleEmulVal}
+import utils.Result.Fail
 
 trait MiscResolver extends OpResolverBase {
   override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
@@ -26,9 +27,9 @@ trait MiscResolver extends OpResolverBase {
         // Check the condition
         val condBool = execState.getValue[Boolean](cond)
         if (!condBool) {
-          execState.log(s"FAILED ASSERT AT ${sym.ctx}")
+          execState.error(s"FAILED ASSERT AT ${sym.ctx}")
           message.foreach {
-            text => execState.log(execState.getValue[String](text))
+            text => execState.error(execState.getValue[String](text))
           }
         }
       }

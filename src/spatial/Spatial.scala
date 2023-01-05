@@ -124,6 +124,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val accelPipeInserter     = AccelPipeInserter(state)
     lazy val forceHierarchical     = ForceHierarchical(state)
     lazy val dependencyGraphAnalyzer = DependencyGraphAnalyzer(state)
+    lazy val counterIterSynchronization = CounterIterSynchronization(state)
 
     lazy val executor = ExecutorPass(state)
 
@@ -136,7 +137,7 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val fifoInitialization = Seq(fifoInitializer, pipeInserter, MetadataStripper(state, S[spatial.metadata.memory.FifoInits]))
 
-    lazy val retimeAnalysisPasses = Seq(duplicateRetimeStripper, retimingAnalyzer)
+    lazy val retimeAnalysisPasses = Seq(printer, duplicateRetimeStripper, printer, retimingAnalyzer)
 
     lazy val bankingAnalysis = retimeAnalysisPasses  ++ Seq(accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
 
@@ -200,6 +201,8 @@ trait Spatial extends Compiler with ParamLoader {
         spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
         bankingAnalysis ==> createDump("PreUnroll") ==>
+        counterIterSynchronization ==>
+        transformerChecks ==>
         executor ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>

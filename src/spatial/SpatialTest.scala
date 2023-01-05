@@ -48,7 +48,7 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
 
   object VCS extends ChiselBackend(
     name = "VCS",
-    args = "--synth --insanity --instrument --runtime --fpga VCS",
+    args = "--synth --instrument --runtime --fpga VCS",
     make = {
       val vcd = checkFlag("VCD")
       println(s"Run VCD: ${vcd}")

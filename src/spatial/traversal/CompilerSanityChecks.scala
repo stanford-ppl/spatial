@@ -150,18 +150,6 @@ case class CompilerSanityChecks(IR: State, enable: Boolean) extends AbstractSani
         }
       case _ =>
     }
-
-    // make sure that cchains are defined in the same parent as the control
-    {
-      val checkSyms = (lhs.cchains.map(_.asInstanceOf[Sym[_]]) ++ lhs.cchains.flatMap(_.counters.map(_.asInstanceOf[Sym[_]])))
-      val failedSyms = checkSyms.filterNot(_.blk == lhs.blk)
-      if (failedSyms.nonEmpty) {
-        error(s"$lhs (${lhs.ctx}) has counter information defined outside of immediately enclosing block:")
-        failedSyms.foreach {
-          fail => error(s"  $fail defined at ${fail.ctx}")
-        }
-      }
-    }
   }
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = {

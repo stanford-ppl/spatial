@@ -165,6 +165,9 @@ public:
   uint64_t getCycles() {
     int id = sendCmd(GET_CYCLES);
     simCmd *resp = recvResp();
+    if (id != resp->id) {
+        std::cout << "Malloc Resp->ID = " << resp->id << " does not match cmd.id " << id << std::endl;
+    }
     ASSERT(id == resp->id, "GET_CYCLES resp->id does not match cmd.id!");
     ASSERT(GET_CYCLES == resp->cmd, "GET_CYCLES resp->cmd does not match cmd.cmd!");
     uint64_t cycles = *(uint64_t*)resp->data;
@@ -220,6 +223,9 @@ public:
     cmd.size = sizeof(size_t);
     cmdChannel->send(&cmd);
     simCmd *resp = recvResp();
+    if (cmd.id != resp->id) {
+        std::cout << "Malloc Resp->ID = " << resp->id << " does not match cmd.id " << cmd.id << std::endl;
+    }
     ASSERT(cmd.id == resp->id, "malloc resp->id does not match cmd.id!");
     ASSERT(cmd.cmd == resp->cmd, "malloc resp->cmd does not match cmd.cmd!");
     return (uint64_t)(*(uint64_t*)resp->data);

@@ -1,8 +1,9 @@
 package spatial.executor.scala
 
-import argon.{Op, Sym, emit, indentGen, stm}
+import argon.{Op, Sym, dbgs, emit, indentGen, stm}
 import forge.tags.stateful
-import spatial.node.{Dequeuer, Enqueuer, FIFODeq, FIFOEnq}
+import spatial.executor.scala.memories.ScalaQueue
+import spatial.node.{Dequeuer, Enqueuer, FIFODeq, FIFOEnq, StreamInRead, StreamOutWrite}
 
 class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) {
   // Can a new workload be pushed in
@@ -11,7 +12,6 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
     if (!canAcceptNewState) {
       throw new IllegalStateException(s"Can't push into a pipeline that's not accepting")
     }
-    assert(canAcceptNewState, s"Can't push into a pipeline that's not accepting")
     stages.head.setExecution(executionState)
   }
 
@@ -85,7 +85,7 @@ trait PipelineStage {
 
   def clearExecution(): Unit = { currentExecution = None }
 
-  @stateful def makeNewExecution(executionState: ExecutionState): PipelineStageExecution
+  def makeNewExecution(executionState: ExecutionState): PipelineStageExecution
 }
 
 trait PipelineStageExecution {
@@ -93,35 +93,48 @@ trait PipelineStageExecution {
   def tick(): Unit
   def isDone: Boolean
   val executionState: ExecutionState
+  implicit def IR: argon.State = executionState.IR
 }
 
 class InnerPipelineStage(syms: Seq[Sym[_]]) extends PipelineStage {
-  @stateful override def makeNewExecution(executionState: ExecutionState): PipelineStageExecution = new InnerPipelineStageExecution(syms, executionState)
+  override def makeNewExecution(executionState: ExecutionState): PipelineStageExecution = new InnerPipelineStageExecution(syms, executionState)
 
   override def toString: String = {
     s"InnerPipelineStage(${syms.mkString(", ")})[$currentExecution]"
   }
 }
 
-class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState: ExecutionState)(implicit state: argon.State) extends PipelineStageExecution {
+class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState: ExecutionState) extends PipelineStageExecution {
+
+  private def getStream(sym: Sym[_]): Option[ScalaQueue[_]] = {
+    val mem: Option[Sym[_]] = sym match {
+      case Op(FIFOEnq(mem, _, _)) => Some(mem)
+      case Op(FIFODeq(mem, _)) => Some(mem)
+      case Op(StreamInRead(mem, _)) => Some(mem)
+      case Op(StreamOutWrite(mem, _, _)) => Some(mem)
+      case _ => None
+    }
+    mem map {
+      executionState(_) match {case sq:ScalaQueue[_] => sq}
+    }
+  }
 
   private val containsStreamAccesses = {
     syms.exists {
       case Op(_: FIFOEnq[_]) => true
       case Op(_: FIFODeq[_]) => true
+      case Op(_: StreamInRead[_]) => true
+      case Op(_: StreamOutWrite[_]) => true
       case _ => false
     }
   }
 
   override def willStall: Boolean = {
-    if (!containsStreamAccesses) { return false }
-
-    throw new NotImplementedError(s"Haven't implemented stalling yet, found stream usage in $syms")
     syms.exists {
-      case Op(enqueuer: Enqueuer[_]) =>
-        false
-      case Op(dequeuer: Dequeuer[_, _]) =>
-        false
+      case Op(FIFOEnq(mem, _, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isFull && ens.forall(executionState.getValue[Boolean](_))}
+      case Op(StreamOutWrite(mem, _, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isFull && ens.forall(executionState.getValue[Boolean](_))}
+      case Op(FIFODeq(mem, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isEmpty && ens.forall(executionState.getValue[Boolean](_))}
+      case Op(StreamInRead(mem, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isEmpty && ens.forall(executionState.getValue[Boolean](_))}
       case _ => false
     }
   }
@@ -133,7 +146,6 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
     indentGen {
       syms.foreach {
         sym =>
-          executionState.log(s"Running: ${stm(sym)} [$executionState]")
           executionState.runAndRegister(sym)
       }
     }
@@ -148,7 +160,7 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
 }
 
 class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends PipelineStage {
-  @stateful override def makeNewExecution(executionState: ExecutionState): PipelineStageExecution = {
+  override def makeNewExecution(executionState: ExecutionState): PipelineStageExecution = {
     transients.foreach(executionState.runAndRegister(_))
     new OuterPipelineStageExecution(ctrl, executionState)
   }
@@ -158,7 +170,7 @@ class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends Pipeline
   }
 }
 
-class OuterPipelineStageExecution(ctrl: Sym[_], override val executionState: ExecutionState)(implicit state: argon.State) extends PipelineStageExecution {
+class OuterPipelineStageExecution(ctrl: Sym[_], override val executionState: ExecutionState) extends PipelineStageExecution {
   override def willStall: Boolean = false
 
   private var overhead = 4
@@ -173,5 +185,8 @@ class OuterPipelineStageExecution(ctrl: Sym[_], override val executionState: Exe
     }
   }
 
-  override def isDone: Boolean = executor.isDone
+  override def isDone: Boolean = executor.status match {
+    case _:Finished => true
+    case Running => false
+  }
 }

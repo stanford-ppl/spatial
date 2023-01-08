@@ -1,7 +1,7 @@
 package spatial.executor.scala
 import argon.lang.{Bit, Idx}
 import argon._
-import emul.{FixedPoint, FixedPointRange}
+import emul.{Bool, FixedPoint, FixedPointRange}
 import forge.tags.stateful
 import spatial.executor.scala.memories.ScalaReg
 import spatial.executor.scala.resolvers.OpResolver
@@ -77,6 +77,7 @@ object ControlExecutor {
       case Op(_:OpForeach) if ctrl.isInnerControl => new InnerForeachExecutor(ctrl, execState)
       case Op(_:OpForeach) if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) => new OuterForeachExecutor(ctrl, execState)
       case Op(_:UnitPipe) if orderedSchedules.contains(ctrl.schedule) => new UnitPipeExecutor(ctrl, execState)
+      case Op(_:UnitPipe) => new StreamUnitPipeExecutor(ctrl, execState)
       case _ => throw new NotImplementedError(s"Didn't know how to handle ${stm(ctrl)}")
     }
   }
@@ -91,15 +92,14 @@ class AccelScopeExecutor(ctrl: Sym[_], override val execState: ExecutionState)(i
   }
   exec.pushState(execState)
   override def tick(): Unit = {
-    assert(!isDone, s"Shouldn't be running, already finished!")
     exec.tick()
   }
-  override def isDone: Boolean = exec.isEmpty
+  override def status: Status = if (exec.isEmpty) Done else Running
 }
 
 class UnitPipeExecutor(ctrl: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends OpExecutorBase {
   private val Op(UnitPipe(ens, blk, stopWhen)) = ctrl
-  private val shouldRun = ens.forall(execState.getValue[Boolean](_))
+  private val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   private val exec = if (ctrl.isInnerControl) {
     ControlExecutorUtils.createInnerPipeline(blk.stms)
   } else {
@@ -110,14 +110,62 @@ class UnitPipeExecutor(ctrl: Sym[_], override val execState: ExecutionState)(imp
 
   override def tick(): Unit = if (shouldRun) exec.tick()
 
-  override def isDone: Boolean = exec.isEmpty
+  override def status: Status = {
+    if (!shouldRun) return Disabled
+    if (exec.isEmpty) return Done
+    Running
+  }
 }
+
+class StreamUnitPipeExecutor(ctrl: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends OpExecutorBase {
+  private val Op(UnitPipe(ens, blk, stopWhen)) = ctrl
+  private val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+  private lazy val executors = blk.stms.flatMap {
+    case child if child.isControl =>
+      Some(ControlExecutor(child, execState))
+    case fringeNode@Op(_:FringeNode[_, _]) =>
+      Some(FringeNodeExecutor(fringeNode, execState))
+    case simple =>
+      execState.runAndRegister(simple)
+      None
+  }
+
+  override def tick(): Unit = if (shouldRun) {
+    executors.foreach {
+      exec =>
+        emit(s"Ticking Exec: $exec")
+        indentGen {
+          exec.tick()
+        }
+    }
+  }
+
+  override def status: Status = {
+    if (!shouldRun) return Disabled
+    val statuses = executors.map(_.status)
+    // if everything here is indeterminate or done, then we're done
+    if (statuses.forall {
+      case Done | Disabled | Indeterminate => true
+      case Running => false
+    }) {
+      Done
+    } else {
+      Running
+    }
+  }
+}
+
 
 abstract class ForeachExecutorBase(ctrl: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends OpExecutorBase {
   protected val Op(OpForeach(ens, cchain, blk, iters, stopWhen)) = ctrl
-  protected val shouldRun: Boolean = ens.forall(execState.getValue[Boolean](_))
+  protected val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   protected val iterMap = ControlExecutorUtils.computeIters(cchain, execState).toIterator
-  protected val shifts = spatial.util.computeShifts(cchain.counters.map(_.ctrParOr1))
+  protected val steps = cchain.counters.map(_.step).map(execState.getValue[FixedPoint](_).toInt)
+  protected val shifts = spatial.util.computeShifts(cchain.counters.map(_.ctrParOr1)).map {
+    shift => shift.zip(steps).map {
+      case (shift, step) => shift * step
+    }
+  }
   protected val itersWithShifts = shifts.map {
     shift => iters.map(_.asSym).zip(shift)
   }
@@ -125,22 +173,30 @@ abstract class ForeachExecutorBase(ctrl: Sym[_], override val execState: Executi
   protected val bounds = (iters.map {
     iter =>
       val ctr = iter.counter.ctr
-      dbgs(s"Getting iter: $iter (${stm(ctr)}")
       iter -> (execState.getValue[FixedPoint](ctr.start), execState.getValue[FixedPoint](ctr.end))
   }).toMap
+
+  protected def pipelines: Map[List[Int], ExecPipeline]
+
+  override def status: Status = {
+    if (!shouldRun) return Disabled
+    if ((pipelines.forall {
+      case (_, pipeline) => pipeline.isEmpty
+    }) && iterMap.isEmpty) {
+      return Done
+    }
+    Running
+  }
 }
 class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit state: argon.State) extends ForeachExecutorBase(ctrl, execState) {
   private val IIEnable = (Stream.from(0).map{ x => (x % ctrl.II.toInt) == 0 }).iterator
 
-  private val pipelines = shifts.map {
+  override lazy val pipelines = shifts.map {
     shift => shift -> ControlExecutorUtils.createInnerPipeline(blk.stms)
   }.toMap
 
-  override def isDone: Boolean = pipelines.forall({
-    case (_, pipeline) => pipeline.isEmpty
-  }) && iterMap.isEmpty
-
   override def tick(): Unit = {
+    if (!shouldRun) return
     emit(s"Ticking Pipelines for $ctrl")
     indentGen {
       pipelines.foreach {
@@ -155,6 +211,10 @@ class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
     if (!IIEnable.next()) return
 
     if (iterMap.isEmpty) return
+
+    val canEnqueue = pipelines.forall(_._2.canAcceptNewState)
+
+    if (!canEnqueue) return
 
     val nextIter = iterMap.next()
     itersWithShifts.foreach {
@@ -179,13 +239,9 @@ class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
 }
 
 class OuterForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit state: argon.State) extends ForeachExecutorBase(ctrl, execState) {
-  private val pipelines = shifts.map {
+  override lazy val pipelines = shifts.map {
     shift => shift -> ControlExecutorUtils.createOuterPipeline(blk.stms)
   }.toMap
-
-  override def isDone: Boolean = pipelines.forall({
-    case (_, pipeline) => pipeline.isEmpty
-  }) && iterMap.isEmpty
 
   emit(s"Setting up OuterForeachExecutor($ctrl):")
   indentGen {

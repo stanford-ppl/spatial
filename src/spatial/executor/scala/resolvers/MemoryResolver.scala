@@ -66,18 +66,12 @@ trait MemoryResolver extends OpResolverBase {
       case Op(sm@SetMem(dram, data)) =>
         val target = execState.getTensor[SomeEmul](dram)
         val wrData = execState.getTensor[SomeEmul](data)
-        if (wrData.shape != target.shape) {
-          throw new Exception(s"Mismatched SetMem shapes: ${target.shape} <- ${wrData.shape}")
-        }
         wrData.values.copyToArray(target.values)
         EmulUnit(sym)
 
       case Op(gm@GetMem(dram, data)) =>
         val wrData = execState.getTensor[SomeEmul](dram)
         val target = execState.getTensor[SomeEmul](data)
-        if (wrData.shape != target.shape) {
-          throw new Exception(s"Mismatched GetMem shapes: ${target.shape} <- ${wrData.shape}")
-        }
         dbgs(s"Transferring <${wrData.values.mkString(", ")}> -> <${target.values.mkString(", ")}>")
         wrData.values.copyToArray(target.values)
         EmulUnit(sym)

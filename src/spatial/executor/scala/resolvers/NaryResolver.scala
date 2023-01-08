@@ -1,7 +1,7 @@
 package spatial.executor.scala.resolvers
 
 import argon.node._
-import argon.{Binary, Exp, Op, Unary, dbgs, stm}
+import argon._
 import emul.FixedPoint
 import spatial.executor.scala.{EmulResult, ExecutionState, SimpleEmulVal}
 
@@ -24,24 +24,10 @@ trait NaryResolver extends OpResolverBase {
         val a = execState.getValue[U](un.a)
         SimpleEmulVal[U](un.unstaged(a))
 
-      case Op(lst: FixLst[_, _, _]) =>
-        val a = execState.getValue[FixedPoint](lst.a)
-        val b = execState.getValue[FixedPoint](lst.b)
-        SimpleEmulVal((a < b))
-
-      case Op(eq: FixEql[_, _, _]) =>
-        val a = execState.getValue[FixedPoint](eq.a)
-        val b = execState.getValue[FixedPoint](eq.b)
-        SimpleEmulVal((a === b))
-
-      case Op(op: FixSLA[_, _, _]) =>
-        val a = execState.getValue[FixedPoint](op.a)
-        val b = execState.getValue[FixedPoint](op.b)
-        if (b >= 0) SimpleEmulVal(a << b) else SimpleEmulVal(a >> -b)
-
-      case Op(op: FixToFix[_, _, _, _, _, _]) =>
-        val a = execState.getValue[FixedPoint](op.a)
-        SimpleEmulVal(a.toFixedPoint(op.fmt.toEmul))
+      case Op(cmp: Comparison[U, _]) =>
+        val a = execState.getValue[U](cmp.a)
+        val b = execState.getValue[U](cmp.b)
+        SimpleEmulVal(cmp.unstaged(a, b))
 
       case _ => super.run(sym, execState)
     }

@@ -152,5 +152,6 @@ object Number {
   def asin(x: FloatPoint): FloatPoint = FloatPoint(Math.asin(x.toDouble), x.fmt).withValid(x.valid)
   def acos(x: FloatPoint): FloatPoint = FloatPoint(Math.acos(x.toDouble), x.fmt).withValid(x.valid)
   def atan(x: FloatPoint): FloatPoint = FloatPoint(Math.atan(x.toDouble), x.fmt).withValid(x.valid)
+  def sigmoid(x: FloatPoint): FloatPoint = FloatPoint(1,x.fmt) / (exp(-x) + FloatPoint(1, x.fmt))
 }
 

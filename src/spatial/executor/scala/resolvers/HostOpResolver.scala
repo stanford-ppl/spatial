@@ -71,7 +71,6 @@ trait HostOpResolver extends OpResolverBase {
           val fpI = SimpleEmulVal(FixedPoint.fromInt(i))
           runBlock(apply, Map(apply.inputA -> arr, apply.inputB -> fpI), execState)
       }
-      dbgs(s"New Values: $newValues")(execState.IR)
       newValues.reduce {
         (a: EmulResult, b: EmulResult) =>
           runBlock(reduce, Map(reduce.inputA -> a, reduce.inputB -> b), execState)

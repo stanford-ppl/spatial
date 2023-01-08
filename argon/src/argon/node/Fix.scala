@@ -21,6 +21,9 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
   extends FixOp1[S,I,F]
      with Unary[FixedPoint,Fix[S,I,F]]
 
+abstract class FixComparison[S:BOOL,I:INT,F:INT](override val unstaged: (FixedPoint, FixedPoint) => emul.Bool)
+  extends FixOp[S, I, F, Bit] with Comparison[FixedPoint, Fix[S, I, F]]
+
 /** Negation of a fixed point value */
 @op case class FixNeg[S:BOOL,I:INT,F:INT](a: Fix[S,I,F]) extends FixUnary[S,I,F](a => -a) {
   @rig override def rewrite: Fix[S,I,F] = a match {
@@ -198,36 +201,16 @@ abstract class FixUnary[S:BOOL,I:INT,F:INT](
 }
 
 /** Fixed point less than comparison */
-@op case class FixLst[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
-  @rig override def rewrite: Bit = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x < y)
-    case _ => super.rewrite
-  }
-}
+@op case class FixLst[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixComparison[S, I, F](_ < _)
 
 /** Fixed point less than or equal comparison */
-@op case class FixLeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
-  @rig override def rewrite: Bit = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x <= y)
-    case _ => super.rewrite
-  }
-}
+@op case class FixLeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixComparison[S, I, F](_ <= _)
 
 /** Fixed point equality comparison */
-@op case class FixEql[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
-  @rig override def rewrite: Bit = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x === y)
-    case _ => super.rewrite
-  }
-}
+@op case class FixEql[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixComparison[S, I, F](_ === _)
 
 /** Fixed point inequality comparison */
-@op case class FixNeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixOp[S,I,F,Bit] {
-  @rig override def rewrite: Bit = (a,b) match {
-    case (Const(x), Const(y)) => R.from(x !== y)
-    case _ => super.rewrite
-  }
-}
+@op case class FixNeq[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixComparison[S, I, F](_ !== _)
 
 /** Fixed point select minimum */
 @op case class FixMin[S:BOOL,I:INT,F:INT](a: Fix[S,I,F], b: Fix[S,I,F]) extends FixBinary[S,I,F](Number.min) {

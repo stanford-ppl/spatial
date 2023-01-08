@@ -32,7 +32,7 @@ class ScalaTensor[T <: EmulResult](val shape: Seq[Int], val elementSize: Option[
       throw new IndexOutOfBoundsException(s"Index $index was out of bounds, shape was $shape")
     }
 
-    (index zip strides).map {case (a, b) => a * b }.product
+    (index zip strides).map {case (a, b) => a * b }.sum
   }
 
   def write(data: T, address: Seq[Int], en: Boolean): Unit = if (en) {

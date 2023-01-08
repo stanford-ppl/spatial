@@ -14,7 +14,9 @@ trait OpResolverBase {
     }
   }
 
-  def runBlock(blk: Block[_], inputMap: Map[Sym[_], EmulResult], execState: ExecutionState): EmulResult = {
+  def runBlock(blk: Block[_],
+               inputMap: Map[Sym[_], EmulResult],
+               execState: ExecutionState): EmulResult = {
     val newState = execState.copy()
     inputMap.foreach {
       case (key, value) => newState.register(key, value)
@@ -31,4 +33,13 @@ trait OpResolverBase {
   }
 }
 
-object OpResolver extends OpResolverBase with MemoryResolver with NaryResolver with ControlResolver with MiscResolver with IOResolver with HostOpResolver
+object OpResolver
+    extends OpResolverBase
+    with MemoryResolver
+    with NaryResolver
+    with ControlResolver
+    with MiscResolver
+    with IOResolver
+    with HostOpResolver
+    with FixResolver
+    with FltResolver

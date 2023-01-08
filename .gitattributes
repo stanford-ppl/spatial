@@ -1,2 +1,6 @@
 *.pmml filter=lfs diff=lfs merge=lfs -text
 *.pkl filter=lfs diff=lfs merge=lfs -text
+* text eol=lf
+
+*.sh text eol=lf
+*.ini text eol=lf

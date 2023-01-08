@@ -356,6 +356,7 @@ void IniReader::SetKey(string key, string valueString, bool isSystemParam, size_
 
 void IniReader::ReadIniFile(string filename, bool isSystemFile)
 {
+    std::cout <<  "Loading INI File from " << filename << std::endl << std::flush;
 	ifstream iniFile;
 	string line;
 	string key,valueString;

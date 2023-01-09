@@ -23,8 +23,8 @@ import spatial.dsl._
       Sequential.Foreach(N by tileSize par 2) { i =>
         val b1 = SRAM[T](tileSize)
 
-        b1 load srcFPGA(i::i+tileSize par 1)
-        dstFPGA(i::i+tileSize par 1) store b1
+        b1 load srcFPGA(i::i+tileSize par 2)
+        dstFPGA(i::i+tileSize par 2) store b1
       }
     }
     getMem(dstFPGA)

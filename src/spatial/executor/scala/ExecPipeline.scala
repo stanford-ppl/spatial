@@ -1,18 +1,22 @@
 package spatial.executor.scala
 
+import argon.lang.Bit
+import argon.node.Enabled
 import argon.{Op, Sym, dbgs, emit, indentGen, stm}
 import forge.tags.stateful
 import spatial.executor.scala.memories.ScalaQueue
-import spatial.node.{Dequeuer, Enqueuer, FIFODeq, FIFOEnq, StreamInRead, StreamOutWrite}
+import spatial.node.{Dequeuer, Enqueuer, FIFODeq, FIFOEnq, LIFOPop, StreamInRead, StreamOutWrite}
+
+import scala.collection.{mutable => cm}
 
 class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) {
   // Can a new workload be pushed in
   def canAcceptNewState: Boolean = stages.head.isEmpty
-  def pushState(executionState: ExecutionState): Unit = {
+  def pushState(executionStates: Seq[ExecutionState]): Unit = {
     if (!canAcceptNewState) {
       throw new IllegalStateException(s"Can't push into a pipeline that's not accepting")
     }
-    stages.head.setExecution(executionState)
+    stages.head.setExecution(executionStates)
   }
 
   def tick(): Unit = {
@@ -49,8 +53,8 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
         emit(s"Attempting to shift: $earlier -> $later")
         (later.currentExecution, earlier.currentExecution) match {
           case (None, Some(execution)) if execution.isDone =>
-            val currentState = execution.executionState
-            later.setExecution(currentState)
+            val currentStates = execution.executionStates
+            later.setExecution(currentStates)
             earlier.clearExecution()
             emit(s"Shifting: $earlier -> $later")
           case _ => // Pass, not ready to move on yet
@@ -76,66 +80,121 @@ trait PipelineStage {
   // Marked as done only if we have an execution and it's done. otherwise check empty
   def isDone: Boolean = currentExecution.exists(_.isDone)
 
-  @stateful def setExecution(executionState: ExecutionState): Unit = {
+  @stateful def setExecution(executionStates: Seq[ExecutionState]): Unit = {
     assert(currentExecution.isEmpty, s"clear the execution first before setting a new one")
-    currentExecution = Some(makeNewExecution(executionState))
+    currentExecution = Some(makeNewExecution(executionStates))
     // Run first tick of cycle 0
     tick()
   }
 
   def clearExecution(): Unit = { currentExecution = None }
 
-  def makeNewExecution(executionState: ExecutionState): PipelineStageExecution
+  def makeNewExecution(executionState: Seq[ExecutionState]): PipelineStageExecution
 }
 
 trait PipelineStageExecution {
   def willStall: Boolean
   def tick(): Unit
   def isDone: Boolean
-  val executionState: ExecutionState
-  implicit def IR: argon.State = executionState.IR
+  val executionStates: Seq[ExecutionState]
+  implicit def IR: argon.State = executionStates.head.IR
 }
 
 class InnerPipelineStage(syms: Seq[Sym[_]]) extends PipelineStage {
-  override def makeNewExecution(executionState: ExecutionState): PipelineStageExecution = new InnerPipelineStageExecution(syms, executionState)
+  override def makeNewExecution(executionStates: Seq[ExecutionState]): PipelineStageExecution = new InnerPipelineStageExecution(syms, executionStates)
 
   override def toString: String = {
     s"InnerPipelineStage(${syms.mkString(", ")})[$currentExecution]"
   }
 }
 
-class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState: ExecutionState) extends PipelineStageExecution {
+class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionStates: Seq[ExecutionState]) extends PipelineStageExecution {
 
-  private def getStream(sym: Sym[_]): Option[ScalaQueue[_]] = {
-    val mem: Option[Sym[_]] = sym match {
-      case Op(FIFOEnq(mem, _, _)) => Some(mem)
-      case Op(FIFODeq(mem, _)) => Some(mem)
-      case Op(StreamInRead(mem, _)) => Some(mem)
-      case Op(StreamOutWrite(mem, _, _)) => Some(mem)
-      case _ => None
-    }
-    mem map {
-      executionState(_) match {case sq:ScalaQueue[_] => sq}
-    }
+  private val enableSyms = (syms.collect {
+    case Op(s: FIFOEnq[_]) => s.ens
+    case Op(s: FIFODeq[_]) => s.ens
+    case Op(s: StreamInRead[_]) => s.ens
+    case Op(s: StreamOutWrite[_]) => s.ens
+  }).flatten
+
+  def isEnabled(ens: Set[Bit], executionState: ExecutionState): Boolean = {
+    ens.forall(executionState.getValue[emul.Bool](_).value)
   }
 
-  private val containsStreamAccesses = {
-    syms.exists {
-      case Op(_: FIFOEnq[_]) => true
-      case Op(_: FIFODeq[_]) => true
-      case Op(_: StreamInRead[_]) => true
-      case Op(_: StreamOutWrite[_]) => true
-      case _ => false
+  object SpeculativeOOB extends Exception with scala.util.control.NoStackTrace
+
+  private def preEvaluateSym(sym: Sym[_], readIndex: cm.Map[Sym[_], Int], writeIndex: cm.Map[Sym[_], Int], execState: ExecutionState): Unit = {
+    // Run and register all of its dependencies that weren't run already
+    sym.inputs.filterNot(execState.values.contains(_)).foreach(preEvaluateSym(_, readIndex, writeIndex, execState))
+
+    sym match {
+      case Op(s: FIFODeq[_]) if isEnabled(s.ens, execState) =>
+        // We can't actually dequeue, so we peek it instead
+        val index = readIndex.getOrElseUpdate(s.mem, 0)
+        readIndex(s.mem) += 1
+        val result = execState(s.mem) match {
+          case sq: ScalaQueue[SomeEmul] =>
+            if (sq.size < index) {throw SpeculativeOOB}
+            sq.queue(index)
+        }
+        execState.register(sym, result)
+      case Op(s: StreamInRead[_]) if isEnabled(s.ens, execState) =>
+        val index = readIndex.getOrElseUpdate(s.mem, 0)
+        readIndex(s.mem) += 1
+        val result = execState(s.mem) match {
+          case sq: ScalaQueue[SomeEmul] =>
+            if (sq.size < index) {throw SpeculativeOOB}
+            sq.queue(index)
+        }
+        execState.register(sym, result)
+      case Op(s: LIFOPop[_]) =>
+        throw new NotImplementedError(s"Haven't implemented LIFOs yet")
+      case _ => execState.runAndRegister(sym)
     }
   }
 
   override def willStall: Boolean = {
-    syms.exists {
-      case Op(FIFOEnq(mem, _, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isFull && ens.forall(executionState.getValue[Boolean](_))}
-      case Op(StreamOutWrite(mem, _, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isFull && ens.forall(executionState.getValue[Boolean](_))}
-      case Op(FIFODeq(mem, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isEmpty && ens.forall(executionState.getValue[Boolean](_))}
-      case Op(StreamInRead(mem, ens)) => executionState(mem) match {case sq:ScalaQueue[_] => sq.isEmpty && ens.forall(executionState.getValue[Boolean](_))}
-      case _ => false
+    val readIndex = cm.Map.empty[Sym[_], Int]
+    val writeIndex = cm.Map.empty[Sym[_], Int]
+
+    try {
+      val queuesAndCounts = executionStates.flatMap {
+        executionStateOld =>
+          // fork the execution state
+          val executionState = executionStateOld.copy()
+
+          // evaluate all of the enable conditions that we need
+          enableSyms.foreach(preEvaluateSym(_, readIndex, writeIndex, executionState))
+
+          syms.collect {
+            case Op(FIFOEnq(mem, _, ens)) if isEnabled(ens, executionState) =>
+              executionState(mem) match {
+                case sq: ScalaQueue[_] => (sq, 1, 0)
+              }
+            case Op(StreamOutWrite(mem, _, ens)) if isEnabled(ens, executionState) =>
+              executionState(mem) match {
+                case sq: ScalaQueue[_] => (sq, 1, 0)
+              }
+            case Op(FIFODeq(mem, ens)) if isEnabled(ens, executionState) =>
+              executionState(mem) match {
+                case sq: ScalaQueue[_] => (sq, 0, 1)
+              }
+            case Op(StreamInRead(mem, ens)) if isEnabled(ens, executionState) =>
+              executionState(mem) match {
+                case sq: ScalaQueue[_] => (sq, 0, 1)
+              }
+          }
+      }
+      val canExecute = queuesAndCounts.groupBy(_._1).forall {
+        case (queue, tmp) =>
+          val enqs = tmp.map(_._2).sum
+          val deqs = tmp.map(_._3).sum
+
+          ((queue.size + enqs) <= queue.capacity) && (queue.size >= deqs)
+      }
+      !canExecute
+    } catch {
+      case SpeculativeOOB => true
     }
   }
 
@@ -146,7 +205,7 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
     indentGen {
       syms.foreach {
         sym =>
-          executionState.runAndRegister(sym)
+          executionStates.foreach(_.runAndRegister(sym))
       }
     }
     hasTicked = true
@@ -160,9 +219,9 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
 }
 
 class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends PipelineStage {
-  override def makeNewExecution(executionState: ExecutionState): PipelineStageExecution = {
-    transients.foreach(executionState.runAndRegister(_))
-    new OuterPipelineStageExecution(ctrl, executionState)
+  override def makeNewExecution(executionStates: Seq[ExecutionState]): PipelineStageExecution = {
+    executionStates.foreach(exec => transients.foreach(exec.runAndRegister(_)))
+    new OuterPipelineStageExecution(ctrl, executionStates)
   }
 
   override def toString: String = {
@@ -170,23 +229,28 @@ class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends Pipeline
   }
 }
 
-class OuterPipelineStageExecution(ctrl: Sym[_], override val executionState: ExecutionState) extends PipelineStageExecution {
+class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Seq[ExecutionState]) extends PipelineStageExecution {
   override def willStall: Boolean = false
 
   private var overhead = 4
-  private val executor = ControlExecutor(ctrl, executionState)
+  private val executors = executionStates.map(ControlExecutor(ctrl, _))
   override def tick(): Unit = {
     if (overhead > 0) {
       overhead -= 1
     } else {
       indentGen {
-        executor.tick()
+        executors.map(_.tick())
       }
     }
   }
 
-  override def isDone: Boolean = executor.status match {
-    case _:Finished => true
-    case Running => false
+  override def isDone: Boolean = {
+    executors.forall {
+      executor =>
+        executor.status match {
+          case _: Finished => true
+          case Running => false
+        }
+    }
   }
 }

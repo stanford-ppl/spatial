@@ -90,7 +90,7 @@ class AccelScopeExecutor(ctrl: Sym[_], override val execState: ExecutionState)(i
   } else {
     ControlExecutorUtils.createOuterPipeline(blk.stms)
   }
-  exec.pushState(execState)
+  exec.pushState(Seq(execState))
   override def tick(): Unit = {
     exec.tick()
   }
@@ -106,7 +106,7 @@ class UnitPipeExecutor(ctrl: Sym[_], override val execState: ExecutionState)(imp
     ControlExecutorUtils.createOuterPipeline(blk.stms)
   }
 
-  if (shouldRun) { exec.pushState(execState) }
+  if (shouldRun) { exec.pushState(Seq(execState)) }
 
   override def tick(): Unit = if (shouldRun) exec.tick()
 
@@ -198,34 +198,27 @@ class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
         (x % ctrl.II.toInt) == 0
       }
   }).iterator
-
-  override lazy val pipelines = shifts.map {
-    shift => shift -> ControlExecutorUtils.createInnerPipeline(blk.stms)
-  }.toMap
+  // There's only one pipeline for an inner foreach
+  override lazy val pipelines = Map(List.empty[Int] -> ControlExecutorUtils.createInnerPipeline(blk.stms))
+  lazy val pipeline = pipelines.head._2
 
   override def tick(): Unit = {
     if (!shouldRun) return
-    emit(s"Ticking Pipelines for $ctrl")
+    emit(s"Ticking Pipeline for $ctrl")
     indentGen {
-      pipelines.foreach {
-        case (shift, pipeline) =>
-          emit(s"Ticking: $shift [$pipeline]")
-          indentGen {
-            pipeline.tick()
-          }
-      }
+      pipeline.tick()
     }
 
     if (!IIEnable.next()) return
 
     if (iterMap.isEmpty) return
 
-    val canEnqueue = pipelines.forall(_._2.canAcceptNewState)
+    val canEnqueue = pipeline.canAcceptNewState
 
     if (!canEnqueue) return
 
     val nextIter = iterMap.next()
-    itersWithShifts.foreach {
+    val states = itersWithShifts.flatMap {
       iterShifts =>
         val isEnabled = iterShifts.forall {
           case (iter, shift) =>
@@ -238,11 +231,10 @@ class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
           iterShifts.foreach {
             case (iter, shift) => newState.register(iter, SimpleEmulVal(nextIter(iter) + shift))
           }
-          val pipelineKey = iterShifts.map(_._2).toList
-          emit(s"Pushing into pipeline: $pipelineKey (${pipelines(pipelineKey)})")
-          pipelines(pipelineKey).pushState(newState)
-        }
+          Some(newState)
+        } else None
     }
+    pipeline.pushState(states)
   }
 }
 
@@ -294,7 +286,7 @@ class OuterForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
           iterShifts.foreach {
             case (iter, shift) => newState.register(iter, SimpleEmulVal(nextIter(iter) + shift))
           }
-          pipelines(iterShifts.map(_._2).toList).pushState(newState)
+          pipelines(iterShifts.map(_._2).toList).pushState(Seq(newState))
         }
     }
   }

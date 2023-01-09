@@ -36,7 +36,7 @@ private object ControlExecutorUtils {
     }
   }.toSeq
 
-  @stateful def splitIntoTransientsAndControl(stms: Seq[Sym[_]]): Seq[TransientsAndControl] = {
+  @stateful def splitIntoTransientsAndControl(stms: Seq[Sym[_]]): (Seq[TransientsAndControl], Seq[Sym[_]]) = {
     var curTransients: Seq[Sym[_]] = Seq.empty
     var curSplits: Seq[TransientsAndControl] = Seq.empty
     stms.foreach {
@@ -45,7 +45,7 @@ private object ControlExecutorUtils {
         curTransients = Seq.empty
       case other => curTransients :+= other
     }
-    curSplits
+    (curSplits, curTransients)
   }
 
   @stateful def createInnerPipeline(stms: Seq[Sym[_]]): ExecPipeline = {
@@ -60,9 +60,12 @@ private object ControlExecutorUtils {
   }
 
   @stateful def createOuterPipeline(stms: Seq[Sym[_]]): ExecPipeline = {
-    val transientsAndControl = splitIntoTransientsAndControl(stms)
-    val stages = transientsAndControl.map {
+    val (transientsAndControl, leftovers) = splitIntoTransientsAndControl(stms)
+    var stages: Seq[PipelineStage] = transientsAndControl.map {
       case TransientsAndControl(transients, control) => new OuterPipelineStage(transients, control)
+    }
+    if (leftovers.nonEmpty) {
+      stages :+= new InnerPipelineStage(leftovers)
     }
     new ExecPipeline(stages)
   }
@@ -78,6 +81,8 @@ object ControlExecutor {
       case Op(_:OpForeach) if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) => new OuterForeachExecutor(ctrl, execState)
       case Op(_:UnitPipe) if orderedSchedules.contains(ctrl.schedule) => new UnitPipeExecutor(ctrl, execState)
       case Op(_:UnitPipe) => new StreamUnitPipeExecutor(ctrl, execState)
+      case Op(_:OpReduce[_]) if ctrl.isInnerControl => new InnerReduceExecutor(ctrl, execState)
+      case Op(_:OpReduce[_]) if ctrl.isOuterControl => new OuterReduceExecutor(ctrl, execState)
       case _ => throw new NotImplementedError(s"Didn't know how to handle ${stm(ctrl)}")
     }
   }
@@ -258,6 +263,180 @@ class OuterForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit sta
           indentGen { pipeline.tick() }
       }
     }
+
+    val schedEnabled = ctrl.schedule match {
+      case Pipelined => pipelines.forall { case (_, pipeline) => pipeline.canAcceptNewState }
+      case Sequenced => pipelines.forall { case (_, pipeline) => pipeline.isEmpty }
+    }
+
+    emit(s"SchedEnabled: $schedEnabled")
+
+    if (!schedEnabled) return
+
+    if (iterMap.isEmpty) return
+
+    val nextIter = iterMap.next()
+    emit(s"Staging next iter: $nextIter")
+    itersWithShifts.foreach {
+      iterShifts =>
+        val isEnabled = iterShifts.forall {
+          case (iter, shift) =>
+            val candidate = nextIter(iter) + shift
+            val (lb, ub) = bounds(iter.unbox)
+            ((lb <= candidate) && (candidate < ub)).value
+        }
+        emit(s"IsEnabled: $isEnabled")
+        if (isEnabled) {
+          val newState = execState.copy()
+          iterShifts.foreach {
+            case (iter, shift) => newState.register(iter, SimpleEmulVal(nextIter(iter) + shift))
+          }
+          pipelines(iterShifts.map(_._2).toList).pushState(Seq(newState))
+        }
+    }
+  }
+
+  override def toString: String = {
+    val pipelineString = pipelines.mapValues(_.toString)
+    s"OuterForeachExecutor($ctrl) {$pipelineString}"
+  }
+}
+
+//@op case class OpReduce[A](
+//  ens:    Set[Bit],
+//  cchain: CounterChain,
+//  accum:  Reg[A],
+//  map:    Block[A],
+//  load:   Lambda1[Reg[A],A],
+//  reduce: Lambda2[A,A,A],
+//  store:  Lambda2[Reg[A],A,Void],
+//  ident:  Option[A],
+//  fold:   Option[A],
+//  iters:  List[I32],
+//  stopWhen:  Option[Reg[Bit]]
+
+abstract class ReduceExecutorBase(ctrl: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends OpExecutorBase {
+  protected val Op(OpReduce(ens, cchain, accum, mapF, loadF, reduceF, storeF, identOpt, foldOpt, iters, stopWhen)) = ctrl
+  protected val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+  protected val iterMap = ControlExecutorUtils.computeIters(cchain, execState).toIterator
+  protected val steps = cchain.counters.map(_.step).map(execState.getValue[FixedPoint](_).toInt)
+  protected val shifts = spatial.util.computeShifts(cchain.counters.map(_.ctrParOr1)).map {
+    shift => shift.zip(steps).map {
+      case (shift, step) => shift * step
+    }
+  }
+  protected val itersWithShifts = shifts.map {
+    shift => iters.map(_.asSym).zip(shift)
+  }
+
+  protected val bounds = (iters.map {
+    iter =>
+      val ctr = iter.counter.ctr
+      iter -> (execState.getValue[FixedPoint](ctr.start), execState.getValue[FixedPoint](ctr.end))
+  }).toMap
+
+  protected val accumReg = execState(accum) match {case sr: ScalaReg[SomeEmul] => sr }
+
+  protected def pipelines: Map[List[Int], ExecPipeline]
+
+  protected def updateAccum(): Unit = {
+    val lastStates = pipelines.values.map(_.lastStates).flatten.toSeq
+    val results = lastStates.map { eState => eState(mapF.result) }
+    if (results.nonEmpty) {
+      val output = results.reduce {
+        (a, b) =>
+          OpResolver.runBlock(reduceF, Map(reduceF.inputA -> a, reduceF.inputB -> b), execState)
+      }
+      val updated = OpResolver.runBlock(reduceF, Map(reduceF.inputA -> output, reduceF.inputB -> accumReg.curVal), execState)
+      accumReg.write(updated, true)
+    }
+  }
+
+  override def status: Status = {
+    if (!shouldRun) return Disabled
+    if ((pipelines.forall {
+      case (_, pipeline) => pipeline.isEmpty
+    }) && iterMap.isEmpty) {
+      return Done
+    }
+    Running
+  }
+}
+
+class InnerReduceExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit state: argon.State) extends ReduceExecutorBase(ctrl, execState) {
+  emit(s"Setting up inner foreach pipeline for $ctrl")
+  private val IIEnable = (Stream.from(0).map{
+    x =>
+      if (ctrl.II.toInt == 0) {
+        true
+      } else {
+        (x % ctrl.II.toInt) == 0
+      }
+  }).iterator
+  // There's only one pipeline for an inner foreach
+  override lazy val pipelines = Map(List.empty[Int] -> ControlExecutorUtils.createInnerPipeline(mapF.stms))
+  lazy val pipeline = pipelines.head._2
+
+  override def tick(): Unit = {
+    if (!shouldRun) return
+    emit(s"Ticking Pipeline for $ctrl")
+    indentGen {
+      pipeline.tick()
+    }
+
+    updateAccum()
+
+    if (!IIEnable.next()) return
+
+    if (iterMap.isEmpty) return
+
+    val canEnqueue = pipeline.canAcceptNewState
+
+    if (!canEnqueue) return
+
+    val nextIter = iterMap.next()
+    val states = itersWithShifts.flatMap {
+      iterShifts =>
+        val isEnabled = iterShifts.forall {
+          case (iter, shift) =>
+            val candidate = nextIter(iter) + shift
+            val (lb, ub) = bounds(iter.unbox)
+            ((lb <= candidate) && (candidate < ub)).value
+        }
+        if (isEnabled) {
+          val newState = execState.copy()
+          iterShifts.foreach {
+            case (iter, shift) => newState.register(iter, SimpleEmulVal(nextIter(iter) + shift))
+          }
+          Some(newState)
+        } else None
+    }
+    pipeline.pushState(states)
+  }
+}
+
+class OuterReduceExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit state: argon.State) extends ReduceExecutorBase(ctrl, execState) {
+  override lazy val pipelines = shifts.map {
+    shift => shift -> ControlExecutorUtils.createOuterPipeline(mapF.stms)
+  }.toMap
+
+  emit(s"Setting up OuterForeachExecutor($ctrl):")
+  indentGen {
+    emit(s"Shifts: $shifts")
+    emit(s"Pipelines: $pipelines")
+  }
+
+  override def tick(): Unit = {
+    emit(s"Ticking Pipelines for $ctrl")
+    indentGen {
+      pipelines.foreach {
+        case (shift, pipeline) =>
+          emit(s"Ticking: $shift [$pipeline]")
+          indentGen { pipeline.tick() }
+      }
+    }
+
+    updateAccum()
 
     val schedEnabled = ctrl.schedule match {
       case Pipelined => pipelines.forall { case (_, pipeline) => pipeline.canAcceptNewState }

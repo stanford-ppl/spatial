@@ -19,6 +19,8 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
     stages.head.setExecution(executionStates)
   }
 
+  var lastStates: Seq[ExecutionState] = Seq.empty
+
   def tick(): Unit = {
     // Advance all stages by one tick
     emit(s"Advancing stages: $stages")
@@ -28,7 +30,10 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
 
     // If the last stage is done, then we pop it off of the pipeline
     if (stages.last.isDone) {
+      lastStates = stages.last.currentExecution.map(_.executionStates).getOrElse(Seq.empty)
       stages.last.currentExecution = None
+    } else {
+      lastStates = Seq.empty
     }
 
     indentGen {

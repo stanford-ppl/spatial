@@ -54,7 +54,8 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    val N = args(0).to[Int]
+//    val N = args(0).to[Int]
+    val N = 256
     val a = Array.fill(N){ random[X](4) }
     val b = Array.fill(N){ random[X](4) }
 

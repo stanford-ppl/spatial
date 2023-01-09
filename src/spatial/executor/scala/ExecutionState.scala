@@ -39,7 +39,9 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTra
   def getValue[T](s: Exp[_, _]): T = {
     val recv = this(s)
     recv match {
-      case ev: EmulVal[T] => ev.value
+      case ev: EmulVal[T] if ev.valid => ev.value
+      case ev: EmulVal[T] if !ev.valid =>
+        throw new Exception(s"$s -> $ev was marked invalid!")
     }
   }
 

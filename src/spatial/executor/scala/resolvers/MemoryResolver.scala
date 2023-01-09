@@ -21,6 +21,24 @@ trait MemoryResolver extends OpResolverBase {
         val initVal = execState(ao.init)
         new ScalaReg(initVal, initVal)
 
+      case Op(streamOut: StreamOutNew[_]) if streamOut.A.isInstanceOf[Struct[_]] =>
+        new ScalaQueue[ScalaStruct]()
+
+      case Op(streamIn@StreamInNew(bus)) if streamIn.A.isInstanceOf[Struct[_]] =>
+        new ScalaQueue[ScalaStruct]()
+
+      case Op(streamIn@StreamInNew(bus)) =>
+        new ScalaQueue[SomeEmul]()
+
+      case Op(malloc: MemAlloc[_, _]) if sym.isSRAM || sym.isDRAM =>
+        val elType: ExpType[_, _] = malloc.A.tp
+        val elSize = malloc.A.nbits / 8
+        val newTensor = new ScalaTensor[SomeEmul](malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt), Some(elSize))
+        if (sym.isDRAM) {
+          execState.hostMem.register(newTensor)
+        }
+        newTensor
+
       case Op(rw@RegWrite(mem, data, ens)) =>
         val tmp = execState(mem) match { case sr:ScalaReg[_] => sr }
         type ET = tmp.ET
@@ -53,16 +71,6 @@ trait MemoryResolver extends OpResolverBase {
         reg.write(realData, true)
         EmulUnit(sym)
 
-      case Op(malloc: MemAlloc[_, _]) if sym.isSRAM || sym.isDRAM && !malloc.A.isInstanceOf[Struct[_]] =>
-        val elType: ExpType[_, _] = malloc.A.tp
-        type ET = elType.L
-        val elSize = malloc.A.nbits / 8
-        val newTensor = new ScalaTensor[SomeEmul](malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt), Some(elSize))
-        if (sym.isDRAM) {
-          execState.hostMem.register(newTensor)
-        }
-        newTensor
-
       case Op(sm@SetMem(dram, data)) =>
         val target = execState.getTensor[SomeEmul](dram)
         val wrData = execState.getTensor[SomeEmul](data)
@@ -75,15 +83,6 @@ trait MemoryResolver extends OpResolverBase {
         dbgs(s"Transferring <${wrData.values.mkString(", ")}> -> <${target.values.mkString(", ")}>")
         wrData.values.copyToArray(target.values)
         EmulUnit(sym)
-
-      case Op(streamOut: StreamOutNew[_]) if streamOut.A.isInstanceOf[Struct[_]] =>
-        new ScalaQueue[ScalaStruct]()
-
-      case Op(streamIn@StreamInNew(bus)) if streamIn.A.isInstanceOf[Struct[_]] =>
-        new ScalaQueue[ScalaStruct]()
-
-      case Op(streamIn@StreamInNew(bus)) =>
-        new ScalaQueue[SomeEmul]()
 
       case Op(sir@StreamInRead(mem, ens)) if !mem.A.isInstanceOf[Struct[_]] =>
         val enabled = sir.isEnabled(execState)

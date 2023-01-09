@@ -189,7 +189,15 @@ abstract class ForeachExecutorBase(ctrl: Sym[_], override val execState: Executi
   }
 }
 class InnerForeachExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit state: argon.State) extends ForeachExecutorBase(ctrl, execState) {
-  private val IIEnable = (Stream.from(0).map{ x => (x % ctrl.II.toInt) == 0 }).iterator
+  emit(s"Setting up inner foreach pipeline for $ctrl")
+  private val IIEnable = (Stream.from(0).map{
+    x =>
+      if (ctrl.II.toInt == 0) {
+        true
+      } else {
+        (x % ctrl.II.toInt) == 0
+      }
+  }).iterator
 
   override lazy val pipelines = shifts.map {
     shift => shift -> ControlExecutorUtils.createInnerPipeline(blk.stms)

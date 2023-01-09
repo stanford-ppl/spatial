@@ -15,5 +15,10 @@ case class EmulUnit(sym: Sym[_]) extends EmulVal[Unit] {
   override def value: Unit = Unit
 }
 
+case class EmulPoison(sym: Sym[_]) extends EmulVal[Nothing] {
+  override def value: Nothing = throw new Exception(s"Attempting to access invalid value defined by $sym")
+  override val valid: Boolean = false
+}
+
 abstract class EmulMem extends EmulResult
 

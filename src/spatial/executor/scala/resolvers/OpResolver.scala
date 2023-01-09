@@ -35,6 +35,7 @@ trait OpResolverBase {
 
 object OpResolver
     extends OpResolverBase
+    with DisabledResolver // This way it runs (almost) last
     with MemoryResolver
     with NaryResolver
     with ControlResolver
@@ -43,3 +44,5 @@ object OpResolver
     with HostOpResolver
     with FixResolver
     with FltResolver
+    with BitOpResolver
+    with FIFOResolver

@@ -12,8 +12,10 @@ import spatial.dsl._
     val dram = DRAM[Int](32)
     val x = ArgIn[Int]
     val y = ArgIn[Int]
-    val plzSetTo1 = args(0).to[Int]
-    val plzSetTo32 = args(1).to[Int]
+//    val plzSetTo1 = args(0).to[Int]
+//    val plzSetTo32 = args(1).to[Int]
+    val plzSetTo1 = 1
+    val plzSetTo32 = 32
     assert(plzSetTo1 == 1)
     assert(plzSetTo32 == 32)
     setArg(x, plzSetTo1)

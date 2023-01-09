@@ -12,6 +12,27 @@ import spatial.metadata.retiming._
 
 import scala.collection.{mutable => cm}
 
+object ControlExecutor {
+  @stateful def apply(ctrl: Sym[_], execState: ExecutionState): OpExecutorBase = {
+    val orderedSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
+
+    ctrl match {
+      case Op(_:AccelScope) => new AccelScopeExecutor(ctrl, execState)
+      case Op(_:OpForeach) if ctrl.isInnerControl => new InnerForeachExecutor(ctrl, execState)
+      case Op(_:OpForeach) if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) => new OuterForeachExecutor(ctrl, execState)
+      case Op(_:UnitPipe) if orderedSchedules.contains(ctrl.schedule) => new UnitPipeExecutor(ctrl, execState)
+      case Op(_:UnitPipe) => new StreamUnitPipeExecutor(ctrl, execState)
+      case Op(_:OpReduce[_]) if ctrl.isInnerControl => new InnerReduceExecutor(ctrl, execState)
+      case Op(_:OpReduce[_]) if ctrl.isOuterControl => new OuterReduceExecutor(ctrl, execState)
+      case Op(_:OpMemReduce[_, _]) if ctrl.isInnerControl => new InnerMemReduceExecutor(ctrl, execState)
+      case Op(_:OpMemReduce[_, _]) if ctrl.isOuterControl => new OuterMemReduceExecutor(ctrl, execState)
+      case Op(_:Switch[_]) => new SwitchExecutor(ctrl, execState)
+      case _ => throw new NotImplementedError(s"Didn't know how to handle ${stm(ctrl)}")
+    }
+  }
+}
+
+
 case class TransientsAndControl(transients: Seq[Sym[_]], control: Sym[_])
 
 private object ControlExecutorUtils {
@@ -68,25 +89,6 @@ private object ControlExecutorUtils {
       stages :+= new InnerPipelineStage(leftovers)
     }
     new ExecPipeline(stages)
-  }
-}
-
-object ControlExecutor {
-  @stateful def apply(ctrl: Sym[_], execState: ExecutionState): OpExecutorBase = {
-    val orderedSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
-
-    ctrl match {
-      case Op(_:AccelScope) => new AccelScopeExecutor(ctrl, execState)
-      case Op(_:OpForeach) if ctrl.isInnerControl => new InnerForeachExecutor(ctrl, execState)
-      case Op(_:OpForeach) if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) => new OuterForeachExecutor(ctrl, execState)
-      case Op(_:UnitPipe) if orderedSchedules.contains(ctrl.schedule) => new UnitPipeExecutor(ctrl, execState)
-      case Op(_:UnitPipe) => new StreamUnitPipeExecutor(ctrl, execState)
-      case Op(_:OpReduce[_]) if ctrl.isInnerControl => new InnerReduceExecutor(ctrl, execState)
-      case Op(_:OpReduce[_]) if ctrl.isOuterControl => new OuterReduceExecutor(ctrl, execState)
-      case Op(_:OpMemReduce[_, _]) if ctrl.isInnerControl => new InnerMemReduceExecutor(ctrl, execState)
-      case Op(_:OpMemReduce[_, _]) if ctrl.isOuterControl => new OuterMemReduceExecutor(ctrl, execState)
-      case _ => throw new NotImplementedError(s"Didn't know how to handle ${stm(ctrl)}")
-    }
   }
 }
 
@@ -668,5 +670,46 @@ class OuterMemReduceExecutor(ctrl: Sym[_], execState: ExecutionState)(implicit s
   override def toString: String = {
     val pipelineString = pipelines.mapValues(_.toString)
     s"OuterForeachExecutor($ctrl) {$pipelineString}"
+  }
+}
+
+class SwitchCaseExecutor(casee: SwitchCase[_], execState: ExecutionState)(implicit state: argon.State) {
+  private val SwitchCase(blk) = casee
+
+  val isOuter = blk.stms.exists(_.isControl)
+
+  private val exec = if (blk.stms.nonEmpty) {
+    Some(if (!isOuter) {
+      ControlExecutorUtils.createInnerPipeline(blk.stms)
+    } else {
+      ControlExecutorUtils.createOuterPipeline(blk.stms)
+    })
+  } else None
+
+  exec.foreach(_.pushState(Seq(execState)))
+
+  def tick(): Unit = exec.foreach(_.tick())
+
+  def status: Status = {
+    if (exec.isEmpty) return Done
+    if (exec.get.isEmpty) return Done
+    Running
+  }
+}
+
+class SwitchExecutor(ctrl: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends OpExecutorBase {
+  private val Op(switches@Switch(selects, _)) = ctrl
+
+  val enabledCases = (selects zip switches.cases) find {
+    case (sel, _) => execState.getValue[emul.Bool](sel).value
+  }
+
+  val exec = enabledCases.map{ case (_, casee) => new SwitchCaseExecutor(casee, execState)}
+
+  override def tick(): Unit = exec.foreach(_.tick())
+
+  override def status: Status = {
+    if (exec.isEmpty) return Disabled
+    exec.get.status
   }
 }

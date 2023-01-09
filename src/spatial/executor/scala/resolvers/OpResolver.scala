@@ -29,7 +29,7 @@ trait OpResolverBase {
     implicit val IR: argon.State = execState.IR
     error(s"Current state: $execState")
     error(s"Did not know how to execute ${stm(sym)}")
-    throw new NotImplementedError(s"Don't know how to execute ${stm(sym)}")
+    throw new Exception(s"Don't know how to execute ${stm(sym)}")
   }
 }
 
@@ -46,3 +46,4 @@ object OpResolver
     with FltResolver
     with BitOpResolver
     with FIFOResolver
+    with StructOpResolver

@@ -169,6 +169,7 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
           val executionState = executionStateOld.copy()
 
           // evaluate all of the enable conditions that we need
+          dbgs(s"Pre-evaluating symbols: $enableSyms")
           enableSyms.foreach(preEvaluateSym(_, readIndex, writeIndex, executionState))
 
           syms.collect {

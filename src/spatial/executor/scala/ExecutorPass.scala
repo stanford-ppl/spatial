@@ -17,9 +17,6 @@ case class ExecutorPass(IR: argon.State) extends AccelTraversal {
             exec.tick()
             cycles += 1
             emit(s"-" * 100)
-            if (cycles >= 1000) {
-              throw new Exception(s"Infinite loop detected")
-            }
           }
         case stmt =>
           // These are top-level host operations

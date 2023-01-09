@@ -18,7 +18,7 @@ object FringeNodeExecutor {
 
 trait FringeOpExecutor extends OpExecutorBase {
   val kLoadLatency: Int = 40
-  // Estimated 200 bytes/tick for DDR4 SDRAM
+  // Estimated 200 bytes/tick
   val kLoadThroughput: Double = 200
   val maxInFlightRequests = 32
 
@@ -57,7 +57,7 @@ trait FringeOpExecutor extends OpExecutorBase {
   }
 
   protected def computeLatency(nElements: Int): Int = {
-    return 1
+//    return 1
     // In Bytes
     val transferSize = bytesPerElement * nElements
     scala.math.ceil(transferSize / kLoadThroughput).toInt + kLoadLatency

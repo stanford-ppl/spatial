@@ -35,7 +35,8 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-    val size = args(0).to[Int]
+//    val size = args(0).to[Int]
+    val size = I32(1920)
     val src = Array.tabulate(size){i => i % 256}
 
     val dst = blockreduce_1d(src, size)

@@ -1,6 +1,6 @@
 package spatial.executor.scala.resolvers
 import argon.lang.Struct
-import argon.{Exp, Op, emit, error}
+import argon.{Const, Exp, Op, Value, emit, error}
 import argon.node.{AssertIf, FixRandom, FixToText, PrintIf, SimpleStruct, TextConcat, TextToFix}
 import emul.FixedPoint
 import spatial.executor.scala.memories.{ScalaStruct, ScalaStructType}
@@ -40,6 +40,7 @@ trait MiscResolver extends OpResolverBase {
           v => execState(v) match {case ev: EmulVal[_] => ev}
         })
 
+      case Value(v) => SimpleEmulVal(v)
 
       case _ => super.run(sym, execState)
     }

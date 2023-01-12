@@ -11,5 +11,6 @@ trait OpExecutorBase {
   val execState: ExecutionState
   def tick(): Unit
   def status: Status
+  def print(): Unit = {}
 }
 

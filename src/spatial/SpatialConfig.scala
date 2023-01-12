@@ -91,6 +91,11 @@ class SpatialConfig extends Config {
   var enablePIR = false
   var enableTsth = false
 
+  var enableScalaExec = false
+  var scalaExecLatency = 100
+  var scalaExecThroughput = 128
+  var scalaExecMaxSimultaneousRequests = 2
+
   var paramSavePath:Option[String] = None
 
   override def copyTo(dst: Config): Unit = {

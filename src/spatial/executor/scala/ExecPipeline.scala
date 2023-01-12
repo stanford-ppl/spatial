@@ -23,7 +23,6 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
 
   def tick(): Unit = {
     // Advance all stages by one tick
-    emit(s"Advancing stages: $stages")
     indentGen {
       stages.foreach(_.tick())
     }
@@ -36,32 +35,14 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
       lastStates = Seq.empty
     }
 
-    indentGen {
-      stages.foreach {
-        stage =>
-          emit(s"Stage: $stage")
-          indentGen {
-            emit(s"CurrentExec: ${stage.currentExecution}")
-            emit(s"IsDone: ${stage.isDone}")
-            stage.currentExecution match {
-              case Some(exec) =>
-                emit(s"WillStall: ${exec.willStall}")
-              case None =>
-            }
-          }
-      }
-    }
-
     // Taking pairs from the end of the stages, advance if the next stage is empty and the current stage is done.
     stages.reverse.sliding(2).foreach {
       case Seq(later, earlier) =>
-        emit(s"Attempting to shift: $earlier -> $later")
         (later.currentExecution, earlier.currentExecution) match {
           case (None, Some(execution)) if execution.isDone =>
             val currentStates = execution.executionStates
             later.setExecution(currentStates)
             earlier.clearExecution()
-            emit(s"Shifting: $earlier -> $later")
           case _ => // Pass, not ready to move on yet
         }
       case skip if skip.size < 2 => // Single or no items
@@ -73,9 +54,41 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
   override def toString: String = {
     s"ExecPipeline(${stages.map(_.toString).mkString(", ")})"
   }
+
+  def print(): Unit = {
+    // If all stages are inner pipeline stages, then print horizontally
+    // Otherwise, we need to print vertically
+    val isAllInner = stages.forall {
+      case _: InnerPipelineStage => true
+      case _: OuterPipelineStage => false
+    }
+
+    if (isAllInner) {
+      val strings = stages.map {
+        case stage: InnerPipelineStage =>
+          stage.currentExecution match {
+            case Some(execution) =>
+              execution.toString
+            case None => "<empty>"
+          }
+      }
+      emit(strings.mkString(" | "))
+    } else {
+      stages.foreach {
+        case stage: InnerPipelineStage =>
+          stage.currentExecution.foreach(emit(_))
+        case stage: OuterPipelineStage =>
+          stage.currentExecution match {
+            case None => emit(s"<empty>")
+            case Some(execution: OuterPipelineStageExecution) =>
+              execution.print()
+          }
+      }
+    }
+  }
 }
 
-trait PipelineStage {
+sealed trait PipelineStage {
   var currentExecution: Option[PipelineStageExecution] = None
   def isEmpty: Boolean = currentExecution.isEmpty
   def tick(): Unit = currentExecution.foreach {
@@ -220,7 +233,8 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
   override def isDone: Boolean = hasTicked
 
   override def toString: String = {
-    s"InnerPipelineStageExecution($syms) [done = $isDone]"
+    val status = if (isDone) { "Done" } else if (willStall) { "Stalled" } else "Pending"
+    s"<${executionStates.map(_.ID).mkString(", ")}>[$status]"
   }
 }
 
@@ -231,7 +245,7 @@ class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends Pipeline
   }
 
   override def toString: String = {
-    s"OuterPipelineStage(${transients.mkString(", ")}, $ctrl)[$currentExecution]"
+    s"OuterPipelineStage(${transients.mkString(", ")}, $ctrl)"
   }
 }
 
@@ -257,6 +271,12 @@ class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Se
           case _: Finished => true
           case Running => false
         }
+    }
+  }
+
+  def print(): Unit = {
+    executors.foreach {
+      _.print()
     }
   }
 }

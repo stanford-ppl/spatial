@@ -126,7 +126,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val dependencyGraphAnalyzer = DependencyGraphAnalyzer(state)
     lazy val counterIterSynchronization = CounterIterSynchronization(state)
 
-    lazy val executor = ExecutorPass(state)
+    lazy val executor = ExecutorPass(state, spatialConfig.scalaExecThroughput, spatialConfig.scalaExecLatency, spatialConfig.scalaExecMaxSimultaneousRequests)
 
     import Stripper.S
     lazy val bankStrippers = MetadataStripper(state,
@@ -203,7 +203,7 @@ trait Spatial extends Compiler with ParamLoader {
         bankingAnalysis ==> createDump("PreUnroll") ==>
         counterIterSynchronization ==>
         transformerChecks ==>
-        executor ==>
+        (spatialConfig.enableScalaExec ? executor) ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */
@@ -551,6 +551,22 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[String]("save-param").action{(x,_) => 
       spatialConfig.paramSavePath = Some(x)
     }.text("Set path to store application parameter")
+
+    cli.opt[Unit]("scalaExec").action {(x, _) =>
+      spatialConfig.enableScalaExec = true
+    }
+
+    cli.opt[Int]("scalaExecLatency").action{ (x, _) =>
+      spatialConfig.scalaExecLatency = x
+    }
+
+    cli.opt[Int]("scalaExecThroughput").action{ (x, _) =>
+      spatialConfig.scalaExecThroughput = x
+    }
+
+    cli.opt[Int]("scalaSimAccess").action { (x, _) =>
+      spatialConfig.scalaExecMaxSimultaneousRequests = x
+    }
   }
 
   override def postprocess(block: Block[_]): Unit = {

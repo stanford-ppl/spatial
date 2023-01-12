@@ -6,6 +6,7 @@ import spatial.dsl._
 
 @spatial class MemCopySRAM1D extends SpatialTest {
   override def runtimeArgs: Args = "100"
+  override def compileArgs: Args = "--scalaExec --scalaSimAccess=1"
 
   val N = 192
 

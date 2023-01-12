@@ -2,6 +2,7 @@ package spatial.executor.scala
 
 import argon.{Const, Exp, Param, Sym, Value, dbgs, stm}
 import emul.Bool
+import spatial.executor.scala.ExecutionState.getNewID
 import spatial.executor.scala.memories.ScalaTensor
 import spatial.executor.scala.resolvers.OpResolver
 
@@ -28,7 +29,17 @@ class MemTracker {
     s"MemTracker: ${mems.mkString(", ")}"
   }
 }
-class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTracker, implicit val IR: argon.State) {
+
+object ExecutionState {
+  var nextID: Int = 0
+
+  def getNewID(): Int = {
+    nextID += 1
+    nextID - 1
+  }
+}
+class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTracker, val memoryController: MemoryController, implicit val IR: argon.State) {
+  val ID: Int = getNewID()
   def apply[U, V](s: Exp[U, V]): EmulResult = s match {
     case Value(result: Boolean) => SimpleEmulVal(emul.Bool(result))
     case Value(result) =>
@@ -56,7 +67,7 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTra
     values += (sym -> v)
   }
 
-  def copy(): ExecutionState = new ExecutionState(values, hostMem, IR)
+  def copy(): ExecutionState = new ExecutionState(values, hostMem, memoryController, IR)
 
   def runAndRegister[U, V](s: Exp[U, V]): EmulResult = {
     val result = OpResolver.run(s, this)
@@ -65,6 +76,6 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTra
   }
 
   override def toString: String = {
-    s"ExecutionState($values)"
+    s"ExecutionState($ID)"
   }
 }

@@ -27,7 +27,7 @@ trait FringeOpExecutor extends OpExecutorBase {
 
   val bytesPerElement: Int
 
-  case class DRAMAccessData(base: Int, nElements: Int)
+  case class DRAMAccessData(base: Int, nElements: Int, size: Int)
   @forge.tags.stateful def decodeCmd(cmd: ScalaStruct): DRAMAccessData = {
     val offset = cmd.fieldValues("offset") match {
       case ev: EmulVal[FixedPoint] => ev.value.toInt
@@ -36,8 +36,6 @@ trait FringeOpExecutor extends OpExecutorBase {
       case ev: EmulVal[FixedPoint] => ev.value.toInt
     }
 
-
-
     // Convert these to address ranges
     val nElements = sizeInBytes / bytesPerElement
 
@@ -45,22 +43,7 @@ trait FringeOpExecutor extends OpExecutorBase {
 
     // dramAddr() = (addr_bytes - dram.address) / bytesPerWord
     val dramIndex = (offset - memEntry.start) / bytesPerElement
-    emit(s"Decoding $cmd:")
-    indentGen {
-      emit(s"Offset = $offset")
-      emit(s"Size (B) = $sizeInBytes")
-      emit(s"MemEntryStart = ${memEntry.start}")
-      emit(s"DramIndex = $dramIndex")
-      emit(s"BytesPerElement = $bytesPerElement")
-    }
-    DRAMAccessData(dramIndex, nElements)
-  }
-
-  protected def computeLatency(nElements: Int): Int = {
-//    return 1
-    // In Bytes
-    val transferSize = bytesPerElement * nElements
-    scala.math.ceil(transferSize / kLoadThroughput).toInt + kLoadLatency
+    DRAMAccessData(dramIndex, nElements, sizeInBytes)
   }
 }
 
@@ -76,35 +59,23 @@ class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState
   override val cmdStream = execState(cmdStreamSym) match { case sq:ScalaQueue[ScalaStruct] => sq }
   val dataStream = execState(dataStreamSym) match { case sq:ScalaQueue[EmulVal[ET]] => sq }
 
-  class DRAMLoad(var latencyRemaining: Int, val accessData: DRAMAccessData) {
-    override def toString: String = s"DRAMLoad($latencyRemaining, $accessData)"
-  }
+  case class DRAMLoad(request: Request, accessData: DRAMAccessData)
 
   val requests = mutable.Queue[DRAMLoad]()
 
   override def tick(): Unit = {
-
-    // decrement all of the current latencies
-    requests.foreach { load => load.latencyRemaining -= 1 }
-
-    emit(s"$this Status Report:")
-    indentGen {
-      emit(s"Requests: ${requests.map(_.toString).mkString(", ")}")
-      emit(s"Pending Cmd: ${cmdStream.headOption}")
-    }
-
-    if (!cmdStream.isEmpty && requests.size < maxInFlightRequests) {
+    if (!cmdStream.isEmpty) {
       val cmd = cmdStream.deq()
       val accessData = decodeCmd(cmd)
-
-      requests.enqueue(new DRAMLoad(computeLatency(accessData.nElements), accessData))
+      val request = execState.memoryController.makeRequest(accessData.size)
+      requests.enqueue(DRAMLoad(request, accessData))
     }
 
     requests.headOption match {
-      case Some(load) if load.latencyRemaining <= 0 =>
-        (0 until load.accessData.nElements) foreach {
+      case Some(DRAMLoad(request, accessData)) if request.status == RequestFinished =>
+        (0 until accessData.nElements) foreach {
           shift =>
-            val readVal = dram.values(load.accessData.base + shift).get
+            val readVal = dram.values(accessData.base + shift).get
             dataStream.enq(readVal)
         }
         requests.dequeue()
@@ -129,25 +100,13 @@ class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionStat
   val dataStream = execState(dataStreamSym) match { case sq:ScalaQueue[EmulVal[ET]] => sq }
   val ackStream = execState(ackStreamSym) match {case sq: ScalaQueue[EmulVal[emul.Bool]] => sq }
 
-  class DRAMStore(var latencyRemaining: Int, val accessData: DRAMAccessData, val values: Seq[Option[EmulVal[_]]]) {
-    override def toString: String = s"DRAMStore($latencyRemaining, $accessData, $values)"
-  }
+  case class DRAMStore(request: Request, accessData: DRAMAccessData, values: Seq[Option[EmulVal[_]]])
+
   val requests = mutable.Queue[DRAMStore]()
 
   override def tick(): Unit = {
 
-    emit(s"$this Status Report:")
-    indentGen {
-      emit(s"Requests: ${requests.map(_.toString).mkString(", ")}")
-      emit(s"Pending Cmd: ${cmdStream.headOption}")
-      emit(s"Current Data: ${dataStream.size}")
-    }
-
-
-    // decrement all of the current latencies
-    requests.foreach { req => req.latencyRemaining -= 1 }
-
-    if (!cmdStream.isEmpty && requests.size < maxInFlightRequests) {
+    if (!cmdStream.isEmpty) {
 
       val dramAccess = decodeCmd(cmdStream.head match {case sc: ScalaStruct => sc})
 
@@ -165,23 +124,23 @@ class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionStat
               val payload = entry.fieldValues("_1")
               Some(payload)
             } else None
-
         }
 
-        requests.enqueue(new DRAMStore(computeLatency(dramAccess.nElements), dramAccess, data))
+        requests.enqueue(new DRAMStore(execState.memoryController.makeRequest(dramAccess.size), dramAccess, data))
         cmdStream.deq()
       }
     }
 
-    if (requests.nonEmpty && requests.head.latencyRemaining <= 0) {
-      // Pop the first request off, and handle it
-      val load = requests.dequeue()
-      load.values.zipWithIndex foreach {
-        case (value@Some(_), offset) =>
-          dram.values(offset + load.accessData.base) = value
-        case _ =>
-      }
-      ackStream.enq(SimpleEmulVal(emul.Bool(true)))
+    requests.headOption match {
+      case Some(DRAMStore(request, accessData, values)) if request.status == RequestFinished =>
+        requests.dequeue()
+        values.zipWithIndex foreach {
+          case (value@Some(_), offset) =>
+            dram.values(offset + accessData.base) = value
+          case _ =>
+        }
+        ackStream.enq(SimpleEmulVal(emul.Bool(true)))
+      case _ =>
     }
   }
 

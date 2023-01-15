@@ -3,7 +3,7 @@ import argon.node._
 import argon.{Exp, Op, dbgs}
 import emul.{FixedPoint, FixedPointRange}
 import spatial.executor.scala.memories.ScalaTensor
-import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal, SomeEmul}
+import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal, SimulationException, SomeEmul}
 import spatial.node._
 import utils.Result.CompileError
 
@@ -12,6 +12,10 @@ import scala.reflect.ClassTag
 
 trait HostOpResolver extends OpResolverBase {
   override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
+
+    case Op(InputArguments()) =>
+      val args = execState.IR.runtimeArgs
+      new ScalaTensor[EmulVal[String]](Seq(args.size), None, Some(args.map{ x => Some(SimpleEmulVal(x)) }))
 
     case Op(newArray@ArrayNew(size)) =>
       val rSize = execState.getValue[FixedPoint](size).toInt
@@ -34,7 +38,7 @@ trait HostOpResolver extends OpResolverBase {
       val index = execState.getValue[FixedPoint](i).toInt
       val result = arr.read(Seq(index), true)
       if (result.isEmpty) {
-        throw new Exception(s"Attempting to access $coll[$i] = $arr[$index], which is unset.")
+        throw SimulationException(s"Attempting to access $coll[$i] = $arr[$index], which is unset.")
       }
       result.orNull
 
@@ -96,6 +100,12 @@ trait HostOpResolver extends OpResolverBase {
       }
       EmulUnit(sym)
 
+    case Op(IfThenElse(cond, thenBlk, elseBlk)) =>
+      if (execState.getValue[emul.Bool](cond).value) {
+        runBlock(thenBlk, Map.empty, execState)
+      } else {
+        runBlock(elseBlk, Map.empty, execState)
+      }
     case _ => super.run(sym, execState)
   }
 }

@@ -9,6 +9,8 @@ import spatial.dsl._
   override def finalModelArgs: Args = "192"
   override def runtimeArgs: Args = "192"
 
+  override def compileArgs: Args = "--scalaExec --scalaSimAccess=1"
+
   def parFifoLoad[T:Num](src1: Array[T], src2: Array[T], in: Int) = {
 
     val tileSize = 96 (96 -> 96)

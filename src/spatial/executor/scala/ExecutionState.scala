@@ -6,18 +6,21 @@ import spatial.executor.scala.ExecutionState.getNewID
 import spatial.executor.scala.memories.ScalaTensor
 import spatial.executor.scala.resolvers.OpResolver
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.{mutable => cm}
 import scala.reflect.ClassTag
 
 // Tracks the state of addresses to tensors on the host side
 case class MemEntry(start: Int, size: Int, tensor: ScalaTensor[SomeEmul])
 class MemTracker {
-  var mems: ArrayBuffer[MemEntry] = ArrayBuffer.empty
+  var mems: cm.ArrayBuffer[MemEntry] = cm.ArrayBuffer.empty
   var maxAddress = 0
   def register[T <: EmulResult](tensor: ScalaTensor[T]): Unit = {
     // "Allocate" a block of memory
     val blockSize = tensor.size * tensor.elementSize.get
-    mems.append(MemEntry(maxAddress, blockSize, tensor.asInstanceOf[ScalaTensor[SomeEmul]]))
+    mems.append(
+      MemEntry(maxAddress,
+               blockSize,
+               tensor.asInstanceOf[ScalaTensor[SomeEmul]]))
     maxAddress += blockSize
   }
 
@@ -30,6 +33,20 @@ class MemTracker {
   }
 }
 
+class CycleTrackerEntry(var cycles: Int, var iterations: Int) {
+  override def toString: String = {
+    s"Cycles: $cycles, Iterations: $iterations"
+  }
+}
+
+class CycleTracker {
+  // Track Cycles, Stalled, Iterations
+  val controllers = cm.Map.empty[Sym[_], CycleTrackerEntry]
+
+  def getEntry(ctrl: Sym[_]): CycleTrackerEntry =
+    controllers.getOrElseUpdate(ctrl, new CycleTrackerEntry(0, 0))
+}
+
 object ExecutionState {
   var nextID: Int = 0
 
@@ -38,7 +55,11 @@ object ExecutionState {
     nextID - 1
   }
 }
-class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTracker, val memoryController: MemoryController, implicit val IR: argon.State) {
+class ExecutionState(var values: Map[Exp[_, _], EmulResult],
+                     val hostMem: MemTracker,
+                     val memoryController: MemoryController,
+                     val cycleTracker: CycleTracker,
+                     implicit val IR: argon.State) {
   val ID: Int = getNewID()
   def apply[U, V](s: Exp[U, V]): EmulResult = s match {
     case Value(result: Boolean) => SimpleEmulVal(emul.Bool(result))
@@ -52,7 +73,7 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTra
     recv match {
       case ev: EmulVal[T] if ev.valid => ev.value
       case ev: EmulVal[T] if !ev.valid =>
-        throw new Exception(s"$s -> $ev was marked invalid!")
+        throw SimulationException(s"$s -> $ev was marked invalid!")
     }
   }
 
@@ -67,7 +88,8 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult], val hostMem: MemTra
     values += (sym -> v)
   }
 
-  def copy(): ExecutionState = new ExecutionState(values, hostMem, memoryController, IR)
+  def copy(): ExecutionState =
+    new ExecutionState(values, hostMem, memoryController, cycleTracker, IR)
 
   def runAndRegister[U, V](s: Exp[U, V]): EmulResult = {
     val result = OpResolver.run(s, this)

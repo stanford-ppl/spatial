@@ -3,7 +3,7 @@ package spatial.executor.scala.resolvers
 import argon._
 import argon.node.Enabled
 import emul.FixedPoint
-import spatial.executor.scala.{EmulResult, EmulVal, ExecutionState}
+import spatial.executor.scala.{EmulResult, EmulVal, ExecutionState, SimulationException}
 
 import scala.reflect.{ClassTag, classTag}
 
@@ -29,7 +29,7 @@ trait OpResolverBase {
     implicit val IR: argon.State = execState.IR
     error(s"Current state: $execState")
     error(s"Did not know how to execute ${stm(sym)}")
-    throw new Exception(s"Don't know how to execute ${stm(sym)}")
+    throw  SimulationException(s"Don't know how to execute ${stm(sym)}")
   }
 }
 

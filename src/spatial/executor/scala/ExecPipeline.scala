@@ -86,6 +86,10 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
       }
     }
   }
+
+  def canProgress: Boolean = {
+    stages.exists(_.canProgress)
+  }
 }
 
 sealed trait PipelineStage {
@@ -108,6 +112,8 @@ sealed trait PipelineStage {
   def clearExecution(): Unit = { currentExecution = None }
 
   def makeNewExecution(executionState: Seq[ExecutionState]): PipelineStageExecution
+
+  def canProgress: Boolean = currentExecution.exists(_.canProgress)
 }
 
 trait PipelineStageExecution {
@@ -116,6 +122,8 @@ trait PipelineStageExecution {
   def isDone: Boolean
   val executionStates: Seq[ExecutionState]
   implicit def IR: argon.State = executionStates.head.IR
+
+  def canProgress: Boolean
 }
 
 class InnerPipelineStage(syms: Seq[Sym[_]]) extends PipelineStage {
@@ -182,25 +190,27 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
           val executionState = executionStateOld.copy()
 
           // evaluate all of the enable conditions that we need
-          dbgs(s"Pre-evaluating symbols: $enableSyms")
-          enableSyms.foreach(preEvaluateSym(_, readIndex, writeIndex, executionState))
+          if (enableSyms.nonEmpty) {
+            dbgs(s"Pre-evaluating symbols: $enableSyms")
+            enableSyms.foreach(preEvaluateSym(_, readIndex, writeIndex, executionState))
+          }
 
           syms.collect {
-            case Op(FIFOEnq(mem, _, ens)) if isEnabled(ens, executionState) =>
+            case s@Op(FIFOEnq(mem, _, ens)) if isEnabled(ens, executionState) =>
               executionState(mem) match {
-                case sq: ScalaQueue[_] => (sq, 1, 0)
+                case sq: ScalaQueue[_] => (sq, 1, 0, s)
               }
-            case Op(StreamOutWrite(mem, _, ens)) if isEnabled(ens, executionState) =>
+            case s@Op(StreamOutWrite(mem, _, ens)) if isEnabled(ens, executionState) =>
               executionState(mem) match {
-                case sq: ScalaQueue[_] => (sq, 1, 0)
+                case sq: ScalaQueue[_] => (sq, 1, 0, s)
               }
-            case Op(FIFODeq(mem, ens)) if isEnabled(ens, executionState) =>
+            case s@Op(FIFODeq(mem, ens)) if isEnabled(ens, executionState) =>
               executionState(mem) match {
-                case sq: ScalaQueue[_] => (sq, 0, 1)
+                case sq: ScalaQueue[_] => (sq, 0, 1, s)
               }
-            case Op(StreamInRead(mem, ens)) if isEnabled(ens, executionState) =>
+            case s@Op(StreamInRead(mem, ens)) if isEnabled(ens, executionState) =>
               executionState(mem) match {
-                case sq: ScalaQueue[_] => (sq, 0, 1)
+                case sq: ScalaQueue[_] => (sq, 0, 1, s)
               }
           }
       }
@@ -209,11 +219,19 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
           val enqs = tmp.map(_._2).sum
           val deqs = tmp.map(_._3).sum
 
+          emit(s"Queue: $queue, tmp: $tmp")
+          emit(s"Enq: ${queue.size + enqs} <= ${queue.capacity}")
+          emit(s"Deq: ${queue.size} >= $deqs")
           ((queue.size + enqs) <= queue.capacity) && (queue.size >= deqs)
+      }
+      if (!canExecute) {
+        emit(s"Queues and Counts: ${queuesAndCounts}")
       }
       !canExecute
     } catch {
-      case SpeculativeOOB => true
+      case SpeculativeOOB =>
+        emit(s"Speculative OOB, will stall")
+        true
     }
   }
 
@@ -235,6 +253,10 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
   override def toString: String = {
     val status = if (isDone) { "Done" } else if (willStall) { "Stalled" } else "Pending"
     s"<${executionStates.map(_.ID).mkString(", ")}>[$status]"
+  }
+
+  override def canProgress: Boolean = {
+    !(isDone || willStall)
   }
 }
 
@@ -278,5 +300,14 @@ class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Se
     executors.foreach {
       _.print()
     }
+  }
+
+  override def canProgress: Boolean = {
+    if (isDone) { return false }
+    if (executors.forall {
+      exec => exec.status.isFinished || exec.status == Indeterminate || exec.isDeadlocked
+    }) return false
+
+    true
   }
 }

@@ -1,22 +1,23 @@
 package spatial.executor.scala
 
-import argon.{Block, Op, emit, error, inGen}
+import argon.{Block, Op, Sym, emit, error, inGen, indentGen}
 import spatial.SpatialConfig
 import spatial.node.AccelScope
 import spatial.traversal.AccelTraversal
+import spatial.metadata.control._
 
 
 case class ExecutorPass(IR: argon.State, bytesPerTick: Int, responseLatency: Int, activeRequests: Int) extends AccelTraversal {
   private val lineLength = 120
   override protected def process[R](block: Block[R]): Block[R] = {
     inGen(IR.config.genDir, s"SimulatedExecutionLog_${IR.paddedPass}") {
-      val executionState = new ExecutionState(Map.empty, new MemTracker, new MemoryController(bytesPerTick, responseLatency, activeRequests), IR)
+      val executionState = new ExecutionState(Map.empty, new MemTracker, new MemoryController(bytesPerTick, responseLatency, activeRequests), new CycleTracker(), IR)
       var cycles = 0
       block.stms.foreach {
         case accelScope@Op(_: AccelScope) =>
           emit(s"Starting Accel Simulation".padTo(lineLength, "-").mkString)
           val exec = new AccelScopeExecutor(accelScope, executionState)
-          while (exec.status != Done) {
+          while (exec.status != Done && !exec.isDeadlocked) {
             emit(s"Tick $cycles".padTo(lineLength, "-").mkString)
             exec.tick()
             emit(s"Execution Status".padTo(lineLength, "-").mkString)
@@ -26,11 +27,30 @@ case class ExecutorPass(IR: argon.State, bytesPerTick: Int, responseLatency: Int
             executionState.memoryController.print(emit(_))
             cycles += 1
           }
+          if (exec.isDeadlocked) {
+            emit(s"Discovered Deadlock!")
+          }
         case stmt =>
           // These are top-level host operations
           executionState.runAndRegister(stmt)
       }
       emit(s"Concluding Simulation".padTo(lineLength, "-").mkString)
+      // Iterate over all controllers in a DFS fashion
+
+      val printed = collection.mutable.Set.empty[Sym[_]]
+      def recursiveCyclePrint(sym: Sym[_]): Unit = {
+        emit(s"$sym [${sym.ctx}]: ${executionState.cycleTracker.controllers(sym)}")
+        printed += sym
+        indentGen {
+          sym.children.foreach {
+            case Ctrl.Node(s, _) if !(printed contains s) && (executionState.cycleTracker.controllers contains s) =>
+              recursiveCyclePrint(s)
+            case _ =>
+          }
+        }
+      }
+      val start = LCA(executionState.cycleTracker.controllers.keySet.toSet)
+      recursiveCyclePrint(start.s.get)
       emit(s"ELAPSED CYCLES: $cycles")
     }
     block

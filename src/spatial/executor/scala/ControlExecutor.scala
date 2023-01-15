@@ -14,7 +14,7 @@ import scala.collection.{mutable => cm}
 
 object ControlExecutor {
   @stateful def apply(ctrl: Sym[_],
-                      execState: ExecutionState): OpExecutorBase = {
+                      execState: ExecutionState): ControlExecutor = {
     val orderedSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
     emit(s"Setting up pipelines for ${ctrl}: ${ctrl.ctx}")
     ctrl match {
@@ -22,11 +22,12 @@ object ControlExecutor {
       case Op(_: OpForeach) if ctrl.isInnerControl =>
         new InnerForeachExecutor(ctrl, execState)
       case Op(_: OpForeach)
-          if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) =>
+        if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) =>
         new OuterForeachExecutor(ctrl, execState)
       case Op(_: UnitPipe) if orderedSchedules.contains(ctrl.schedule) =>
         new UnitPipeExecutor(ctrl, execState)
       case Op(_: UnitPipe) => new StreamUnitPipeExecutor(ctrl, execState)
+      case Op(_: ParallelPipe) => new StreamUnitPipeExecutor(ctrl, execState)
       case Op(_: OpReduce[_]) if ctrl.isInnerControl =>
         new InnerReduceExecutor(ctrl, execState)
       case Op(_: OpReduce[_]) if ctrl.isOuterControl =>
@@ -44,7 +45,7 @@ object ControlExecutor {
 
 case class TransientsAndControl(transients: Seq[Sym[_]], control: Sym[_])
 
-trait ControlExecutorPrinting { this: OpExecutorBase =>
+abstract class ControlExecutor extends OpExecutorBase {
   implicit def state: argon.State
   val ctrl: Sym[_]
   var lastIter: Option[Seq[FixedPoint]] = None
@@ -55,6 +56,25 @@ trait ControlExecutorPrinting { this: OpExecutorBase =>
     }
   }
   def printInternals(): Unit = {}
+  def shouldRun: Boolean = true
+
+  var hasBeenRegistered = false
+
+  def getCycleEntry: CycleTrackerEntry = {
+    execState.cycleTracker.getEntry(ctrl)
+  }
+
+  override def tick(): Unit = {
+    if (shouldRun) {
+      if (!hasBeenRegistered) {
+        getCycleEntry.iterations += 1
+        hasBeenRegistered = true
+      }
+      getCycleEntry.cycles += 1
+    }
+  }
+
+  def isDeadlocked: Boolean
 }
 
 private object ControlExecutorUtils {
@@ -118,9 +138,7 @@ private object ControlExecutorUtils {
 
 class AccelScopeExecutor(val ctrl: Sym[_],
                          override val execState: ExecutionState)(
-    implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
+    implicit override val state: argon.State) extends ControlExecutor {
   private val Op(AccelScope(blk)) = ctrl
   private val exec = if (ctrl.isInnerControl) {
     ControlExecutorUtils.createInnerPipeline(blk.stms)
@@ -129,6 +147,7 @@ class AccelScopeExecutor(val ctrl: Sym[_],
   }
   exec.pushState(Seq(execState))
   override def tick(): Unit = {
+    super.tick()
     exec.tick()
   }
   override def status: Status = if (exec.isEmpty) Done else Running
@@ -136,23 +155,31 @@ class AccelScopeExecutor(val ctrl: Sym[_],
   override def printInternals(): Unit = {
     exec.print()
   }
+
+  override def isDeadlocked: Boolean = {
+    exec.canProgress
+  }
 }
 
 class UnitPipeExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
+    extends  ControlExecutor {
   private val Op(UnitPipe(ens, blk, stopWhen)) = ctrl
-  private val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+  override val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   private val exec = if (ctrl.isInnerControl) {
     ControlExecutorUtils.createInnerPipeline(blk.stms)
   } else {
     ControlExecutorUtils.createOuterPipeline(blk.stms)
   }
 
-  if (shouldRun) { exec.pushState(Seq(execState)) }
+  if (shouldRun) {
+    exec.pushState(Seq(execState))
+  }
 
-  override def tick(): Unit = if (shouldRun) exec.tick()
+  override def tick(): Unit = if (shouldRun) {
+    super.tick()
+    exec.tick()
+  }
 
   override def status: Status = {
     if (!shouldRun) return Disabled
@@ -163,15 +190,23 @@ class UnitPipeExecutor(val ctrl: Sym[_], override val execState: ExecutionState)
   override def printInternals(): Unit = {
     exec.print()
   }
+
+  override def isDeadlocked: Boolean = {
+    !exec.canProgress
+  }
 }
 
 class StreamUnitPipeExecutor(val ctrl: Sym[_],
                              override val execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
-  private val Op(UnitPipe(ens, blk, stopWhen)) = ctrl
-  private val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+    extends  ControlExecutor {
+
+  val (ens, blk, stopWhen) = ctrl match {
+    case Op(UnitPipe(ens, blk, stopWhen)) => (ens, blk, stopWhen)
+    case Op(ParallelPipe(ens, blk)) => (ens, blk, None)
+  }
+
+  override val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   private lazy val executors = blk.stms.flatMap {
     case child if child.isControl =>
       Some(ControlExecutor(child, execState))
@@ -183,6 +218,7 @@ class StreamUnitPipeExecutor(val ctrl: Sym[_],
   }
 
   override def tick(): Unit = if (shouldRun) {
+    super.tick()
     executors.foreach { exec =>
       indentGen {
         exec.tick()
@@ -207,15 +243,20 @@ class StreamUnitPipeExecutor(val ctrl: Sym[_],
   override def printInternals(): Unit = {
     executors.foreach(_.print())
   }
+
+  override def isDeadlocked: Boolean = {
+    (executors.collect {
+      case ctrl: ControlExecutor => ctrl.isDeadlocked
+    }).forall(x => x)
+  }
 }
 
 abstract class ForeachExecutorBase(ctrl: Sym[_],
                                    override val execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
+    extends  ControlExecutor {
   protected val Op(OpForeach(ens, cchain, blk, iters, stopWhen)) = ctrl
-  protected val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+  override val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   protected val iterMap =
     ControlExecutorUtils.computeIters(cchain, execState).toIterator
   protected val steps =
@@ -247,11 +288,14 @@ abstract class ForeachExecutorBase(ctrl: Sym[_],
     }
     Running
   }
+
+  override def isDeadlocked: Boolean = {
+    !pipelines.values.exists(_.canProgress)
+  }
 }
 class InnerForeachExecutor(val ctrl: Sym[_], execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends ForeachExecutorBase(ctrl, execState)
-    with ControlExecutorPrinting {
+    extends ForeachExecutorBase(ctrl, execState) {
   private val IIEnable = (Stream
     .from(0)
     .map { x =>
@@ -269,6 +313,8 @@ class InnerForeachExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
   override def tick(): Unit = {
     if (!shouldRun) return
+
+    super.tick()
     indentGen {
       pipeline.tick()
     }
@@ -309,13 +355,14 @@ class InnerForeachExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
 class OuterForeachExecutor(val ctrl: Sym[_], execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends ForeachExecutorBase(ctrl, execState)
-    with ControlExecutorPrinting {
+    extends ForeachExecutorBase(ctrl, execState) {
   override lazy val pipelines = shifts.map { shift =>
     shift -> ControlExecutorUtils.createOuterPipeline(blk.stms)
   }.toMap
 
   override def tick(): Unit = {
+    if (!shouldRun) {return}
+    super.tick()
     indentGen {
       pipelines.foreach {
         case (shift, pipeline) =>
@@ -381,8 +428,7 @@ class OuterForeachExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 abstract class ReduceExecutorBase(ctrl: Sym[_],
                                   override val execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
+    extends  ControlExecutor {
   protected val Op(
     OpReduce(ens,
              cchain,
@@ -395,7 +441,7 @@ abstract class ReduceExecutorBase(ctrl: Sym[_],
              foldOpt,
              iters,
              stopWhen)) = ctrl
-  protected val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+  override val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   protected val iterMap =
     ControlExecutorUtils.computeIters(cchain, execState).toIterator
   protected val steps =
@@ -450,12 +496,15 @@ abstract class ReduceExecutorBase(ctrl: Sym[_],
     }
     Running
   }
+
+  override def isDeadlocked: Boolean = {
+    !pipelines.values.exists(_.canProgress)
+  }
 }
 
 class InnerReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends ReduceExecutorBase(ctrl, execState)
-    with ControlExecutorPrinting {
+    extends ReduceExecutorBase(ctrl, execState) {
   private val IIEnable = (Stream
     .from(0)
     .map { x =>
@@ -473,6 +522,8 @@ class InnerReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
   override def tick(): Unit = {
     if (!shouldRun) return
+    super.tick()
+
     indentGen {
       pipeline.tick()
     }
@@ -515,13 +566,14 @@ class InnerReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
 class OuterReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends ReduceExecutorBase(ctrl, execState)
-    with ControlExecutorPrinting {
+    extends ReduceExecutorBase(ctrl, execState) {
   override lazy val pipelines = shifts.map { shift =>
     shift -> ControlExecutorUtils.createOuterPipeline(mapF.stms)
   }.toMap
 
   override def tick(): Unit = {
+    if (!shouldRun) return
+    super.tick()
     indentGen {
       pipelines.foreach {
         case (shift, pipeline) =>
@@ -590,8 +642,7 @@ class OuterReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 abstract class MemReduceExecutorBase(ctrl: Sym[_],
                                      override val execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
+    extends  ControlExecutor {
   protected val Op(
     OpMemReduce(ens,
                 cchain,
@@ -607,7 +658,7 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
                 iters,
                 itersRed,
                 stopWhen)) = ctrl
-  protected val shouldRun = ens.forall(execState.getValue[Bool](_).value)
+  override val shouldRun = ens.forall(execState.getValue[Bool](_).value)
   protected val iterMap =
     ControlExecutorUtils.computeIters(cchain, execState).toIterator
   protected val steps =
@@ -675,12 +726,15 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
     }
     Running
   }
+
+  override def isDeadlocked: Boolean = {
+    !pipelines.values.exists(_.canProgress)
+  }
 }
 
 class InnerMemReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends MemReduceExecutorBase(ctrl, execState)
-    with ControlExecutorPrinting {
+    extends MemReduceExecutorBase(ctrl, execState) {
   private val IIEnable = (Stream
     .from(0)
     .map { x =>
@@ -698,6 +752,7 @@ class InnerMemReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
   override def tick(): Unit = {
     if (!shouldRun) return
+    super.tick()
     indentGen {
       pipeline.tick()
     }
@@ -745,13 +800,14 @@ class InnerMemReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
 class OuterMemReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends MemReduceExecutorBase(ctrl, execState)
-    with ControlExecutorPrinting {
+    extends MemReduceExecutorBase(ctrl, execState) {
   override lazy val pipelines = shifts.map { shift =>
     shift -> ControlExecutorUtils.createOuterPipeline(mapF.stms)
   }.toMap
 
   override def tick(): Unit = {
+    if (!shouldRun) return
+    super.tick()
     indentGen {
       pipelines.foreach {
         case (shift, pipeline) =>
@@ -829,12 +885,13 @@ class SwitchCaseExecutor(casee: SwitchCase[_], execState: ExecutionState)(
   def printInternals(): Unit = {
     exec.foreach(_.print())
   }
+
+  def canProgress: Boolean = exec.exists(_.canProgress)
 }
 
 class SwitchExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
     implicit override val state: argon.State)
-    extends OpExecutorBase
-    with ControlExecutorPrinting {
+    extends  ControlExecutor {
   private val Op(switches @ Switch(selects, _)) = ctrl
 
   val enabledCases = (selects zip switches.cases) find {
@@ -845,7 +902,10 @@ class SwitchExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
     case (_, casee) => new SwitchCaseExecutor(casee, execState)
   }
 
-  override def tick(): Unit = exec.foreach(_.tick())
+  override def tick(): Unit = {
+    super.tick()
+    exec.foreach(_.tick())
+  }
 
   override def status: Status = {
     if (exec.isEmpty) return Disabled
@@ -859,5 +919,9 @@ class SwitchExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
       case Some((_, _)) =>
         exec.foreach(_.printInternals())
     }
+  }
+
+  override def isDeadlocked: Boolean = {
+    !exec.exists(_.canProgress)
   }
 }

@@ -1,10 +1,10 @@
 package spatial.executor.scala.memories
 
-import spatial.executor.scala.{EmulMem, EmulResult}
+import spatial.executor.scala.{EmulMem, EmulResult, SimulationException}
 
 import scala.collection.mutable
 
-case class ScalaQueue[T <: EmulResult](capacity: Int = scala.Int.MaxValue) extends EmulMem {
+class ScalaQueue[T <: EmulResult](val capacity: Int = scala.Int.MaxValue) extends EmulMem {
   val queue = new mutable.Queue[T]()
 
   def isFull: Boolean = queue.size >= capacity
@@ -12,14 +12,14 @@ case class ScalaQueue[T <: EmulResult](capacity: Int = scala.Int.MaxValue) exten
 
   def enq(value: T): Unit = {
     if (isFull) {
-      throw new Exception(s"Attempting to enqueue to a full FIFO")
+      throw SimulationException(s"Attempting to enqueue to a full FIFO")
     }
     queue.enqueue(value)
   }
 
   def deq(): T = {
     if (isEmpty) {
-      throw new Exception(s"Attempting to dequeue from an empty FIFO")
+      throw  SimulationException(s"Attempting to dequeue from an empty FIFO")
     }
     queue.dequeue()
   }

@@ -1,7 +1,11 @@
 package spatial.executor.scala
 
-sealed trait Status
-sealed trait Finished extends Status
+sealed trait Status {
+  def isFinished: Boolean = false
+}
+sealed trait Finished extends Status {
+  override def isFinished: Boolean = true
+}
 case object Done extends Status with Finished
 case object Indeterminate extends Status
 case object Running extends Status

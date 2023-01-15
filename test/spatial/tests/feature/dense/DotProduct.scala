@@ -73,6 +73,7 @@ import spatial.dsl._
 
 @spatial class DotProductStream extends SpatialTest {
   override def runtimeArgs: Args = "1280 256"
+  override def compileArgs: Args = "--scalaExec --scalaSimAccess=1"
   type T = FixPt[TRUE,_32,_0]
 
   def main(args: Array[String]): Unit = {

@@ -56,6 +56,7 @@ object ExecutionState {
   }
 }
 class ExecutionState(var values: Map[Exp[_, _], EmulResult],
+                     val runtimeArgs: Seq[String],
                      val hostMem: MemTracker,
                      val memoryController: MemoryController,
                      val cycleTracker: CycleTracker,
@@ -89,7 +90,7 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult],
   }
 
   def copy(): ExecutionState =
-    new ExecutionState(values, hostMem, memoryController, cycleTracker, IR)
+    new ExecutionState(values, runtimeArgs, hostMem, memoryController, cycleTracker, IR)
 
   def runAndRegister[U, V](s: Exp[U, V]): EmulResult = {
     val result = OpResolver.run(s, this)

@@ -2,10 +2,10 @@ package spatial.executor.scala
 
 import argon.lang.Bit
 import argon.node.Enabled
-import argon.{Op, Sym, dbgs, emit, indentGen, stm}
+import argon.{Op, Sym, dbgs, emit, indent, indentGen, stm}
 import forge.tags.stateful
 import spatial.executor.scala.memories.ScalaQueue
-import spatial.node.{Dequeuer, Enqueuer, FIFODeq, FIFOEnq, LIFOPop, StreamInRead, StreamOutWrite}
+import spatial.node.{Accessor, Dequeuer, Enqueuer, FIFODeq, FIFOEnq, LIFOPop, StreamInRead, StreamOutWrite}
 
 import scala.collection.{mutable => cm}
 
@@ -218,14 +218,20 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
         case (queue, tmp) =>
           val enqs = tmp.map(_._2).sum
           val deqs = tmp.map(_._3).sum
-
-          emit(s"Queue: $queue, tmp: $tmp")
-          emit(s"Enq: ${queue.size + enqs} <= ${queue.capacity}")
-          emit(s"Deq: ${queue.size} >= $deqs")
-          ((queue.size + enqs) <= queue.capacity) && (queue.size >= deqs)
-      }
-      if (!canExecute) {
-        emit(s"Queues and Counts: ${queuesAndCounts}")
+          val canRun = ((queue.size + enqs) <= queue.capacity) && (queue.size >= deqs)
+          if (!canRun) {
+            val mem = (tmp.map(_._4).map {
+              case Op(acc:Accessor[_, _]) => acc.mem
+            }).head
+            dbgs(s"Stalled by ${stm(mem)} @ ${mem.ctx}")
+            indent {
+              dbgs(s"Current Size: ${queue.size}")
+              dbgs(s"Capacity: ${queue.capacity}")
+              dbgs(s"Enqueues: $enqs")
+              dbgs(s"Dequeues: $deqs")
+            }
+          }
+          canRun
       }
       !canExecute
     } catch {

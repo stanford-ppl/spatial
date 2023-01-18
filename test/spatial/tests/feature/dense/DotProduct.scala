@@ -3,16 +3,17 @@ package spatial.tests.feature.dense
 import spatial.dsl._
 
 @spatial class DotProduct extends SpatialTest {
-  override def dseModelArgs: Args = "640"
-  override def finalModelArgs: Args = "640"
-  override def runtimeArgs: Args = "640"
-  override def compileArgs: Args = super.compileArgs and "--noBindParallels"
+  override def dseModelArgs: Args = "1280"
+  override def finalModelArgs: Args = "1280"
+  override def runtimeArgs: Args = "1280"
+//  override def compileArgs: Args = super.compileArgs and "--noBindParallels"
+  override def compileArgs: Args = "--scalaExec --scalaSimAccess=2"
   type X = FixPt[TRUE,_32,_0]
 
   def dotproduct[T:Num](aIn: Array[T], bIn: Array[T]): T = {
     // Can be overwritten using --param-path=fileName at command line
     val ip = 4 (1 -> 192)
-    val op = 2 (1 -> 6)
+    val op = 1 (1 -> 6)
     val ts  = 32 (32 -> 64 -> 19200)
     val loadPar = 4 (1 -> 1 -> 16)
 
@@ -36,15 +37,17 @@ import spatial.dsl._
 
     Accel {
       val accO = Reg[T](0.to[T])
-      out0 := Reduce(accO)(N by B par P1){i =>
+      out0 := Pipe.Reduce(accO)(N by B par P1){i =>
         //val ts = Reg[Int](0)
         //ts := min(B, N-i)
         val aBlk = SRAM[T](B)
         val bBlk = SRAM[T](B)
         //aBlk load a(i::i+ts.value par P3)
         //bBlk load b(i::i+ts.value par P3)
-        aBlk load a(i::i+B par P3)
-        bBlk load b(i::i+B par P3)
+        Parallel {
+          aBlk load a(i :: i + B par P3)
+          bBlk load b(i :: i + B par P3)
+        }
         val accI = Reg[T](0.to[T])
         Reduce(accI)(B par P2){ii => aBlk(ii) * bBlk(ii) }{_+_}
       }{_+_}
@@ -54,8 +57,8 @@ import spatial.dsl._
 
 
   def main(args: Array[String]): Unit = {
-//    val N = args(0).to[Int]
-    val N = 256
+    val N = args(0).to[Int]
+//    val N = 256
     val a = Array.fill(N){ random[X](4) }
     val b = Array.fill(N){ random[X](4) }
 
@@ -73,18 +76,15 @@ import spatial.dsl._
 
 @spatial class DotProductStream extends SpatialTest {
   override def runtimeArgs: Args = "1280 256"
-  override def compileArgs: Args = "--scalaExec --scalaSimAccess=1"
+  override def compileArgs: Args = "--scalaExec --scalaSimAccess=2"
   type T = FixPt[TRUE,_32,_0]
 
   def main(args: Array[String]): Unit = {
-    val ip = loadParam("ip", default=4 (1 -> 192))
-    val op = loadParam("op", default=1 (1 -> 6))
+    val P = loadParam("ip", default=4 (1 -> 192))
     val ts  = loadParam("ts", default=32 (32 -> 64 -> 19200))
     val loadPar = loadParam("loadPar", default=4 (1 -> 1 -> 16))
 
     val BS = ts
-    val P1 = op
-    val P2 = ip
     val P3 = loadPar
 
     val N = args(0).to[Int]
@@ -115,10 +115,8 @@ import spatial.dsl._
       Stream{
         val aBlk = FIFO[T](BS)
         val bBlk = FIFO[T](BS)
-
-
         // Load data
-        Foreach(n by dynBlockSize){blk => 
+        Foreach(n by dynBlockSize){blk =>
           val thisblk = min(dynBlockSize.value, n-blk)
           Parallel {
             // Handle edge case
@@ -126,9 +124,8 @@ import spatial.dsl._
             bBlk load b(blk::blk + thisblk par P3)
           }
         }
-
         // Greedily consume data
-        Reduce(accO)(n by 1 par P1){i => aBlk.deq() * bBlk.deq()}{_+_}
+        Reduce(accO)(n by 1 par P){i => aBlk.deq() * bBlk.deq()}{_+_}
       }
       // Copy result out
       out0 := accO

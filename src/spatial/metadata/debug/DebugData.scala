@@ -12,3 +12,4 @@ case class ShouldDumpFinal(flag: Boolean) extends Data[ShouldDumpFinal](SetBy.Us
 
 case class NoWarnWriteRead(flag: Boolean) extends Data[NoWarnWriteRead](Transfer.Mirror)
 
+case class TreeAnnotations(str: String) extends Data[TreeAnnotations](Transfer.Mirror)

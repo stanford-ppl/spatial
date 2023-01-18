@@ -5,6 +5,7 @@ import spatial.SpatialConfig
 import spatial.node.AccelScope
 import spatial.traversal.AccelTraversal
 import spatial.metadata.control._
+import spatial.metadata.debug._
 
 case class ExecutorPass(IR: argon.State,
                         bytesPerTick: Int,
@@ -16,16 +17,16 @@ case class ExecutorPass(IR: argon.State,
     IR.runtimeArgs.zipWithIndex.foreach {
       case (rtArgs, index) =>
         val splitArgs = rtArgs.split("\\W+")
+        val executionState = new ExecutionState(
+          Map.empty,
+          splitArgs,
+          new MemTracker,
+          new MemoryController(bytesPerTick, responseLatency, activeRequests),
+          new CycleTracker(),
+          IR)
+        var cycles = 0
         inGen(IR.config.genDir,
               s"SimulatedExecutionLog_${IR.paddedPass}_${index}") {
-          val executionState = new ExecutionState(
-            Map.empty,
-            splitArgs,
-            new MemTracker,
-            new MemoryController(bytesPerTick, responseLatency, activeRequests),
-            new CycleTracker(),
-            IR)
-          var cycles = 0
           emit(s"Starting Simulation with args: ${splitArgs.mkString("Array(", ", ", ")")}")
           block.stms.foreach {
             case accelScope @ Op(_: AccelScope) =>
@@ -51,17 +52,27 @@ case class ExecutorPass(IR: argon.State,
           }
           emit(s"Concluding Simulation".padTo(lineLength, "-").mkString)
           // Iterate over all controllers in a DFS fashion
+        }
 
+        inGen(IR.config.genDir,
+          s"SimulatedExecutionSummary_${IR.paddedPass}_${index}") {
           val printed = collection.mutable.Set.empty[Sym[_]]
 
           def recursiveCyclePrint(sym: Sym[_]): Unit = {
             emit(
               s"$sym [${sym.ctx}]: ${executionState.cycleTracker.controllers(sym)}")
+            val data = executionState.cycleTracker.controllers(sym)
+            val cycsPerIter = data.cycles / data.iterations
+            sym.treeAnnotations =
+              s"""
+                 |<font color=\"red\"> $cycsPerIter cycles/iter<br>
+                 |<font size="2">(${data.cycles} total cycles, ${data.iterations} total iters)<br></font> </font><br>""".stripMargin
+
             printed += sym
             indentGen {
               sym.children.foreach {
                 case Ctrl.Node(s, _)
-                    if !(printed contains s) && (executionState.cycleTracker.controllers contains s) =>
+                  if !(printed contains s) && (executionState.cycleTracker.controllers contains s) =>
                   recursiveCyclePrint(s)
                 case _ =>
               }

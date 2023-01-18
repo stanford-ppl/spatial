@@ -200,10 +200,11 @@ trait Spatial extends Compiler with ParamLoader {
         fifoInitialization ==> printer ==>
         spatialConfig.streamify ? createDump("PostInit") ==>
 //        /** Memory analysis */
-        bankingAnalysis ==> createDump("PreUnroll") ==>
+        bankingAnalysis ==>
         counterIterSynchronization ==>
+        createDump("PreExecution") ==>
         transformerChecks ==>
-        (spatialConfig.enableScalaExec ? executor) ==>
+        (spatialConfig.enableScalaExec ? (Seq(executor) ++ createDump("PostExecution"))) ==>
         /** Unrolling */
         unrollTransformer   ==> printer ==> transformerChecks ==>
         /** CSE on regs */

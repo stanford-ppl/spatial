@@ -9,5 +9,7 @@ package object debug {
 
     def noWarnWR: Boolean = metadata[NoWarnWriteRead](s).exists(_.flag)
     def noWarnWR_=(flag: Boolean): Unit = metadata.add[NoWarnWriteRead](s, NoWarnWriteRead(flag))
+    def treeAnnotations: Option[String] = metadata[TreeAnnotations](s).map(_.str)
+    def treeAnnotations_= (str: String): Unit = metadata.add[TreeAnnotations](s, TreeAnnotations(str))
   }
 }

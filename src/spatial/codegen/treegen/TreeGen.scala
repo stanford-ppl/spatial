@@ -5,6 +5,7 @@ import spatial.lang._
 import spatial.metadata.access._
 import spatial.metadata.control._
 import spatial.metadata.memory._
+import spatial.metadata.debug._
 import spatial.node._
 import spatial.traversal.AccelTraversal
 import spatial.util.modeling.scrubNoise
@@ -142,6 +143,11 @@ case class TreeGen(IR: State, filename: String = "controller_tree", IRFile: Stri
         val ctrs = lhs.cchains.head.counters
         val ctrText = ctrs.map(_.op.get).mkString(", ")
         emit(s"""${"  "*ident}<br><font size = "1">Counter: ${link(cchain.get)} = ${ctrText}</font>""")
+      }
+      lhs.treeAnnotations match {
+        case Some(annot) =>
+          emit(s"<div>$annot</div>")
+        case None =>
       }
       emit("")
       print_stream_info(lhs)

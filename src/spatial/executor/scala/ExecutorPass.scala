@@ -1,6 +1,6 @@
 package spatial.executor.scala
 
-import argon.{Block, Op, Sym, emit, error, inGen, indentGen, info, stm}
+import argon.{Block, Op, Sym, dbgs, emit, error, inGen, indentGen, info, stm}
 import spatial.SpatialConfig
 import spatial.node.AccelScope
 import spatial.traversal.AccelTraversal
@@ -18,6 +18,7 @@ case class ExecutorPass(IR: argon.State,
   private val lineLength = 120
   override protected def process[R](block: Block[R]): Block[R] = {
     info(s"Starting scala simulation")
+    val accelScopes = collection.mutable.Set.empty[Sym[_]]
     IR.runtimeArgs.zipWithIndex.foreach {
       case (rtArgs, index) =>
         val splitArgs = rtArgs.split("\\W+")
@@ -34,6 +35,7 @@ case class ExecutorPass(IR: argon.State,
           emit(s"Starting Simulation with args: ${splitArgs.mkString("Array(", ", ", ")")}")
           block.stms.foreach {
             case accelScope @ Op(_: AccelScope) =>
+              accelScopes.add(accelScope)
               emit(s"Starting Accel Simulation".padTo(lineLength, "-").mkString)
               val exec = new AccelScopeExecutor(accelScope, executionState)
               while (exec.status != Done) {
@@ -89,9 +91,7 @@ case class ExecutorPass(IR: argon.State,
               }
             }
           }
-
-          val start = LCA(executionState.cycleTracker.controllers.keySet.toSet)
-          recursiveCyclePrint(start.s.get)
+          accelScopes.foreach(recursiveCyclePrint)
           emit(s"ELAPSED CYCLES: $cycles")
         }
     }

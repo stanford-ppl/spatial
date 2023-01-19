@@ -77,6 +77,17 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     override val makeTimeout: Long = 130000
   }
 
+  object CS217 extends ChiselBackend(
+    name = "CS217",
+    args = "--synth --instrument --runtime --scalaExec --scalaSimAccess=2 --countResources --fpga VCS",
+    make = "echo \"Skipping Make\"",
+    run = "echo \"Skipping Run\"",
+    model = ""
+  ) {
+    override def shouldRun: Boolean = checkFlag("test.CS217")
+    override val makeTimeout: Long = 130000
+  }
+
   object Zynq extends ChiselBackend(
     name = "Zynq",
     args = "--synth --insanity --fpga Zynq",
@@ -137,6 +148,6 @@ trait SpatialTest extends Spatial with DSLTest with PlasticineTest { self =>
     def apply(n: Int): Seq[Backend] = Seq(new RequireErrors(n))
   }
 
-  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP, ZCUSynth, VCSTest) ++ super.backends
+  override def backends: Seq[Backend] = Seq(Scala, Zynq, ZCU, VCS, AWS, CXP, ZCUSynth, VCSTest, CS217) ++ super.backends
 
 }

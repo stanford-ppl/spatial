@@ -8,6 +8,12 @@ publish:
 	sbt "; project emul; +publishLocal; project fringe; publishLocal; project argon; publishLocal; project forge; publishLocal; project spatial; publishLocal; project models; publishLocal; project poly; publishLocal; project utils; publishLocal"
 
 ###-----------------------------------###
+## Publish only core spatial to ivy2.  ##
+###-----------------------------------###
+publishSpatial:
+	sbt "; project spatial; publishLocal"
+
+###-----------------------------------###
 ## Publish spatial locally to m2.      ##
 ###-----------------------------------###
 publishM2Local:

@@ -247,6 +247,7 @@ trait Spatial extends Compiler with ParamLoader {
         ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
         ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
         (spatialConfig.reportArea ? resourceReporter) ==>
+        (spatialConfig.countResources ? ResourceCountReporter(state)) ==>
         (spatialConfig.enablePIR ? pirCodegen) ==>
         (spatialConfig.enableTsth ? tsthCodegen)
     }
@@ -492,6 +493,10 @@ trait Spatial extends Compiler with ParamLoader {
     cli.opt[Unit]("reportArea").action { (_,_) =>
       spatialConfig.reportArea = true
     }.text("Generate area model report.")
+
+    cli.opt[Unit]("countResources").action { (_, _) =>
+      spatialConfig.countResources = true
+    }.text("Rough Resource Counter")
 
     cli.opt[Unit]("instrument").action { (_,_) => // Must necessarily turn on retiming
       spatialConfig.enableInstrumentation = true

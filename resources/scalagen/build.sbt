@@ -7,9 +7,9 @@ scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:refle
 scalaSource in Compile := baseDirectory.value / "scala"
 scalaSource in Test := baseDirectory.value / "scala"
 
-libraryDependencies += "edu.stanford.cs.dawn" %% {"emul" + sys.env.get("EMUL_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT-nzhang"
-libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT-nzhang"
-libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % "1.1-SNAPSHOT-nzhang"
+libraryDependencies += "edu.stanford.cs.dawn" %% {"emul" + sys.env.get("EMUL_PACKAGE").getOrElse("")} % "1.1-cs217"
+libraryDependencies += "edu.stanford.cs.dawn" %% {"models" + sys.env.get("MODELS_PACKAGE").getOrElse("")} % "1.1-cs217"
+libraryDependencies += "edu.stanford.cs.dawn" %% {"utils" + sys.env.get("UTILS_PACKAGE").getOrElse("")} % "1.1-cs217"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

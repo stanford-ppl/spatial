@@ -85,7 +85,7 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult],
   }
 
   def register(sym: Sym[_], v: EmulResult): Unit = {
-    dbgs(s"Registering: ${stm(sym)} -> $v")
+//    dbgs(s"Registering: ${stm(sym)} -> $v")
     values += (sym -> v)
   }
 
@@ -93,7 +93,9 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult],
     new ExecutionState(values, runtimeArgs, hostMem, memoryController, cycleTracker, IR)
 
   def runAndRegister[U, V](s: Exp[U, V]): EmulResult = {
+//    dbgs(s"Running: $s")
     val result = OpResolver.run(s, this)
+//    dbgs(s"Result: $result")
     register(s, result)
     result
   }

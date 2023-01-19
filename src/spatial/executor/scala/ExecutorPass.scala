@@ -1,6 +1,6 @@
 package spatial.executor.scala
 
-import argon.{Block, Op, Sym, emit, error, inGen, indentGen}
+import argon.{Block, Op, Sym, emit, error, inGen, indentGen, info, stm}
 import spatial.SpatialConfig
 import spatial.node.AccelScope
 import spatial.traversal.AccelTraversal
@@ -12,8 +12,12 @@ case class ExecutorPass(IR: argon.State,
                         responseLatency: Int,
                         activeRequests: Int)
     extends AccelTraversal {
+
+  private val shouldPrint = IR.config.enLog
+
   private val lineLength = 120
   override protected def process[R](block: Block[R]): Block[R] = {
+    info(s"Starting scala simulation")
     IR.runtimeArgs.zipWithIndex.foreach {
       case (rtArgs, index) =>
         val splitArgs = rtArgs.split("\\W+")
@@ -33,21 +37,28 @@ case class ExecutorPass(IR: argon.State,
               emit(s"Starting Accel Simulation".padTo(lineLength, "-").mkString)
               val exec = new AccelScopeExecutor(accelScope, executionState)
               while (exec.status != Done) {
-                emit(s"Tick $cycles".padTo(lineLength, "-").mkString)
+                if (shouldPrint) {
+                  emit(s"Tick $cycles".padTo(lineLength, "-").mkString)
+                }
                 exec.tick()
-                emit(s"Execution Status".padTo(lineLength, "-").mkString)
-                exec.print()
-                emit(s"MemoryController".padTo(lineLength, "-").mkString)
+                if (shouldPrint) {
+                  emit(s"Execution Status".padTo(lineLength, "-").mkString)
+                  exec.print()
+                }
+
                 executionState.memoryController.tick()
-                executionState.memoryController.print(emit(_))
+                if (shouldPrint) {
+                  emit(s"MemoryController".padTo(lineLength, "-").mkString)
+                  executionState.memoryController.print(emit(_))
+                }
                 cycles += 1
-              }
-              if (exec.isDeadlocked) {
-                emit(s"Discovered Deadlock!")
-                throw SimulationException(s"Discovered Deadlock atfter cycle $cycles")
+                if (cycles % 10000 == 0) {
+                  info(s"$cycles elapsed")
+                }
               }
             case stmt =>
               // These are top-level host operations
+              emit(s"Executing host operation ${stm(stmt)}")
               executionState.runAndRegister(stmt)
           }
           emit(s"Concluding Simulation".padTo(lineLength, "-").mkString)

@@ -43,6 +43,7 @@ class SpatialConfig extends Config {
   var imperfect: Boolean = false
   var useAreaModels: Boolean = true
   var reportArea: Boolean = false
+  var countResources: Boolean = false
   var enableForceBanking: Boolean = false
   var groupUnrolledAccess: Boolean = false
   var enableParallelBinding: Boolean = true

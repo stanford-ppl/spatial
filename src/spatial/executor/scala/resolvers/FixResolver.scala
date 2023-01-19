@@ -60,6 +60,8 @@ trait FixResolver extends OpResolverBase {
 
     case Op(ttf: TextToFix[_, _, _]) =>
       val a = execState.getValue[String](ttf.t)
+//      implicit val state: argon.State = execState.IR
+//      dbgs(s"Converting $a to FP: ${FixedPoint(a, ttf.f.toEmul)}")
       SimpleEmulVal(FixedPoint(a, ttf.f.toEmul))
 
     case Op(random@FixRandom(max)) =>

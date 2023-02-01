@@ -9,18 +9,14 @@ import spatial.node._
 import scala.collection.mutable
 
 object FringeNodeExecutor {
-  @forge.tags.stateful def apply(op: Sym[_], execState: ExecutionState): OpExecutorBase = op match {
+  @forge.tags.stateful def apply(op: Sym[_], execState: ExecutionState): ControlExecutor = op match {
     case Op(_: FringeDenseLoad[_, _]) => new FringeDenseLoadExecutor(op, execState)
     case Op(_: FringeDenseStore[_, _]) => new FringeDenseStoreExecutor(op, execState)
     case _ => throw new NotImplementedError(s"Haven't implemented ${stm(op)} yet!")
   }
 }
 
-trait FringeOpExecutor extends OpExecutorBase {
-  val kLoadLatency: Int = 40
-  // Estimated 200 bytes/tick
-  val kLoadThroughput: Double = 200
-  val maxInFlightRequests = 32
+trait FringeOpExecutor extends ControlExecutor {
 
   val memEntry: MemEntry
   val cmdStream: ScalaQueue[ScalaStruct]
@@ -45,11 +41,14 @@ trait FringeOpExecutor extends OpExecutorBase {
     val dramIndex = (offset - memEntry.start) / bytesPerElement
     DRAMAccessData(dramIndex, nElements, sizeInBytes)
   }
+
+  override def isDeadlocked: Boolean = false
 }
 
-class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends FringeOpExecutor {
+class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState) extends FringeOpExecutor {
   val Op(fdl@FringeDenseLoad(dramSym, cmdStreamSym, dataStreamSym)) = op
 
+  override val ctrl: Sym[_] = op
 
   type ET = fdl.A.L
   val dram = execState.getTensor[EmulVal[ET]](dramSym)
@@ -90,6 +89,8 @@ class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState
 
 class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends FringeOpExecutor {
   val Op(fdr@FringeDenseStore(dramSym, cmdStreamSym, dataStreamSym, ackStreamSym)) = op
+
+  override val ctrl: Sym[_] = op
 
   type ET = fdr.A.L
   val dram = execState.getTensor[EmulVal[ET]](dramSym)

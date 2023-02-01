@@ -296,7 +296,7 @@ class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Se
     executors.forall {
       executor =>
         executor.status match {
-          case _: Finished => true
+          case _: Finished | Indeterminate => true
           case Running => false
         }
     }

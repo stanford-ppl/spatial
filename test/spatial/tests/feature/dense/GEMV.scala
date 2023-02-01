@@ -86,8 +86,8 @@ import spatial.dsl._
   def main(args: Array[String]): Unit = {
 
     // These are on the HOST
-    val x_host = loadCSV1D[T](s"$DATA/vector.csv")
-    val A_host = loadCSV2D[T](s"$DATA/matrix.csv")
+    val x_host = Array.tabulate[T](N) { i => random[T](2) - 1 }
+    val A_host = Matrix.tabulate[T](N, N) { (i, j) => random[T](2) - 1}
     val A_dram = DRAM[T](N, N)
     val x_dram = DRAM[T](N)
     setMem(A_dram, A_host)

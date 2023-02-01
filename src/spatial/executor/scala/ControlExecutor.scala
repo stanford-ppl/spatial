@@ -37,6 +37,7 @@ object ControlExecutor {
       case Op(_: OpMemReduce[_, _]) if ctrl.isOuterControl =>
         new OuterMemReduceExecutor(ctrl, execState)
       case Op(_: Switch[_]) => new SwitchExecutor(ctrl, execState)
+      case Op(_: FringeNode[_, _]) => FringeNodeExecutor(ctrl, execState)
       case _ =>
         throw new NotImplementedError(s"Didn't know how to handle ${stm(ctrl)}")
     }
@@ -46,7 +47,7 @@ object ControlExecutor {
 case class TransientsAndControl(transients: Seq[Sym[_]], control: Sym[_])
 
 abstract class ControlExecutor extends OpExecutorBase {
-  implicit def state: argon.State
+  implicit def state: argon.State = execState.IR
   val ctrl: Sym[_]
   var lastIter: Option[Seq[FixedPoint]] = None
   override def print(): Unit = {
@@ -107,6 +108,9 @@ private object ControlExecutorUtils {
     stms.foreach {
       case ctrl if ctrl.isControl =>
         curSplits :+= TransientsAndControl(curTransients, ctrl)
+        curTransients = Seq.empty
+      case fringeOp@Op(_:FringeNode[_, _]) =>
+        curSplits :+= TransientsAndControl(curTransients, fringeOp)
         curTransients = Seq.empty
       case other => curTransients :+= other
     }

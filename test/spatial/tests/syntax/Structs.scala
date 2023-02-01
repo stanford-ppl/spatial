@@ -52,17 +52,16 @@ import spatial.dsl._
     val oc = ArgOut[I32]
 
     Accel {
-      implicit def bEV: Bits[Vec[Bit]] = Vec.bits(MyStruct(I32(0), I32(0), I32(0)).nbits)
-      val reg = Reg[Vec[Bit]]
+      val reg = Reg[MyStruct]
       reg.nonbuffer
 
       Pipe {
         val testStruct = MyStruct(I32(0), I32(1), I32(2))
-        reg := testStruct.asBits
+        reg := testStruct
       }
 
       Pipe {
-        val read = reg.value.as[MyStruct]
+        val read = reg.value
         oa := read.x
         ob := read.y
         oc := read.z

@@ -519,7 +519,7 @@ module test;
   endfunction
 
   function void startVCD();
-    vcdon = 0;
+    vcdon = 1;
   endfunction
 
   function void stopVPD();
@@ -527,7 +527,7 @@ module test;
   endfunction
 
   function void stopVCD();
-    vcdon = 1;
+    vcdon = 0;
   endfunction
 
 

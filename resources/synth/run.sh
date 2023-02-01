@@ -17,8 +17,8 @@ fi
 export USE_IDEAL_DRAM=$ideal
 export DRAM_DEBUG=$dbg_dram
 export DEBUG_REGS=$dbg_reg
-export VPD_ON=0
-export VCD_ON=0
+export VPD_ON=${VPD_ON:=0}
+export VCD_ON=${VCD_ON:=0}
 export DRAM_NUM_OUTSTANDING_BURSTS=-1  # -1 == infinite number of outstanding bursts
 export DRAMSIM_HOME=`pwd`/verilog/DRAMSim2
 export LD_LIBRARY_PATH=${DRAMSIM_HOME}:$LD_LIBRARY_PATH

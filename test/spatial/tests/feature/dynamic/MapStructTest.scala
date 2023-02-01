@@ -1,25 +1,25 @@
 package spatial.tests.feature.dynamic
 
 import spatial.dsl._
-import spatial.util.VecStructType
+import spatial.util.MapStructType
 
 @struct case class StructElement(a: I32, b: Bit)
 
-@spatial class VecStructTest extends SpatialTest {
+@spatial class MapStructTest extends SpatialTest {
 
   override def compileArgs = "--nostreamify --vv"
 
   val IntValue: scala.Int = 0x1010
 
   override def main(args: Array[String]) = {
-    val VST = VecStructType(Seq("z" -> StructElement(I32(0), Bit(true))))
+    val VST = MapStructType(Seq("z" -> StructElement(I32(0), Bit(true))))
     System.out.println(s"VST: $VST")
 
     val zAOut = ArgOut[I32]
     val zBOut = ArgOut[Bit]
 
     Accel {
-      val tmp = Reg[VST.VecStruct]
+      val tmp = Reg[VST.MapStruct]
 
       Pipe {
         val packed = VST(Map("z" -> StructElement(I32(IntValue), Bit(false))))
@@ -39,22 +39,57 @@ import spatial.util.VecStructType
   }
 }
 
-@spatial class VecStructTestStream extends SpatialTest {
+@spatial class MapStructTest2 extends SpatialTest {
+
+  override def compileArgs = "--nostreamify --vv"
+
+  val IntValue: scala.Int = 0x1010
+
+  @struct case class VST(z: StructElement)
+
+  override def main(args: Array[String]) = {
+
+    val zAOut = ArgOut[I32]
+    val zBOut = ArgOut[Bit]
+
+    Accel {
+      val tmp = Reg[VST]
+
+      Pipe {
+        val packed = VST(StructElement(I32(IntValue), Bit(false)))
+        tmp := packed
+      }
+      Pipe {
+        val read = tmp.value
+        val z = read.z
+        zAOut := z.a
+        zBOut := z.b
+      }
+    }
+
+    println(r"Received: z -> StructElement(${zAOut.value}, ${zBOut.value})")
+    assert(zAOut.value == I32(IntValue))
+    assert(zBOut.value == Bit(false))
+  }
+}
+
+
+@spatial class MapStructTestStream extends SpatialTest {
 
   override def compileArgs = "--nostreamify --vv"
 
   val iters = 8
 
   override def main(args: Array[String]) = {
-    val VST = VecStructType(Seq("x" -> Bit(true), "y" -> I32(0)))
-    println(s"VecStructType: $VST")
+    val MST = MapStructType(Seq("x" -> Bit(true), "y" -> I32(0)))
+    println(s"MapStructType: $MST")
     val out = ArgOut[I32]
     Accel {
-      val tmp = FIFO[VST.VecStruct](I32(4))
+      val tmp = FIFO[MST.MapStruct](I32(4))
       Stream {
         Foreach(iters by 1) {
           i =>
-            val packed = VST(Map("x" -> ((i & I32(1)) === I32(0)), "y" -> i))
+            val packed = MST(Map("x" -> ((i & I32(1)) === I32(0)), "y" -> i))
             tmp.enq(packed)
         }
         Pipe {

@@ -49,6 +49,21 @@ object BitsCarrier {
 }
 
 object CoherentUtils {
+
+  object intBitsCarrier extends BitsCarrier {
+    override type T = I32
+    override val bitsEV: Bits[T] = proto(I32(0))
+
+    @stateful override def zero: Bits[T] = I32(0)
+  }
+
+  object boolBitsCarrier extends BitsCarrier {
+    override type T = Bit
+    override val bitsEV: Bits[T] = proto(Bit(false))
+
+    @stateful override def zero: Bits[T] = Bit(false)
+  }
+
   def MemToBitsCarrier(mem: Sym[_]): BitsCarrier = {
     mem match {
       case r: Reg[_] =>
@@ -58,6 +73,9 @@ object CoherentUtils {
 
           @stateful override def zero: Bits[T] = r.A.zero.asInstanceOf[Bits[T]]
         }
+      case m: SRAM[_, _] => intBitsCarrier
+      case sr: StreamOut[_] => boolBitsCarrier
+      case sr: StreamIn[_] => boolBitsCarrier
     }
   }
 }
@@ -79,7 +97,7 @@ object CoherentUtils {
   }
 }
 
-case class StreamBundle(pIterType: VecStructType[Sym[Num[_]]], intakeTokenType: VecStructType[Sym[_]], outputTokenType: VecStructType[Sym[_]], genToMainDepth: I32, genToReleaseDepth: I32, mainToReleaseDepth: I32)(implicit state: argon.State) {
+case class StreamBundle(pIterType: MapStructType[Sym[Num[_]]], intakeTokenType: MapStructType[Sym[_]], outputTokenType: MapStructType[Sym[_]], genToMainDepth: I32, genToReleaseDepth: I32, mainToReleaseDepth: I32)(implicit state: argon.State) {
   val genToMainIters = pIterType.VFIFO(genToMainDepth)
   val genToMainTokens = intakeTokenType.VFIFO(genToMainDepth)
 
@@ -116,16 +134,28 @@ class DependencyFIFOManager(implicit state: argon.State) {
       if (edge.isPseudoEdge) {
         targets foreach {
           inner =>
+            dbgs(s"Registering PseudoEdge: $edge")
             pseudoEdges.add(PseudoEdgeEntry(edge.src, inner, edge))
         }
       } else {
         targets foreach {
           inner =>
+            dbgs(s"Registering Edge: $edge")
             val newFIFO = FIFO[tCarrier.T](I32(computeDepth(coherent)))
             newFIFO.explicitName = s"FIFO_${edge.src.s.get}_${inner.s.get}_${coherent.mem}"
             fifoRegistry.add(RegistryEntry(edge.src, inner, edge, newFIFO))
         }
       }
+  }
+
+  def createBufferInits(): Unit = {
+    'FIFOInitializers.Stream {
+      fifoRegistry.collect {
+        case entry@RegistryEntry(src, dst, edge: InferredDependencyEdge, fifo) if edge.edgeType == EdgeType.Return =>
+          dbgs(s"Initializing entry: $entry")
+
+      }
+    }
   }
 
   def computeDepth(edge: DependencyEdge): Int = 8
@@ -151,9 +181,20 @@ class DependencyFIFOManager(implicit state: argon.State) {
 case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with AccelTraversal {
 
 //  private var edgeFIFOMap: Map[(DependencyEdge, Ctrl), FIFO[_]] = Map.empty
-  private var fifoManager = new DependencyFIFOManager()
+  private val fifoManager = new DependencyFIFOManager()
 
   private lazy val edges: Set[DependencyEdge] = globals[DependencyEdges].get.edges.toSet
+
+  private lazy val bufferDepths = {
+    // In order to compute buffer depths, we need to count how many controllers there are on the critical path.
+    // For now, just use the current buffer depth
+    Map.empty[Sym[_], Int].withDefault {
+      case mem: Reg[_] => 1
+      case mem =>
+        val parents = mem.accesses.map(_.parent)
+        parents.size
+    }
+  }
 
   class DependencyManager(ctrl: Ctrl, var fetchedEdges: Set[DependencyEdge] = Set.empty, var currentValues: Map[Sym[_], Reg[_]] = Map.empty) {
     def copy(): DependencyManager = new DependencyManager(ctrl, fetchedEdges, currentValues)
@@ -185,9 +226,9 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           val value = fifo.deq(enabled)
           (edge.mem, enabled, value)
       } ++ pseudoEdges.toSeq.map {
-        case edge@InferredDependencyEdge(_, _, mem@Op(RegNew(init)), Initialize) =>
-          dbgs(s"Inferred Initialization Edge: $mem = RegNew($init)")
-          (mem, edge.dstRecv(timeStamp), init)
+        case edge@InferredDependencyEdge(_, _, mem, EdgeType.Initialize(v)) =>
+          dbgs(s"Inferred Initialization Edge: $mem = RegNew($v)")
+          (mem, edge.dstRecv(timeStamp), v)
       }
 
       triplets.groupBy(_._1).foreach {
@@ -200,7 +241,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           }
           implicit def bEV: Bits[tInfo.T] = tInfo.bitsEV
           val result = oneHotMux(newEns, castedValues)
-          val isEnabled = newEns.reduceTree(_ & _)
+          val isEnabled = newEns.reduceTree(_ | _)
           val newValue = currentValues.get(mem) match {
             case Some(reg: Reg[tInfo.T]) =>
               mux(isEnabled, result, reg.value)
@@ -208,10 +249,12 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           }
           // Create a register to hold this value
           val valueRegIntake = Reg[tInfo.T]
+          valueRegIntake.explicitName = s"RegIntake_$mem"
           valueRegIntake.write(newValue, isEnabled)
           valueRegIntake.nonbuffer
 
           val valueRegBuf = Reg[tInfo.T]
+          valueRegBuf.explicitName = s"RegIntakeBuf_$mem"
           valueRegBuf := valueRegIntake.value
           dbgs(s"Updating Current Values: $mem -> $valueRegBuf")
           currentValues += mem -> valueRegBuf
@@ -614,7 +657,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
         val tokens: Map[Sym[_], TokenWithValid[_]] = {
           val mtr = mainToReleaseTokens.deq(tokenSource)
           val gtr = genToReleaseTokens.deq(!tokenSource)
-          val recv: outputTokenType.VecStruct = mux[outputTokenType.VecStruct](tokenSource, mtr, gtr)
+          val recv: outputTokenType.MapStruct = mux[outputTokenType.MapStruct](tokenSource, mtr, gtr)
           recv.unpack.toMap.mapValues {
             case t: TokenWithValid[_] => t
           }
@@ -673,7 +716,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
   private def createFIFOs(): Unit = {
     dbgs("=" * 10 + s"Adding FIFO Edges" + "=" * 10)
-    edges.foreach(fifoManager.addEdge(_))
+    edges.foreach(fifoManager.addEdge)
     fifoManager.printEdges()
     dbgs("="*30)
   }
@@ -687,7 +730,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
     // FIFO Typing
     val counters = inner.ancestors.flatMap(_.cchains).flatMap(_.counters)
-    val pIterType = VecStructType[Sym[Num[_]]](counters.map {
+    val pIterType = MapStructType[Sym[Num[_]]](counters.map {
       counter =>
         val iterSym = counter.iter.get.asInstanceOf[Sym[Num[_]]]
         implicit def bEV: Bits[counter.CT] = counter.CTeV.asInstanceOf[Bits[counter.CT]]
@@ -698,7 +741,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
     val intakeEdges = edges.collect {
       case edge: CoherentEdge if edge.dst == inner.toCtrl => edge
     }
-    val intakeTokenType = VecStructType[Sym[_]](intakeEdges.map {
+    val intakeTokenType = MapStructType[Sym[_]](intakeEdges.map {
       coherent: CoherentEdge =>
         val carrier: BitsCarrier = CoherentUtils.MemToBitsCarrier(coherent.mem)
 
@@ -712,7 +755,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
     val releaseEdges = edges.collect {
       case edge: CoherentEdge if edge.src == inner.toCtrl => edge
     }
-    val releaseTokenType = VecStructType[Sym[_]](releaseEdges.map {
+    val releaseTokenType = MapStructType[Sym[_]](releaseEdges.map {
       coherent: CoherentEdge =>
         val carrier: BitsCarrier = CoherentUtils.MemToBitsCarrier(coherent.mem)
 

@@ -15,11 +15,7 @@ import spatial.util.{assertUniqueAndTake, crossJoin, oneAndOthers}
 import spatial.util.modeling._
 
 sealed trait EdgeType
-case object Forward extends EdgeType
-case object Backward extends EdgeType
-case object Return extends EdgeType
-case object Inner extends EdgeType
-case object Initialize extends EdgeType
+
 
 object EdgeType {
   @stateful def apply(src: Ctrl, dst: Ctrl): EdgeType = {
@@ -30,12 +26,19 @@ object EdgeType {
       case Some(x) if x > 0 => Forward
     }
   }
+
+  case object Forward extends EdgeType
+  case object Backward extends EdgeType
+  case object Inner extends EdgeType
+  trait Initial extends EdgeType
+  case class Initialize[T](v: T) extends Initial
+  case object Return extends Initial
 }
 
 case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: EdgeType)(implicit state: argon.State) extends DependencyEdge with CoherentEdge with StartEndEdge {
 
   override def isPseudoEdge: Boolean = edgeType match {
-    case Initialize => true
+    case EdgeType.Initialize(v) => true
     case _ => false
   }
 
@@ -71,38 +74,32 @@ case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: E
 
   override lazy val srcIterators: Set[Sym[Num[_]]] = {
     (edgeType match {
-      case Forward | Initialize => pathSrcIters
-      case Backward => surroundingCounters.map(_.iter.get) ++ pathSrcIters
-      case Inner => Set.empty
-//      case Return =>
+      case EdgeType.Forward | _:EdgeType.Initialize[_] => pathSrcIters
+      case EdgeType.Backward | EdgeType.Return => surroundingCounters.map(_.iter.get) ++ pathSrcIters
+      case EdgeType.Inner => Set.empty
     }).toSet.asInstanceOf[Set[Sym[Num[_]]]]
   }
 
   private lazy val pathDstIters = pathDst.drop(1).flatMap(_.cchains).flatMap(_.counters).map(_.iter.get)
   override lazy val dstIterators: Set[Sym[Num[_]]] = {
     (edgeType match {
-      case Forward | Initialize => pathDstIters
-      case Backward => surroundingCounters.map(_.iter.get) ++ pathDstIters
-      case Inner => Set.empty
-//      case Return =>
+      case EdgeType.Forward | _:EdgeType.Initial => pathDstIters
+      case EdgeType.Backward => surroundingCounters.map(_.iter.get) ++ pathDstIters
+      case EdgeType.Inner => Set.empty
     }).toSet.asInstanceOf[Set[Sym[Num[_]]]]
   }
 
   override def dstRecv(ts: TimeStamp)(implicit state: argon.State): Bit = {
     lazy val isFirstIterInLCA = ts.isFirst(pathDstIters.headOption).getOrElse(Bit(true))
     edgeType match {
-      case Forward | Initialize => isFirstIterInLCA
-      case Backward =>
+      case EdgeType.Forward | _:EdgeType.Initial => isFirstIterInLCA
+      case EdgeType.Backward =>
         if (surroundingCounters.nonEmpty) {
           isFirstIterInLCA & !isFirstSurroundingIter(ts)
         } else {
           Bit(false)
         }
-      case Return =>
-        // On a Return Edge, we assume that the FIFO was either pre-populated or had a value written during
-        // the previous outer iteration.
-        isFirstIterInLCA
-      case Inner => Bit(true)
+      case EdgeType.Inner => Bit(true)
     }
   }
 
@@ -110,19 +107,18 @@ case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: E
 //    lazy val isLastIterWithinLCA = isLastIter(ts, pathSrc.drop(1).flatMap(_.cchains).flatMap(_.counters))
     lazy val isLastIterWithinLCA = ts.isLast(pathSrcIters.headOption).getOrElse(Bit(true))
     edgeType match {
-      case Forward | Initialize => isLastIterWithinLCA
-      case Backward =>
+      case EdgeType.Forward | _:EdgeType.Initial => isLastIterWithinLCA
+      case EdgeType.Backward =>
         // If we're a back-edge, There must be an outer loop. Find the outer loop where there isn't also another
         // access, and release as long as there isn't another access.
         isLastIterWithinLCA & !isLastSurroundingIter(ts)
-      case Return =>
+      case EdgeType.Return =>
         isLastIterWithinLCA
-      case Inner => Bit(true)
+      case EdgeType.Inner => Bit(true)
     }
   }
 
   override def toString: String = {
-
     s"CoherentEdge[$edgeType]($src -> $dst, $mem)"
   }
 }
@@ -158,7 +154,17 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
           val shouldInitialize = !groupedPreceding.exists(_.edgeType == Forward) && !mem.isGlobalMem
 
           if (shouldInitialize) {
-            Seq(InferredDependencyEdge(mem.parent, parent, mem, Initialize)) ++ groupedPreceding
+            mem match {
+              case Op(RegNew(init)) =>
+                Seq(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(init))) ++ groupedPreceding
+              case _ =>
+                // If we're not a register, then we're passing tokens around instead.
+                groupedPreceding.map {
+                  case ide@InferredDependencyEdge(src, dst, mem, EdgeType.Backward) => ide.copy(edgeType = EdgeType.Return)
+                  case e => e
+                }
+            }
+
           } else {
             groupedPreceding
           }
@@ -170,7 +176,7 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
 
   def compressEdges(edges: Seq[DependencyEdge]): Seq[DependencyEdge] = {
     edges filter {
-      case InferredDependencyEdge(_, _, _, Inner) => false
+      case InferredDependencyEdge(_, _, _, EdgeType.Inner) => false
       case _ => true
     }
   }

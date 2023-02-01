@@ -1,7 +1,7 @@
 package spatial.metadata.memory
 
 import argon._
-import spatial.util.VecStructType
+import spatial.util.MapStructType
 
 /** Set of reader symbols for each local memory
   *
@@ -112,5 +112,3 @@ case class StreamBufferAmount(buffering: Int, min: Int = 0, max: Int = Int.MaxVa
 case class StreamBufferIndex(bufferIndex: spatial.lang.I32) extends Data[StreamBufferIndex](Transfer.Mirror)
 
 case class FifoInits(values: Seq[Sym[_]]) extends Data[FifoInits](Transfer.Mirror)
-
-case class FIFOType(tp: VecStructType[_]) extends Data[FIFOType](Transfer.Mirror)

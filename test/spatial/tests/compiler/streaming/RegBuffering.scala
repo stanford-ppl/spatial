@@ -60,7 +60,7 @@ class RegBufferingNoStream extends RegBuffering {
       }
     }
     println(r"Recv: ${output.value}")
-    assert(output.value == 3, r"Expected 90, received ${output.value}")
+    assert(output.value == 3, r"Expected 3, received ${output.value}")
   }
 }
 

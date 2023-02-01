@@ -1648,7 +1648,7 @@ import utils.io.files._
 
     Accel{
 
-      Foreach(dim by i_tileSize par loop_ii) { ii => // this loop defenitilely cant be parallelized right now
+      Foreach(dim by i_tileSize par loop_ii) { ii => // this loop definitely can't be parallelized right now
         Foreach(dim by tileSize par loop_jj) { jj => 
           val c_col = SRAM[T](i_tileSize,tileSize)
           MemReduce(c_col(0::i_tileSize, 0::tileSize par reduce_col))(dim by tileSize par loop_kk) { kk => 

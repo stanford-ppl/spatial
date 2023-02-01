@@ -6,7 +6,7 @@ import spatial.node._
 import spatial.metadata.bounds.Expect
 import spatial.metadata.access._
 import spatial.metadata.control._
-import spatial.util.{VecStructType, spatialConfig}
+import spatial.util.{MapStructType, spatialConfig}
 import forge.tags.stateful
 
 package object memory {
@@ -453,9 +453,6 @@ package object memory {
 
     def fifoInits: Option[Seq[Sym[_]]] = metadata[FifoInits](mem).map(_.values)
     def fifoInits_=(values: Seq[Sym[_]]): Unit = metadata.add(mem, FifoInits(values))
-
-    def fifoType: Option[VecStructType[_]] = metadata[FIFOType](mem).map(_.tp)
-    def fifoType_=(tp: VecStructType[_]): Unit = metadata.add(mem, FIFOType(tp))
   }
 
 

@@ -16,7 +16,6 @@ trait NaryResolver extends OpResolverBase {
       case Op(fb: Binary[U, _]) =>
         val a = execState.getValue[U](fb.a)
         val b = execState.getValue[U](fb.b)
-        dbgs(s"Running Binary op: ${stm(sym)}, a -> $a, b -> $b")
         val result = fb.unstaged(a, b)
         SimpleEmulVal[U](result)
 

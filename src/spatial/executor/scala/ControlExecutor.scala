@@ -17,14 +17,15 @@ object ControlExecutor {
                       execState: ExecutionState): ControlExecutor = {
     val orderedSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
     emit(s"Setting up pipelines for ${ctrl}: ${ctrl.ctx}")
+    val schedule = ctrl.schedule
     ctrl match {
       case Op(_: AccelScope) => new AccelScopeExecutor(ctrl, execState)
       case Op(_: OpForeach) if ctrl.isInnerControl =>
         new InnerForeachExecutor(ctrl, execState)
       case Op(_: OpForeach)
-        if ctrl.isOuterControl && orderedSchedules.contains(ctrl.schedule) =>
+        if ctrl.isOuterControl && orderedSchedules.contains(schedule) =>
         new OuterForeachExecutor(ctrl, execState)
-      case Op(_: UnitPipe) if orderedSchedules.contains(ctrl.schedule) =>
+      case Op(_: UnitPipe) if orderedSchedules.contains(schedule) =>
         new UnitPipeExecutor(ctrl, execState)
       case Op(_: UnitPipe) => new StreamUnitPipeExecutor(ctrl, execState)
       case Op(_: ParallelPipe) => new StreamUnitPipeExecutor(ctrl, execState)
@@ -49,9 +50,10 @@ case class TransientsAndControl(transients: Seq[Sym[_]], control: Sym[_])
 abstract class ControlExecutor extends OpExecutorBase {
   implicit def state: argon.State = execState.IR
   val ctrl: Sym[_]
+  lazy val schedule = ctrl.schedule
   var lastIter: Option[Seq[FixedPoint]] = None
   override def print(): Unit = {
-    emit(s"${ctrl} ${ctrl.schedule}($status, ${lastIter.map(_.mkString(", ")).getOrElse("None")}) @ [${ctrl.ctx}]")
+    emit(s"${ctrl} ${schedule}($status, ${lastIter.map(_.mkString(", ")).getOrElse("None")}) @ [${ctrl.ctx}]")
     indentGen {
       printInternals()
     }
@@ -374,7 +376,7 @@ class OuterForeachExecutor(val ctrl: Sym[_], execState: ExecutionState)(
       }
     }
 
-    val schedEnabled = ctrl.schedule match {
+    val schedEnabled = schedule match {
       case Pipelined =>
         pipelines.forall { case (_, pipeline) => pipeline.canAcceptNewState }
       case Sequenced =>
@@ -587,7 +589,7 @@ class OuterReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
     updateAccum()
 
-    val schedEnabled = ctrl.schedule match {
+    val schedEnabled = schedule match {
       case Pipelined =>
         pipelines.forall { case (_, pipeline) => pipeline.canAcceptNewState }
       case Sequenced =>
@@ -821,7 +823,7 @@ class OuterMemReduceExecutor(val ctrl: Sym[_], execState: ExecutionState)(
 
     updateAccum()
 
-    val schedEnabled = ctrl.schedule match {
+    val schedEnabled = schedule match {
       case Pipelined =>
         pipelines.forall { case (_, pipeline) => pipeline.canAcceptNewState }
       case Sequenced =>

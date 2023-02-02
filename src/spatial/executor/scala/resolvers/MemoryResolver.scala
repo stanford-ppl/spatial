@@ -14,23 +14,23 @@ import scala.reflect.ClassTag
 
 trait MemoryResolver extends OpResolverBase {
 
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = {
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
     implicit val st: argon.State = execState.IR
-    sym match {
-      case Op(ao:RegAlloc[_, Reg]) if !ao.A.isInstanceOf[Struct[_]]=>
+    op match {
+      case ao:RegAlloc[_, Reg] if !ao.A.isInstanceOf[Struct[_]]=>
         val initVal = execState(ao.init)
         new ScalaReg(initVal, initVal)
 
-      case Op(streamOut: StreamOutNew[_]) if streamOut.A.isInstanceOf[Struct[_]] =>
+      case streamOut: StreamOutNew[_] if streamOut.A.isInstanceOf[Struct[_]] =>
         new ScalaQueue[ScalaStruct]()
 
-      case Op(streamIn@StreamInNew(bus)) if streamIn.A.isInstanceOf[Struct[_]] =>
+      case streamIn@StreamInNew(bus) if streamIn.A.isInstanceOf[Struct[_]] =>
         new ScalaQueue[ScalaStruct]()
 
-      case Op(streamIn@StreamInNew(bus)) =>
+      case streamIn@StreamInNew(bus) =>
         new ScalaQueue[SomeEmul]()
 
-      case Op(malloc: MemAlloc[_, _]) if sym.isSRAM || sym.isDRAM =>
+      case malloc: MemAlloc[_, _] if sym.isSRAM || sym.isDRAM =>
         val elType: ExpType[_, _] = malloc.A.tp
         val elSize = malloc.A.nbits / 8
         val newTensor = new ScalaTensor[SomeEmul](malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt), Some(elSize))
@@ -39,7 +39,7 @@ trait MemoryResolver extends OpResolverBase {
         }
         newTensor
 
-      case Op(rw@RegWrite(mem, data, ens)) =>
+      case rw@RegWrite(mem, data, ens) =>
         val tmp = execState(mem) match { case sr:ScalaReg[_] => sr }
         type ET = tmp.ET
         val sReg = tmp.asInstanceOf[ScalaReg[ET]]
@@ -50,17 +50,17 @@ trait MemoryResolver extends OpResolverBase {
         sReg.write(eData, enabled)
         EmulUnit(sym)
 
-      case Op(RegRead(mem)) =>
+      case RegRead(mem) =>
         execState(mem) match {
           case sr: ScalaReg[_] => sr.curVal
         }
 
-      case Op(GetReg(mem)) =>
+      case GetReg(mem) =>
         execState(mem) match {
           case sr: ScalaReg[_] => sr.curVal
         }
 
-      case Op(SetReg(mem, data)) =>
+      case SetReg(mem, data) =>
         val tmp = execState(mem) match {
           case sr: ScalaReg[_] => sr
         }
@@ -71,20 +71,20 @@ trait MemoryResolver extends OpResolverBase {
         reg.write(realData, true)
         EmulUnit(sym)
 
-      case Op(sm@SetMem(dram, data)) =>
+      case sm@SetMem(dram, data) =>
         val target = execState.getTensor[SomeEmul](dram)
         val wrData = execState.getTensor[SomeEmul](data)
         wrData.values.copyToArray(target.values)
         EmulUnit(sym)
 
-      case Op(gm@GetMem(dram, data)) =>
+      case gm@GetMem(dram, data) =>
         val wrData = execState.getTensor[SomeEmul](dram)
         val target = execState.getTensor[SomeEmul](data)
         dbgs(s"Transferring <${wrData.values.mkString(", ")}> -> <${target.values.mkString(", ")}>")
         wrData.values.copyToArray(target.values)
         EmulUnit(sym)
 
-      case Op(sir@StreamInRead(mem, ens)) if !mem.A.isInstanceOf[Struct[_]] =>
+      case sir@StreamInRead(mem, ens) if !mem.A.isInstanceOf[Struct[_]] =>
         val enabled = sir.isEnabled(execState)
         val queue = execState(mem) match { case sq: ScalaQueue[_] => sq }
         if (enabled) {
@@ -93,7 +93,7 @@ trait MemoryResolver extends OpResolverBase {
           SimpleEmulVal(mem.A.zero.asInstanceOf[Bits[_]].c.get, false)
         }
 
-      case Op(sow@StreamOutWrite(mem, data, ens)) if data.isInstanceOf[Struct[_]] =>
+      case sow@StreamOutWrite(mem, data, ens) if data.isInstanceOf[Struct[_]] =>
         execState(mem) match {
           case sq: ScalaQueue[ScalaStruct] =>
             if (sow.isEnabled(execState)) {
@@ -103,15 +103,15 @@ trait MemoryResolver extends OpResolverBase {
         }
         EmulUnit(sym)
 
-      case Op(DRAMAddress(dram)) =>
+      case DRAMAddress(dram) =>
         // Get the location of the dram
         val tensor = execState.getTensor(dram)
         SimpleEmulVal(FixedPoint.fromInt(execState.hostMem.getEntry(tensor).start))
 
-      case Op(DRAMIsAlloc(mem)) =>
+      case DRAMIsAlloc(mem) =>
         SimpleEmulVal(emul.Bool(true))
 
-      case Op(srw@SRAMWrite(mem, data, addr, ens)) if !srw.A.isInstanceOf[Struct[_]] =>
+      case srw@SRAMWrite(mem, data, addr, ens) if !srw.A.isInstanceOf[Struct[_]] =>
         if (srw.isEnabled(execState)) {
           val realData = execState.getValue[srw.A.L](data)
           val tensor = execState.getTensor[EmulVal[srw.A.L]](mem)
@@ -120,16 +120,20 @@ trait MemoryResolver extends OpResolverBase {
         }
         EmulUnit(sym)
 
-      case Op(srw@SRAMRead(mem, addr, ens)) if !srw.A.isInstanceOf[Struct[_]] =>
+      case srw@SRAMRead(mem, addr, ens) if !srw.A.isInstanceOf[Struct[_]] =>
         if (srw.isEnabled(execState)) {
           val tensor = execState.getTensor[EmulVal[srw.A.L]](mem)
           val address = addr.map(execState.getValue[FixedPoint](_).toInt)
-          tensor.read(address, srw.isEnabled(execState)).get
+          val read = tensor.read(address, true)
+          if (read.isEmpty) {
+            throw SimulationException(s"Attempting to read $mem[${address.mkString(", ")}], which was uninitialized.")
+          }
+          read.get
         } else {
           SimpleEmulVal[srw.A.L](null, false)
         }
 
-      case _ => super.run(sym, execState)
+      case _ => super.run(sym, op, execState)
     }
   }
 }

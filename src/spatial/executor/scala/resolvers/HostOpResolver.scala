@@ -18,19 +18,18 @@ import utils.Result.CompileError
 import scala.reflect.ClassTag
 
 trait HostOpResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V],
-                         execState: ExecutionState): EmulResult = sym match {
+  override def run[U, V](sym: Exp[U, V], op: Op[V],
+                         execState: ExecutionState): EmulResult = op match {
 
-    case Op(InputArguments()) =>
+    case InputArguments() =>
       val rtArgs = execState.runtimeArgs
       new ScalaTensor[EmulVal[String]](Seq(rtArgs.size), None, Some(rtArgs.map { x => Some(SimpleEmulVal(x))}))
 
-    case Op(newArray @ ArrayNew(size)) =>
+    case ArrayNew(size) =>
       val rSize = execState.getValue[FixedPoint](size).toInt
-      type ET = newArray.A.L
       new ScalaTensor[SomeEmul](Seq(rSize), None, None)
 
-    case Op(amap @ ArrayMap(array, applyF, func)) =>
+    case ArrayMap(array, applyF, func) =>
       val arr = execState.getTensor[SomeEmul](array)
       val result = Seq.tabulate(arr.size) { i =>
         val fpI = SimpleEmulVal(FixedPoint.fromInt(i))
@@ -42,7 +41,7 @@ trait HostOpResolver extends OpResolverBase {
 
       new ScalaTensor[SomeEmul](arr.shape, None, Some(result.map(Some(_))))
 
-    case Op(ArrayApply(coll, i)) =>
+    case ArrayApply(coll, i) =>
       val arr = execState.getTensor[SomeEmul](coll)
       val index = execState.getValue[FixedPoint](i).toInt
       val result = arr.read(Seq(index), true)
@@ -52,7 +51,7 @@ trait HostOpResolver extends OpResolverBase {
       }
       result.orNull
 
-    case Op(mi @ MapIndices(s, func)) =>
+    case mi @ MapIndices(s, func) =>
       val size = execState.getValue[FixedPoint](s).toInt
       val mapped = Seq.tabulate(size) { i =>
         val tmpState = execState.copy()
@@ -62,7 +61,7 @@ trait HostOpResolver extends OpResolverBase {
       }
       new ScalaTensor[SomeEmul](Seq(size), None, Some(mapped.map(Some(_))))
 
-    case Op(ArrayZip(arrayA, arrayB, applyA, applyB, func)) =>
+    case ArrayZip(arrayA, arrayB, applyA, applyB, func) =>
       val arrA = execState.getTensor(arrayA)
       val arrB = execState.getTensor(arrayB)
       val size = arrA.size
@@ -80,7 +79,7 @@ trait HostOpResolver extends OpResolverBase {
       type ET = elementType.L
       new ScalaTensor[SomeEmul](Seq(size), None, Some(newValues.map(Some(_))))
 
-    case Op(ArrayReduce(array, apply, reduce)) =>
+    case ArrayReduce(array, apply, reduce) =>
       val arr = execState.getTensor(array)
       val newValues = Seq.tabulate(arr.size) { i =>
         val fpI = SimpleEmulVal(FixedPoint.fromInt(i))
@@ -92,15 +91,15 @@ trait HostOpResolver extends OpResolverBase {
         runBlock(reduce, Map(reduce.inputA -> a, reduce.inputB -> b), execState)
       }
 
-    case Op(ArrayLength(array)) =>
+    case ArrayLength(array) =>
       val arr = execState.getTensor(array)
       SimpleEmulVal(FixedPoint.fromInt(arr.size))
 
-    case Op(TextToFix(t, fmt)) =>
+    case TextToFix(t, fmt) =>
       val text = execState.getValue[String](t)
       SimpleEmulVal(FixedPoint(text, fmt.toEmul))
 
-    case Op(SeriesForeach(start, end, step, func)) =>
+    case SeriesForeach(start, end, step, func) =>
       val rStart = execState.getValue[FixedPoint](start)
       val rEnd = execState.getValue[FixedPoint](end)
       val rStep = execState.getValue[FixedPoint](step)
@@ -111,12 +110,12 @@ trait HostOpResolver extends OpResolverBase {
       }
       EmulUnit(sym)
 
-    case Op(IfThenElse(cond, thenBlk, elseBlk)) =>
+    case IfThenElse(cond, thenBlk, elseBlk) =>
       if (execState.getValue[emul.Bool](cond).value) {
         runBlock(thenBlk, Map.empty, execState)
       } else {
         runBlock(elseBlk, Map.empty, execState)
       }
-    case _ => super.run(sym, execState)
+    case _ => super.run(sym, op, execState)
   }
 }

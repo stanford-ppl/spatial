@@ -5,7 +5,7 @@ import spatial.node.{CounterChainNew, CounterNew}
 import spatial.metadata.control._
 
 trait ControlResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = sym match {
     case Op(_: CounterNew[_]) | Op(_: CounterChainNew) =>
       EmulUnit(sym)
 
@@ -28,6 +28,6 @@ trait ControlResolver extends OpResolverBase {
       EmulUnit(ctrl)
 
     case _ =>
-      super.run(sym, execState)
+      super.run(sym, op, execState)
   }
 }

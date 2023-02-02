@@ -136,12 +136,14 @@ class InnerPipelineStage(syms: Seq[Sym[_]]) extends PipelineStage {
 
 class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionStates: Seq[ExecutionState]) extends PipelineStageExecution {
 
-  private val enableSyms = (syms.collect {
-    case Op(s: FIFOEnq[_]) => s.ens
-    case Op(s: FIFODeq[_]) => s.ens
-    case Op(s: StreamInRead[_]) => s.ens
-    case Op(s: StreamOutWrite[_]) => s.ens
-  }).flatten
+  private val streams = syms.collect {
+    case Op(s: FIFOEnq[_]) => s
+    case Op(s: FIFODeq[_]) => s
+    case Op(s: StreamInRead[_]) => s
+    case Op(s: StreamOutWrite[_]) => s
+  }
+
+  private val enableSyms = streams.flatMap(_.ens)
 
   def isEnabled(ens: Set[Bit], executionState: ExecutionState): Boolean = {
     ens.forall(executionState.getValue[emul.Bool](_).value)
@@ -180,6 +182,8 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
   }
 
   override def willStall: Boolean = {
+    if (streams.isEmpty) return false
+
     val readIndex = cm.Map.empty[Sym[_], Int]
     val writeIndex = cm.Map.empty[Sym[_], Int]
 

@@ -7,20 +7,20 @@ import spatial.executor.scala.memories.{ScalaStruct, ScalaStructType}
 import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal}
 
 trait MiscResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = {
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
     implicit val ir: argon.State = execState.IR
-    sym match {
-      case Op(TextConcat(parts)) =>
+    op match {
+      case TextConcat(parts) =>
         SimpleEmulVal(parts.map(execState.getValue[String](_)).mkString(""))
 
-      case Op(pi@PrintIf(ens, text)) =>
+      case pi@PrintIf(ens, text) =>
         if (pi.isEnabled(execState)) {
           emit(execState.getValue[String](text))
         }
 
         EmulUnit(sym)
 
-      case Op(ai@AssertIf(ens, cond, message)) =>
+      case ai@AssertIf(ens, cond, message) =>
         if (ai.isEnabled(execState)) {
           // Check the condition
           val condBool = execState.getValue[emul.Bool](cond).value
@@ -35,14 +35,14 @@ trait MiscResolver extends OpResolverBase {
 
         EmulUnit(sym)
 
-      case Op(SimpleStruct(elems)) =>
+      case SimpleStruct(elems) =>
         ScalaStruct(elems.toMap.mapValues {
           v => execState(v) match {case ev: EmulVal[_] => ev}
         })
 
       case Value(v) => SimpleEmulVal(v)
 
-      case _ => super.run(sym, execState)
+      case _ => super.run(sym, op, execState)
     }
   }
 }

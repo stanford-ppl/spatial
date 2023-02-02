@@ -25,11 +25,13 @@ trait OpResolverBase {
     newState(blk.result)
   }
 
-  def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = {
+  final def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = run(sym, sym.op.get, execState)
+
+  def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
     implicit val IR: argon.State = execState.IR
     error(s"Current state: $execState")
     error(s"Did not know how to execute ${stm(sym)}")
-    throw  SimulationException(s"Don't know how to execute ${stm(sym)}")
+    throw SimulationException(s"Don't know how to execute ${stm(sym)}")
   }
 }
 

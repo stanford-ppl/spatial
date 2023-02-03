@@ -1,10 +1,11 @@
 package spatial.executor.scala.resolvers
 import argon.lang.Struct
-import argon.{Const, Exp, Op, Value, emit, error}
-import argon.node.{AssertIf, FixRandom, FixToText, PrintIf, SimpleStruct, TextConcat, TextToFix}
+import argon._
+import argon.node._
 import emul.FixedPoint
 import spatial.executor.scala.memories.{ScalaStruct, ScalaStructType}
 import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal}
+import spatial.node.Mux
 
 trait MiscResolver extends OpResolverBase {
   override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
@@ -41,6 +42,14 @@ trait MiscResolver extends OpResolverBase {
         })
 
       case Value(v) => SimpleEmulVal(v)
+
+      case Mux(en, left, right) =>
+        val select = execState.getValue[emul.Bool](en).value
+        if (select) {
+          execState(left)
+        } else {
+          execState(right)
+        }
 
       case _ => super.run(sym, op, execState)
     }

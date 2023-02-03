@@ -3,15 +3,7 @@ import argon.node._
 import argon.{Exp, Op, dbgs}
 import emul.{FixedPoint, FixedPointRange}
 import spatial.executor.scala.memories.ScalaTensor
-import spatial.executor.scala.{
-  EmulResult,
-  EmulUnit,
-  EmulVal,
-  ExecutionState,
-  SimpleEmulVal,
-  SimulationException,
-  SomeEmul
-}
+import spatial.executor.scala.{EmulPoison, EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal, SimulationException, SomeEmul}
 import spatial.node._
 import utils.Result.CompileError
 
@@ -49,7 +41,7 @@ trait HostOpResolver extends OpResolverBase {
         throw SimulationException(
           s"Attempting to access $coll[$i] = $arr[$index], which is unset.")
       }
-      result.orNull
+      result.getOrElse(EmulPoison(sym))
 
     case mi @ MapIndices(s, func) =>
       val size = execState.getValue[FixedPoint](s).toInt

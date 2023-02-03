@@ -63,10 +63,10 @@ package object util {
     candidate
   }
 
-  def computeShifts(parFactors: Iterable[Int]) = {
+  def computeShifts(parFactors: Iterable[Int]): Vector[Vector[Int]] = {
     (spatial.util.crossJoin((parFactors map { f => Range(0, f).toList }).toList) map {
-      _.toList
-    }).toList
+      _.toVector
+    }).toVector
   }
 
   def assertUniqueAndTake[T](x: Set[T]): T = {

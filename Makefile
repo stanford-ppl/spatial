@@ -37,6 +37,7 @@ install:
 ###-----------------------------------###
 pir: models utils
 	git submodule update --init
+	git submodule update --remote
 	bin/update_resources.sh
 	cd pir && make
 

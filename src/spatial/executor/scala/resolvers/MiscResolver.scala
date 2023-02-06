@@ -41,8 +41,6 @@ trait MiscResolver extends OpResolverBase {
           v => execState(v) match {case ev: EmulVal[_] => ev}
         })
 
-      case Value(v) => SimpleEmulVal(v)
-
       case Mux(en, left, right) =>
         val select = execState.getValue[emul.Bool](en).value
         if (select) {

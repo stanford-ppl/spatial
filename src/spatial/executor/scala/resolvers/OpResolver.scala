@@ -3,7 +3,7 @@ package spatial.executor.scala.resolvers
 import argon._
 import argon.node.Enabled
 import emul.FixedPoint
-import spatial.executor.scala.{EmulResult, EmulVal, ExecutionState, SimulationException}
+import spatial.executor.scala.{EmulResult, EmulVal, ExecutionState, SimpleEmulVal, SimulationException}
 
 import scala.reflect.{ClassTag, classTag}
 
@@ -25,7 +25,12 @@ trait OpResolverBase {
     newState(blk.result)
   }
 
-  final def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = run(sym, sym.op.get, execState)
+  final def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = {
+    sym match {
+      case Value(c) => SimpleEmulVal(c)
+      case _ => run(sym, sym.op.get, execState)
+    }
+  }
 
   def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
     implicit val IR: argon.State = execState.IR

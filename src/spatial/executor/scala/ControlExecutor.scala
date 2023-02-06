@@ -17,7 +17,7 @@ object ControlExecutor {
                       execState: ExecutionState): ControlExecutor = {
     val orderedSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
     emit(s"Setting up pipelines for ${ctrl}: ${ctrl.ctx}")
-    val schedule = ctrl.schedule
+    lazy val schedule = ctrl.schedule
     ctrl match {
       case Op(_: AccelScope) => new AccelScopeExecutor(ctrl, execState)
       case Op(_: OpForeach) if ctrl.isInnerControl =>

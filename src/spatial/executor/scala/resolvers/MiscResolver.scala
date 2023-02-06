@@ -16,7 +16,9 @@ trait MiscResolver extends OpResolverBase {
 
       case pi@PrintIf(ens, text) =>
         if (pi.isEnabled(execState)) {
+          val stringToWrite = execState.getValue[String](text)
           emit(execState.getValue[String](text))
+          info(stringToWrite)
         }
 
         EmulUnit(sym)

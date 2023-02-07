@@ -74,8 +74,19 @@ class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState
       case Some(DRAMLoad(request, accessData)) if request.status == RequestFinished =>
         (0 until accessData.nElements) foreach {
           shift =>
-            val readVal = dram.values(accessData.base + shift).get
-            dataStream.enq(readVal)
+            val addr = accessData.base + shift
+            val result = {
+              if (addr >= dram.size) {
+                EmulPoison(ctrl)
+              } else {
+                val readVal = dram.values(accessData.base + shift)
+                readVal match {
+                  case Some(v) => v
+                  case None => EmulPoison(ctrl)
+                }
+              }
+            }
+            dataStream.enq(result)
         }
         requests.dequeue()
       case _ =>
@@ -127,7 +138,7 @@ class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionStat
             } else None
         }
 
-        requests.enqueue(new DRAMStore(execState.memoryController.makeRequest(dramAccess.size), dramAccess, data))
+        requests.enqueue(DRAMStore(execState.memoryController.makeRequest(dramAccess.size), dramAccess, data))
         cmdStream.deq()
       }
     }
@@ -137,7 +148,10 @@ class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionStat
         requests.dequeue()
         values.zipWithIndex foreach {
           case (value@Some(_), offset) =>
-            dram.values(offset + accessData.base) = value
+            val address = offset + accessData.base
+            if (address < dram.size) {
+              dram.values(offset + accessData.base) = value
+            }
           case _ =>
         }
         ackStream.enq(SimpleEmulVal(emul.Bool(true)))

@@ -660,7 +660,7 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
                 reduceF,
                 storeAcc,
                 identOpt,
-                foldOpt,
+                isFold,
                 iters,
                 itersRed,
                 stopWhen)) = ctrl
@@ -688,6 +688,13 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
   protected val accumMem =
     execState.getTensor[SomeEmul](accum.asInstanceOf[Sym[_]])
 
+  if (!isFold) {
+    // If we're not a fold, initialize accumMem to all None
+    (0 until accumMem.size).foreach {
+      i => accumMem.values(i) = None
+    }
+  }
+
   protected def pipelines: Map[Seq[Int], ExecPipeline]
 
   protected def updateAccum(): Unit = {
@@ -709,7 +716,12 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
       val iterations = spatial.util.crossJoin(ranges.toList)
       iterations.foreach { iterVals =>
         val addr = iterVals.map(_.toInt).toSeq
-        val aVal = resultTensor.read(addr, true).get
+        val aVal = resultTensor.read(addr, true) match {
+          case Some(value) => value
+          case None =>
+            throw SimulationException(
+              s"Attempting to read from partial result tensor ${mapF.result}[${addr.mkString(", ")}], which was undefined!")
+        }
         val result = accumMem.read(addr, true) match {
           case Some(bVal) =>
             OpResolver.runBlock(reduceF,

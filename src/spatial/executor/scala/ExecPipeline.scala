@@ -96,7 +96,7 @@ sealed trait PipelineStage {
   var currentExecution: Option[PipelineStageExecution] = None
   def isEmpty: Boolean = currentExecution.isEmpty
   def tick(): Unit = currentExecution.foreach {
-    execution => if (!execution.willStall && !execution.isDone) execution.tick()
+    execution => if (!execution.isDone && !execution.willStall) execution.tick()
   }
 
   // Marked as done only if we have an execution and it's done. otherwise check empty
@@ -241,7 +241,6 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
     }
   }
 
-  private var hasTicked = false
   override def tick(): Unit = {
     // Simply run and register all of the symbols
     // We don't worry about delay because it's run on a timed graph.
@@ -251,10 +250,10 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
           executionStates.foreach(_.runAndRegister(sym))
       }
     }
-    hasTicked = true
+    isDone = true
   }
 
-  override def isDone: Boolean = hasTicked
+  var isDone: Boolean = false
 
   override def toString: String = {
     val status = if (isDone) { "Done" } else if (willStall) { "Stalled" } else "Pending"

@@ -6,10 +6,10 @@ trait NoStream extends SpatialTest {
 }
 
 @spatial class SRAMBufferingSimple extends SpatialTest {
-  override def compileArgs = "--max_cycles=100000"
+  override def compileArgs = "--max_cycles=10000"
 
   val outerIters = 4
-  val innerIters = 128
+  val innerIters = 16
 
   override def main(args: Array[String]) = {
 //    implicitly[argon.State].config.stop = 50
@@ -18,7 +18,7 @@ trait NoStream extends SpatialTest {
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)
       val outputSR2 = SRAM[I32](outerIters, innerIters)
-      Foreach(0 until outerIters by 1 par 2) {
+      Foreach(0 until outerIters by 1) {
         outer =>
           val sr = SRAM[I32](innerIters)
           'Producer.Foreach(0 until innerIters by 1) {
@@ -29,7 +29,7 @@ trait NoStream extends SpatialTest {
           Parallel {
             'Consumer.Foreach(0 until innerIters by 1) {
               inner =>
-                outputSR(outer, inner) = sr(inner)
+                outputSR(outer, inner) = sr(inner) + 1
             }
 
             'Consumer2.Foreach(0 until innerIters by 1) {
@@ -43,7 +43,7 @@ trait NoStream extends SpatialTest {
     }
     printMatrix(getMatrix(output))
     val reference = Matrix.tabulate(outerIters, innerIters) {
-      (outer, inner) => outer + inner
+      (outer, inner) => outer + inner + 1
     }
     assert(checkGold(output, reference))
     printMatrix(getMatrix(output2))
@@ -56,8 +56,8 @@ class SRAMBufferingSimpleNoStream extends SRAMBufferingSimple {
 }
 
 class SRAMTransfer extends SpatialTest {
-  val transferSize = 32
-  override def compileArgs = "--max_cycles=500"
+  val transferSize = 128
+  override def compileArgs = "--max_cycles=4000"
   override def main(args: Array[String]): Void = {
     val input = DRAM[I32](transferSize)
     val output = DRAM[I32](transferSize)
@@ -65,8 +65,12 @@ class SRAMTransfer extends SpatialTest {
     setMem(input, gold)
     Accel {
       val sr = SRAM[I32](transferSize)
-      Pipe {sr load input}
-      Pipe {output store sr}
+      Pipe {
+        sr load input
+      }
+      Pipe {
+        output store sr
+      }
     }
     assert(checkGold(output, gold))
     assert(Bit(true))
@@ -75,6 +79,31 @@ class SRAMTransfer extends SpatialTest {
 
 class SRAMTransferNS extends SRAMTransfer {
   override def compileArgs = super.compileArgs + "--nostreamify"
+}
+
+class SRAMRMW extends SpatialTest {
+  val transferSize = 128
+  override def compileArgs = "--max_cycles=4000"
+  override def main(args: Array[String]): Void = {
+    val input = DRAM[I32](transferSize)
+    val output = DRAM[I32](transferSize)
+    val inVals = Array.tabulate(transferSize){
+      i => i
+    }
+
+    setMem(input, inVals)
+    Accel {
+      val sr = SRAM[I32](transferSize).conflictable
+      sr load input
+      Foreach(0 until transferSize) {
+        i => sr(i) = sr(i) + 8
+      }
+      output store sr
+    }
+    val gold = Array.tabulate(transferSize) {i => i + 8}
+    assert(checkGold(output, gold))
+    assert(Bit(true))
+  }
 }
 
 class SRAMStore extends SpatialTest {

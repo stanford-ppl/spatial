@@ -141,7 +141,12 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = retimeAnalysisPasses  ++ Seq(accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
 
-    lazy val streamify = createDump("PreEarlyUnroll") ++ Seq(dependencyGraphAnalyzer, initiationAnalyzer, printer, streamChecks) ++ createDump("PreFlatten") ++ Seq(HierarchicalToStream(state), printer, switchTransformer, printer, pipeInserter, printer, streamChecks)++ createDump("PostStream")
+    lazy val streamify = Seq(counterIterSynchronization) ++
+      bankingAnalysis ++ createDump("PreEarlyUnroll") ++
+      Seq(dependencyGraphAnalyzer, initiationAnalyzer, printer, streamChecks) ++
+      createDump("PreFlatten") ++
+      Seq(HierarchicalToStream(state), printer, switchTransformer,
+        printer, pipeInserter, printer, streamChecks)++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -192,10 +197,10 @@ trait Spatial extends Compiler with ParamLoader {
         regReadCSE          ==>
         /** Dead code elimination */
         DCE ==>
-        /** Metapipelines to Streams */
-        spatialConfig.streamify ? streamify ==>
         /** Stream controller rewrites */
         (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
+        (/** Metapipelines to Streams */
+          spatialConfig.streamify ? streamify) ==>
         // Always Run this pass
         fifoInitialization ==> printer ==>
         spatialConfig.streamify ? createDump("PostInit") ==>
@@ -210,7 +215,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** CSE on regs */
         regReadCSE          ==>
         /** Dead code elimination */
-        DCE ==> Seq(retimingAnalyzer, printer, streamChecks) ==>
+        DCE ==> retimeAnalysisPasses ==> Seq(printer, streamChecks) ==>
         /** Hardware Rewrites **/
         rewriteAnalyzer     ==>
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
@@ -224,7 +229,7 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableOptimizedReduce ? accumAnalyzer) ==> printer ==>
         (spatialConfig.enableOptimizedReduce ? accumTransformer) ==> printer ==> transformerChecks ==>
         /** Retiming */
-        retimingAnalyzer    ==> printer ==>
+        retimeAnalysisPasses ==>
         retiming            ==> printer ==> transformerChecks ==>
         retimeReporter      ==>
         /** Broadcast cleanup */

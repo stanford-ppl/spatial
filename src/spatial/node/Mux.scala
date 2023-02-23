@@ -25,6 +25,7 @@ import utils.implicits.collections._
       if (trues.lengthMoreThan(1)) {
         warn(ctx, "One-hot mux has multiple statically true selects")
         warn(ctx)
+        throw new Exception(s"Behavior when multiple statically true selects is undefined:")
       }
       val idx = trues.head._2
       vals(idx).unbox

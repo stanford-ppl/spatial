@@ -135,33 +135,42 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
       val groupedByParent = allAccesses.groupBy(_.parent)
       oneAndOthers(groupedByParent.toSeq).flatMap {
         case ((parent, accesses), others) =>
-          val otherWrites = others.filter(_._2.exists(_.isWriter))
+          dbgs(s"Parent: $parent Accesses: $accesses others: $others")
           val preceding = accesses.flatMap {
             access =>
-              val otherWrites = others.flatMap(_._2).filter(_.isWriter).toSet
               if (mem.isReg) {
+                val otherWrites = others.flatMap(_._2).filter(_.isWriter).toSet
                 reachingWritesToReg(access, otherWrites, writesAlwaysKill = true)
               } else {
-                val reachingMatrices = reachingWrites(access.affineMatrices.toSet, otherWrites.flatMap(_.affineMatrices), mem.isGlobalMem)
+                val otherAccesses = others.flatMap(_._2).toSet
+                dbgs(s"OtherAccesses: $otherAccesses")
+                dbgs(s"Other Matrices: ${otherAccesses.flatMap(_.affineMatrices)}")
+                val reachingMatrices = reachingWrites(access.affineMatrices.toSet, otherAccesses.flatMap(_.affineMatrices), mem.isGlobalMem)
                 reachingMatrices.map(_.access)
               }
           }
+          dbgs(s"Preceding: $preceding")
           val groupedPreceding = preceding.groupBy(_.parent) map {
             case (otherParent, otherAccesses) =>
               InferredDependencyEdge(otherParent, parent, mem, EdgeType(otherParent, parent))
           }
 
-          val shouldInitialize = !groupedPreceding.exists(_.edgeType == Forward) && !mem.isGlobalMem
-
+          val shouldInitialize = !groupedPreceding.exists(_.edgeType == EdgeType.Forward) && !mem.isGlobalMem
+          dbgs(s"Should Initialize: $shouldInitialize")
           if (shouldInitialize) {
             mem match {
               case Op(RegNew(init)) =>
                 Seq(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(init))) ++ groupedPreceding
               case _ =>
                 // If we're not a register, then we're passing tokens around instead.
-                groupedPreceding.map {
-                  case ide@InferredDependencyEdge(src, dst, mem, EdgeType.Backward) => ide.copy(edgeType = EdgeType.Return)
-                  case e => e
+                if (groupedPreceding.exists(_.edgeType == EdgeType.Backward)) {
+                  groupedPreceding.map {
+                    case ide@InferredDependencyEdge(src, dst, mem, EdgeType.Backward) => ide.copy(edgeType = EdgeType.Return)
+                    case e => e
+                  }
+                } else {
+                  // This memory literally only ever goes forward, which means that it should just be initialized
+                  Seq(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(I32(0)))) ++ groupedPreceding
                 }
             }
 
@@ -182,15 +191,20 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
   }
 
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
-    case _ if lhs.isMem =>
-      val prodCons = computeDependencyGraph(lhs)
-      dbgs(s"$lhs = $rhs -> $prodCons")
-      dependencyEdges ++= prodCons
+    case AccelScope(blk) =>
+      blk.nestedStms.filter(_.isMem).filter(StreamifyUtils.getConflictGroups(_).nonEmpty).foreach {
+        mem =>
+          val prodCons = computeDependencyGraph(mem)
+          dbgs(s"${stm(mem)}-> $prodCons")
+          if (prodCons.size > 1) {
+            dependencyEdges ++= prodCons
+          } else {
+            dbgs(s"Eliding prodcons $prodCons")
+          }
+      }
 
-    case _ => {
-      dbgs(s"Skipping: $lhs = $rhs")
-      super.visit(lhs, rhs)
-    }
+
+    case _ => super.visit(lhs, rhs)
   }
 
   override def postprocess[R](block: Block[R]): Block[R] = {

@@ -167,22 +167,23 @@ object DenseTransfer {
       val dataStream = StreamOut[Tup2[A,Bit]](BurstFullDataBus[A]())
       val ackStream  = StreamIn[Bit](BurstAckBus)
       val enableQueue = FIFO[Bit](32)
-
-      // Command generator
-      'DenseTransferCommands.Sequential {
-        enableQueue.deqVec(p match {case Const(c) => c.toInt})
-        val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
-        val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
-        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
-        // issueQueue.enq(size)
-      }
+      enableQueue.explicitName = s"AlignedStore_EnableQueue_$old"
 
       // Data loading
       Foreach(requestLength par p){i =>
         val data = local.__read(localAddr(i), Set.empty)
         dataStream := pack(data,true)
         retimeGate()
-        enableQueue.enq(Bit(true), i < p)
+        enableQueue.enq(Bit(true), i === I32(0))
+      }
+
+      // Command generator
+      'DenseTransferCommands.Sequential {
+        enableQueue.deq(requestLength > I32(0))
+        val addr_bytes = (dramAddr() * bytesPerWord).to[I64] + dram.address
+        val size_bytes = requestLength * bytesPerWord / wordsPackedInByte
+        cmdStream := (BurstCmd(addr_bytes.to[I64], size_bytes, false), dram.isAlloc)
+        // issueQueue.enq(size)
       }
 
       // Fringe
@@ -286,9 +287,15 @@ object DenseTransfer {
           val startBound: Reg[I32] = Reg[I32]
           val endBound: Reg[I32]   = Reg[I32]
           val length: Reg[I32]     = Reg[I32]
+          length.explicitName = s"UnalignedStore_length_$old"
           val size_bytes: Reg[I32] = Reg[I32]
           val addr_bytes: Reg[I64] = Reg[I64]
-          val enableQueue = FIFO[Bit](32)
+          val enableFIFODepth = p match {
+            case Value(v) => v.toInt * 8
+          }
+          val enableQueue = FIFO[Bit](enableFIFODepth)
+          enableQueue.explicitName = s"UnalignedStore_EnableQueue_$old"
+          dbgs(s"Par Factor: $p")
           Pipe {
             val aligned = alignmentCalc(dramAddr)
             startBound := aligned.start
@@ -297,25 +304,27 @@ object DenseTransfer {
             size_bytes := aligned.size_bytes
             addr_bytes := aligned.addr_bytes
           }
-          Foreach(length.value par p) { i =>
-            val en = staticStart(dramAddr) match {
-              case Left(x) => i >= x && i < endBound
-              case Right(_) => i >= startBound && i < endBound
+          'DataProcessor.Stream {
+            'DataEnqueue.Foreach(length.value par p) { i =>
+              val en = staticStart(dramAddr) match {
+                case Left(x) => i >= x && i < endBound
+                case Right(_) => i >= startBound && i < endBound
+              }
+              val addr = staticStart(dramAddr) match {
+                case Left(x) => localAddr(i - x)
+                case Right(_) => localAddr(i - startBound)
+              }
+              val data = local.__read(addr, Set(en))
+              dataStream := pack(data, en)
+              retimeGate()
+              enableQueue.enq(Bit(true), i === I32(0))
             }
-            val addr = staticStart(dramAddr) match {
-              case Left(x) => localAddr(i - x)
-              case Right(_) => localAddr(i - startBound)
+            'CmdEnqueue.Pipe {
+              enableQueue.deq(length.value > 0)
+              retimeGate()
+              cmdStream := (BurstCmd(addr_bytes.value, size_bytes.value, false), dram.isAlloc)
             }
-            val data = local.__read(addr, Set(en))
-            dataStream := pack(data, en)
-            retimeGate()
-            enableQueue.enq(i < p)
           }
-          Pipe {
-            enableQueue.deqVec(p match {case Const(c) => c.toInt})
-            cmdStream := (BurstCmd(addr_bytes.value, size_bytes.value, false), dram.isAlloc)
-          }
-
         }
         // Fringe
         val store = Fringe.denseStore(dram, cmdStream, dataStream, ackStream)

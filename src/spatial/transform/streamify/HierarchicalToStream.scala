@@ -191,7 +191,8 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       case mem: Reg[_] => 1
       case mem =>
         val parents = mem.accesses.map(_.parent)
-        parents.size
+//        parents.size * 3
+        8
     }
   }
 
@@ -436,6 +437,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               }, newIters, None)) {
                 lhs2 =>
                   dbgs(s"CounterGen: $loop -> $lhs2")
+                  lhs2.userSchedule = Sequenced
               }
             }
           }
@@ -846,20 +848,38 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           dbgs(s"Creating CounterGen")
           isolateSubst() {
             indent {
-              counterGen(lhs, bundle)
+              withFlow("counterGen", {
+                case sym if sym.isControl =>
+                  sym.name = Some(sym.nameOr(s"CounterGen_$lhs"))
+                case _ =>
+              }) {
+                counterGen(lhs, bundle)
+              }
             }
           }
           dbgs(s"Creating Main")
           isolateSubst() {
             indent {
-              mainGen(lhs, bundle)
+              withFlow("MainGen", {
+                case sym if sym.isControl =>
+                  sym.name = Some(sym.nameOr(s"MainGen_$lhs"))
+                case _ =>
+              }) {
+                mainGen(lhs, bundle)
+              }
             }
           }
 
           dbgs(s"Creating Release")
           isolateSubst() {
             indent {
-              releaseGen(lhs, bundle, stopWhen)
+              withFlow("ReleaseGen", {
+                case sym if sym.isControl =>
+                  sym.name = Some(sym.nameOr(s"ReleaseGen_$lhs"))
+                case _ =>
+              }) {
+                releaseGen(lhs, bundle, stopWhen)
+              }
             }
           }
         }
@@ -880,6 +900,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
           transferDataIfNew(lhs, lhs2)
           lhs2.userSchedule = Streaming
           lhs2.ctx = lhs.ctx
+          lhs2.name = lhs.name
       }
 
     case srn: SRAMNew[_, _] if syncMems contains lhs =>
@@ -891,18 +912,22 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
       // create a new SRAM with an additional buffering dimension
       val dims = srn.dims
       // Make bufferDepths the outermost dimension
-      val newDims = dims ++ Seq(I32(bufferDepths(lhs)))
+      val bufferDepth = bufferDepths(lhs)
+      val newDims = dims ++ Seq(I32(bufferDepth))
       val newSR = stage(SRAMNew[A, SRAMN](newDims))
-      newSR.conflictable
-
-      newSR.fullybankdim(dims.size)
+//      newSR.fullybankdim(dims.size)
+      newSR.fullyBankDims = (0 to dims.size).toSet
       newSR
 
     case srr: SRAMRead[_, _] if syncMems contains srr.mem =>
       dbgs(s"Extending ${stm(lhs)} with a buffer dimension")
       val newAddr = f(srr.addr) ++ Seq(bufferIndex(srr.mem))
       dbgs(s"Buffer Index Data: $bufferIndex")
-      stage(SRAMRead(f(srr.mem), newAddr, f(srr.ens))(srr.A))
+      val read = stage(SRAMRead(f(srr.mem), newAddr, f(srr.ens))(srr.A))
+//      val reg = Reg[srr.A.R]
+//      reg := read
+//      reg.value
+      read
 
     case srw: SRAMWrite[_, _] if syncMems contains srw.mem =>
       dbgs(s"Extending ${stm(lhs)} with a buffer dimension")

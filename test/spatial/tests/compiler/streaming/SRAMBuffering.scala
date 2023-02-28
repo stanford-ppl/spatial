@@ -6,10 +6,10 @@ trait NoStream extends SpatialTest {
 }
 
 @spatial class SRAMBufferingSimple extends SpatialTest {
-  override def compileArgs = "--max_cycles=10000"
+  override def compileArgs = "--max_cycles=20000"
 
-  val outerIters = 4
-  val innerIters = 16
+  val outerIters = 32
+  val innerIters = 32
 
   override def main(args: Array[String]) = {
 //    implicitly[argon.State].config.stop = 50
@@ -17,7 +17,7 @@ trait NoStream extends SpatialTest {
     val output2 = DRAM[I32](outerIters, innerIters)
     Accel {
       val outputSR = SRAM[I32](outerIters, innerIters)
-      val outputSR2 = SRAM[I32](outerIters, innerIters)
+//      val outputSR2 = SRAM[I32](outerIters, innerIters)
       Foreach(0 until outerIters by 1) {
         outer =>
           val sr = SRAM[I32](innerIters)
@@ -32,14 +32,14 @@ trait NoStream extends SpatialTest {
                 outputSR(outer, inner) = sr(inner) + 1
             }
 
-            'Consumer2.Foreach(0 until innerIters by 1) {
-              inner =>
-                outputSR2(outer, inner) = sr(inner) + 1
-            }
+//            'Consumer2.Foreach(0 until innerIters by 1) {
+//              inner =>
+//                outputSR2(outer, inner) = sr(inner) + 1
+//            }
           }
       }
       output store outputSR(0::outerIters, 0::innerIters)
-      output2 store outputSR2(0::outerIters, 0::innerIters)
+//      output2 store outputSR2(0::outerIters, 0::innerIters)
     }
     printMatrix(getMatrix(output))
     val reference = Matrix.tabulate(outerIters, innerIters) {

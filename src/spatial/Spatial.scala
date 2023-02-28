@@ -141,12 +141,12 @@ trait Spatial extends Compiler with ParamLoader {
 
     lazy val bankingAnalysis = retimeAnalysisPasses  ++ Seq(accessAnalyzer, iterationDiffAnalyzer, printer, memoryAnalyzer, memoryAllocator, printer)
 
-    lazy val streamify = Seq(counterIterSynchronization) ++
+    lazy val streamify = Seq(counterIterSynchronization) ++ Seq(bankStrippers) ++
       bankingAnalysis ++ createDump("PreEarlyUnroll") ++
       Seq(dependencyGraphAnalyzer, initiationAnalyzer, printer, streamChecks) ++
       createDump("PreFlatten") ++
       Seq(HierarchicalToStream(state), printer, switchTransformer,
-        printer, pipeInserter, printer, streamChecks)++ createDump("PostStream")
+        printer, pipeInserter, printer, streamChecks) ++ Seq(bankStrippers) ++ bankingAnalysis ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)
@@ -198,7 +198,7 @@ trait Spatial extends Compiler with ParamLoader {
         /** Dead code elimination */
         DCE ==>
         /** Stream controller rewrites */
-        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
+//        (spatialConfig.distributeStreamCtr ? streamTransformer) ==> printer ==>
         (/** Metapipelines to Streams */
           spatialConfig.streamify ? streamify) ==>
         // Always Run this pass

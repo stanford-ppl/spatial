@@ -120,8 +120,14 @@ case class TreeGen(IR: State, filename: String = "controller_tree", IRFile: Stri
     val isBox = if (lhs.isBlackboxImpl) " BLACKBOX" else ""
 
     val isFSM = lhs match {case Op(_: StateMachine[_]) => " FSM"; case _ => ""}
+
+    val ctrlNameStr = lhs.name match {
+      case Some(str) => s", $str"
+      case None => ""
+    }
+
     inCell(src"$lhs", !isLeaf){
-      emit(s"""${"  "*ident}<font size = "6">${link(s"$lhs")}$isBox: ${lhs.schedule} ${lhs.op.map(_.name).getOrElse("")} $isFSM<font size = "4"> (${lhs.level})</font>""")
+      emit(s"""${"  "*ident}<font size = "6">${link(s"$lhs")}$isBox: ${lhs.schedule} ${lhs.op.map(_.name).getOrElse("")} $isFSM<font size = "4"> (${lhs.level}$ctrlNameStr)</font>""")
       emit(s"""${"  "*ident}<br><font size = "2">${lhs.ctx} <font color="grey">- $line</font></font>""")
       val ii = scrubNoise(lhs.II).toInt
       val lat = scrubNoise(lhs.bodyLatency.sum).toInt

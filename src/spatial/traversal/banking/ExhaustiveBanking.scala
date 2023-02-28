@@ -369,7 +369,10 @@ case class ExhaustiveBanking()(implicit IR: State, isl: ISL) extends BankingStra
     // If user requested fully banked for this dim, give a fully banked scheme for this dim and don't even check it
 //    if (mem.fullyBankDims.isDefined && axes.head == mem.fullyBankDim.get) {
     if (mem.fullyBankDims.contains(axes.head)) {
-        return Some(Seq(ModBanking(filteredStagedDims.head().toInt, 1,Seq(1),axes,Seq(filteredStagedDims.head().toInt))))
+      if (axes.size > 1) {
+        throw new UnsupportedOperationException(s"Whoops, axes: $axes")
+      }
+      return Some(Seq(ModBanking(filteredStagedDims.head().toInt, 1,Seq(1),axes,Seq(filteredStagedDims.head().toInt))))
     }
     val Nmin_base_r: Int = regroupedGrps.filter(_.size > 0).filter(_.head.isReader).map(_.size).maxOrElse(1)
     val Nmin_base_w: Int = regroupedGrps.filter(_.size > 0).filter(!_.head.isReader).map(_.size).maxOrElse(1)

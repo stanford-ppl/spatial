@@ -8,11 +8,11 @@ trait NoStream extends SpatialTest {
 @spatial class SRAMBufferingSimple extends SpatialTest {
   override def compileArgs = "--max_cycles=20000"
 
-  val outerIters = 32
-  val innerIters = 32
+  val outerIters = 16
+  val innerIters = 16
 
   override def main(args: Array[String]) = {
-//    implicitly[argon.State].config.stop = 50
+    implicitly[argon.State].config.setV(3)
     val output = DRAM[I32](outerIters, innerIters)
     val output2 = DRAM[I32](outerIters, innerIters)
     Accel {

@@ -149,7 +149,7 @@ class DependencyFIFOManager(implicit state: argon.State) {
       fifoRegistry.collect {
         case entry@RegistryEntry(src, dst, edge: InferredDependencyEdge, fifo) if edge.edgeType == EdgeType.Return =>
           dbgs(s"Initializing entry: $entry")
-          val initAmount = computeDepth(edge)
+          val initAmount = bufferDepths(edge.mem)
           Foreach(0 until initAmount) {
             i => fifo.asInstanceOf[FIFO[I32]].enq(i)
           }
@@ -157,7 +157,18 @@ class DependencyFIFOManager(implicit state: argon.State) {
     }
   }
 
-  def computeDepth(edge: DependencyEdge): Int = 8
+  def computeDepth(edge: DependencyEdge): Int = 32
+
+  val bufferDepths = {
+    // In order to compute buffer depths, we need to count how many controllers there are on the critical path.
+    // For now, just use the current buffer depth
+    Map.empty[Sym[_], Int].withDefault {
+      case mem: Reg[_] => 2
+      case mem =>
+        val parents = mem.accesses.map(_.parent)
+        parents.size + 2
+    }
+  }
 
   def getIntakeFIFOs(ctrl: Ctrl): Map[DependencyEdge, FIFO[_]] = (fifoRegistry.collect {
     case RegistryEntry(src, dst, edge, fifo) if dst == ctrl => edge -> fifo
@@ -183,18 +194,6 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
   private val fifoManager = new DependencyFIFOManager()
 
   private lazy val edges: Set[DependencyEdge] = globals[DependencyEdges].get.edges.toSet
-
-  private lazy val bufferDepths = {
-    // In order to compute buffer depths, we need to count how many controllers there are on the critical path.
-    // For now, just use the current buffer depth
-    Map.empty[Sym[_], Int].withDefault {
-      case mem: Reg[_] => 1
-      case mem =>
-        val parents = mem.accesses.map(_.parent)
-//        parents.size * 3
-        8
-    }
-  }
 
   class DependencyManager(ctrl: Ctrl, var fetchedEdges: Set[DependencyEdge] = Set.empty, var currentValues: Map[Sym[_], Reg[_]] = Map.empty) {
     def copy(): DependencyManager = new DependencyManager(ctrl, fetchedEdges, currentValues)
@@ -415,11 +414,23 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
         case Ctrl.Node(loop@Op(OpForeach(ens, cchain, block, iters, None)), stage) :: remaining =>
           dbgs(s"Peeling Foreach Loop: ${stm(loop)}")
+          val isInner = remaining.flatMap(_.cchains).isEmpty
+          dbgs(s"Is Inner: $isInner (chains: ${remaining.flatMap(_.cchains)})")
           def stageRunBranch(): Void = {
             isolateSubst() {
               val newDependencyManager = dependencyManager.copy()
               val cache = cm.Map.empty[Sym[_], Sym[_]]
               val newChains = cchain.counters.map(newDependencyManager.mirrorRecursive(_, cache)._1).map(_.unbox)
+//              if (isInner) {
+//                // Update newChains to have par factors
+//                newChains.foreach {
+//                  case Op(ctrn@CounterNew(start, end, step, par)) =>
+//                    isolateSubst(){
+//                      register(par -> I32(1))
+//                      ctrn.update(f)
+//                    }
+//                }
+//              }
               val newIters = makeIters(newChains).map(_.unbox.asInstanceOf[I32])
               val newCChain = CounterChain(newChains)
               val newEns = ens.map(dependencyManager.mirrorRecursive(_, cache)._1)
@@ -812,6 +823,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
   }
 
   private var syncMems: Set[Sym[_]] = Set.empty
+  private var memBuffers: Map[Sym[_], Seq[Sym[_]]] = Map.empty
   private var bufferIndex: Map[Sym[_], Idx] = Map.empty
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
@@ -905,34 +917,47 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
     case srn: SRAMNew[_, _] if syncMems contains lhs =>
       dbgs(s"Extending ${stm(lhs)} with a buffer dimension")
-
-      type A = srn.A.R
-      lazy implicit val bEV: Bits[A] = srn.A
-
-      // create a new SRAM with an additional buffering dimension
-      val dims = srn.dims
-      // Make bufferDepths the outermost dimension
-      val bufferDepth = bufferDepths(lhs)
-      val newDims = dims ++ Seq(I32(bufferDepth))
-      val newSR = stage(SRAMNew[A, SRAMN](newDims))
-//      newSR.fullybankdim(dims.size)
-      newSR.fullyBankDims = (0 to dims.size).toSet
-      newSR
+      memBuffers += lhs -> Seq.fill(fifoManager.bufferDepths(lhs)){mirrorSym(lhs)}
+      dbgs(s"MemBuffers: $memBuffers")
+      lhs
 
     case srr: SRAMRead[_, _] if syncMems contains srr.mem =>
       dbgs(s"Extending ${stm(lhs)} with a buffer dimension")
-      val newAddr = f(srr.addr) ++ Seq(bufferIndex(srr.mem))
-      dbgs(s"Buffer Index Data: $bufferIndex")
-      val read = stage(SRAMRead(f(srr.mem), newAddr, f(srr.ens))(srr.A))
-//      val reg = Reg[srr.A.R]
-//      reg := read
-//      reg.value
-      read
+      type A = srr.A.R
+
+      implicit def bEV: Bits[A] = srr.A
+      val valsAndEnables = memBuffers(srr.mem).zipWithIndex map {
+        case (buffer, ind) =>
+          isolateSubst() {
+            register(srr.mem -> buffer)
+
+            val newEn = (I32(ind) === bufferIndex(srr.mem))
+            val newReadOp = srr.mirrorEn(f, Set(newEn))
+            val newRead = stageWithFlow(newReadOp) {
+              newReadSym => transferData(lhs, newReadSym)
+            }
+            (newRead.asInstanceOf[A], newEn)
+          }
+      }
+      val values = valsAndEnables.map(_._1)
+      val enables = valsAndEnables.map(_._2)
+      stage(OneHotMux(enables, values.map(_.asInstanceOf[Bits[A]])))
 
     case srw: SRAMWrite[_, _] if syncMems contains srw.mem =>
       dbgs(s"Extending ${stm(lhs)} with a buffer dimension")
       dbgs(s"Buffer Index Data: $bufferIndex")
-      stage(SRAMWrite(f(srw.mem), f(srw.data), f(srw.addr) ++ Seq(bufferIndex(srw.mem)), f(srw.ens))(srw.A))
+      memBuffers(srw.mem).zipWithIndex foreach {
+        case (buffer, ind) =>
+          isolateSubst() {
+            register(srw.mem -> buffer)
+            val newEn = (I32(ind) === bufferIndex(srw.mem))
+            val newWriteOp = srw.mirrorEn(f, Set(newEn))
+            stageWithFlow(newWriteOp) {
+              newWriteSym => transferData(lhs, newWriteSym)
+            }
+          }
+      }
+      void
 
     case _ if syncMems contains lhs =>
       dbgs(s"Skipping $lhs since it's in syncMems")

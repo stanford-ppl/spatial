@@ -453,7 +453,7 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
                 lhs2 =>
                   dbgs(s"CounterGen: $loop -> $lhs2")
                   lhs2.userSchedule = if (isInner) {
-                    Sequenced
+                    Pipelined
                   } else Sequenced
               }
             }

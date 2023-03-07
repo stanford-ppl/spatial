@@ -125,6 +125,59 @@ case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: E
 
 case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends AccelTraversal {
 
+  private def isKilled(candidate: Ctrl, killer: Ctrl, observer: Ctrl): Boolean = {
+    // Check if candidate -> killer -> observer
+    val (accessLCA, relDist) = LCAWithDataflowDistance(candidate, killer)
+
+    val (jointLCA, jointDist) = LCAWithDataflowDistance(accessLCA, observer)
+
+    // If the LCAs are the same (i.e. all 3 have the same LCA), then we need to check the relative orderings.
+    if (accessLCA == jointLCA) {
+      val candToObserver = getStageDistance(jointLCA, candidate, observer).get
+      val killerToObserver = getStageDistance(jointLCA, killer, observer).get
+
+      // cand -> observer, killer -> observer, cand -> killer
+      return (candToObserver > 0, killerToObserver > 0, relDist > 0) match {
+        case (true, true, candBeforeKill) =>
+          // cand -> killer -> observer OR killer -> cand -> observer
+          candBeforeKill
+        case (true, false, _) => false // cand -> observer -> killer
+        case (false, false, true) => true // observer -> cand -> killer
+        case (true, true, false) => false // killer -> cand -> observer
+        case (false, true, _) => true // killer -> observer -> cand
+        case (false, false, false) => false // observer -> killer -> cand
+      }
+    } else {
+      // If the killer is after the candidate in their LCA, and the LCA isn't shared with the observer, then
+      // we know that it's (candidate -> killer) -> observer OR observer -> (candidate -> killer)
+      // In either case, we know that the candidate is killed.
+
+      // Case 1: (candidate, killer), observer
+      // This can be detected by checking if accessLCA is a child of jointLCA
+      if (accessLCA.hasAncestor(jointLCA)) {
+        // In this case, we just need to know whether killer is after candidate
+        return relDist > 0
+      }
+
+      // Case 2: (candidate, observer), killer
+      val candObsLCA = LCA(candidate, observer)
+      if (candObsLCA.hasAncestor(jointLCA) && candObsLCA != jointLCA) {
+        // check whether candidate happens before observer
+        // If the candidate happens before the observer, then it's not killed
+        return getStageDistance(candObsLCA, candidate, observer).get < 0
+      }
+
+      // Case 3: (killer, observer), candidate
+      val killerObsLCA = LCA(killer, observer)
+      if (killerObsLCA.hasAncestor(jointLCA) && killerObsLCA != jointLCA) {
+        // If the killer happens before the observer, then it kills any potential loopback
+        return getStageDistance(killerObsLCA, killer, observer).get > 0
+      }
+
+      throw new Exception(s"This shouldn't be possible! Error occurred when checking isKilled($candidate, $killer, $observer")
+    }
+  }
+
   def computeDependencyGraph(mem: Sym[_]): Seq[_ <: DependencyEdge] = {
 
     dbgs(s"Computing graph for $mem = ${mem.op.get} (${mem.ctx})")
@@ -140,43 +193,50 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
             access =>
               if (mem.isReg) {
                 val otherWrites = others.flatMap(_._2).filter(_.isWriter).toSet
-                reachingWritesToReg(access, otherWrites, writesAlwaysKill = true)
+                reachingWritesToReg(access, otherWrites, writesAlwaysKill = true).map(_.parent)
               } else {
-                val otherAccesses = others.flatMap(_._2).toSet
-                dbgs(s"OtherAccesses: $otherAccesses")
-                dbgs(s"Other Matrices: ${otherAccesses.flatMap(_.affineMatrices)}")
-                val reachingMatrices = reachingWrites(access.affineMatrices.toSet, otherAccesses.flatMap(_.affineMatrices), mem.isGlobalMem)
-                reachingMatrices.map(_.access)
+                // Does A happen before B with respect to C?
+                val otherCtrls = others.map(_._1)
+                // consider a ctrl to be killed by another ctrl if there exists another control in between
+                val visibleCtrls = oneAndOthers(otherCtrls).flatMap {
+                  case (candidate, killCtrls) if killCtrls.exists {killCtrl => isKilled(candidate, killCtrl, parent)} =>
+                    None
+                  case (candidate, killCtrls) =>
+                    // Only consider a candidate if it isn't clearly killed.
+                    val (lca, dist) = LCAWithStageDistance(candidate, parent)
+                    if (dist > 0 || lca.willRunMultiple) {
+                      Some(candidate)
+                    } else {
+                      None
+                    }
+                }
+                visibleCtrls
               }
           }
           dbgs(s"Preceding: $preceding")
-          val groupedPreceding = preceding.groupBy(_.parent) map {
-            case (otherParent, otherAccesses) =>
-              InferredDependencyEdge(otherParent, parent, mem, EdgeType(otherParent, parent))
+          val precedingEdges = preceding.map {
+            otherParent => InferredDependencyEdge(otherParent, parent, mem, EdgeType(otherParent, parent))
           }
 
-          val shouldInitialize = !groupedPreceding.exists(_.edgeType == EdgeType.Forward) && !mem.isGlobalMem
+          val shouldInitialize = !precedingEdges.exists(_.edgeType == EdgeType.Forward)
           dbgs(s"Should Initialize: $shouldInitialize")
           if (shouldInitialize) {
             mem match {
               case Op(RegNew(init)) =>
-                Seq(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(init))) ++ groupedPreceding
+                Set(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(init))) ++ precedingEdges
               case _ =>
                 // If we're not a register, then we're passing tokens around instead.
-                if (groupedPreceding.exists(_.edgeType == EdgeType.Backward)) {
-                  groupedPreceding.map {
+                if (precedingEdges.exists(_.edgeType == EdgeType.Backward)) {
+                  precedingEdges.map {
                     case ide@InferredDependencyEdge(src, dst, mem, EdgeType.Backward) => ide.copy(edgeType = EdgeType.Return)
                     case e => e
                   }
                 } else {
                   // This memory literally only ever goes forward, which means that it should just be initialized
-                  Seq(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(I32(0)))) ++ groupedPreceding
+                  Set(InferredDependencyEdge(mem.parent, parent, mem, EdgeType.Initialize(I32(0)))) ++ precedingEdges
                 }
             }
-
-          } else {
-            groupedPreceding
-          }
+          } else precedingEdges
       }
     }
   }.toSeq

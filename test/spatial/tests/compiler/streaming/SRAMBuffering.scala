@@ -11,13 +11,13 @@ trait NoStream extends SpatialTest {
   val outerIters = 16
   val innerIters = 16
 
+  val numConsumers = 4
+
   override def main(args: Array[String]) = {
-    implicitly[argon.State].config.setV(3)
-    val output = DRAM[I32](outerIters, innerIters)
-    val output2 = DRAM[I32](outerIters, innerIters)
+//    implicitly[argon.State].config.setV(3)
+    val outputs = Seq.fill(numConsumers){DRAM[I32](outerIters, innerIters)}
     Accel {
-      val outputSR = SRAM[I32](outerIters, innerIters)
-//      val outputSR2 = SRAM[I32](outerIters, innerIters)
+      val outputSRs = Seq.fill(numConsumers) {SRAM[I32](outerIters, innerIters)}
       Foreach(0 until outerIters by 1) {
         outer =>
           val sr = SRAM[I32](innerIters)
@@ -26,27 +26,26 @@ trait NoStream extends SpatialTest {
               sr(inner) = inner + outer
           }
 
-          Parallel {
-            'Consumer.Foreach(0 until innerIters by 1) {
-              inner =>
-                outputSR(outer, inner) = sr(inner) + 1
-            }
-
-//            'Consumer2.Foreach(0 until innerIters by 1) {
-//              inner =>
-//                outputSR2(outer, inner) = sr(inner) + 1
-//            }
+          Seq.tabulate(numConsumers) {
+            consumer =>
+              'Consumer.Foreach(0 until innerIters by 1) {
+                inner =>
+                  outputSRs(consumer)(outer, inner) = sr(inner) + consumer
+              }
           }
       }
-      output store outputSR(0::outerIters, 0::innerIters)
-//      output2 store outputSR2(0::outerIters, 0::innerIters)
+      (outputs zip outputSRs).foreach {
+        case (dr, sr) => dr store sr
+      }
     }
-    printMatrix(getMatrix(output))
-    val reference = Matrix.tabulate(outerIters, innerIters) {
-      (outer, inner) => outer + inner + 1
+
+    outputs.zipWithIndex.foreach {
+      case (output, ind) =>
+        val reference = Matrix.tabulate(outerIters, innerIters) {
+          (outer, inner) => outer + inner + ind
+        }
+        assert(checkGold(output, reference))
     }
-    assert(checkGold(output, reference))
-    printMatrix(getMatrix(output2))
     assert(Bit(true))
   }
 }

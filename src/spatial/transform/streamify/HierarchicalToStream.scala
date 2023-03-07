@@ -163,10 +163,24 @@ class DependencyFIFOManager(implicit state: argon.State) {
     // In order to compute buffer depths, we need to count how many controllers there are on the critical path.
     // For now, just use the current buffer depth
     Map.empty[Sym[_], Int].withDefault {
-      case mem: Reg[_] => 2
+//      case mem: Reg[_] => 2
       case mem =>
-        val parents = mem.accesses.map(_.parent)
-        parents.size + 2
+        // If we're only expected to run once, then the depth should just be 1`
+        val onlyRunsOnce = mem.ancestors.forall {
+          case Ctrl.Node(s, _) =>
+            s.cchains.flatMap(_.counters).map(_.nIters).forall {
+              case None => true
+              case Some(bound) if bound.toInt == 1 => true
+              case _ => false
+            }
+          case Ctrl.Host => true
+        }
+        if (onlyRunsOnce) {
+          1
+        } else {
+          val parents = mem.accesses.map(_.parent)
+          parents.size + 2
+        }
     }
   }
 
@@ -421,16 +435,6 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               val newDependencyManager = dependencyManager.copy()
               val cache = cm.Map.empty[Sym[_], Sym[_]]
               val newChains = cchain.counters.map(newDependencyManager.mirrorRecursive(_, cache)._1).map(_.unbox)
-//              if (isInner) {
-//                // Update newChains to have par factors
-//                newChains.foreach {
-//                  case Op(ctrn@CounterNew(start, end, step, par)) =>
-//                    isolateSubst(){
-//                      register(par -> I32(1))
-//                      ctrn.update(f)
-//                    }
-//                }
-//              }
               val newIters = makeIters(newChains).map(_.unbox.asInstanceOf[I32])
               val newCChain = CounterChain(newChains)
               val newEns = ens.map(dependencyManager.mirrorRecursive(_, cache)._1)
@@ -448,7 +452,9 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
               }, newIters, None)) {
                 lhs2 =>
                   dbgs(s"CounterGen: $loop -> $lhs2")
-                  lhs2.userSchedule = Sequenced
+                  lhs2.userSchedule = if (isInner) {
+                    Sequenced
+                  } else Sequenced
               }
             }
           }
@@ -457,8 +463,6 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
             dbgs(s"Static Chain and empty Ens, continuing")
             stageRunBranch()
           } else {
-
-
             val tempMap = TimeMap(iters.map {
                 iter =>
                   iter.asSym -> TimeTriplet(iter.counter.ctr.start.asInstanceOf[I32], Bit(true), Bit(false))
@@ -532,7 +536,8 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
                 val typeCarrier = CoherentUtils.MemToBitsCarrier(mem)
                 implicit def bitsEV: Bits[typeCarrier.T] = typeCarrier.bitsEV
                 dbgs(s"Fetching: $mem -> value = ${stm(value.asInstanceOf[Sym[_]])} [isEnabled = ${stm(isEnabled)}]")
-                mem -> TokenWithValid(value.asInstanceOf[typeCarrier.T], isEnabled).asInstanceOf[Bits[_]]
+                val tmp = debug.tagValue(value.asInstanceOf[typeCarrier.T], s"${ctrl}_${mem}_tokenGen", Some(isEnabled))
+                mem -> TokenWithValid(tmp, isEnabled).asInstanceOf[Bits[_]]
             }).toMap[Sym[_], Bits[_]]
             dbgs(s"Fetched Values: $fetchedValues")
             fifoBundle.genToMainTokens.enq(fifoBundle.intakeTokenType(fetchedValues))
@@ -686,6 +691,17 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
   def releaseGen(lhs: Sym[_], fifoBundle: StreamBundle, stopWhen: Reg[Bit]): Unit = {
     import fifoBundle._
 
+    // Stage all of the reads
+    val regMap = ((outputTokenType.structFields).map {
+      case (sym, bits: TokenWithValid[_]) =>
+        val tpInfo = bits.typeInfo
+        type T = tpInfo.T
+        implicit def bEV: Bits[T] = tpInfo.bitsEV
+        val newReg = Reg[T]
+        newReg.nonbuffer
+        newReg.explicitName = s"ReleaseReg_${lhs}_${sym}"
+        sym -> newReg
+    }).toMap[Sym[_], Reg[_]]
     Foreach(*) {
       ignore =>
         val tMap = TimeMap(genToReleaseIters.deq().unpack.map {
@@ -696,24 +712,18 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
 
         val tokenSource = source.deq()
 
-        val tokens: Map[Sym[_], TokenWithValid[_]] = {
+        val tokens = {
           val mtr = mainToReleaseTokens.deq(tokenSource)
           val gtr = genToReleaseTokens.deq(!tokenSource)
           val recv: outputTokenType.MapStruct = mux[outputTokenType.MapStruct](tokenSource, mtr, gtr)
-          recv.unpack.toMap.mapValues {
-            case t: TokenWithValid[_] => t
-          }
-        }
-        dbgs(s"Tokens: $tokens")
-
-        tokens.foreach {
-          case (s: Sym[_], twv: TokenWithValid[_]) =>
-            val tpInfo = twv.typeInfo
-            implicit def bEV: Bits[tpInfo.T] = tpInfo.bitsEV
-            val debugReg = Reg[tpInfo.T]
-            debugReg.dontTouch
-            debugReg.explicitName = s"DebugReg_${lhs}_$s"
-            debugReg.write(twv.value.asInstanceOf[Bits[_]].as[tpInfo.T], twv.valid)
+          (recv.unpack.map {
+            case (sym, t: TokenWithValid[_]) =>
+              val tpInfo = t.typeInfo
+              type T = tpInfo.T
+              val reg = regMap(sym).asInstanceOf[Reg[T]]
+              reg.write(t.value.asInstanceOf[T], t.valid)
+              sym -> reg.value.asInstanceOf[Bits[_]]
+          }).toMap[Sym[_], Bits[_]]
         }
 
         fifoManager.getOutputFIFOs(lhs.toCtrl).foreach {
@@ -721,19 +731,16 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
             val shouldSend = edge.srcSend(tMap)
             val token = tokens(edge.mem)
             dbgs(s"Processing Edge: $edge -> Send: $shouldSend, token: $token")
-            val read = token.value
-
-            val typeInfo = token.typeInfo
-            implicit def bEV: Bits[typeInfo.T] = typeInfo.bitsEV
 
             fifos.foreach {
               tf =>
-                (tf, read) match {
-                  case (fifo: FIFO[typeInfo.T], r: typeInfo.T) =>
+                (tf, token) match {
+                  case (fifo: FIFO[_], r: Bits[_]) =>
+                    val castR = r.asInstanceOf[fifo.A.R]
+                    implicit def bEV: Bits[fifo.A.R] = fifo.A
+                    debug.tagValue(castR, s"EnqValue_${lhs}_${edge.mem}")
 
-                    debug.tagValue(r, s"EnqValue_${lhs}_${edge.mem}")
-
-                    fifo.enq(r, shouldSend)
+                    fifo.enq(castR, shouldSend)
                 }
             }
         }

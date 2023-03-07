@@ -126,13 +126,22 @@ case class InferredDependencyEdge(src: Ctrl, dst: Ctrl, mem: Sym[_], edgeType: E
 case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends AccelTraversal {
 
   private def isKilled(candidate: Ctrl, killer: Ctrl, observer: Ctrl): Boolean = {
+    def isSequenced(ctrl: Ctrl): Boolean = {
+      Seq(Sequenced, Pipelined) contains ctrl.schedule
+    }
     // Check if candidate -> killer -> observer
     val (accessLCA, relDist) = LCAWithDataflowDistance(candidate, killer)
+    if (!isSequenced(accessLCA)) {
+      return false
+    }
 
     val (jointLCA, jointDist) = LCAWithDataflowDistance(accessLCA, observer)
 
     // If the LCAs are the same (i.e. all 3 have the same LCA), then we need to check the relative orderings.
     if (accessLCA == jointLCA) {
+      if (!isSequenced(jointLCA)) {
+        return false
+      }
       val candToObserver = getStageDistance(jointLCA, candidate, observer).get
       val killerToObserver = getStageDistance(jointLCA, killer, observer).get
 
@@ -155,6 +164,9 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
       // Case 1: (candidate, killer), observer
       // This can be detected by checking if accessLCA is a child of jointLCA
       if (accessLCA.hasAncestor(jointLCA)) {
+        if (!isSequenced(accessLCA)) {
+          return false
+        }
         // In this case, we just need to know whether killer is after candidate
         return relDist > 0
       }
@@ -162,6 +174,7 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
       // Case 2: (candidate, observer), killer
       val candObsLCA = LCA(candidate, observer)
       if (candObsLCA.hasAncestor(jointLCA) && candObsLCA != jointLCA) {
+        if (!isSequenced(candObsLCA))
         // check whether candidate happens before observer
         // If the candidate happens before the observer, then it's not killed
         return getStageDistance(candObsLCA, candidate, observer).get < 0
@@ -170,6 +183,7 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
       // Case 3: (killer, observer), candidate
       val killerObsLCA = LCA(killer, observer)
       if (killerObsLCA.hasAncestor(jointLCA) && killerObsLCA != jointLCA) {
+        if (!isSequenced(killerObsLCA)) return false
         // If the killer happens before the observer, then it kills any potential loopback
         return getStageDistance(killerObsLCA, killer, observer).get > 0
       }

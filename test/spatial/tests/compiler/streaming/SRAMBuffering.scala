@@ -26,12 +26,14 @@ trait NoStream extends SpatialTest {
               sr(inner) = inner + outer
           }
 
-          Seq.tabulate(numConsumers) {
-            consumer =>
-              'Consumer.Foreach(0 until innerIters by 1) {
-                inner =>
-                  outputSRs(consumer)(outer, inner) = sr(inner) + consumer
-              }
+          Parallel {
+            Seq.tabulate(numConsumers) {
+              consumer =>
+                'Consumer.Foreach(0 until innerIters by 1) {
+                  inner =>
+                    outputSRs(consumer)(outer, inner) = sr(inner) + consumer
+                }
+            }
           }
       }
       (outputs zip outputSRs).foreach {

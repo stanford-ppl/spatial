@@ -15,7 +15,7 @@ class MLP_Variant_exp_nostream extends MLP_Variant_Base {
   override def compileArgs = "--nostreamify --vv"
 }
 
-class MLP_Variant_Batch_1 extends MLP_Variants(N=2048,batch=1,dims=List(4,4,4,4),ips=List(4,4,4),mps=List(1,1,1),ops=List(1,1,1))
+class MLP_Variant_Batch_1 extends MLP_Variants(N=2048,batch=1,dims=List(4,4,4,4),ips=List(4,4,4),mps=List(1,1,1),ops=List(1,1,1), ipls=1)
 class MLP_Variant_exp_b1_stream extends MLP_Variant_Batch_1 {
   override def compileArgs = "--streamify --vv"
 }

@@ -18,10 +18,10 @@ trait NoStream extends SpatialTest {
     val outputs = Seq.fill(numConsumers){DRAM[I32](outerIters, innerIters)}
     Accel {
       val outputSRs = Seq.fill(numConsumers) {SRAM[I32](outerIters, innerIters)}
-      Foreach(0 until outerIters by 1) {
+      Foreach(0 until outerIters by 1 par 2) {
         outer =>
           val sr = SRAM[I32](innerIters)
-          'Producer.Foreach(0 until innerIters by 1) {
+          'Producer.Foreach(0 until innerIters by 1 par 2) {
             inner =>
               sr(inner) = inner + outer
           }
@@ -29,7 +29,7 @@ trait NoStream extends SpatialTest {
           Parallel {
             Seq.tabulate(numConsumers) {
               consumer =>
-                'Consumer.Foreach(0 until innerIters by 1) {
+                'Consumer.Foreach(0 until innerIters by 1 par 4) {
                   inner =>
                     outputSRs(consumer)(outer, inner) = sr(inner) + consumer
                 }

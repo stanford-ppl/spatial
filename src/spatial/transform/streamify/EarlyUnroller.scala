@@ -204,88 +204,15 @@ case class EarlyUnroller(IR: State) extends ForwardTransformer with AccelTravers
 
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _:AccelScope => inAccel { super.transform(lhs, rhs) }
-    case foreach:OpForeach if inHw && !(lhs.hasStreamPrimitiveAncestor || lhs.isStreamPrimitive) =>
+    case foreach:OpForeach if inHw && lhs.isOuterControl =>
       unrollForeach(lhs, foreach)
-    case reduceOp:OpReduce[_] if inHw && !(lhs.hasStreamPrimitiveAncestor || lhs.isStreamPrimitive) =>
+    case reduceOp:OpReduce[_] if inHw =>
       type T = reduceOp.A.R
       implicit def bitsEV: Bits[T] = reduceOp.A
       unrollReduce[T](lhs, reduceOp)
     case LaneStatic(iter, elems) if laneMap.contains(iter) =>
       iter.from(elems(laneMap(iter))).asSym
-    case _ if lhs.getDispatches.nonEmpty && inHw =>
-      dbgs(s"Processing Dispatches for $lhs = $rhs in $laneMap")
-      val accessedMem = (lhs.readMem ++ lhs.writtenMem).head
-      if (accessedMem.hasStreamPrimitiveAncestor) {
-        mirrorSym(lhs)
-      } else {
-        indent {
-          dbgs(s"AccessedMem: $accessedMem")
-          val iterators = accessIterators(lhs, accessedMem)
-          dbgs(s"Iterators: ${accessIterators(lhs, accessedMem)}")
-          val mappedIterator = iterators.map(laneMap.get).toList
-          dbgs(s"MappedIterator: $mappedIterator")
-          val iterPrefix = mappedIterator.flatten
-
-          def hasPrefix(s: Iterable[Int]) = s.zip(iterPrefix).forall { case (a, b) => a == b }
-
-          dbgs(s"All Dispatches: ${lhs.dispatches}")
-
-          // TODO: Support streamprimitives, need to only match a prefix of the iterator.
-          val newIteratorPrefix = mappedIterator.collect {
-            case Some(_) => 0
-          }
-
-          def makeNewIter(iter: Iterable[Int]) = newIteratorPrefix ++ iter.drop(newIteratorPrefix.size)
-
-          val v = mirrorSym(lhs)
-          val matchedDispatches = lhs.dispatches.filter {
-            case (key, _) => hasPrefix(key)
-          }
-
-          dbgs(s"Filtered Dispatches:")
-          indent {
-            matchedDispatches.keys.foreach(dbgs(_))
-          }
-
-          v.dispatches = matchedDispatches.map {
-            case (key, dispatch) =>
-              val newKey = makeNewIter(key)
-              newKey -> dispatch
-          }
-
-          v.clearPorts
-          v.dispatches.flatMap(_._2).toSet.foreach {
-            dispatch: Int =>
-              val ports = lhs.getPorts(dispatch).get
-              ports.collect {
-                case (unroll, port) if hasPrefix(unroll) =>
-                  v.addPort(dispatch, makeNewIter(unroll), port)
-              }
-          }
-          v.gids = lhs.gids.collect {
-            case (unroll, gids) if hasPrefix(unroll) =>
-              makeNewIter(unroll) -> gids
-          }
-
-          val keyReplacement = (laneMap.map {
-            case (iter, offset) => iter.unbox.asInstanceOf[Idx] -> (f(iter).asInstanceOf[Idx], offset)
-          }).toMap[Idx, (Idx, Int)]
-          v.affineMatrices = lhs.affineMatrices.collect {
-            case AccessMatrix(_, matrix, unroll, isReader) if hasPrefix(unroll) =>
-              AccessMatrix(v, matrix.replaceKeys(keyReplacement), makeNewIter(unroll), isReader)
-          }
-
-          v.explicitName = lhs.explicitName.getOrElse(s"$lhs") + "_" + mappedIterator.flatMap({x => x}).mkString("_")
-
-          v
-        }
-      }
-
-    case _ => {
-      val v = super.transform(lhs, rhs)
-      v.ctx = implicitly[argon.SrcCtx].copy(previous = Seq(lhs.ctx) ++ lhs.ctx.previous)
-      v
-    }
+    case _ => super.transform(lhs, rhs)
   }).asInstanceOf[Sym[A]]
 
 //  printRegister = true

@@ -267,7 +267,8 @@ case class DependencyGraphAnalyzer(IR: State)(implicit isl: poly.ISL) extends Ac
   override def visit[A](lhs: Sym[A], rhs: Op[A]): Unit = rhs match {
     case AccelScope(blk) =>
       blk.nestedStms.filter(_.isMem).filter(StreamifyUtils.getConflictGroups(_).nonEmpty).foreach {
-        mem =>
+        case lut: LUT[_, _] =>
+        case mem =>
           val prodCons = computeDependencyGraph(mem)
           dbgs(s"${stm(mem)}-> $prodCons")
           if (prodCons.size > 1) {

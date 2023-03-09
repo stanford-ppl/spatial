@@ -157,7 +157,9 @@ class DependencyFIFOManager(implicit state: argon.State) {
     }
   }
 
-  def computeDepth(edge: DependencyEdge): Int = 32
+  def computeDepth(edge: DependencyEdge): Int = edge match {
+    case ce: CoherentEdge => bufferDepths(ce.mem)
+  }
 
   val bufferDepths = {
     // In order to compute buffer depths, we need to count how many controllers there are on the critical path.
@@ -179,7 +181,7 @@ class DependencyFIFOManager(implicit state: argon.State) {
           1
         } else {
           val parents = mem.accesses.map(_.parent)
-          parents.size + 2
+          parents.size
         }
     }
   }
@@ -833,12 +835,19 @@ case class HierarchicalToStream(IR: argon.State) extends ForwardTransformer with
   private var memBuffers: Map[Sym[_], Seq[Sym[_]]] = Map.empty
   private var bufferIndex: Map[Sym[_], Idx] = Map.empty
 
+  private def shouldSync(mem: Sym[_]): Boolean = {
+    if (!mem.isMem) return false
+    if (isInternalMem(mem)) return false
+    if (mem.isLUT) return false
+    return true
+  }
+
   override def transform[A: Type](lhs: Sym[A], rhs: Op[A])(implicit ctx: SrcCtx): Sym[A] = (rhs match {
     case _: AccelScope if lhs.isInnerControl => lhs
 
     case accel: AccelScope => inAccel {
       stage(AccelScope(stageBlock {
-        syncMems = (accel.block.nestedStms.filter { x => x.isMem && !isInternalMem(x) }).toSet
+        syncMems = (accel.block.nestedStms.filter(shouldSync)).toSet
         dbgs(s"Synchronizing: $syncMems")
         dbgs(s"Creating FIFOs:")
         indent {

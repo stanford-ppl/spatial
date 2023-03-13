@@ -121,7 +121,6 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val unitIterationElimination = UnitIterationElimination(state)
     lazy val duplicateRetimeStripper = DuplicateRetimeStripper(state)
     lazy val earlyUnroller         = EarlyUnroller(state)
-    lazy val accelPipeInserter     = AccelPipeInserter(state)
     lazy val forceHierarchical     = ForceHierarchical(state)
     lazy val dependencyGraphAnalyzer = DependencyGraphAnalyzer(state)
     lazy val counterIterSynchronization = CounterIterSynchronization(state)

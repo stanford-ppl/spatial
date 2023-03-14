@@ -124,6 +124,7 @@ trait Spatial extends Compiler with ParamLoader {
     lazy val forceHierarchical     = ForceHierarchical(state)
     lazy val dependencyGraphAnalyzer = DependencyGraphAnalyzer(state)
     lazy val counterIterSynchronization = CounterIterSynchronization(state)
+    lazy val CChainSimplification       = CounterChainSimplificationTransformer(state)
 
     lazy val executor = ExecutorPass(state, spatialConfig.scalaExecThroughput, spatialConfig.scalaExecLatency, spatialConfig.scalaExecMaxSimultaneousRequests)
 
@@ -145,7 +146,7 @@ trait Spatial extends Compiler with ParamLoader {
       Seq(dependencyGraphAnalyzer, initiationAnalyzer, printer, streamChecks) ++
       createDump("PreFlatten") ++
       Seq(HierarchicalToStream(state), printer, switchTransformer,
-        printer, pipeInserter, printer, streamChecks) ++ Seq(bankStrippers) ++ bankingAnalysis ++ createDump("PostStream")
+        printer, pipeInserter, printer, streamChecks, CChainSimplification, counterIterSynchronization) ++ Seq(bankStrippers) ++ bankingAnalysis ++ createDump("PostStream")
 
     // --- Codegen
     lazy val chiselCodegen = ChiselGen(state)

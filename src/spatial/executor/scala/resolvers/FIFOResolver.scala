@@ -8,10 +8,10 @@ import spatial.metadata.memory._
 import utils.implicits.collections.IterableHelpers
 
 trait FIFOResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
-    case Op(FIFONew(depth)) =>
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = op match {
+    case FIFONew(depth) =>
       new ScalaQueue[SomeEmul](execState.getValue[FixedPoint](depth).toInt)
-    case Op(enq@FIFOEnq(fifo, data, ens)) =>
+    case enq@FIFOEnq(fifo, data, ens) =>
       type ET = fifo.A.L
       if (enq.isEnabled(execState)) {
         execState(fifo) match {
@@ -21,40 +21,40 @@ trait FIFOResolver extends OpResolverBase {
       }
       EmulUnit(sym)
 
-    case Op(deq@FIFODeq(fifo, ens)) if deq.isEnabled(execState) =>
+    case deq@FIFODeq(fifo, ens) if deq.isEnabled(execState) =>
       execState(fifo) match {
         case sq: ScalaQueue[SomeEmul] => sq.deq()
       }
 
-    case Op(isFull@FIFOIsFull(mem, _)) if isFull.isEnabled(execState) =>
+    case isFull@FIFOIsFull(mem, _) if isFull.isEnabled(execState) =>
       execState(mem) match {
         case sq: ScalaQueue[SomeEmul] => SimpleEmulVal(emul.Bool(sq.isFull))
       }
 
 
-    case Op(isEmpty@FIFOIsEmpty(mem, _)) if isEmpty.isEnabled(execState) =>
+    case isEmpty@FIFOIsEmpty(mem, _) if isEmpty.isEnabled(execState) =>
       execState(mem) match {
         case sq: ScalaQueue[SomeEmul] => SimpleEmulVal(sq.isEmpty)
       }
 
-    case Op(isAlmostFull@FIFOIsAlmostFull(fifo, _)) if isAlmostFull.isEnabled(execState) =>
+    case isAlmostFull@FIFOIsAlmostFull(fifo, _) if isAlmostFull.isEnabled(execState) =>
       val wPar = fifo.writeWidths.maxOrElse(1)
       execState(fifo) match {
         case sq: ScalaQueue[SomeEmul] => SimpleEmulVal(Bool(sq.size + wPar >= sq.capacity))
       }
 
-    case Op(isAlmostEmpty@FIFOIsAlmostEmpty(fifo, _)) if isAlmostEmpty.isEnabled(execState) =>
+    case isAlmostEmpty@FIFOIsAlmostEmpty(fifo, _) if isAlmostEmpty.isEnabled(execState) =>
       val rPar = fifo.readWidths.maxOrElse(1)
       execState(fifo) match {
         case sq: ScalaQueue[SomeEmul] => SimpleEmulVal(Bool(sq.size <= rPar))
       }
 
-    case Op(peek@FIFOPeek(fifo, _)) if peek.isEnabled(execState) =>
+    case peek@FIFOPeek(fifo, _) if peek.isEnabled(execState) =>
       execState(fifo) match {
         case sq: ScalaQueue[SomeEmul] => sq.head
       }
 
-    case _ => super.run(sym, execState)
+    case _ => super.run(sym, op, execState)
   }
 
 }

@@ -6,32 +6,32 @@ import emul._
 import spatial.executor.scala.{EmulResult, ExecutionState, SimpleEmulVal}
 
 trait FltResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
-    case Op(FltIsPosInf(a)) =>
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = op match {
+    case FltIsPosInf(a) =>
       val result = execState.getValue[FloatPoint](a).isPositiveInfinity
       SimpleEmulVal(emul.Bool(result))
 
-    case Op(FltIsNegInf(a)) =>
+    case FltIsNegInf(a) =>
       val result = execState.getValue[FloatPoint](a).isNegativeInfinity
       SimpleEmulVal(emul.Bool(result))
 
-    case Op(FltIsNaN(a)) =>
+    case FltIsNaN(a) =>
       val result = execState.getValue[FloatPoint](a).isNaN
       SimpleEmulVal(emul.Bool(result))
 
-    case Op(FltToFix(a, f2)) =>
+    case FltToFix(a, f2) =>
       val result = execState.getValue[FloatPoint](a).toFixedPoint(f2.toEmul)
       SimpleEmulVal(result)
 
-    case Op(FltToFlt(a, f2)) =>
+    case FltToFlt(a, f2) =>
       val result = execState.getValue[FloatPoint](a).toFloatPoint(f2.toEmul)
       SimpleEmulVal(result)
 
-    case Op(FltToText(a, format)) =>
+    case FltToText(a, format) =>
       val result = execState.getValue[FloatPoint](a).toString
       SimpleEmulVal(result)
 
-    case Op(rand@FltRandom(max)) =>
+    case rand@FltRandom(max) =>
       SimpleEmulVal(max match {
         case Some(maximum) =>
           FloatPoint.random(execState.getValue[FloatPoint](maximum), rand.fmt.toEmul)
@@ -39,6 +39,6 @@ trait FltResolver extends OpResolverBase {
           FloatPoint.random(rand.fmt.toEmul)
       })
 
-    case _ => super.run(sym, execState)
+    case _ => super.run(sym, op, execState)
   }
 }

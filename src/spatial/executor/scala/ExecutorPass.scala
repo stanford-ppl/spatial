@@ -19,6 +19,7 @@ case class ExecutorPass(IR: argon.State,
   override protected def process[R](block: Block[R]): Block[R] = {
     info(s"Starting scala simulation")
     val accelScopes = collection.mutable.Set.empty[Sym[_]]
+    var time: Long = System.currentTimeMillis()
     IR.runtimeArgs.zipWithIndex.foreach {
       case (rtArgs, index) =>
         val splitArgs = rtArgs.split("\\W+")
@@ -36,6 +37,9 @@ case class ExecutorPass(IR: argon.State,
           block.stms.foreach {
             case accelScope @ Op(_: AccelScope) =>
               accelScopes.add(accelScope)
+              val newTime = System.currentTimeMillis()
+              info(s"Setup time: ${newTime - time} ms")
+              time = newTime
               emit(s"Starting Accel Simulation".padTo(lineLength, "-").mkString)
               val exec = new AccelScopeExecutor(accelScope, executionState)
               while (exec.status != Done) {
@@ -55,9 +59,12 @@ case class ExecutorPass(IR: argon.State,
                 }
                 cycles += 1
                 if (cycles % 10000 == 0) {
-                  info(s"$cycles elapsed")
+                  val newTime = System.currentTimeMillis()
+                  info(s"$cycles elapsed [${newTime - time}ms]")
+                  time = newTime
                 }
               }
+              info(s"Finished in $cycles")
             case stmt =>
               // These are top-level host operations
               emit(s"Executing host operation ${stm(stmt)}")

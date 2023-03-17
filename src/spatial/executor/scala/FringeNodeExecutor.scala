@@ -9,18 +9,14 @@ import spatial.node._
 import scala.collection.mutable
 
 object FringeNodeExecutor {
-  @forge.tags.stateful def apply(op: Sym[_], execState: ExecutionState): OpExecutorBase = op match {
+  @forge.tags.stateful def apply(op: Sym[_], execState: ExecutionState): ControlExecutor = op match {
     case Op(_: FringeDenseLoad[_, _]) => new FringeDenseLoadExecutor(op, execState)
     case Op(_: FringeDenseStore[_, _]) => new FringeDenseStoreExecutor(op, execState)
     case _ => throw new NotImplementedError(s"Haven't implemented ${stm(op)} yet!")
   }
 }
 
-trait FringeOpExecutor extends OpExecutorBase {
-  val kLoadLatency: Int = 40
-  // Estimated 200 bytes/tick
-  val kLoadThroughput: Double = 200
-  val maxInFlightRequests = 32
+trait FringeOpExecutor extends ControlExecutor {
 
   val memEntry: MemEntry
   val cmdStream: ScalaQueue[ScalaStruct]
@@ -45,11 +41,14 @@ trait FringeOpExecutor extends OpExecutorBase {
     val dramIndex = (offset - memEntry.start) / bytesPerElement
     DRAMAccessData(dramIndex, nElements, sizeInBytes)
   }
+
+  override def isDeadlocked: Boolean = false
 }
 
-class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends FringeOpExecutor {
+class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState) extends FringeOpExecutor {
   val Op(fdl@FringeDenseLoad(dramSym, cmdStreamSym, dataStreamSym)) = op
 
+  override val ctrl: Sym[_] = op
 
   type ET = fdl.A.L
   val dram = execState.getTensor[EmulVal[ET]](dramSym)
@@ -75,8 +74,19 @@ class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState
       case Some(DRAMLoad(request, accessData)) if request.status == RequestFinished =>
         (0 until accessData.nElements) foreach {
           shift =>
-            val readVal = dram.values(accessData.base + shift).get
-            dataStream.enq(readVal)
+            val addr = accessData.base + shift
+            val result = {
+              if (addr >= dram.size) {
+                EmulPoison(ctrl)
+              } else {
+                val readVal = dram.values(accessData.base + shift)
+                readVal match {
+                  case Some(v) => v
+                  case None => EmulPoison(ctrl)
+                }
+              }
+            }
+            dataStream.enq(result)
         }
         requests.dequeue()
       case _ =>
@@ -90,6 +100,8 @@ class FringeDenseLoadExecutor(op: Sym[_], override val execState: ExecutionState
 
 class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionState)(implicit state: argon.State) extends FringeOpExecutor {
   val Op(fdr@FringeDenseStore(dramSym, cmdStreamSym, dataStreamSym, ackStreamSym)) = op
+
+  override val ctrl: Sym[_] = op
 
   type ET = fdr.A.L
   val dram = execState.getTensor[EmulVal[ET]](dramSym)
@@ -126,7 +138,7 @@ class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionStat
             } else None
         }
 
-        requests.enqueue(new DRAMStore(execState.memoryController.makeRequest(dramAccess.size), dramAccess, data))
+        requests.enqueue(DRAMStore(execState.memoryController.makeRequest(dramAccess.size), dramAccess, data))
         cmdStream.deq()
       }
     }
@@ -136,7 +148,10 @@ class FringeDenseStoreExecutor(op: Sym[_], override val execState: ExecutionStat
         requests.dequeue()
         values.zipWithIndex foreach {
           case (value@Some(_), offset) =>
-            dram.values(offset + accessData.base) = value
+            val address = offset + accessData.base
+            if (address < dram.size) {
+              dram.values(offset + accessData.base) = value
+            }
           case _ =>
         }
         ackStream.enq(SimpleEmulVal(emul.Bool(true)))

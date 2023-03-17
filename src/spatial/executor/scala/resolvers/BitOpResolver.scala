@@ -5,14 +5,14 @@ import emul._
 import spatial.executor.scala._
 
 trait BitOpResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): SomeEmul = sym match {
-    case Op(BitToText(a)) =>
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): SomeEmul = op match {
+    case BitToText(a) =>
       SimpleEmulVal(execState.getValue[emul.Bool](a).toString)
-    case Op(BitRandom(None)) =>
+    case BitRandom(None) =>
       SimpleEmulVal(Bool(scala.util.Random.nextBoolean()))
-    case Op(TextToBit(text)) =>
+    case TextToBit(text) =>
       val str = execState.getValue[String](text)
       SimpleEmulVal(Bool.from(str))
-    case _ => super.run(sym, execState)
+    case _ => super.run(sym, op, execState)
   }
 }

@@ -1,26 +1,29 @@
 package spatial.executor.scala.resolvers
 import argon.lang.Struct
-import argon.{Const, Exp, Op, Value, emit, error}
-import argon.node.{AssertIf, FixRandom, FixToText, PrintIf, SimpleStruct, TextConcat, TextToFix}
+import argon._
+import argon.node._
 import emul.FixedPoint
 import spatial.executor.scala.memories.{ScalaStruct, ScalaStructType}
 import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal}
+import spatial.node.Mux
 
 trait MiscResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = {
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
     implicit val ir: argon.State = execState.IR
-    sym match {
-      case Op(TextConcat(parts)) =>
+    op match {
+      case TextConcat(parts) =>
         SimpleEmulVal(parts.map(execState.getValue[String](_)).mkString(""))
 
-      case Op(pi@PrintIf(ens, text)) =>
+      case pi@PrintIf(ens, text) =>
         if (pi.isEnabled(execState)) {
+          val stringToWrite = execState.getValue[String](text)
           emit(execState.getValue[String](text))
+          info(stringToWrite)
         }
 
         EmulUnit(sym)
 
-      case Op(ai@AssertIf(ens, cond, message)) =>
+      case ai@AssertIf(ens, cond, message) =>
         if (ai.isEnabled(execState)) {
           // Check the condition
           val condBool = execState.getValue[emul.Bool](cond).value
@@ -35,14 +38,20 @@ trait MiscResolver extends OpResolverBase {
 
         EmulUnit(sym)
 
-      case Op(SimpleStruct(elems)) =>
+      case SimpleStruct(elems) =>
         ScalaStruct(elems.toMap.mapValues {
           v => execState(v) match {case ev: EmulVal[_] => ev}
         })
 
-      case Value(v) => SimpleEmulVal(v)
+      case Mux(en, left, right) =>
+        val select = execState.getValue[emul.Bool](en).value
+        if (select) {
+          execState(left)
+        } else {
+          execState(right)
+        }
 
-      case _ => super.run(sym, execState)
+      case _ => super.run(sym, op, execState)
     }
   }
 }

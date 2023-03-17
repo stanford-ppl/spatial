@@ -4,10 +4,10 @@ import argon.node.Enabled
 import spatial.executor.scala.{EmulPoison, EmulResult, ExecutionState}
 
 trait DisabledResolver extends OpResolverBase {
-  override def run[U, V](sym: Exp[U, V], execState: ExecutionState): EmulResult = sym match {
-    case Op(enabled: Enabled[_]) if !enabled.isEnabled(execState) =>
+  override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = op match {
+    case enabled: Enabled[_] if !enabled.isEnabled(execState) =>
       EmulPoison(sym)
-    case _ => super.run(sym, execState)
+    case _ => super.run(sym, op, execState)
   }
 
 }

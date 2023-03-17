@@ -9,17 +9,17 @@ import spatial.node.{Accessor, Dequeuer, Enqueuer, FIFODeq, FIFOEnq, LIFOPop, St
 
 import scala.collection.{mutable => cm}
 
-class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) {
+class ExecPipeline(val stages: Vector[PipelineStage])(implicit state: argon.State) {
   // Can a new workload be pushed in
   def canAcceptNewState: Boolean = stages.head.isEmpty
-  def pushState(executionStates: Seq[ExecutionState]): Unit = {
+  def pushState(executionStates: Vector[ExecutionState]): Unit = {
     if (!canAcceptNewState) {
       throw new IllegalStateException(s"Can't push into a pipeline that's not accepting")
     }
     stages.head.setExecution(executionStates)
   }
 
-  var lastStates: Seq[ExecutionState] = Seq.empty
+  var lastStates: Vector[ExecutionState] = Vector.empty
 
   def tick(): Unit = {
     // Advance all stages by one tick
@@ -29,15 +29,16 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
 
     // If the last stage is done, then we pop it off of the pipeline
     if (stages.last.isDone) {
-      lastStates = stages.last.currentExecution.map(_.executionStates).getOrElse(Seq.empty)
+      lastStates = stages.last.currentExecution.map(_.executionStates).getOrElse(Vector.empty)
       stages.last.currentExecution = None
     } else {
-      lastStates = Seq.empty
+      lastStates = Vector.empty
     }
 
-    // Taking pairs from the end of the stages, advance if the next stage is empty and the current stage is done.
+    // Taking pairs from the end of the stages, advance if the next
+    // stage is empty and the current stage is done.
     stages.reverse.sliding(2).foreach {
-      case Seq(later, earlier) =>
+      case Vector(later, earlier) =>
         (later.currentExecution, earlier.currentExecution) match {
           case (None, Some(execution)) if execution.isDone =>
             val currentStates = execution.executionStates
@@ -45,7 +46,7 @@ class ExecPipeline(val stages: Seq[PipelineStage])(implicit state: argon.State) 
             earlier.clearExecution()
           case _ => // Pass, not ready to move on yet
         }
-      case skip if skip.size < 2 => // Single or no items
+      case skip: Vector[_] if skip.size < 2 => // Single or no items
     }
   }
 
@@ -102,7 +103,7 @@ sealed trait PipelineStage {
   // Marked as done only if we have an execution and it's done. otherwise check empty
   def isDone: Boolean = currentExecution.exists(_.isDone)
 
-  @stateful def setExecution(executionStates: Seq[ExecutionState]): Unit = {
+  @stateful def setExecution(executionStates: Vector[ExecutionState]): Unit = {
     assert(currentExecution.isEmpty, s"clear the execution first before setting a new one")
     currentExecution = Some(makeNewExecution(executionStates))
     // Run first tick of cycle 0
@@ -111,7 +112,7 @@ sealed trait PipelineStage {
 
   def clearExecution(): Unit = { currentExecution = None }
 
-  def makeNewExecution(executionState: Seq[ExecutionState]): PipelineStageExecution
+  def makeNewExecution(executionState: Vector[ExecutionState]): PipelineStageExecution
 
   def canProgress: Boolean = currentExecution.exists(_.canProgress)
 }
@@ -120,28 +121,30 @@ trait PipelineStageExecution {
   def willStall: Boolean
   def tick(): Unit
   def isDone: Boolean
-  val executionStates: Seq[ExecutionState]
+  val executionStates: Vector[ExecutionState]
   implicit def IR: argon.State = executionStates.head.IR
 
   def canProgress: Boolean
 }
 
-class InnerPipelineStage(syms: Seq[Sym[_]]) extends PipelineStage {
-  override def makeNewExecution(executionStates: Seq[ExecutionState]): PipelineStageExecution = new InnerPipelineStageExecution(syms, executionStates)
+class InnerPipelineStage(syms: Vector[Sym[_]]) extends PipelineStage {
+  override def makeNewExecution(executionStates: Vector[ExecutionState]): PipelineStageExecution = new InnerPipelineStageExecution(syms, executionStates)
 
   override def toString: String = {
     s"InnerPipelineStage(${syms.mkString(", ")})[$currentExecution]"
   }
 }
 
-class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionStates: Seq[ExecutionState]) extends PipelineStageExecution {
+class InnerPipelineStageExecution(syms: Vector[Sym[_]], override val executionStates: Vector[ExecutionState]) extends PipelineStageExecution {
 
-  private val enableSyms = (syms.collect {
-    case Op(s: FIFOEnq[_]) => s.ens
-    case Op(s: FIFODeq[_]) => s.ens
-    case Op(s: StreamInRead[_]) => s.ens
-    case Op(s: StreamOutWrite[_]) => s.ens
-  }).flatten
+  private val streams = syms.collect {
+    case Op(s: FIFOEnq[_]) => s
+    case Op(s: FIFODeq[_]) => s
+    case Op(s: StreamInRead[_]) => s
+    case Op(s: StreamOutWrite[_]) => s
+  }
+
+  private val enableSyms = streams.flatMap(_.ens)
 
   def isEnabled(ens: Set[Bit], executionState: ExecutionState): Boolean = {
     ens.forall(executionState.getValue[emul.Bool](_).value)
@@ -180,6 +183,8 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
   }
 
   override def willStall: Boolean = {
+    if (streams.isEmpty) return false
+
     val readIndex = cm.Map.empty[Sym[_], Int]
     val writeIndex = cm.Map.empty[Sym[_], Int]
 
@@ -265,8 +270,8 @@ class InnerPipelineStageExecution(syms: Seq[Sym[_]], override val executionState
   }
 }
 
-class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends PipelineStage {
-  override def makeNewExecution(executionStates: Seq[ExecutionState]): PipelineStageExecution = {
+class OuterPipelineStage(transients: Vector[Sym[_]], ctrl: Sym[_]) extends PipelineStage {
+  override def makeNewExecution(executionStates: Vector[ExecutionState]): PipelineStageExecution = {
     executionStates.foreach(exec => transients.foreach(exec.runAndRegister(_)))
     new OuterPipelineStageExecution(ctrl, executionStates)
   }
@@ -276,7 +281,7 @@ class OuterPipelineStage(transients: Seq[Sym[_]], ctrl: Sym[_]) extends Pipeline
   }
 }
 
-class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Seq[ExecutionState]) extends PipelineStageExecution {
+class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Vector[ExecutionState]) extends PipelineStageExecution {
   override def willStall: Boolean = false
 
   private var overhead = 4
@@ -295,7 +300,7 @@ class OuterPipelineStageExecution(ctrl: Sym[_], override val executionStates: Se
     executors.forall {
       executor =>
         executor.status match {
-          case _: Finished => true
+          case _: Finished | Indeterminate => true
           case Running => false
         }
     }

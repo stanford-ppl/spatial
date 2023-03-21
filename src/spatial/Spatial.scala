@@ -248,8 +248,8 @@ trait Spatial extends Compiler with ParamLoader {
         (spatialConfig.enableFlatDot ? dotFlatGen)      ==>
         (spatialConfig.enableDot ? dotHierGen)      ==>
         (spatialConfig.enableSim   ? scalaCodegen)  ==>
-        (spatialConfig.enableSynth ? chiselCodegen) ==>
-        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp") ? cppCodegen) ==>
+        ((spatialConfig.enableSynth && !spatialConfig.enableScalaExec) ? chiselCodegen) ==>
+        ((spatialConfig.enableSynth && spatialConfig.target.host == "cpp" && !spatialConfig.enableScalaExec) ? cppCodegen) ==>
         ((spatialConfig.target.host == "rogue") ? rogueCodegen) ==>
         (spatialConfig.reportArea ? resourceReporter) ==>
         (spatialConfig.countResources ? ResourceCountReporter(state)) ==>

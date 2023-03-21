@@ -5,7 +5,7 @@ import argon.node.Enabled
 import argon.{Op, Sym, dbgs, emit, indent, indentGen, stm}
 import forge.tags.stateful
 import spatial.executor.scala.memories.ScalaQueue
-import spatial.node.{Accessor, Dequeuer, Enqueuer, FIFODeq, FIFOEnq, LIFOPop, StreamInRead, StreamOutWrite}
+import spatial.node.{Accessor, Dequeuer, Enqueuer, FIFODeq, FIFOEnq, FIFOVecDeq, LIFOPop, StreamInRead, StreamOutWrite}
 
 import scala.collection.{mutable => cm}
 
@@ -140,6 +140,7 @@ class InnerPipelineStageExecution(syms: Vector[Sym[_]], override val executionSt
   private val streams = syms.collect {
     case Op(s: FIFOEnq[_]) => s
     case Op(s: FIFODeq[_]) => s
+    case Op(s: FIFOVecDeq[_]) => s
     case Op(s: StreamInRead[_]) => s
     case Op(s: StreamOutWrite[_]) => s
   }
@@ -212,6 +213,11 @@ class InnerPipelineStageExecution(syms: Vector[Sym[_]], override val executionSt
             case s@Op(FIFODeq(mem, ens)) if isEnabled(ens, executionState) =>
               executionState(mem) match {
                 case sq: ScalaQueue[_] => (sq, 0, 1, s)
+              }
+            case s@Op(FIFOVecDeq(mem, adr, ens)) if isEnabled(ens, executionState) =>
+              executionState(mem) match {
+                case sq: ScalaQueue[_] =>
+                  (sq, 0, adr.size, s)
               }
             case s@Op(StreamInRead(mem, ens)) if isEnabled(ens, executionState) =>
               executionState(mem) match {

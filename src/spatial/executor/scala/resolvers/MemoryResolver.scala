@@ -30,12 +30,22 @@ trait MemoryResolver extends OpResolverBase {
       case streamIn@StreamInNew(bus) =>
         new ScalaQueue[SomeEmul]()
 
-      case malloc: MemAlloc[_, _] if sym.isSRAM || sym.isDRAM =>
+      case malloc: MemAlloc[_, _] if sym.isSRAM || sym.isDRAM || sym.isRegFile =>
         val elType: ExpType[_, _] = malloc.A.tp
         val elSize = malloc.A.nbits / 8
         val newTensor = new ScalaTensor[SomeEmul](malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt), Some(elSize))
         if (sym.isDRAM) {
           execState.hostMem.register(newTensor)
+        }
+        if (sym.isRegFile) {
+          op match {
+            case RegFileNew(_, Some(inits)) =>
+              inits.zipWithIndex.foreach {
+                case (v, ind) =>
+                  val evaled = execState(v)
+                  newTensor.values(ind) = Some(evaled)
+              }
+          }
         }
         newTensor
 
@@ -132,6 +142,22 @@ trait MemoryResolver extends OpResolverBase {
         } else {
           SimpleEmulVal[srw.A.L](null, false)
         }
+
+      case rfr@RegFileRead(mem, addr, _) if rfr.isEnabled(execState) =>
+        val tensor = execState.getTensor[EmulVal[rfr.A.L]](mem)
+        val address = addr.map(execState.getValue[FixedPoint](_).toInt)
+        val read = tensor.read(address, true)
+        if (read.isEmpty) {
+          throw SimulationException(s"Attempting to read $mem[${address.mkString(", ")}], which was uninitialized.")
+        }
+        read.get
+
+      case rfw@RegFileWrite(mem, data, addr, ens) if rfw.isEnabled(execState) =>
+        val realData = execState.getValue[rfw.A.L](data)
+        val tensor = execState.getTensor[EmulVal[rfw.A.L]](mem)
+        val address = addr.map(execState.getValue[FixedPoint](_).toInt)
+        tensor.write(SimpleEmulVal(realData), address, true)
+        EmulUnit(sym)
 
       case _ => super.run(sym, op, execState)
     }

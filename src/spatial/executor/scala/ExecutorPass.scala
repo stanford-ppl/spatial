@@ -42,7 +42,8 @@ case class ExecutorPass(IR: argon.State,
               time = newTime
               emit(s"Starting Accel Simulation".padTo(lineLength, "-").mkString)
               val exec = new AccelScopeExecutor(accelScope, executionState)
-              while (exec.status != Done) {
+              var continue: Boolean = true
+              while (continue && exec.status != Done) {
                 if (shouldPrint) {
                   emit(s"Tick $cycles".padTo(lineLength, "-").mkString)
                 }

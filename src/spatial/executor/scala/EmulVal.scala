@@ -11,6 +11,8 @@ abstract class EmulVal[+VT] extends EmulResult {
 
 case class SimpleEmulVal[+VT](value: VT, override val valid: Boolean = true) extends EmulVal[VT]
 
+case class EmulVector[+VT](value: Seq[VT], override val valid: Boolean = true) extends EmulVal[Seq[VT]]
+
 case class EmulUnit(sym: Sym[_]) extends EmulVal[Unit] {
   override def value: Unit = Unit
 }

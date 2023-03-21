@@ -4,8 +4,8 @@ import argon._
 import argon.node._
 import emul.FixedPoint
 import spatial.executor.scala.memories.{ScalaStruct, ScalaStructType}
-import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal}
-import spatial.node.Mux
+import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, EmulVector, ExecutionState, SimpleEmulVal, SomeEmul}
+import spatial.node.{Mux, RetimeGate}
 
 trait MiscResolver extends OpResolverBase {
   override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = {
@@ -49,6 +49,15 @@ trait MiscResolver extends OpResolverBase {
           execState(left)
         } else {
           execState(right)
+        }
+
+      case RetimeGate() =>
+        EmulUnit(sym)
+
+      case VecApply(vec, i) =>
+        execState(vec) match {
+          case EmulVector(value, _) =>
+            value(i).asInstanceOf[SomeEmul]
         }
 
       case _ => super.run(sym, op, execState)

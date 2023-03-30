@@ -1,10 +1,7 @@
 package spatial.executor.scala.resolvers
-import argon.lang.Struct
 import argon._
 import argon.node._
-import emul.FixedPoint
-import spatial.executor.scala.memories.{ScalaStruct, ScalaStructType}
-import spatial.executor.scala.{EmulResult, EmulUnit, EmulVal, ExecutionState, SimpleEmulVal}
+import spatial.executor.scala._
 import spatial.node.Mux
 
 trait MiscResolver extends OpResolverBase {
@@ -37,11 +34,6 @@ trait MiscResolver extends OpResolverBase {
         }
 
         EmulUnit(sym)
-
-      case SimpleStruct(elems) =>
-        ScalaStruct(elems.toMap.mapValues {
-          v => execState(v) match {case ev: EmulVal[_] => ev}
-        })
 
       case Mux(en, left, right) =>
         val select = execState.getValue[emul.Bool](en).value

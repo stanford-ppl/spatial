@@ -1616,17 +1616,18 @@ import utils.io.files._
 
 
   def main(args: Array[String]): Unit = {
+    implicitly[argon.State].config.setV(0)
 
     val dim_arg = args(0).to[Int]
     val dim = ArgIn[Int]
     setArg(dim, dim_arg)
     val tileSize = 16 (16 -> 16 -> 128)
     val i_tileSize = 64 (64 -> 16 -> 128)
-    val par_load = 1
-    val par_store = 1
+    val par_load = 2
+    val par_store = 2
     val loop_jj    = 1 // (1 -> 1 -> dim/tileSize) // THIS PAR DOES NOT WORK UNTIL BUG #205 IS FIXED
     val loop_ii    = 1 // not sure if this one works
-    val loop_kk    = 1 (1 -> 1 -> 8)
+    val loop_kk    = 8 (1 -> 1 -> 8)
     val loop_i     = 1 (1 -> 1 -> 32)
     val loop_k     = 1 (1 -> 1 -> 16)
     val loop_j     = 1 (1 -> 1 -> 16)

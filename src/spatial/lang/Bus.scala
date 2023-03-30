@@ -69,7 +69,7 @@ case class FileEOFBus[A:Bits](fileName:String)(implicit state:State) extends Bus
   Type[A] match {
     case a:Struct[_] if a.fields.last._2 == Type[Bit] => 
     case a => 
-      error(s"EFOBus must have struct type with last field in Bit. Got type ${a}")
+      error(s"EOFBus must have struct type with last field in Bit. Got type ${a}")
       state.logError()
   }
   @rig def nbits: Int = Bits[A].nbits

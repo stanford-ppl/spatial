@@ -4,8 +4,8 @@ import argon._
 import argon.lang.{Bits, Struct}
 import emul.FixedPoint
 import spatial.executor.scala._
-import spatial.executor.scala.memories.{ScalaQueue, ScalaReg, ScalaStruct, ScalaStructType, ScalaTensor}
-import spatial.lang.Reg
+import spatial.executor.scala.memories._
+import spatial.lang._
 import spatial.node._
 
 import spatial.metadata.memory._
@@ -20,6 +20,12 @@ trait MemoryResolver extends OpResolverBase {
       case ao:RegAlloc[_, Reg] if !ao.A.isInstanceOf[Struct[_]]=>
         val initVal = execState(ao.init)
         new ScalaReg(initVal, initVal)
+
+      case streamIn@StreamInNew(FileBus(filename)) =>
+        new FileReadScalaQueue(filename, streamIn.A)
+
+      case StreamOutNew(FileBus(filename)) =>
+        new FileWriteScalaQueue(filename)
 
       case streamOut: StreamOutNew[_] if streamOut.A.isInstanceOf[Struct[_]] =>
         new ScalaQueue[ScalaStruct]()

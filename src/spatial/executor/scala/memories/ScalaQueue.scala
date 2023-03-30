@@ -1,6 +1,7 @@
 package spatial.executor.scala.memories
 
-import spatial.executor.scala.{EmulMem, EmulResult, SimulationException}
+import argon.ExpType
+import spatial.executor.scala.{EmulMem, EmulResult, EmulVal, ExecUtils, SimulationException, SomeEmul}
 
 import scala.collection.mutable
 
@@ -32,3 +33,29 @@ class ScalaQueue[T <: EmulResult](val capacity: Int = scala.Int.MaxValue) extend
     s"Queue(capacity = $capacity, size = $size)"
   }
 }
+
+class FileReadScalaQueue(filename: String, fmt: ExpType[_, _]) extends ScalaQueue[SomeEmul] {
+  private val file = scala.io.Source.fromFile(filename)
+  file.getLines().foreach {
+    line => queue.enqueue(ExecUtils.parse(line.split(",").toIterator, fmt))
+  }
+  file.close()
+
+  override def enq(value: SomeEmul): Unit = {
+    throw SimulationException(s"Cannot Enqueue to a FileRead Stream!")
+  }
+}
+
+class FileWriteScalaQueue(filename: String) extends ScalaQueue[EmulVal[_]] {
+  private val file = new java.io.FileWriter(filename)
+
+  override def deq(): EmulVal[_] = {
+    throw SimulationException(s"Cannot Dequeue from a FileWrite Stream!")
+  }
+  override def enq(value: EmulVal[_]): Unit = {
+    val serialized = ExecUtils.serialize(value)
+    file.write(serialized.mkString("", ", ", "\n"))
+  }
+}
+
+

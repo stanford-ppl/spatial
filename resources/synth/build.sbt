@@ -6,7 +6,7 @@ version := "1.1"
 
 name := "spatial-app"
 
-scalaVersion     := "2.12.6"
+scalaVersion     := "2.12.17"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls", "-Xsource:2.11")
 
@@ -58,7 +58,7 @@ parallelExecution in Test := false
 val common = Seq(
   name := "RuntimeModel",
 
-  scalaVersion := "2.12.5",
+  scalaVersion := "2.12.17",
   scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls"),
 
   scalaSource in Compile := baseDirectory.value,
@@ -81,3 +81,4 @@ val common = Seq(
 
 
 lazy val model = project.settings(common)
+ThisBuild / evictionErrorLevel := Level.Info

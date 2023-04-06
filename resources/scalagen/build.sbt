@@ -1,7 +1,7 @@
 // Build file for testing spatial apps
 name := "spatial-app"
 
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.17"
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls")
 
 scalaSource in Compile := baseDirectory.value / "scala"
@@ -22,3 +22,4 @@ logBuffered in Test := false
 // Disable parallel execution when running te
 //  Running tests in parallel on Jenkins currently fails.
 parallelExecution in Test := false
+ThisBuild / evictionErrorLevel := Level.Info

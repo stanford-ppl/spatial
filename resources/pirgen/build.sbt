@@ -1,7 +1,7 @@
 // Build file for testing spatial apps
 name := "pir-app"
 
-scalaVersion := "2.12.10"
+scalaVersion := "2.12.17"
 scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-language:reflectiveCalls")
 
 scalaSource in Compile := baseDirectory.value / "pir"
@@ -18,3 +18,4 @@ logBuffered in Test := false
 parallelExecution in Test := false
 addCommandAlias("make", "compile")
 excludeFilter in unmanagedSources := HiddenFileFilter || "*trace*"
+ThisBuild / evictionErrorLevel := Level.Info

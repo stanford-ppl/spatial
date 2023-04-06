@@ -1,5 +1,5 @@
-val scala_version     = "2.12.7"
-val paradise_version  = "2.1.0"
+val scala_version     = "2.12.17"
+val paradise_version  = "2.1.1"
 val scalatestVersion  = "3.0.5"
 
 name := "spatial"
@@ -182,3 +182,5 @@ Global / concurrentRestrictions += Tags.limit(Tags.Test, threadsOrDefault)
 
 val cleanAll = taskKey[Unit]("Clean all projects")
 cleanAll := clean.all(ScopeFilter(inAnyProject)).value
+
+ThisBuild / evictionErrorLevel := Level.Info

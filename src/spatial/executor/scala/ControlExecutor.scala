@@ -9,6 +9,7 @@ import spatial.lang.{CounterChain, Reg}
 import spatial.node._
 import spatial.metadata.control._
 import spatial.metadata.retiming._
+import spatial.metadata.memory._
 
 import scala.collection.{mutable => cm}
 
@@ -39,6 +40,7 @@ object ControlExecutor {
         new OuterMemReduceExecutor(ctrl, execState)
       case Op(_: Switch[_]) => new SwitchExecutor(ctrl, execState)
       case Op(_: FringeNode[_, _]) => FringeNodeExecutor(ctrl, execState)
+      case Op(_: StateMachine[_]) => new FSMExecutor(ctrl, execState)
       case _ =>
         throw new NotImplementedError(s"Didn't know how to handle ${stm(ctrl)}")
     }
@@ -472,6 +474,9 @@ abstract class ReduceExecutorBase(ctrl: Sym[_],
     case sr: ScalaReg[SomeEmul] => sr
   }
 
+  // since we're not in a fold, reset the reg
+  accumReg.reset()
+
   protected def pipelines: Map[Seq[Int], ExecPipeline]
 
   protected def updateAccum(): Unit = {
@@ -685,13 +690,25 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
       .getValue[FixedPoint](ctr.end))
   }).toMap
 
-  protected val accumMem =
+  // For some blasted reason, Fold on registers gets dumped down this path as well!
+  // As a workaround, turn this into a def, and then
+  // add a second one for reg
+  private val isRegFold = accum.asInstanceOf[Sym[_]].isReg
+  protected def accumMem =
     execState.getTensor[SomeEmul](accum.asInstanceOf[Sym[_]])
+
+  protected def accumReg = execState(accum.asInstanceOf[Sym[_]]) match {
+    case sr: ScalaReg[SomeEmul] => sr
+  }
 
   if (!isFold) {
     // If we're not a fold, initialize accumMem to all None
-    (0 until accumMem.size).foreach {
-      i => accumMem.values(i) = None
+    if (isRegFold) {
+      throw new SimulationException("If we're a regFold, then we shouldn't be in the !isFold path!")
+    } else {
+      (0 until accumMem.size).foreach {
+        i => accumMem.values(i) = None
+      }
     }
   }
 
@@ -699,38 +716,60 @@ abstract class MemReduceExecutorBase(ctrl: Sym[_],
 
   protected def updateAccum(): Unit = {
     val lastStates = pipelines.values.flatMap(_.lastStates)
-    val results = lastStates.map { eState =>
-      eState.getTensor[SomeEmul](mapF.result)
-    }
-    // Results will be a list of tensors in this case.
-    results.foreach { resultTensor =>
-      val ranges = cchainRed.counters.map {
-        case Op(CounterNew(start, end, step, _)) =>
-          FixedPointRange(
-            execState.getValue[FixedPoint](start),
-            execState.getValue[FixedPoint](end),
-            execState.getValue[FixedPoint](step),
-            isInclusive = false
-          ).toList
+    if (isRegFold) {
+      val results = lastStates.map { eState =>
+        eState(mapF.result)
       }
-      val iterations = spatial.util.crossJoin(ranges.toList)
-      iterations.foreach { iterVals =>
-        val addr = iterVals.map(_.toInt).toSeq
-        val aVal = resultTensor.read(addr, true) match {
-          case Some(value) => value
-          case None =>
-            throw SimulationException(
-              s"Attempting to read from partial result tensor ${mapF.result}[${addr.mkString(", ")}], which was undefined!")
+      if (results.nonEmpty) {
+        val output = results.reduce { (a, b) =>
+          OpResolver.runBlock(reduceF,
+            Map(reduceF.inputA -> a, reduceF.inputB -> b),
+            execState)
         }
-        val result = accumMem.read(addr, true) match {
-          case Some(bVal) =>
-            OpResolver.runBlock(reduceF,
-                                Map(reduceF.inputA -> aVal,
-                                    reduceF.inputB -> bVal),
-                                execState)
-          case None => aVal
+        val trueOutput = output match {
+          case sr: ScalaReg[_] => sr.curVal
+          case x => x
         }
-        accumMem.write(result, addr, true)
+        val updated = OpResolver.runBlock(
+          reduceF,
+          Map(reduceF.inputA -> trueOutput, reduceF.inputB -> accumReg.curVal),
+          execState)
+        accumReg.write(updated, true)
+      }
+    } else {
+      val results = lastStates.map { eState =>
+        eState.getTensor[SomeEmul](mapF.result)
+      }
+      // Results will be a list of tensors in this case.
+      results.foreach { resultTensor =>
+        val ranges = cchainRed.counters.map {
+          case Op(CounterNew(start, end, step, _)) =>
+            FixedPointRange(
+              execState.getValue[FixedPoint](start),
+              execState.getValue[FixedPoint](end),
+              execState.getValue[FixedPoint](step),
+              isInclusive = false
+            ).toList
+        }
+        val iterations = spatial.util.crossJoin(ranges.toList)
+        iterations.foreach { iterVals =>
+          val addr = iterVals.map(_.toInt).toSeq
+          val aVal = resultTensor.read(addr, true) match {
+            case Some(value) => value
+            case None =>
+              throw SimulationException(
+                s"Attempting to read from partial result tensor ${mapF.result}[${addr.mkString(", ")}], which was undefined!")
+          }
+          val result = accumMem.read(addr, true) match {
+            case Some(bVal) =>
+              OpResolver.runBlock(reduceF,
+                Map(reduceF.inputA -> aVal,
+                  reduceF.inputB -> bVal),
+                execState)
+            case None => aVal
+          }
+          accumMem.write(result, addr, true)
+        }
       }
     }
   }
@@ -941,5 +980,63 @@ class SwitchExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
 
   override def isDeadlocked: Boolean = {
     !exec.exists(_.canProgress)
+  }
+}
+
+//  ens:       Set[Bit],
+//  start:     Bits[A],
+//  notDone:   Lambda1[A,Bit],
+//  action:    Lambda1[A,Void],
+//  nextState: Lambda1[A,A]
+class FSMExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
+  implicit override val state: argon.State)
+  extends  ControlExecutor {
+  private val Op(fsm@StateMachine(ens, start, notDone, action, nextState)) = ctrl
+  private var curState = execState(start)
+  private lazy val isEnabled = ens.forall {
+    en => execState.getValue[emul.Bool](en).value
+  }
+  private var isDone = false
+
+  private lazy val exec = if (ctrl.isInnerControl) {
+    ControlExecutorUtils.createInnerPipeline(action.stms)
+  } else {
+    ControlExecutorUtils.createOuterPipeline(action.stms)
+  }
+  override def tick(): Unit = {
+    // Check if we're done.
+    if (isDone) return
+    if (exec.isEmpty) {
+      // We don't have an active exec, so that means that we've either not started or that
+      // We're in-between iterations
+      isDone = !(OpResolver.runBlock(notDone, Map(notDone.input -> curState), execState) match {
+        case SimpleEmulVal(v: emul.Bool, _) => v.value
+      })
+      if (isDone) return
+      // If we're not done, push a new iteration into the executor
+      execState.register(action.input, curState)
+      exec.pushState(Vector(execState))
+    }
+    exec.tick()
+    if (exec.isEmpty) {
+      // We just finished an iteration
+      // Since the input is already registered in the execstate,
+      val newState = OpResolver.runBlock(nextState, Map(nextState.input -> curState), execState)
+      curState = newState
+    }
+  }
+
+  override def status: Status = {
+    if (!isEnabled) {
+      return Disabled
+    }
+    if (isDone) {
+      return Done
+    }
+    Running
+  }
+
+  override def isDeadlocked: Boolean = {
+    false
   }
 }

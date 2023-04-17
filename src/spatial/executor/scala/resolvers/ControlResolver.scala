@@ -10,15 +10,6 @@ trait ControlResolver extends OpResolverBase {
       EmulUnit(sym)
 
     case ctrl if ctrl.isControl =>
-      val inAccel = ctrl.ancestors.exists {
-        case Ctrl.Node(ctrl, _) => ctrl.isAccel
-        case _ => false
-      }
-
-      if (inAccel) {
-        throw SimulationException(s"Should not be calling this from an Accel scope, this is meant for host (untimed) simulation")
-      }
-
       implicit val IR: argon.State = execState.IR
       val executor = ControlExecutor(ctrl, execState)
       while (!executor.status.isFinished) {

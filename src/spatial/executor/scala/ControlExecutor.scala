@@ -930,8 +930,20 @@ class SwitchCaseExecutor(casee: SwitchCase[_], execState: ExecutionState)(
   } else None
 
   exec.foreach(_.pushState(Vector(execState)))
+  var results: Vector[EmulResult] = if (blk.stms.nonEmpty) {
+    Vector.empty
+  } else {
+    Vector(execState(blk.result))
+  }
 
-  def tick(): Unit = exec.foreach(_.tick())
+  def tick(): Unit = {
+    exec.foreach(_.tick())
+    val allStates: Iterable[ExecutionState] = exec.toSeq.flatMap(_.lastStates)
+    results = (allStates.map {
+      st =>
+        st(blk.result)
+    }).toVector
+  }
 
   def status: Status = {
     if (exec.isEmpty) return Done
@@ -950,7 +962,7 @@ class SwitchExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
     implicit override val state: argon.State)
     extends  ControlExecutor {
   private val Op(switches @ Switch(selects, _)) = ctrl
-
+  val enables = selects.map(execState.getValue[emul.Bool](_).value)
   val enabledCases = (selects zip switches.cases) find {
     case (sel, _) => execState.getValue[emul.Bool](sel).value
   }
@@ -959,9 +971,24 @@ class SwitchExecutor(val ctrl: Sym[_], override val execState: ExecutionState)(
     case (_, casee) => new SwitchCaseExecutor(casee, execState)
   }
 
+  def updateResult() = {
+    exec.foreach {
+      ex =>
+        if (ex.status.isFinished) {
+          assert(ex.results.size == 1)
+          execState.register(ctrl, ex.results(0))
+        }
+    }
+  }
+  updateResult()
+
+  dbgs(s"CTRL: $ctrl")
+  dbgs(s"Enables: $enables")
+
   override def tick(): Unit = {
     super.tick()
     exec.foreach(_.tick())
+    updateResult()
   }
 
   override def status: Status = {

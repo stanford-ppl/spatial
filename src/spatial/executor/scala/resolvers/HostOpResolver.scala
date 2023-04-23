@@ -108,6 +108,11 @@ trait HostOpResolver extends OpResolverBase {
       } else {
         runBlock(elseBlk, Map.empty, execState)
       }
+
+    case ArrayFromSeq(seq) =>
+      val elems = seq.map(execState(_))
+      new ScalaTensor[SomeEmul](Seq(elems.size), None, Some(elems.map(Some(_))))
+
     case _ => super.run(sym, op, execState)
   }
 }

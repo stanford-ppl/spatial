@@ -1,7 +1,7 @@
 package spatial.executor.scala.memories
 
 import argon.{Op, Sym}
-import spatial.executor.scala.{EmulMem, EmulResult, EmulVal}
+import spatial.executor.scala.{EmulMem, EmulResult, EmulVal, SimulationException}
 import spatial.node.MemAlloc
 
 import scala.reflect.ClassTag
@@ -23,7 +23,7 @@ class ScalaTensor[T <: EmulResult](val shape: Seq[Int], val elementSize: Option[
       initVals.toArray
   }
 
-  private def flattenIndex(index: Seq[Int]): Int = {
+  def flattenIndex(index: Seq[Int]): Int = {
     if (index.size != shape.size) {
       throw new IllegalArgumentException(s"Expected an index of size ${shape.size} but received ${index.size} instead")
     }
@@ -46,5 +46,19 @@ class ScalaTensor[T <: EmulResult](val shape: Seq[Int], val elementSize: Option[
       values(flattenIndex(address))
     }
   }
+  def reset(): Unit = {
+    initValues match {
+      case None => throw SimulationException("Cannot reset a memory with no initializer!")
+      case Some(rvals) =>
+        rvals.zipWithIndex.foreach {
+          case (value, ind) =>
+            values(ind) = value
+        }
+    }
+  }
   override def toString: String = s"ScalaTensor(shape = ${shape}, elementSize = $elementSize, size = $size, strides = $strides, values = <${values.map(_.toString).mkString(", ")}>)"
+}
+
+class ScalaLB[T <: EmulResult](shape: Seq[Int], elementSize: Option[Int], initValues: Option[Seq[Option[T]]] = None) extends ScalaTensor[T](shape, elementSize, initValues) {
+  var nextAddr: Int = 0
 }

@@ -67,7 +67,6 @@ case class ExecutorPass(IR: argon.State,
               info(s"Finished in $cycles")
             case stmt =>
               // These are top-level host operations
-              emit(s"Executing host operation ${stm(stmt)}")
               executionState.runAndRegister(stmt)
           }
           emit(s"Concluding Simulation".padTo(lineLength, "-").mkString)

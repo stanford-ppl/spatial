@@ -17,7 +17,7 @@ object ControlExecutor {
   @stateful def apply(ctrl: Sym[_],
                       execState: ExecutionState): ControlExecutor = {
     val orderedSchedules = Set[CtrlSchedule](Pipelined, Sequenced)
-    emit(s"Setting up pipelines for ${ctrl}: ${ctrl.ctx}")
+//    emit(s"Setting up pipelines for ${ctrl}: ${ctrl.ctx}")
     lazy val schedule = ctrl.schedule
     ctrl match {
       case Op(_: AccelScope) => new AccelScopeExecutor(ctrl, execState)

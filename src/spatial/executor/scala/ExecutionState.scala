@@ -74,6 +74,7 @@ class ExecutionState(var values: Map[Exp[_, _], EmulResult],
     recv match {
       case ev: EmulVal[T] if ev.valid => ev.value
       case ev: EmulVal[T] if !ev.valid =>
+        dbgs(s"Current state: $values")
         throw SimulationException(s"$s -> $ev was marked invalid!")
     }
   }

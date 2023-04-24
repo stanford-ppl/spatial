@@ -2,7 +2,7 @@ package spatial.executor.scala.resolvers
 import argon._
 import argon.node._
 import emul._
-import spatial.executor.scala.{EmulResult, ExecutionState, SimpleEmulVal}
+import spatial.executor.scala.{EmulResult, EmulVal, ExecutionState, SimpleEmulVal}
 
 trait FixResolver extends OpResolverBase {
   override def run[U, V](sym: Exp[U, V], op: Op[V], execState: ExecutionState): EmulResult = op match {
@@ -55,8 +55,11 @@ trait FixResolver extends OpResolverBase {
       SimpleEmulVal(a.toFloatPoint(op.f2.toEmul))
 
     case ftt: FixToText[_, _, _] =>
-      val a = execState.getValue[FixedPoint](ftt.a.asSym)
-      SimpleEmulVal(a.toString)
+      execState(ftt.a.asSym) match {
+        case ev: EmulVal[_] if !ev.valid => SimpleEmulVal("X")
+        case ev: EmulVal[FixedPoint] => SimpleEmulVal(ev.value.toString)
+      }
+
 
     case ttf: TextToFix[_, _, _] =>
       val a = execState.getValue[String](ttf.t)

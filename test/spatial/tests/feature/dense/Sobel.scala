@@ -6,7 +6,7 @@ import spatial.dsl._
   override def compileArgs: Args = super.compileArgs and "--forceBanking"
   override def dseModelArgs: Args = "200 160 160 160 160 99"
   override def finalModelArgs: Args = "200 160 160 160 160 99 160 160 99"
-  override def runtimeArgs: Args = "200 160"
+  override def runtimeArgs: Args = "20 16"
 
 
   def main(args: Array[String]): Unit = {
@@ -38,12 +38,12 @@ import spatial.dsl._
     setArg(C, image.cols)
 
     // Set up parallelization factors
-    val lb_par = 16 (1 -> 1 -> 16)
+    val lb_par = 1 (1 -> 1 -> 16)
     val par_store = 16
     val row_stride = 10 (100 -> 100 -> 500)
-    val row_par = 2 (1 -> 1 -> 16)
-    val par_Kh = 3 (1 -> 1 -> 3)
-    val par_Kw = 3 (1 -> 1 -> 3)
+    val row_par = 1 (1 -> 1 -> 16)
+    val par_Kh = 1 (1 -> 1 -> 3)
+    val par_Kw = 1 (1 -> 1 -> 3)
 
     // Set up input and output images
     val img = DRAM[Int](R, C)
@@ -76,19 +76,35 @@ import spatial.dsl._
           lb load img(ldaddr, 0::C par lb_par)
 
           // Iterate over each column
-          Foreach(0 until C) { c =>
+          Sequential.Foreach(0 until C) { c =>
 
             // Reset shift register
             Pipe{sr.reset(c == 0)}
 
             // Shift into 2D window
-            Foreach(0 until Kh par Kh){i => sr(i, *) <<= lb(i, c) }
+            Foreach(0 until Kh par Kh){i =>
+              val lbval = lb(i, c)
+              println(r"lb($i, $c) = $lbval")
+              sr(i, *) <<= lbval
+            }
+            Foreach(0 until Kh, 0 until Kw) { (i, j) =>
+              print(r"${sr(i, j)}")
+              printIf(Set(j !== (Kw-1)), ",")
+              printIf(Set(j === (Kw-1)), "\n")
+            }
 
             val horz = Reduce(Reg[Int])(Kh by 1 par par_Kh, Kw by 1 par par_Kw){(i,j) =>
-              sr(i,j) * kh(i,j)
+              val srij = sr(i, j)
+              val khij = kh(i, j)
+              println(r"sr($i, $j) = ${srij}; kh($i, $j) = ${khij}")
+              srij * khij
             }{_+_}
             val vert = Reduce(Reg[Int])(Kh by 1 par par_Kh, Kw by 1 par par_Kw){(i,j) =>
-              sr(i,j) * kv(i,j)
+              val srij = sr(i, j)
+              val kvij = kv(i, j)
+              println(r"sr($i, $j) = ${srij}; kh($i, $j) = ${kvij}")
+              srij * kvij
+//              sr(i,j) * kv(i,j)
             }{_+_}
 
             // Store abs sum into answer memory

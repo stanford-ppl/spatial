@@ -41,6 +41,9 @@ trait MemoryResolver extends OpResolverBase {
         new ScalaQueue[SomeEmul]()
 
       case malloc: MemAlloc[_, _] if isSimpleMem(sym) =>
+        if (sym.isWriteBuffer) {
+          throw SimulationException("Explicitly buffered memories are not currently handled in Scalasim2")
+        }
         val elType: ExpType[_, _] = malloc.A.tp
         val elSize = malloc.A.nbits / 8
         val shape = malloc.dims.map(execState.getValue[FixedPoint](_)).map(_.toInt)
@@ -136,46 +139,6 @@ trait MemoryResolver extends OpResolverBase {
       case DRAMIsAlloc(mem) =>
         SimpleEmulVal(emul.Bool(true))
 
-      case read: Reader[_, _] if read.isEnabled(execState) && isSimpleMem(read.mem) =>
-        val tensor = execState.getTensor[SomeEmul](read.mem)
-        val address = read.addr.map(execState.getValue[FixedPoint](_).toInt)
-        val res = tensor.read(address, true)
-        res.getOrElse(EmulPoison(sym))
-
-      case write: Writer[_] if write.isEnabled(execState) && isSimpleMem(write.mem) =>
-        val tensor = execState.getTensor[SomeEmul](write.mem)
-        val address = write.addr.map(execState.getValue[FixedPoint](_).toInt)
-        val res = tensor.write( execState(write.data), address, true)
-        EmulUnit(sym)
-
-      case lbn@LineBufferNew(rows, cols, stride) =>
-        val logicalDims = Seq(rows, cols, stride).map(execState.getValue[FixedPoint](_).toInt)
-        val depth = sym.instance.depth
-        val realStride = execState.getValue[FixedPoint](stride).toInt
-        new ScalaLB[SomeEmul](logicalDims, Some(lbn.A.nbits/8), None,
-          realStride, emit = {x: Any => emit(x)})
-
-      case lbr@LineBufferRead(mem, addrs, ens) if lbr.isEnabled(execState) =>
-        val tens = execState.getTensor[SomeEmul](mem)
-        val addr = addrs.map(execState.getValue[FixedPoint](_).toInt)
-        val fullAddr = if (addr.size == 3) { addr } else {addr ++ Seq(0)}
-        emitNB(s"$mem\t")
-        val result = tens.read(fullAddr, true).getOrElse(EmulPoison(sym))
-//        emit(s"Reading from tensor $mem[${fullAddr}] = $result")
-        result
-
-      case lbenq@LineBufferEnq(mem, data, addrs, ens) if lbenq.isEnabled(execState) =>
-        val tens = execState(mem) match {
-          case slb: ScalaLB[SomeEmul] => slb
-        }
-        val wData = execState(data)
-        val addr = addrs.map(execState.getValue[FixedPoint](_).toInt)
-        val Seq(row, col) = addr.take(2)
-//        emit(s"Writing to Linebuffer $mem[${addr.mkString(", ")}] <- $wData")
-        emitNB(s"$mem\t")
-        tens.push(row, col, Some(wData))
-        EmulUnit(sym)
-
       case rfr@RegFileReset(mem, ens) if rfr.isEnabled(execState) =>
         val tens = execState.getTensor[SomeEmul](mem)
         tens.reset()
@@ -190,12 +153,48 @@ trait MemoryResolver extends OpResolverBase {
 
         val stride = tens.strides(axis)
         // To shift the data in, go through that axis, and shift all the data down by 1.
-        Range(1, tens.shape(axis)).foreach( {
+        Range(0, tens.shape(axis)-1).reverse.foreach({
           i =>
-            tens.values(flatIndex + stride * (i-1)) = tens.values(flatIndex + stride * i)
+            tens.values(flatIndex + stride * (i + 1)) = tens.values(flatIndex + stride * i)
         })
-        tens.values(flatIndex + stride * (tens.shape(axis) - 1)) = Some(wData)
+        tens.values(flatIndex) = Some(wData)
+        EmulUnit(sym)
 
+      case read: Reader[_, _] if read.isEnabled(execState) && isSimpleMem(read.mem) =>
+        val tensor = execState.getTensor[SomeEmul](read.mem)
+        val address = read.addr.map(execState.getValue[FixedPoint](_).toInt)
+        val res = tensor.read(address, true)
+        res.getOrElse(EmulPoison(sym))
+
+      case write: Writer[_] if write.isEnabled(execState) && isSimpleMem(write.mem) =>
+        val tensor = execState.getTensor[SomeEmul](write.mem)
+        val address = write.addr.map(execState.getValue[FixedPoint](_).toInt)
+        val res = tensor.write( execState(write.data), address, true)
+        EmulUnit(sym)
+
+      case lbn@LineBufferNew(rows, cols, stride) =>
+        val logicalDims = Seq(rows, cols, stride).map(execState.getValue[FixedPoint](_).toInt)
+        val realStride = execState.getValue[FixedPoint](stride).toInt
+        new ScalaLB[SomeEmul](logicalDims, Some(lbn.A.nbits/8), None,
+          realStride, emit = {x: Any => emit(x)})
+
+      case lbr@LineBufferRead(mem, addrs, ens) if lbr.isEnabled(execState) =>
+        val tens = execState.getTensor[SomeEmul](mem)
+        val addr = addrs.map(execState.getValue[FixedPoint](_).toInt)
+        val fullAddr = if (addr.size == 3) { addr } else {addr ++ Seq(0)}
+        val result = tens.read(fullAddr, true).getOrElse(EmulPoison(sym))
+//        emit(s"Reading from tensor $mem[${fullAddr}] = $result")
+        result
+
+      case lbenq@LineBufferEnq(mem, data, addrs, ens) if lbenq.isEnabled(execState) =>
+        val tens = execState(mem) match {
+          case slb: ScalaLB[SomeEmul] => slb
+        }
+        val wData = execState(data)
+        val addr = addrs.map(execState.getValue[FixedPoint](_).toInt)
+        val Seq(row, col) = addr.take(2)
+//        emit(s"Writing to Linebuffer $mem[${addr.mkString(", ")}] <- $wData")
+        tens.push(row, col, Some(wData))
         EmulUnit(sym)
 
       case _ => super.run(sym, op, execState)

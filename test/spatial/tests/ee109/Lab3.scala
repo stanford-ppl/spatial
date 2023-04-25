@@ -38,10 +38,14 @@ import spatial.dsl._
       Foreach(0 until R) { r =>
         lb load img(r, 0::C par lb_par)
 
-        Foreach(0 until C) { c =>
+        Sequential.Foreach(0 until C) { c =>
           Pipe{sr.reset(c == 0)}
           // Shifting in data from the line buffer
           Foreach(0 until Kh par Kh){i => sr(i, *) <<= lb(i, c) }
+          Foreach(0 until Kh, 0 until Kw) {
+            (i, j) =>
+              println(r"sr($i, $j) = ${sr(i, j)}")
+          }
 
           // Implement the computation part for a 2-D convolution.
           // Use horz and vert to store your convolution results.
@@ -51,15 +55,19 @@ import spatial.dsl._
 
           Reduce(horz)(0 until Kh par Kh) { xh =>
             Reduce(0.to[T])(0 until Kw par Kw) { yh =>
+//              println(r"[XH, YH = $xh, $yh] ${sr(xh, yh)} * ${kh(xh, yh)}")
               sr(xh, yh) * kh(xh, yh)
             }{_+_}
           }{_+_}
 
           Reduce(vert)(0 until Kh par Kh) { xv =>
             Reduce(0.to[T])(0 until Kw par Kw) { yv =>
+//              println(r"[XV, YV = $xv, $yv] ${sr(xv, yv)} * ${kh(xv, yv)}")
               sr(xv, yv) * kv(xv, yv)
             }{_+_}
           }{_+_}
+
+          println(r"$r,$c Horiz = ${horz.value}, Vert = ${vert.value}")
 
           lineOut(c) = mux( (r < 2 || c < 2), 0.to[T], abs(horz.value) + abs(vert.value)) // Technically should be sqrt(horz**2 + vert**2)
         }

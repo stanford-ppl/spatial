@@ -59,6 +59,48 @@ class ScalaTensor[T <: EmulResult](val shape: Seq[Int], val elementSize: Option[
   override def toString: String = s"ScalaTensor(shape = ${shape}, elementSize = $elementSize, size = $size, strides = $strides, values = <${values.map(_.toString).mkString(", ")}>)"
 }
 
-class ScalaLB[T <: EmulResult](shape: Seq[Int], elementSize: Option[Int], initValues: Option[Seq[Option[T]]] = None) extends ScalaTensor[T](shape, elementSize, initValues) {
-  var nextAddr: Int = 0
+class ScalaLB[T <: EmulResult](shape: Seq[Int], elementSize: Option[Int], initValues: Option[Seq[Option[T]]] = None, stride: Int, emit: Any => Unit) extends ScalaTensor[T](shape, elementSize, initValues) {
+  private var wrCounter = 0
+
+  private val numRows = shape.head
+
+  private var rowMap = (Range(0, numRows).map {
+    r => r -> r
+  }).toMap
+  private def posMod(n: Int, d: Int): Int = ((n % d)+d) % d
+
+  private var prevRow = 0
+  // if either of these change, then we're on a new row and should shift the buffer
+
+  private def finishRow() = {
+    rowMap = rowMap.map {
+      case (ref, cur) =>
+        ref -> posMod(cur + 1, numRows)
+    }
+  }
+
+  def push(row: Int, col: Int, el: Option[T]): Unit = {
+    // ignore col for now
+    if (row != prevRow || wrCounter == shape(1)) {
+//      emit(s"Finished one row!")
+      wrCounter = 0
+      prevRow = row
+      finishRow()
+    }
+    val ind = Seq(rowMap(0), wrCounter, 0)
+//    emit(s"Writing [$row, $col]: [${ind.mkString(", ")}] <- $el")
+    values(flattenIndex(ind)) = el
+    wrCounter += 1
+  }
+
+  override def read(address: Seq[Int], en: Boolean): Option[T] = {
+    if (!en) {
+      None
+    } else {
+      val newAddress = Seq(rowMap(posMod(-address.head, numRows))) ++ address.tail
+      val result = values(flattenIndex(newAddress))
+//      emit(s"Reading [${address.mkString(", ")}]: [${newAddress.mkString(", ")}] <- $result")
+      result
+    }
+  }
 }

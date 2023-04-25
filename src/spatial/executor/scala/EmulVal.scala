@@ -9,7 +9,9 @@ abstract class EmulVal[+VT] extends EmulResult {
   val valid: Boolean = true
 }
 
-case class SimpleEmulVal[+VT](value: VT, override val valid: Boolean = true) extends EmulVal[VT]
+case class SimpleEmulVal[+VT](value: VT, override val valid: Boolean = true) extends EmulVal[VT] {
+  override def toString: String = if (valid) value.toString  else "X"
+}
 
 case class EmulUnit(sym: Sym[_]) extends EmulVal[Unit] {
   override def value: Unit = Unit

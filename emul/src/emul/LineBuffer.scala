@@ -29,13 +29,11 @@ class LineBuffer[T:ClassTag](
   }
 
   def apply(ctx: String, bank: Seq[Seq[FixedPoint]], ofs: Seq[FixedPoint], ens: Seq[Bool]): Array[T] = {
-    println(s"$name.apply($ctx, $bank, $ofs, $ens)")
     Array.tabulate(bank.length){i =>
       val row = (bank(i).apply(0) + readRow) % fullRows
       val addr = s"Bank: ${row}, ${bank(i).apply(1)}; Ofs: ${ofs(i)}"
       OOB.readOrElse(name, addr, invalid, ens(i).value){
         if (ens(i).value) {
-          println(s"READING $name($addr)")
           data.apply(row.toInt).apply(flattenAddress(bank(i).apply(1), ofs(i)).toInt)
         } else invalid
       }
@@ -43,7 +41,6 @@ class LineBuffer[T:ClassTag](
   }
 
   def update(ctx: String, row: FixedPoint, ens: Seq[Bool], elems: Seq[T]): Unit = {
-    println(s"$name.update($ctx, $row, $ens, $elems)")
     val bank0 = posMod((stride-1-row.toInt) + bufferRow, fullRows)
     if (bank0 != lastWrRow) wrCounter = 0
     lastWrRow = bank0
@@ -55,7 +52,6 @@ class LineBuffer[T:ClassTag](
       OOB.writeOrElse(name, addr, elems(i), ens(i).value){
         if (ens(i).value) {
           numWritten = numWritten + 1
-          println(s"WRITING $name [$addr] ($bank0, ${flattenAddress(FixedPoint(bank1, row.fmt),FixedPoint(ofs, row.fmt)).toInt}) <= ${elems(i)}")
           data.apply(bank0.toInt).update(flattenAddress(FixedPoint(bank1, row.fmt),FixedPoint(ofs, row.fmt)).toInt,elems(i))
         }
       }

@@ -38,6 +38,11 @@ install:
 	bin/update_resources.sh
 	sbt "; project emul; +publishLocal; project fringe; publishLocal"
 
+publishEmul:
+	bin/update_resources.sh
+	sbt "; project emul; +publishLocal"
+
+
 ###-----------------------------------###
 ## Update pir libs.                    ##
 ###-----------------------------------###

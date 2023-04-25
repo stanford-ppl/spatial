@@ -149,14 +149,19 @@ trait MemoryResolver extends OpResolverBase {
         EmulUnit(sym)
 
       case lbn@LineBufferNew(rows, cols, stride) =>
-        val realDims = Seq(rows, cols, stride).map(execState.getValue[FixedPoint](_).toInt)
-        new ScalaLB[SomeEmul](realDims, Some(lbn.A.nbits/8), None)
+        val logicalDims = Seq(rows, cols, stride).map(execState.getValue[FixedPoint](_).toInt)
+        val depth = sym.instance.depth
+        val realStride = execState.getValue[FixedPoint](stride).toInt
+        new ScalaLB[SomeEmul](logicalDims, Some(lbn.A.nbits/8), None,
+          realStride, emit = {x: Any => emit(x)})
 
       case lbr@LineBufferRead(mem, addrs, ens) if lbr.isEnabled(execState) =>
         val tens = execState.getTensor[SomeEmul](mem)
         val addr = addrs.map(execState.getValue[FixedPoint](_).toInt)
         val fullAddr = if (addr.size == 3) { addr } else {addr ++ Seq(0)}
+        emitNB(s"$mem\t")
         val result = tens.read(fullAddr, true).getOrElse(EmulPoison(sym))
+//        emit(s"Reading from tensor $mem[${fullAddr}] = $result")
         result
 
       case lbenq@LineBufferEnq(mem, data, addrs, ens) if lbenq.isEnabled(execState) =>
@@ -165,18 +170,10 @@ trait MemoryResolver extends OpResolverBase {
         }
         val wData = execState(data)
         val addr = addrs.map(execState.getValue[FixedPoint](_).toInt)
-        val fullAddr = if (addr.size == 3) { addr } else {addr ++ Seq(0)}
-        dbgs(s"Writing to Linebuffer $mem[$fullAddr = ${tens.nextAddr}] <- $wData")
-        if (tens.nextAddr == tens.size) {
-          // the linebuffer is full, time to start shifting!
-          Range(0, tens.size-1).foreach {
-            i => tens.values(i) = tens.values(i+1)
-          }
-          tens.values(tens.size - 1) = Some(wData)
-        } else {
-          tens.values(tens.nextAddr) = Some(wData)
-          tens.nextAddr += 1
-        }
+        val Seq(row, col) = addr.take(2)
+//        emit(s"Writing to Linebuffer $mem[${addr.mkString(", ")}] <- $wData")
+        emitNB(s"$mem\t")
+        tens.push(row, col, Some(wData))
         EmulUnit(sym)
 
       case rfr@RegFileReset(mem, ens) if rfr.isEnabled(execState) =>

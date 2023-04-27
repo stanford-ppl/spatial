@@ -491,14 +491,14 @@ set_property top design_1_wrapper [current_fileset]
 update_compile_order -fileset sources_1
 
 # Copy required files here
-if { [file exists ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v] == 1} {               
-    file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v ./design_1.v
+if { [file exists ./bd_project/bd_project.gen/sources_1/bd/design_1/hdl/design_1.v] == 1} {               
+    file copy -force ./bd_project/bd_project.gen/sources_1/bd/design_1/hdl/design_1.v ./design_1.v
 } else {
-    file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/sim/design_1.v ./design_1.v
+    file copy -force ./bd_project/bd_project.gen/sources_1/bd/design_1/sim/design_1.v ./design_1.v
 }
 
 
 #file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1.v ./design_1.v
-file copy -force ./bd_project/bd_project.srcs/sources_1/bd/design_1/hdl/design_1_wrapper.v ./design_1_wrapper.v
+file copy -force ./bd_project/bd_project.gen/sources_1/bd/design_1/hdl/design_1_wrapper.v ./design_1_wrapper.v
 
 close_project

@@ -54,6 +54,11 @@ trait FIFOResolver extends OpResolverBase {
         case sq: ScalaQueue[SomeEmul] => sq.head
       }
 
+    case numel@FIFONumel(fifo, _) if numel.isEnabled(execState) =>
+      execState(fifo) match {
+        case sq: ScalaQueue[SomeEmul] => SimpleEmulVal(FixedPoint.fromInt(sq.size))
+      }
+
     case _ => super.run(sym, op, execState)
   }
 

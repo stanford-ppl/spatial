@@ -37,10 +37,6 @@ trait HostOpResolver extends OpResolverBase {
       val arr = execState.getTensor[SomeEmul](coll)
       val index = execState.getValue[FixedPoint](i).toInt
       val result = arr.read(Seq(index), true)
-      if (result.isEmpty) {
-        throw SimulationException(
-          s"Attempting to access $coll[$i] = $arr[$index], which is unset.")
-      }
       result.getOrElse(EmulPoison(sym))
 
     case mi @ MapIndices(s, func) =>

@@ -34,9 +34,16 @@ case class InitiationAnalyzer(IR: State) extends AccelTraversal {
     dbgs(s" - Interval: $interval ($slowestBbox bbox)")
     dbgs(s" - Iter Diff: $minIterDiff (from $iterdiffs)")
     lhs.bodyLatency = latency
-    val compilerII = if (forceII1) 1.0 else if (minIterDiff.isEmpty) interval else if (minIterDiff.get == 1) interval else scala.math.ceil(interval/minIterDiff.get)
-    lhs.II = if (lhs.getUserSchedule.isDefined && lhs.userSchedule == Sequenced) latency
-             else                                                                lhs.userII.getOrElse(scala.math.min(compilerII,latency))
+    val compilerII = {
+      if (forceII1) 1.0
+      else if (minIterDiff.isEmpty) interval
+      else if (minIterDiff.get == 1) interval
+      else scala.math.ceil(interval/minIterDiff.get)
+    }
+    lhs.II = scala.math.max(1,
+      if (lhs.getUserSchedule.isDefined && lhs.userSchedule == Sequenced) latency
+      else lhs.userII.getOrElse(scala.math.min(compilerII,latency))
+    )
     lhs.compilerII = compilerII
   }
 

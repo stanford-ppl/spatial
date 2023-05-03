@@ -830,10 +830,21 @@ package object control {
     @stateful def latencySum: Double = if (spatialConfig.enableRetiming) s.bodyLatency.sum else 0.0
 
     def II: Double = metadata[InitiationInterval](s).map(_.interval).getOrElse(1.0)
-    def II_=(interval: Double): Unit = metadata.add(s, InitiationInterval(interval))
+    def II_=(interval: Double): Unit = {
+      if (interval < 1) {
+        throw new IllegalArgumentException(s"II cannot be set to <1!")
+      }
+      metadata.add(s, InitiationInterval(interval))
+    }
 
     def userII: Option[Double] = metadata[UserII](s).map(_.interval)
-    def userII_=(interval: Option[Double]): Unit = interval.foreach{ii => metadata.add(s, UserII(ii)) }
+    def userII_=(interval: Option[Double]): Unit = {
+      interval.foreach{ii =>
+        if (ii < 1) {
+          throw new IllegalArgumentException(s"II cannot be set to <1!")
+        }
+        metadata.add(s, UserII(ii)) }
+    }
 
     def compilerII: Double = metadata[CompilerII](s).map(_.interval).getOrElse(1.0)
     def compilerII_=(interval: Double): Unit = metadata.add(s, CompilerII(interval))

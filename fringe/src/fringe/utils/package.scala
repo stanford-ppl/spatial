@@ -86,6 +86,9 @@ package object utils {
   }
 
   def getRetimed[T<:Data](sig: T, delay: Int, en: Bool = true.B, init: Long = 0): T = {
+    if (delay < 0) {
+      throw new IllegalArgumentException(s"Attempting to make a negative delay of $delay [sig = $sig]")
+    }
     if (delay == 0) {
       sig
     }

@@ -176,7 +176,7 @@ object DenseTransfer {
       }
 
       // Data loading
-      Foreach(requestLength par p){i =>
+      'DenseTransferStore.Foreach(requestLength par p){i =>
         val data = local.__read(localAddr(i), Set.empty)
         dataStream := pack(data,true)
       }
@@ -277,12 +277,12 @@ object DenseTransfer {
       val ackStream  = StreamIn[Bit](BurstAckBus)
 
       // Command generator
-      Pipe{ // Outer pipe necessary or else acks may come back after extra write commands
+      'UnalignedStoreWrapper.Pipe{ // Outer pipe necessary or else acks may come back after extra write commands
         Pipe {
           val startBound: Reg[I32] = Reg[I32]
           val endBound: Reg[I32]   = Reg[I32]
           val length: Reg[I32]     = Reg[I32]
-          Pipe {
+          'UnalignedStoreSetup.Pipe {
             val aligned = alignmentCalc(dramAddr)
 
             cmdStream := (BurstCmd(aligned.addr_bytes.to[I64], aligned.size_bytes, false), dram.isAlloc)
@@ -291,7 +291,7 @@ object DenseTransfer {
             endBound := aligned.end
             length := aligned.size
           }
-          Foreach(length.value par p){i =>
+          'UnalignedStoreWrite.Foreach(length.value par p){i =>
             val en = staticStart(dramAddr) match {
                     case Left(x)  => i >= x && i < endBound
                     case Right(_) => i >= startBound && i < endBound
@@ -309,7 +309,7 @@ object DenseTransfer {
         transferSyncMeta(old, store)
         // Ack receive
         // TODO[4]: Assumes one ack per command
-        Pipe {
+        'UnalignedStoreAck.Pipe {
           //        val size = Reg[I32]
           //        Pipe{size := issueQueue.deq()}
           val ack  = ackStream.value()

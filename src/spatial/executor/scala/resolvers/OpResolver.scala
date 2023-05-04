@@ -54,3 +54,4 @@ object OpResolver
     with BitOpResolver
     with FIFOResolver
     with StructOpResolver
+    with VecOpResolver

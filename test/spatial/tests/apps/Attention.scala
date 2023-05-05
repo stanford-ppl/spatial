@@ -68,7 +68,7 @@ import spatial.dsl._
   // Useful for making IDEs happy about implicits
 //  implicit def bits: Bits[T] = implicitly[Bits[T]]
 //  implicit def num: Num[T] = implicitly[Num[T]]
-  val N = 512
+  val N = 16
   override def main(args: Array[String]): Unit = {
     val qVals = Array.fill(N) { random[T](1) }
     val kVals = Array.fill(N) { random[T](1) }
@@ -144,3 +144,316 @@ import spatial.dsl._
     printArray(getMem(outDRAM))
   }
 }
+
+
+@spatial class VectorFIFO extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _10, _22]
+  val D = 4
+  val N = 16
+
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill(D*N) { random[T](1) }
+    val kVals = Array.fill(N*D) { random[T](1) }
+    val qDRAM = DRAM[T](D*N)
+    val kDRAM = DRAM[T](N*D)
+    setMem(qDRAM, qVals)
+    setMem(kDRAM, kVals)
+
+    val outDRAM = DRAM[T](N)
+
+    Accel {
+      val Q = FIFO[T](D*N)
+      val K = SRAM[T](N*D)
+      // Load data
+      Q load qDRAM
+      K load kDRAM
+
+      val S = FIFO[T](N)
+
+      val QReg = {
+        implicit def ev: Bits[Vec[T]] = Vec.bits(D)
+        Reg[Vec[T]]
+      }
+      Stream {
+        Foreach(0 until N) { (i) =>
+          QReg := Q.deqVec(D)
+          val accum = Reg[T](1)
+          Reduce(accum)(0 until D) { j =>
+            val qregv = QReg.value
+            qregv(j) * K(i*N+j)
+          } {_ + _}
+          S.enq(accum.value)
+        }
+      }
+      outDRAM store S
+    }
+    assert(Bit(true))
+    printArray(getMem(outDRAM))
+  }
+}
+/*
+
+@spatial class MemfreeStreamedAttention extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _10, _22]
+
+  // Useful for making IDEs happy about implicits
+//  implicit def bits: Bits[T] = implicitly[Bits[T]]
+//  implicit def num: Num[T] = implicitly[Num[T]]
+  val N = 8//512
+  val D = 4
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill(D) { random[T](1) }
+    val kVals = Array.fill(N*D) { random[T](1) }
+    val vVals = Array.fill(N*D) { random[T](1) }
+    val oVals = Array.fill(D)(0.to[T])
+
+    val qDRAM = DRAM[T](D)
+    setMem(qDRAM, qVals)
+    val kDRAM = DRAM[T](N*D)
+    setMem(kDRAM, kVals)
+    val vDRAM = DRAM[T](N*D)
+    setMem(vDRAM, vVals)
+
+    val outDRAM = DRAM[T](D)
+    setMem(outDRAM, oVals)
+    printArray(getMem(outDRAM))
+    
+
+    Accel {
+      // inputs
+      val Q = SRAM[T](D) // let's assume for now we only have 1 row of Q
+      val K = SRAM[T](N*D)
+      val V = SRAM[T](N*D)
+      val O = SRAM[T](D) // Since we'll only generate one row for now
+
+      val RowMax = Reg[T](1)
+      val QKRecipSum = FIFO[T](2)
+      val P1 = FIFO[T](2)
+      val P2 = FIFO[T](2)
+
+      Q load qDRAM
+      K load kDRAM
+      V load vDRAM
+      O load outDRAM
+
+      Stream {
+        // Compute exp(QK^T-max)
+        Foreach(0 until N) { i =>
+          val accum = Reg[T]
+          Reduce(accum)(0 until D) { j =>
+            Q(j) * K(D*i + j)
+          } {_ + _}
+          val expValue = exp(accum.value-RowMax.value)
+          P1.enq(expValue)
+          P2.enq(expValue)
+        }
+
+        val RowSum = Reg[T]
+        // When we extend this to the whole matrix, we need to add outer Foreach block (0 until N)
+        // to iterate through the N rows of P
+        Reduce(RowSum)(0 until N) {
+          i => P1.deq()
+        } {_ + _}
+        QKRecipSum.enq(1 / RowSum.value)
+      
+        
+        val RecipSumReg = Reg[T] // Holds the value from QKRecipSum for N*D cycles at a time.
+        val PReg = Reg[T] // Holds the value from P2 for D cycles at a time
+        // Need to chage into Foreach(0 until N, 0 until N, 0 until D) { (i,j,k)}
+        // If we want to get the whole O
+        Foreach(0 until N, 0 until D) { (i, j) =>
+          val RecipDeqEnable = (i+j) === 0
+          RecipSumReg.write(QKRecipSum.deq(en = RecipDeqEnable), RecipDeqEnable)
+
+          val PDeqEnable = j === 0
+          PReg.write(P2.deq(en = PDeqEnable), PDeqEnable)
+          
+          val value = PReg.value * V(D*i+j) / RecipSumReg.value
+
+          O(j) = O(j) + value
+        }
+      }
+
+      outDRAM store O
+    }
+    assert(Bit(true))
+    printArray(getMem(outDRAM))
+  }
+}
+
+@spatial class StreamedAttention1 extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _10, _22]
+
+  // Useful for making IDEs happy about implicits
+//  implicit def bits: Bits[T] = implicitly[Bits[T]]
+//  implicit def num: Num[T] = implicitly[Num[T]]
+  val N = 8//512
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill(N) { random[T](1) }
+    val kVals = Array.fill(N) { random[T](1) }
+    val vVals = Array.fill(N) { random[T](1) }
+
+    val qDRAM = DRAM[T](N)
+    setMem(qDRAM, qVals)
+    val kDRAM = DRAM[T](N)
+    setMem(kDRAM, kVals)
+    val vDRAM = DRAM[T](N)
+    setMem(vDRAM, vVals)
+
+    val outDRAM = DRAM[T](N)
+
+    Accel {
+      val Q = FIFO[T](N)
+      val K = SRAM[T](N*D)
+      val QK1 = FIFO[T](2)
+      val QK2 = FIFO[T](N+1)
+      val QKRecipSum = FIFO[T](2)
+      val QKOut = FIFO[T](2)
+      val V = SRAM[T](N*D)
+      val output = FIFO[T](N)
+
+      Q load qDRAM
+      K load kDRAM
+      V load vDRAM
+
+      println(r"Q size: ${Q.numel}")
+
+      Stream {
+        // Compute exp(QK^T)
+        val QReg = Reg[T] // Holds the value from Q for M cycles at a time.
+        Foreach(0 until N, 0 until N) { (i, j) =>
+          val QDeqEnable = j === 0
+          QReg.write(Q.deq(en = QDeqEnable), QDeqEnable)
+          val value = QReg.value * K(j)
+          val expValue = exp(value)
+          QK1.enq(expValue)
+          QK2.enq(expValue)
+        }
+
+        // Compute sum over QK1
+        Foreach(0 until N) { i =>
+          val accum = Reg[T]
+          Reduce(accum)(0 until N) {
+            j => QK1.deq()
+          } {_ + _}
+          QKRecipSum.enq(1 / accum.value)
+        }
+
+        // Perform division step in softmax
+        val SReg = Reg[T] // Holds the sum value for division
+        Foreach(0 until N, 0 until N) { (i, j) =>
+          val recipDeqEnable = j === 0
+          SReg.write(QKRecipSum.deq(en = recipDeqEnable), recipDeqEnable)
+          QKOut.enq(QK2.deq() * SReg.value)
+        }
+
+        // Compute Matrix-vector product
+        Foreach(0 until N) { i =>
+          val accum = Reg[T]
+          Reduce(accum)(0 until N) { j =>
+            QKOut.deq() * V(j)
+          } {_ + _}
+          output.enq(accum.value)
+        }
+      }
+
+      outDRAM store output
+    }
+    assert(Bit(true))
+    printArray(getMem(outDRAM))
+  }
+}
+
+@spatial class StreamedAttention2 extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _10, _22]
+  type Vec4 = Vector4[T]
+
+  // Useful for making IDEs happy about implicits
+//  implicit def bits: Bits[T] = implicitly[Bits[T]]
+//  implicit def num: Num[T] = implicitly[Num[T]]
+  val N = 8//512
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill(N) { random[T](1) }
+    val kVals = Array.fill(N) { random[T](1) }
+    val vVals = Array.fill(N) { random[T](1) }
+
+    val qDRAM = DRAM[T](N)
+    setMem(qDRAM, qVals)
+    val kDRAM = DRAM[T](N)
+    setMem(kDRAM, kVals)
+    val vDRAM = DRAM[T](N)
+    setMem(vDRAM, vVals)
+
+    val outDRAM = DRAM[T](N)
+
+    Accel {
+      val Q = FIFO[Vec4](N)
+      val K = SRAM[Vec4](N)
+      
+      val QK1 = FIFO[T](2)
+      val QK2 = FIFO[T](N+1)
+      val QKRecipSum = FIFO[T](2)
+      val QKOut = FIFO[T](2)
+      val V = SRAM[T](N*D)
+      val output = FIFO[T](N)
+
+      Q load qDRAM
+      K load kDRAM
+      V load vDRAM
+
+      println(r"Q size: ${Q.numel}")
+
+      Stream {
+        // Compute exp(QK^T)
+        val QReg = Reg[T] // Holds the value from Q for M cycles at a time.
+        Foreach(0 until N, 0 until N) { (i, j) =>
+          val QDeqEnable = j === 0
+          QReg.write(Q.deq(en = QDeqEnable), QDeqEnable)
+          val value = QReg.value * K(j)
+          val expValue = exp(value)
+          QK1.enq(expValue)
+          QK2.enq(expValue)
+        }
+
+        // Compute sum over QK1
+        Foreach(0 until N) { i =>
+          val accum = Reg[T]
+          Reduce(accum)(0 until N) {
+            j => QK1.deq()
+          } {_ + _}
+          QKRecipSum.enq(1 / accum.value)
+        }
+
+        // Perform division step in softmax
+        val SReg = Reg[T] // Holds the sum value for division
+        Foreach(0 until N, 0 until N) { (i, j) =>
+          val recipDeqEnable = j === 0
+          SReg.write(QKRecipSum.deq(en = recipDeqEnable), recipDeqEnable)
+          QKOut.enq(QK2.deq() * SReg.value)
+        }
+
+        // Compute Matrix-vector product
+        Foreach(0 until N) { i =>
+          val accum = Reg[T]
+          Reduce(accum)(0 until N) { j =>
+            QKOut.deq() * V(j)
+          } {_ + _}
+          output.enq(accum.value)
+        }
+      }
+
+      outDRAM store output
+    }
+    assert(Bit(true))
+    printArray(getMem(outDRAM))
+  }
+}
+*/

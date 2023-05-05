@@ -145,8 +145,7 @@ import spatial.dsl._
   }
 }
 
-
-@spatial class VectorFIFO extends SpatialTest {
+@spatial class StreamAttentionBasic extends SpatialTest {
   override def compileArgs = "--nostreamify"
 
   type T = Fix[TRUE, _10, _22]
@@ -154,40 +153,43 @@ import spatial.dsl._
   val N = 16
 
   override def main(args: Array[String]): Unit = {
-    val qVals = Array.fill(D*N) { random[T](1) }
-    val kVals = Array.fill(N*D) { random[T](1) }
-    val qDRAM = DRAM[T](D*N)
+    val qVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    val kVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    //val vVals = Array.fill(N*D) { random[T](1) }
+
+    val qDRAM = DRAM[T](N*D)
     val kDRAM = DRAM[T](N*D)
+    //val vDRAM = DRAM[T](N*D)
+    val outDRAM = DRAM[T](N) // TODO: N->D
+
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
-
-    val outDRAM = DRAM[T](N)
+    //setMem(vDRAM, vVals)
 
     Accel {
-      val Q = FIFO[T](D*N)
+      // SRAMS
+      val Q = SRAM[T](D)
       val K = SRAM[T](N*D)
-      // Load data
-      Q load qDRAM
+      //val V = SRAM[T](N*D)
+
+      // FIFO
+      val sFIFO = FIFO[T](N) // TODO: N->2
+      
+      // Load data to SRAMs
+      Q load qDRAM(0::D)
       K load kDRAM
+      //V load vDRAM
 
-      val S = FIFO[T](N)
-
-      val QReg = {
-        implicit def ev: Bits[Vec[T]] = Vec.bits(D)
-        Reg[Vec[T]]
-      }
       Stream {
-        Foreach(0 until N) { (i) =>
-          QReg := Q.deqVec(D)
-          val accum = Reg[T](1)
+        Foreach(0 until N) { i =>
+          val accum = Reg[T](0)
           Reduce(accum)(0 until D) { j =>
-            val qregv = QReg.value
-            qregv(j) * K(i*N+j)
+            Q(j) * K(i*D+j)
           } {_ + _}
-          S.enq(accum.value)
+          sFIFO.enq(accum.value)
         }
       }
-      outDRAM store S
+      outDRAM store sFIFO
     }
     assert(Bit(true))
     printArray(getMem(outDRAM))
@@ -451,6 +453,55 @@ import spatial.dsl._
       }
 
       outDRAM store output
+    }
+    assert(Bit(true))
+    printArray(getMem(outDRAM))
+  }
+}
+
+
+@spatial class VectorFIFO extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _10, _22]
+  val D = 4
+  val N = 16
+
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill(D*N) { random[T](1) }
+    val kVals = Array.fill(N*D) { random[T](1) }
+    val qDRAM = DRAM[T](D*N)
+    val kDRAM = DRAM[T](N*D)
+    setMem(qDRAM, qVals)
+    setMem(kDRAM, kVals)
+
+    val outDRAM = DRAM[T](N)
+
+    Accel {
+      val Q = FIFO[T](D*N)
+      val K = SRAM[T](N*D)
+      // Load data
+      Q load qDRAM
+      K load kDRAM
+
+      val S = FIFO[T](N)
+
+      val QReg = {
+        implicit def ev: Bits[Vec[T]] = Vec.bits(D)
+        Reg[Vec[T]]
+      }
+      Stream {
+        Foreach(0 until N) { (i) =>
+          QReg := Q.deqVec(D)
+          val accum = Reg[T](1)
+          Reduce(accum)(0 until D) { j =>
+            val qregv = QReg.value
+            qregv(j) * K(i*N+j)
+          } {_ + _}
+          S.enq(accum.value)
+        }
+      }
+      outDRAM store S
     }
     assert(Bit(true))
     printArray(getMem(outDRAM))

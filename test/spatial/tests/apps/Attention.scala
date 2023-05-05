@@ -148,7 +148,7 @@ import spatial.dsl._
 @spatial class StreamAttentionBasic extends SpatialTest {
   override def compileArgs = "--nostreamify"
 
-  type T = Fix[TRUE, _10, _22]
+  type T = Int//Fix[TRUE, _10, _22]
   val D = 4
   val N = 16
 
@@ -160,7 +160,7 @@ import spatial.dsl._
     val qDRAM = DRAM[T](N*D)
     val kDRAM = DRAM[T](N*D)
     //val vDRAM = DRAM[T](N*D)
-    val outDRAM = DRAM[T](N) // TODO: N->D
+    val outDRAM = DRAM[T](N*2) // TODO: N->D
 
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
@@ -174,14 +174,13 @@ import spatial.dsl._
 
       // FIFO
       val sFIFO = FIFO[T](2)
-      val mOldSumFIFO = FIFO[T](2)
-      val mNewSumFIFO = FIFO[T](2)
-      val sSumFIFO = FIFO[T](2)
-      val mOldVFIFO = FIFO[T](2)
-      val mNewVFIFO = FIFO[T](2)
-      val sVFIFO = FIFO[T](2)
+      val mScaleSumFIFO = FIFO[T](2)
+      val expSumFIFO = FIFO[T](2)
+      val mScaleVFIFO = FIFO[T](2)
+      val expVFIFO = FIFO[T](2)
 
-      val output = FIFO[T](N) // Temporary
+      val output = FIFO[T](N*2)
+      // Use 2N to check the values of s but also the value of Sum
 
       // Load data to SRAMs
       Q load qDRAM(0::D)
@@ -204,34 +203,34 @@ import spatial.dsl._
           val si = sFIFO.deq() // i th element
           val m = RowMaxReg.value // Max value until (i-1)th element
           val mNew = if (si > m) si else m // Max value until (i)th element
+          
+          // Calculate the scaling factor for row max and exp of (i)th element
+          val mScale = exp(m-mNew)
+          val expS = exp(si)
 
           // FIFOs to pass down values to Sum Controller
-          mOldSumFIFO.enq(m)
-          mNewSumFIFO.enq(mNew)
-          sSumFIFO.enq(si)
+          mScaleSumFIFO.enq(mScale)
+          expSumFIFO.enq(expS)
 
           // FIFOs to pass down values to Sum Controller
-          mOldVFIFO.enq(m)
-          mNewVFIFO.enq(mNew)
-          sVFIFO.enq(si)
+          mScaleVFIFO.enq(mScale)
+          expVFIFO.enq(expS)
 
           RowMaxReg := mNew // Update the Reg
         }
 
         // Sumup the row
-        Foreach(0 until N){i =>
-          // FIFOs to pass down values to Sum Controller
-          mOldSumFIFO.deq()
-          mNewSumFIFO.deq()
-          sSumFIFO.deq()
+        val SumReg = Reg[T](0)
+        Foreach(0 until N){ i =>
+          SumReg := SumReg.value*mScaleSumFIFO.deq() + expSumFIFO.deq()
         }
 
         // Outer product with V
-        Foreach(0 until N){i =>
+        Foreach(0 until N){ i =>
           // FIFOs to pass down values to Sum Controller
-          mOldVFIFO.deq()
-          mNewVFIFO.deq()
-          output.enq(sVFIFO.deq())
+          mScaleVFIFO.deq()
+          output.enq(expVFIFO.deq())
+          output.enq(SumReg.value) // We will also check it the summation happens properly
         }
       }
       outDRAM store output

@@ -173,14 +173,23 @@ import spatial.dsl._
       //val V = SRAM[T](N*D)
 
       // FIFO
-      val sFIFO = FIFO[T](N) // TODO: N->2
-      
+      val sFIFO = FIFO[T](2)
+      val mOldSumFIFO = FIFO[T](2)
+      val mNewSumFIFO = FIFO[T](2)
+      val sSumFIFO = FIFO[T](2)
+      val mOldVFIFO = FIFO[T](2)
+      val mNewVFIFO = FIFO[T](2)
+      val sVFIFO = FIFO[T](2)
+
+      val output = FIFO[T](N) // Temporary
+
       // Load data to SRAMs
       Q load qDRAM(0::D)
       K load kDRAM
       //V load vDRAM
 
       Stream {
+        // Multiply Q*KT
         Foreach(0 until N) { i =>
           val accum = Reg[T](0)
           Reduce(accum)(0 until D) { j =>
@@ -188,8 +197,44 @@ import spatial.dsl._
           } {_ + _}
           sFIFO.enq(accum.value)
         }
+
+        val RowMaxReg = Reg[T](0)
+        Foreach(0 until N){ i =>
+          // Get the max until the i-th element
+          val si = sFIFO.deq() // i th element
+          val m = RowMaxReg.value // Max value until (i-1)th element
+          val mNew = if (si > m) si else m // Max value until (i)th element
+
+          // FIFOs to pass down values to Sum Controller
+          mOldSumFIFO.enq(m)
+          mNewSumFIFO.enq(mNew)
+          sSumFIFO.enq(si)
+
+          // FIFOs to pass down values to Sum Controller
+          mOldVFIFO.enq(m)
+          mNewVFIFO.enq(mNew)
+          sVFIFO.enq(si)
+
+          RowMaxReg := mNew // Update the Reg
+        }
+
+        // Sumup the row
+        Foreach(0 until N){i =>
+          // FIFOs to pass down values to Sum Controller
+          mOldSumFIFO.deq()
+          mNewSumFIFO.deq()
+          sSumFIFO.deq()
+        }
+
+        // Outer product with V
+        Foreach(0 until N){i =>
+          // FIFOs to pass down values to Sum Controller
+          mOldVFIFO.deq()
+          mNewVFIFO.deq()
+          output.enq(sVFIFO.deq())
+        }
       }
-      outDRAM store sFIFO
+      outDRAM store output
     }
     assert(Bit(true))
     printArray(getMem(outDRAM))

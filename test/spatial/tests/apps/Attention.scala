@@ -155,22 +155,25 @@ import spatial.dsl._
   override def main(args: Array[String]): Unit = {
     val qVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
     val kVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
-    //val vVals = Array.fill(N*D) { random[T](1) }
+    val vVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    val oVals = Array.fill[T](N*D)(0)
 
     val qDRAM = DRAM[T](N*D)
     val kDRAM = DRAM[T](N*D)
-    //val vDRAM = DRAM[T](N*D)
-    val outDRAM = DRAM[T](N*2) // TODO: N->D
+    val vDRAM = DRAM[T](N*D)
+    val outDRAM = DRAM[T](D) // TODO: N->D
 
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
-    //setMem(vDRAM, vVals)
+    setMem(vDRAM, vVals)
+    setMem(outDRAM, oVals)
 
     Accel {
       // SRAMS
       val Q = SRAM[T](D)
       val K = SRAM[T](N*D)
-      //val V = SRAM[T](N*D)
+      val V = SRAM[T](N*D)
+      val O = SRAM[T](D).buffer
 
       // FIFO
       val sFIFO = FIFO[T](2)
@@ -179,13 +182,11 @@ import spatial.dsl._
       val mScaleVFIFO = FIFO[T](2)
       val expVFIFO = FIFO[T](2)
 
-      val output = FIFO[T](N*2)
-      // Use 2N to check the values of s but also the value of Sum
-
       // Load data to SRAMs
       Q load qDRAM(0::D)
       K load kDRAM
-      //V load vDRAM
+      V load vDRAM
+      O load outDRAM // initializing to 0
 
       Stream {
         // Multiply Q*KT
@@ -205,7 +206,7 @@ import spatial.dsl._
           val mNew = if (si > m) si else m // Max value until (i)th element
           
           // Calculate the scaling factor for row max and exp of (i)th element
-          val mScale = exp(m-mNew)
+          val mScale = if (i === 0) 1 else exp(m-mNew)
           val expS = exp(si)
 
           // FIFOs to pass down values to Sum Controller
@@ -221,19 +222,28 @@ import spatial.dsl._
 
         // Sumup the row
         val SumReg = Reg[T](0)
-        Foreach(0 until N){ i =>
-          SumReg := SumReg.value*mScaleSumFIFO.deq() + expSumFIFO.deq()
-        }
+        //Foreach(0 until N){ i =>
+        //  SumReg := SumReg.value*mScaleSumFIFO.deq() + expSumFIFO.deq()
+        //}
+        Reduce(SumReg)(N by 1){ i =>
+          SumReg := SumReg.value * mScaleSumFIFO.deq()
+          expSumFIFO.deq()
+        }{_ + _}
 
         // Outer product with V
-        Foreach(0 until N){ i =>
-          // FIFOs to pass down values to Sum Controller
-          mScaleVFIFO.deq()
-          output.enq(expVFIFO.deq())
-          output.enq(SumReg.value) // We will also check it the summation happens properly
-        }
+        MemReduce(O)(N by 1){
+          i =>
+            val tmp = SRAM[T](D)
+            val mScaleV = mScaleVFIFO.deq()
+            val expV = expVFIFO.deq()
+            (0 to D-1).foreach{ j =>
+              O(j) = mScaleV * O(j) // scale the previously accumulated partial sums
+              tmp(j) = expV * V(i*D + j) // accumulate the new partial sum
+            }
+            tmp
+        }{_+_}
       }
-      outDRAM store output
+      outDRAM store O
     }
     assert(Bit(true))
     printArray(getMem(outDRAM))

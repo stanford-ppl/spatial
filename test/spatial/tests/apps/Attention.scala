@@ -161,7 +161,7 @@ import spatial.dsl._
     val qDRAM = DRAM[T](N*D)
     val kDRAM = DRAM[T](N*D)
     val vDRAM = DRAM[T](N*D)
-    val outDRAM = DRAM[T](D) // TODO: N->D
+    val outDRAM = DRAM[T](D)
 
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
@@ -173,7 +173,8 @@ import spatial.dsl._
       val Q = SRAM[T](D)
       val K = SRAM[T](N*D)
       val V = SRAM[T](N*D)
-      val O = SRAM[T](D).buffer
+      val tempO = SRAM[T](D).buffer
+      val O = SRAM[T](D)
 
       // FIFO
       val sFIFO = FIFO[T](2)
@@ -181,12 +182,16 @@ import spatial.dsl._
       val expSumFIFO = FIFO[T](2)
       val mScaleVFIFO = FIFO[T](2)
       val expVFIFO = FIFO[T](2)
+      val sumCounterFIFO = FIFO[Boolean](2)
+      val mulVCounterFIFO = FIFO[Boolean](2)
+      val doneSumFIFO = FIFO[Boolean](2)
+      val doneVFIFO = FIFO[Boolean](2)
 
       // Load data to SRAMs
       Q load qDRAM(0::D)
       K load kDRAM
       V load vDRAM
-      O load outDRAM // initializing to 0
+      tempO load outDRAM // initializing to 0
 
       Stream {
         // Multiply Q*KT
@@ -222,26 +227,47 @@ import spatial.dsl._
 
         // Sumup the row
         val SumReg = Reg[T](0)
-        //Foreach(0 until N){ i =>
-        //  SumReg := SumReg.value*mScaleSumFIFO.deq() + expSumFIFO.deq()
-        //}
+        // Foreach(0 until N){
+        //   SumReg := SumReg.value * mScaleSumFIFO.deq() + expSumFIFO.deq()
+        //   doneSumFIFO.enq(true, i === N)
+        // }
         Reduce(SumReg)(N by 1){ i =>
           SumReg := SumReg.value * mScaleSumFIFO.deq()
+          sumCounterFIFO.enq(true)
           expSumFIFO.deq()
         }{_ + _}
 
+        Foreach(0 until N+1){ i =>
+          sumCounterFIFO.deq(en = (i < N))
+          doneSumFIFO.enq(true, i === N)
+        }
+
         // Outer product with V
-        MemReduce(O)(N by 1){
+        MemReduce(tempO)(N by 1){
           i =>
             val tmp = SRAM[T](D)
             val mScaleV = mScaleVFIFO.deq()
             val expV = expVFIFO.deq()
             (0 to D-1).foreach{ j =>
-              O(j) = mScaleV * O(j) // scale the previously accumulated partial sums
+              tempO(j) = mScaleV * tempO(j) // scale the previously accumulated partial sums
               tmp(j) = expV * V(i*D + j) // accumulate the new partial sum
             }
+            mulVCounterFIFO.enq(true) // control logic to inform the start of softmax scaling
             tmp
         }{_+_}
+
+        Foreach(0 until N+1){ i =>
+          mulVCounterFIFO.deq(en = (i < N))
+          doneVFIFO.enq(true, i === N) // conditional enqueue
+        }
+
+        Foreach(0 until 1){ i =>
+          doneSumFIFO.deq()
+          doneVFIFO.deq()
+          (0 to D-1).foreach{ j =>
+            O(j) = tempO(j)//tempO(j)/(SumReg.value)
+          }
+        }
       }
       outDRAM store O
     }

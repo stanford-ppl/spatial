@@ -145,10 +145,10 @@ import spatial.dsl._
   }
 }
 
-@spatial class SingleSeqStreamedAttention extends SpatialTest {
+@spatial class SingleTokenStreamedAttention extends SpatialTest {
   override def compileArgs = "--nostreamify"
 
-  type T = Int//Fix[TRUE, _10, _22]
+  type T = Fix[TRUE, _24, _8] // Int
   val D = 4
   val N = 16
 
@@ -289,6 +289,128 @@ import spatial.dsl._
           /* (0 to D-1).foreach{ j =>
             O(j) = tempO(j)/(SumReg.value)
           }*/
+        }
+        
+      }
+      outDRAM store O
+    }
+    assert(Bit(true))
+    printArray(getMem(outDRAM))
+  }
+}
+
+@spatial class MultiTokenStreamedAttention extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _24, _8] // Int
+  val D = 4
+  val N = 16
+
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    val kVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    val vVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    val oVals = Array.fill[T](N*D)(0)
+
+    val qDRAM = DRAM[T](N*D)
+    val kDRAM = DRAM[T](N*D)
+    val vDRAM = DRAM[T](N*D)
+    val outDRAM = DRAM[T](D)
+
+    setMem(qDRAM, qVals)
+    setMem(kDRAM, kVals)
+    setMem(vDRAM, vVals)
+    setMem(outDRAM, oVals)
+
+    Accel {
+      // SRAMS
+      val Q = SRAM[T](D)
+      val K = SRAM[T](N*D)
+      val V = SRAM[T](N*D)
+      val tempO = SRAM[T](D)
+      val O = SRAM[T](D)
+
+      // FIFO
+      val sFIFO = FIFO[T](2)
+      val mScaleSumFIFO = FIFO[T](2)
+      val expSumFIFO = FIFO[T](2)
+      val mScaleVFIFO = FIFO[T](2)
+      val expVFIFO = FIFO[T](2)
+      val doneSumFIFO = FIFO[Boolean](2)
+      val doneVFIFO = FIFO[Boolean](2)
+
+      // Load data to SRAMs
+      Q load qDRAM(0::D)
+      K load kDRAM
+      V load vDRAM
+      tempO load outDRAM // initializing to 0
+
+      Stream {
+        // =============== Multiply Q*KT =============================
+        Foreach(0 until N) { i =>
+          val accum = Reg[T](0)
+          Reduce(accum)(0 until D) { j =>
+            Q(j) * K(i*D+j)
+          } {_ + _}
+          sFIFO.enq(accum.value)
+        }
+
+
+        // =============== Incremental Rowmax ========================
+        val RowMaxReg = Reg[T](0)
+        Foreach(0 until N){ i =>
+          // ------------- Calculate Values -------------
+          val si = sFIFO.deq() // i th element
+          val m = RowMaxReg.value // Max until (i-1)th element
+          val mNew = if (si > m) si else m // Max until (i)th element
+          
+          val expS = exp(si) // exponent of the i-th element
+          val mScale = if (i === 0) 1 else exp(m-mNew) 
+            // |_ Scaling factor for the partial sum in (⊗ V)
+
+          // ------------- Enq values in the FIFO ------------- 
+          mScaleSumFIFO.enq(mScale) // -> Sum Controller
+          expSumFIFO.enq(expS)      // -> Sum Controller
+          
+          mScaleVFIFO.enq(mScale)   // -> (⊗ V) Controller
+          expVFIFO.enq(expS)        // -> (⊗ V) Controller
+
+          // ------------- Update the Row Max Reg -------------
+          RowMaxReg := mNew
+        }
+
+
+        // =============== Row Sum ===================================
+        val SumReg = Reg[T](0)
+        // Foreach Ver
+        Foreach(0 until N){ i =>
+          SumReg := SumReg.value * mScaleSumFIFO.deq() + expSumFIFO.deq()
+          doneSumFIFO.enq(true, i === (N-1))
+        }
+        
+
+        // =============== Outer product with V ===============
+        // Foreach ver
+        Foreach(0 until N){ i =>
+          val mScaleV = mScaleVFIFO.deq()
+          val expV = expVFIFO.deq()
+          Foreach(D by 1 par D){j =>
+            tempO(j) = mScaleV * tempO(j) + expV * V(i*D + j)
+              // scale the previously accumulated partial sums
+              // + accumulate the new partial sum
+          }
+
+          doneVFIFO.enq(true, i === (N-1))
+        }
+        
+        
+        // =============== Softmax Scaling with Rowsum ===============
+        Foreach(0 until 1){ i =>
+          doneSumFIFO.deq()
+          doneVFIFO.deq()
+          Foreach(D by 1 par D){ j =>
+            O(j) = tempO(j)/(SumReg.value)
+          }
         }
         
       }

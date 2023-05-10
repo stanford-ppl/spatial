@@ -318,7 +318,7 @@ import spatial.dsl._
     val vDRAM = DRAM[T](N*D)
     val outDRAM = DRAM[T](D)
 
-    val tempDRAM = DRAM[T](N)
+    val tempDRAM = DRAM[T](D)
 
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
@@ -339,8 +339,8 @@ import spatial.dsl._
       val expSumFIFO = FIFO[T](2)
       val mScaleVFIFO = FIFO[T](2)
       val expVFIFO = FIFO[T](2)
-      val rowSumFIFO = FIFO[T](N)
-      val doneVFIFO = FIFO[T](N)//[Boolean](2)
+      val rowSumFIFO = FIFO[T](2)
+      val doneVFIFO = FIFO[Boolean](2)
 
       val loadNewQuery = FIFO[Boolean](2)
 
@@ -386,8 +386,8 @@ import spatial.dsl._
             mScaleSumFIFO.enq(mScale) // -> Sum Controller
             expSumFIFO.enq(expS)      // -> Sum Controller
             
-            //mScaleVFIFO.enq(mScale)   // -> (⊗ V) Controller
-            //expVFIFO.enq(expS)        // -> (⊗ V) Controller
+            mScaleVFIFO.enq(mScale)   // -> (⊗ V) Controller
+            expVFIFO.enq(expS)        // -> (⊗ V) Controller
 
             // ------------- Update the Row Max Reg -------------
             RowMaxReg := mNew
@@ -404,51 +404,34 @@ import spatial.dsl._
             rowSumFIFO.enq(SumReg.value, j === (N-1))
           }
         }
-
-        /*
+        
+        
         // =============== Outer product with V ===============
         // Foreach ver
         Foreach(0 until N){ i =>
           Foreach(0 until N){ j =>
             val mScaleV = mScaleVFIFO.deq()
             val expV = expVFIFO.deq()
-            Foreach(D by 1 par D){ k =>
+            Foreach(D by 1 par D){k =>
               tempO(k) = mScaleV * tempO(k) + expV * V(j*D + k)
                 // scale the previously accumulated partial sums
                 // + accumulate the new partial sum
             }
-
-            doneVFIFO.enq(1, j === (N-1))
+            doneVFIFO.enq(true, j === (N-1))
           }
         }
-
         
-        Foreach(0 until N, 0 until N){ (i,j) =>
-          val mScaleV = mScaleVFIFO.deq() // on j==0, it will be 0 to initialize tempO
-          val expV = expVFIFO.deq()
-          Foreach(D by 1 par D){ k =>
-            tempO(k) = mScaleV * tempO(k) + expV * V(j*D + k)
-              // scale the previously accumulated partial sums
-              // + accumulate the new partial sum
-          }
-
-          doneVFIFO.enq(1, j === (N-1))
-        }
-        */
-        
-        /*
         // =============== Softmax Scaling with Rowsum ===============
-        Foreach(0 until 1){ i =>
-          doneSumFIFO.deq()
-          doneVFIFO.deq()//rowSumFIFO
+        Foreach(0 until N){ i =>
+          val rowSumVal = rowSumFIFO.deq()
+          doneVFIFO.deq()
           Foreach(D by 1 par D){ j =>
-            O(j) = tempO(j)/(SumReg.value)
+            O(j) = tempO(j)/rowSumVal
           }
         }
-        */
         
       }
-      tempDRAM store rowSumFIFO
+      tempDRAM store O
     }
     assert(Bit(true))
     printArray(getMem(tempDRAM))

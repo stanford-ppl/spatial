@@ -311,19 +311,19 @@ import spatial.dsl._
     val qVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
     val kVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
     val vVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
-    val oVals = Array.fill[T](N*D)(0)
 
     val qDRAM = DRAM[T](N*D)
     val kDRAM = DRAM[T](N*D)
     val vDRAM = DRAM[T](N*D)
-    val outDRAM = DRAM[T](D)
-
-    val tempDRAM = DRAM[T](D)
+    val oDRAM = DRAM[T](N*D)
 
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
     setMem(vDRAM, vVals)
-    setMem(outDRAM, oVals)
+
+    val zeroVals = Array.fill[T](N*D)(0)
+    val zeroDRAM = DRAM[T](D)
+    setMem(zeroDRAM, zeroVals)
 
     Accel {
       // SRAMS
@@ -343,11 +343,12 @@ import spatial.dsl._
       val doneVFIFO = FIFO[Boolean](2)
 
       val loadNewQuery = FIFO[Boolean](2)
+      val doneSoftmaxScaleFIFO = FIFO[Boolean](2)
 
       // Load data to SRAMs
       K load kDRAM
       V load vDRAM
-      tempO load outDRAM // initializing to 0
+      tempO load zeroDRAM // initializing to 0
 
       Stream {
         // =============== Multiply Q*KT =============================
@@ -428,15 +429,20 @@ import spatial.dsl._
           Foreach(D by 1 par D){ j =>
             O(j) = tempO(j)/rowSumVal
           }
+          doneSoftmaxScaleFIFO.enq(true)
         }
-        
+
+        Foreach(0 until N){ i =>
+          doneSoftmaxScaleFIFO.deq()
+          oDRAM(i*D::i*D+D) store O
+        }
       }
-      tempDRAM store O
     }
     assert(Bit(true))
-    printArray(getMem(tempDRAM))
+    printArray(getMem(oDRAM))
   }
 }
+
 /*
 @spatial class MultiQueryStreamedAttention extends SpatialTest {
   override def compileArgs = "--nostreamify"

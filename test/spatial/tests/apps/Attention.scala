@@ -212,7 +212,7 @@ import spatial.dsl._
           val m = RowMaxReg.value // Max until (i-1)th element
           val mNew = if (si > m) si else m // Max until (i)th element
           
-          val expS = exp(si) // exponent of the i-th element
+          val expS = exp(si-mNew) // exponent of the i-th element
           val mScale = if (i === 0) 1 else exp(m-mNew) 
             // |_ Scaling factor for the partial sum in (⊗ V)
           
@@ -308,9 +308,9 @@ import spatial.dsl._
   val N = 4
 
   override def main(args: Array[String]): Unit = {
-    val qVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
-    val kVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
-    val vVals = Array.fill[T](N*D)(1) //Array.fill(N*D) { random[T](1) }
+    val qVals = Array.fill(N*D) { random[T](5) } //Array.fill[T](N*D)(1)
+    val kVals = Array.fill(N*D) { random[T](5) } //Array.fill[T](N*D)(1)
+    val vVals = Array.fill(N*D) { random[T](5) } //Array.fill[T](N*D)(1)
 
     val qDRAM = DRAM[T](N*D)
     val kDRAM = DRAM[T](N*D)
@@ -320,6 +320,10 @@ import spatial.dsl._
     setMem(qDRAM, qVals)
     setMem(kDRAM, kVals)
     setMem(vDRAM, vVals)
+
+    printArray(getMem(qDRAM))
+    printArray(getMem(kDRAM))
+    printArray(getMem(vDRAM))
 
     val zeroVals = Array.fill[T](N*D)(0)
     val zeroDRAM = DRAM[T](D)
@@ -379,7 +383,7 @@ import spatial.dsl._
             val m = RowMaxReg.value // Max until (i-1)th element
             val mNew = if (si > m) si else m // Max until (i)th element
             
-            val expS = exp(si) // exponent of the i-th element
+            val expS = exp(si-mNew) // exponent of the i-th element
             val mScale = if (j === 0) 0 else exp(m-mNew) 
               // |_ Scaling factor for the partial sum in (⊗ V)
 

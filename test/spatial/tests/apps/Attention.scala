@@ -447,3 +447,151 @@ import spatial.dsl._
   }
 }
 
+@spatial class FlashierAttention extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Int//Fix[TRUE, _24, _8] // Int
+  val D = 8
+  val N = 16
+  val tile = 4
+
+  override def main(args: Array[String]): Unit = {
+    val qVals = Array.fill(N*D) { random[T](5) } //Array.fill[T](N*D)(1)
+    val kVals = Array.fill(N*D) { random[T](5) } //Array.fill[T](N*D)(1)
+    val vVals = Array.fill(N*D) { random[T](5) } //Array.fill[T](N*D)(1)
+
+    val qDRAM = DRAM[T](N*D)
+    val kDRAM = DRAM[T](N*D)
+    val vDRAM = DRAM[T](N*D)
+    val oDRAM = DRAM[T](N*D)
+
+    setMem(qDRAM, qVals)
+    setMem(kDRAM, kVals)
+    setMem(vDRAM, vVals)
+
+    printArray(getMem(qDRAM))
+    printArray(getMem(kDRAM))
+    printArray(getMem(vDRAM))
+
+    val zeroVals = Array.fill[T](N*D)(0)
+    val zeroDRAM = DRAM[T](D)
+    setMem(zeroDRAM, zeroVals)
+
+    Accel {
+      // SRAMS
+      val Q = SRAM[T](N*D)
+      val K = SRAM[T](N*D)
+      val V = SRAM[T](N*D)
+      val tempO = SRAM[T](D)
+      val O = SRAM[T](D)
+
+      // FIFO
+      val sFIFO = FIFO[T](2)
+      val mScaleSumFIFO = FIFO[T](2)
+      val expSumFIFO = FIFO[T](2)
+      val mScaleVFIFO = FIFO[T](2)
+      val expVFIFO = FIFO[T](2)
+      val rowSumFIFO = FIFO[T](2)
+      val doneVFIFO = FIFO[Boolean](2)
+
+      val loadNewQuery = FIFO[Boolean](2)
+      val doneSoftmaxScaleFIFO = FIFO[Boolean](2)
+
+      // Load data to SRAMs
+      K load kDRAM
+      V load vDRAM
+      tempO load zeroDRAM // initializing to 0
+
+      Stream {
+        // =============== Multiply Q*KT =============================
+        // Load query
+        Foreach(0 until N) { i =>
+          Q load qDRAM(i*D::i*D+D)
+          loadNewQuery.enq(true)
+        }
+
+        Foreach(0 until N, 0 until N) { (i, j) =>
+          val startNewQuery = j === 0
+          loadNewQuery.deq(en = startNewQuery)
+
+          val accum = Reg[T](0)
+          Reduce(accum)(0 until D) { k =>
+            Q(k) * K(j*D+k)
+          } {_ + _}
+          sFIFO.enq(accum.value)
+        }
+
+        
+        // =============== Incremental Rowmax ========================
+        Foreach(0 until N){ i =>
+          val RowMaxReg = Reg[T](0) // TODO: Change to the min val for T
+          Foreach(0 until N){ j =>
+            // ------------- Calculate Values -------------
+            val si = sFIFO.deq() // i th element
+            val m = RowMaxReg.value // Max until (i-1)th element
+            val mNew = if (si > m) si else m // Max until (i)th element
+            
+            val expS = exp(si-mNew) // exponent of the i-th element
+            val mScale = if (j === 0) 0 else exp(m-mNew) 
+              // |_ Scaling factor for the partial sum in (⊗ V)
+
+            // ------------- Enq values in the FIFO ------------- 
+            mScaleSumFIFO.enq(mScale) // -> Sum Controller
+            expSumFIFO.enq(expS)      // -> Sum Controller
+            
+            mScaleVFIFO.enq(mScale)   // -> (⊗ V) Controller
+            expVFIFO.enq(expS)        // -> (⊗ V) Controller
+
+            // ------------- Update the Row Max Reg -------------
+            RowMaxReg := mNew
+          }
+        }
+
+        
+        // =============== Row Sum ===================================
+        // Foreach Ver
+        Foreach(0 until N){ i =>
+          val SumReg = Reg[T](0)
+          Foreach(0 until N){ j =>
+            SumReg := SumReg.value * mScaleSumFIFO.deq() + expSumFIFO.deq()
+            rowSumFIFO.enq(SumReg.value, j === (N-1))
+          }
+        }
+        
+        
+        // =============== Outer product with V ===============
+        // Foreach ver
+        Foreach(0 until N){ i =>
+          Foreach(0 until N){ j =>
+            val mScaleV = mScaleVFIFO.deq()
+            val expV = expVFIFO.deq()
+            Foreach(D by 1 par D){k =>
+              tempO(k) = mScaleV * tempO(k) + expV * V(j*D + k)
+                // scale the previously accumulated partial sums
+                // + accumulate the new partial sum
+            }
+            doneVFIFO.enq(true, j === (N-1))
+          }
+        }
+        
+        // =============== Softmax Scaling with Rowsum ===============
+        Foreach(0 until N){ i =>
+          val rowSumVal = rowSumFIFO.deq()
+          doneVFIFO.deq()
+          Foreach(D by 1 par D){ j =>
+            O(j) = tempO(j)/rowSumVal
+          }
+          doneSoftmaxScaleFIFO.enq(true)
+        }
+
+        Foreach(0 until N){ i =>
+          doneSoftmaxScaleFIFO.deq()
+          oDRAM(i*D::i*D+D) store O
+        }
+      }
+    }
+    assert(Bit(true))
+    printArray(getMem(oDRAM))
+  }
+}
+

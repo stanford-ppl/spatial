@@ -1,4 +1,6 @@
+package spatial.tests.apps
 
+import spatial.dsl._
 @spatial class Seq2 extends SpatialTest {
   override def compileArgs = "--nostreamify"
 

@@ -163,5 +163,69 @@ import spatial.dsl._
   }
 }
 
+@spatial class UnitMatVec extends SpatialTest {
+  override def compileArgs = "--nostreamify"
+
+  type T = Fix[TRUE, _10, _22]
+
+  // Useful for making IDEs happy about implicits
+//  implicit def bits: Bits[T] = implicitly[Bits[T]]
+//  implicit def num: Num[T] = implicitly[Num[T]]
+  val N = 128
+  override def main(args: Array[String]): Unit = {
+    val qtkVals = Array.fill(N*N) { random[T](1) }
+    val vVals = Array.fill(N) { random[T](1) }
+
+    val qktDRAM = DRAM[T](N*N)
+    setMem(qktDRAM, qtkVals)
+    val vDRAM = DRAM[T](N)
+    setMem(vDRAM, vVals)
+
+    val outDRAM = DRAM[T](N)
+
+    Accel {
+      val QKOut = FIFO[T](N*N)
+      val V = SRAM[T](N)
+
+      val output = FIFO[T](N)
+
+      QKOut load qktDRAM
+      V load vDRAM
+
+      //println(r"Q size: ${Q.numel}")
+
+      Stream {
+        // Compute exp(QK^T)
+        
+        // Original code
+        // Foreach(0 until N) { i =>
+        //   val accum = Reg[T]
+        //   Reduce(accum)(0 until N) { j =>
+        //     QKOut.deq() * V(j)
+        //   } {_ + _}
+        //   output.enq(accum.value)
+        // }
+
+        val accumReg2 = Reg[T]
+        accumReg2 := 0
+        Foreach(0 until N, 0 until N) { (i,j) =>
+          val newVal = QKOut.deq() * V(j)
+          val updateVal = accumReg2.value + newVal
+          val resetVal = newVal
+          val newAccum = if (j === 0) resetVal else updateVal
+          accumReg2.write(newAccum)
+          output.enq(accumReg2.value, j === (N-1))
+        }
+
+      }
+
+      outDRAM store output
+    }
+    assert(Bit(true))
+    //printArray(getMem(outDRAM))
+  }
+}
+
+
 
 

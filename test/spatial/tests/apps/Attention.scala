@@ -68,7 +68,7 @@ import spatial.dsl._
   // Useful for making IDEs happy about implicits
 //  implicit def bits: Bits[T] = implicitly[Bits[T]]
 //  implicit def num: Num[T] = implicitly[Num[T]]
-  val N = 16
+  val N = 512
   override def main(args: Array[String]): Unit = {
     val qVals = Array.fill(N) { random[T](1) }
     val kVals = Array.fill(N) { random[T](1) }
@@ -87,7 +87,7 @@ import spatial.dsl._
       val Q = FIFO[T](N)
       val K = SRAM[T](N)
       val QK1 = FIFO[T](2)
-      val QK2 = FIFO[T](N+1)
+      val QK2 = FIFO[T](N+2)
       val QKRecipSum = FIFO[T](2)
       val QKOut = FIFO[T](2)
       val V = SRAM[T](N)
@@ -97,7 +97,7 @@ import spatial.dsl._
       K load kDRAM
       V load vDRAM
 
-      println(r"Q size: ${Q.numel}")
+      //println(r"Q size: ${Q.numel}")
 
       Stream {
         // Compute exp(QK^T)
@@ -141,9 +141,11 @@ import spatial.dsl._
       outDRAM store output
     }
     assert(Bit(true))
-    printArray(getMem(outDRAM))
+    //printArray(getMem(outDRAM))
   }
 }
+
+
 
 @spatial class SingleQueryStreamedAttention extends SpatialTest {
   override def compileArgs = "--nostreamify"

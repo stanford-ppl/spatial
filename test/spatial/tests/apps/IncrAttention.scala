@@ -89,7 +89,7 @@ import spatial.dsl._
       val Q = FIFO[T](N)
       val K = SRAM[T](N)
       val QK1 = FIFO[T](3)
-      val QK2 = FIFO[T](2*N)
+      val QK2 = FIFO[T](N+24)
       val QKRecipSum = FIFO[T](2)
       val QKOut = FIFO[T](N*N)
 

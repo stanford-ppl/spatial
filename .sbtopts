@@ -1,0 +1,4 @@
+-J-Xmx8g
+-J-Xms8g
+-Dsbt.ivy.home=/home/ginasohn
+-Dsbt.boot.directory=/home/ginasohn/.sbt/boot/

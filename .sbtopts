@@ -1,4 +1,4 @@
 -J-Xmx8g
 -J-Xms8g
--Dsbt.ivy.home=/home/ginasohn
--Dsbt.boot.directory=/home/ginasohn/.sbt/boot/
+-Dsbt.ivy.home=/home/ubuntu
+-Dsbt.boot.directory=/home/ubuntu/.sbt/boot/

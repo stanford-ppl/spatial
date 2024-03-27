@@ -1,4 +1,2 @@
 -J-Xmx64g
 -J-Xss8192k
--Dsbt.ivy.home=/local/ssd/home/ginasohn
--Dsbt.boot.directory=/local/ssd/home/ginasohn/.sbt/boot/

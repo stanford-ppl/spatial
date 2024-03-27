@@ -137,7 +137,7 @@ import spatial.dsl._
 }
 
 
-@spatial class Seq4 extends SpatialTest {
+@spatial class StreamedAttentionBase extends SpatialTest {
   override def compileArgs = "--nostreamify"
 
   type T = Fix[TRUE, _10, _22]
@@ -145,7 +145,7 @@ import spatial.dsl._
   // Useful for making IDEs happy about implicits
 //  implicit def bits: Bits[T] = implicitly[Bits[T]]
 //  implicit def num: Num[T] = implicitly[Num[T]]
-  val N = 128
+  def N = 512
   override def main(args: Array[String]): Unit = {
     val qVals = Array.fill(N) { random[T](1) }
     val kVals = Array.fill(N) { random[T](1) }
@@ -223,4 +223,28 @@ import spatial.dsl._
     }
     assert(Bit(true))
   }
+}
+
+class StreamedAttention512 extends StreamedAttentionBase{
+  override def N =512
+}
+
+class StreamedAttention1k extends StreamedAttentionBase{
+  override def N =1024
+}
+
+class StreamedAttention2k extends StreamedAttentionBase{
+  override def N =2048
+}
+
+class StreamedAttention4k extends StreamedAttentionBase{
+  override def N =4096
+}
+
+class StreamedAttention8k extends StreamedAttentionBase{
+  override def N =8192
+}
+
+class StreamedAttention16k extends StreamedAttentionBase{
+  override def N =16384
 }

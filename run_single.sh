@@ -8,7 +8,7 @@ VARA="$(grep ExecutorPass logs/CS217/StreamedAttention$1/9999_Timing.log)"
 valueA1="${VARA#*:}" # take everything after the ':'
 valueA2="${valueA1%(*}" # take everything before the '('
 echo "Real Time: $valueA2"
-echo "Real Time to simualte Spatial (length: $1)= $valueA2\n" >> /home/dam/dam-experiments/stream-attn-r-dam/spatial_sweep.txt
+echo "Real Time to simualte Spatial (length: $1)=$valueA2" >> /home/dam/dam-experiments/stream-attn-r-dam/spatial_sweep.txt
 rm -rf ./logs/CS217/StreamedAttention$1/
 
 egrep "x311</a>: Streaming UnitPipe" gen/CS217/StreamedAttention$1/info/PostExecution.html -A 3 > ./cycle_$1.txt

@@ -229,22 +229,22 @@ class StreamedAttention512 extends StreamedAttentionBase{
   override def N =512
 }
 
-class StreamedAttention1k extends StreamedAttentionBase{
+class StreamedAttention1024 extends StreamedAttentionBase{
   override def N =1024
 }
 
-class StreamedAttention2k extends StreamedAttentionBase{
+class StreamedAttention2048 extends StreamedAttentionBase{
   override def N =2048
 }
 
-class StreamedAttention4k extends StreamedAttentionBase{
+class StreamedAttention4096 extends StreamedAttentionBase{
   override def N =4096
 }
 
-class StreamedAttention8k extends StreamedAttentionBase{
+class StreamedAttention8192 extends StreamedAttentionBase{
   override def N =8192
 }
 
-class StreamedAttention16k extends StreamedAttentionBase{
+class StreamedAttention16384 extends StreamedAttentionBase{
   override def N =16384
 }

@@ -1,3 +1,7 @@
+# This is to initialize some reports. Do not modify.
+echo "dummymessage" >> /home/dam/dam-experiments/stream-attn-r-dam/spatial_sweep.txt
+rm /home/dam/dam-experiments/stream-attn-r-dam/spatial_sweep.txt
+
 # The total run will take 16 hr
 ./run_single.sh 512 # 45 sec
 echo ""

@@ -42,7 +42,7 @@ trait MemoryResolver extends OpResolverBase {
 
       case malloc: MemAlloc[_, _] if isSimpleMem(sym) =>
         if (sym.isWriteBuffer) {
-          throw SimulationException("Explicitly buffered memories are not currently handled in Scalasim2")
+          // throw SimulationException("Explicitly buffered memories are not currently handled in Scalasim2")
         }
         val elType: ExpType[_, _] = malloc.A.tp
         val elSize = malloc.A.nbits / 8

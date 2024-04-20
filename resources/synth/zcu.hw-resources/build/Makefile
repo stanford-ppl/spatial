@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 ifndef XILINXD_LICENSE_FILE
 export XILINXD_LICENSE_FILE=7193@cadlic0.stanford.edu
 $(info set $$XILINXD_LICENSE_FILE to [${XILINXD_LICENSE_FILE}])

@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 ZCU_V_DIR=verilog-zcu
 
 APPNAME=$(shell basename $(shell pwd))

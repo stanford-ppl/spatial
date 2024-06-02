@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 ZYNQ_V_DIR=verilog-zynq
 
 APPNAME=$(shell basename $(shell pwd))

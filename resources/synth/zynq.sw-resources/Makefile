@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 CC=g++
 LINK=g++
 CROSS_COMPILE=/usr/bin/arm-linux-gnueabihf-
